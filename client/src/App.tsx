@@ -14,6 +14,8 @@ import Quotes from "@/pages/quotes";
 import QuoteEditor from "@/pages/quote-editor";
 import Destinations from "@/pages/destinations";
 import DestinationEditor from "@/pages/destination-editor";
+import Clients from "@/pages/clients";
+import ClientEditor from "@/pages/client-editor";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -39,6 +41,9 @@ function Router() {
           <Route path="/quotes" component={Quotes} />
           <Route path="/quotes/new" component={QuoteEditor} />
           <Route path="/quotes/:id" component={QuoteEditor} />
+          <Route path="/clients" component={Clients} />
+          <Route path="/clients/new" component={ClientEditor} />
+          <Route path="/clients/:id" component={ClientEditor} />
           <Route path="/destinations" component={Destinations} />
           <Route path="/destinations/new" component={DestinationEditor} />
           <Route path="/destinations/:id" component={DestinationEditor} />

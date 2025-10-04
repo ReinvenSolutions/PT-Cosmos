@@ -1,5 +1,6 @@
 import {
   users,
+  clients,
   destinations,
   itineraryDays,
   hotels,
@@ -9,6 +10,8 @@ import {
   quoteDestinations,
   type User,
   type UpsertUser,
+  type Client,
+  type InsertClient,
   type Destination,
   type InsertDestination,
   type ItineraryDay,
@@ -30,6 +33,12 @@ import { eq, desc, and, sql, ilike } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  
+  getClients(params?: { status?: string; search?: string }): Promise<Client[]>;
+  getClient(id: string): Promise<Client | undefined>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: string): Promise<void>;
   
   getDestinations(params?: { isActive?: boolean }): Promise<Destination[]>;
   getDestination(id: string): Promise<Destination | undefined>;
@@ -89,6 +98,64 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async getClients(params?: { status?: string; search?: string }): Promise<Client[]> {
+    const conditions = [];
+    
+    if (params?.status) {
+      conditions.push(eq(clients.status, params.status));
+    }
+    
+    if (params?.search) {
+      const searchPattern = `%${params.search}%`;
+      conditions.push(
+        sql`(${clients.name} ILIKE ${searchPattern} OR ${clients.email} ILIKE ${searchPattern} OR ${clients.company} ILIKE ${searchPattern})`
+      );
+    }
+    
+    const query = db
+      .select()
+      .from(clients)
+      .orderBy(desc(clients.createdAt));
+    
+    if (conditions.length > 0) {
+      return query.where(and(...conditions));
+    }
+    
+    return query;
+  }
+
+  async getClient(id: string): Promise<Client | undefined> {
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, id));
+    return client;
+  }
+
+  async createClient(client: InsertClient): Promise<Client> {
+    const [created] = await db
+      .insert(clients)
+      .values(client)
+      .returning();
+    return created;
+  }
+
+  async updateClient(
+    id: string,
+    client: Partial<InsertClient>
+  ): Promise<Client | undefined> {
+    const [updated] = await db
+      .update(clients)
+      .set({ ...client, updatedAt: new Date() })
+      .where(eq(clients.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteClient(id: string): Promise<void> {
+    await db.delete(clients).where(eq(clients.id, id));
   }
 
   async getDestinations(params?: { isActive?: boolean }): Promise<Destination[]> {

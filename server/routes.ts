@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import {
+  insertClientSchema,
   insertDestinationSchema,
   insertItineraryDaySchema,
   insertHotelSchema,
@@ -11,9 +12,22 @@ import {
   insertQuoteSchema,
   insertQuoteDestinationSchema,
 } from "@shared/schema";
+import multer from "multer";
+import { handleFileUpload } from "./upload";
+import express from "express";
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
+
+  const uploadsDir = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
+  app.use("/uploads", express.static(uploadsDir));
+
+  app.post("/api/upload", isAuthenticated, upload.single("file"), handleFileUpload);
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
@@ -23,6 +37,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/clients", isAuthenticated, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const search = req.query.search as string | undefined;
+      const clients = await storage.getClients({ status, search });
+      res.json(clients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ message: "Failed to fetch clients" });
+    }
+  });
+
+  app.get("/api/clients/:id", isAuthenticated, async (req, res) => {
+    try {
+      const client = await storage.getClient(req.params.id);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      const clientQuotes = await storage.getQuotes({ search: client.name });
+      
+      res.json({
+        ...client,
+        quotes: clientQuotes,
+        totalQuotes: clientQuotes.length,
+        acceptedQuotes: clientQuotes.filter((q) => q.status === "accepted").length,
+      });
+    } catch (error) {
+      console.error("Error fetching client:", error);
+      res.status(500).json({ message: "Failed to fetch client" });
+    }
+  });
+
+  app.post("/api/clients", isAuthenticated, async (req, res) => {
+    try {
+      const parsed = insertClientSchema.parse(req.body);
+      const client = await storage.createClient(parsed);
+      res.status(201).json(client);
+    } catch (error) {
+      console.error("Error creating client:", error);
+      res.status(400).json({ message: "Failed to create client", error });
+    }
+  });
+
+  app.patch("/api/clients/:id", isAuthenticated, async (req, res) => {
+    try {
+      const client = await storage.updateClient(req.params.id, req.body);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      res.json(client);
+    } catch (error) {
+      console.error("Error updating client:", error);
+      res.status(500).json({ message: "Failed to update client" });
+    }
+  });
+
+  app.delete("/api/clients/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteClient(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting client:", error);
+      res.status(500).json({ message: "Failed to delete client" });
     }
   });
 

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Save, X, FileDown } from "lucide-react";
+import { ArrowLeft, Plus, Save, X, FileDown, Upload, Image as ImageIcon } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,8 @@ export default function QuoteEditor() {
 
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [showDestinationDialog, setShowDestinationDialog] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [flightImageUrl, setFlightImageUrl] = useState<string | null>(null);
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations"],
@@ -58,6 +60,7 @@ export default function QuoteEditor() {
       const data = await response.json();
       
       setSelectedDestinations(data.quoteDestinations?.map((qd: any) => qd.destinationId) || []);
+      setFlightImageUrl(data.flightImageUrl || null);
       
       return data;
     },
@@ -83,11 +86,16 @@ export default function QuoteEditor() {
     mutationFn: async (data: InsertQuote) => {
       let savedQuote: Quote;
       
+      const dataWithImage = {
+        ...data,
+        flightImageUrl,
+      };
+      
       if (isEditing) {
-        savedQuote = await apiRequest("PATCH", `/api/quotes/${quoteId}`, data);
+        savedQuote = await apiRequest("PATCH", `/api/quotes/${quoteId}`, dataWithImage);
         await apiRequest("DELETE", `/api/quote-destinations/${quoteId}`);
       } else {
-        savedQuote = await apiRequest("POST", "/api/quotes", data);
+        savedQuote = await apiRequest("POST", "/api/quotes", dataWithImage);
       }
       
       for (let i = 0; i < selectedDestinations.length; i++) {
@@ -455,19 +463,115 @@ export default function QuoteEditor() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notas</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} value={field.value || ""} rows={3} data-testid="input-notes" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-4">
+                <div>
+                  <FormLabel>Imagen de Vuelo</FormLabel>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Sube una captura de los detalles del vuelo
+                  </p>
+                  {flightImageUrl ? (
+                    <div className="space-y-2">
+                      <div className="relative border rounded-md overflow-hidden">
+                        <img 
+                          src={flightImageUrl} 
+                          alt="Flight details" 
+                          className="w-full h-48 object-contain bg-muted"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                          onClick={() => setFlightImageUrl(null)}
+                          data-testid="button-remove-flight-image"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="file"
+                        id="flight-image"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+
+                          setUploadingImage(true);
+                          try {
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            
+                            const response = await fetch("/api/upload", {
+                              method: "POST",
+                              body: formData,
+                            });
+                            
+                            if (!response.ok) throw new Error("Upload failed");
+                            
+                            const { url } = await response.json();
+                            setFlightImageUrl(url);
+                            
+                            toast({
+                              title: "Imagen subida",
+                              description: "La imagen del vuelo se ha guardado correctamente",
+                            });
+                          } catch (error) {
+                            toast({
+                              title: "Error",
+                              description: "No se pudo subir la imagen",
+                              variant: "destructive",
+                            });
+                          } finally {
+                            setUploadingImage(false);
+                          }
+                        }}
+                        data-testid="input-flight-image"
+                      />
+                      <label htmlFor="flight-image">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          disabled={uploadingImage}
+                          asChild
+                        >
+                          <span>
+                            {uploadingImage ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                                Subiendo...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4 mr-2" />
+                                Subir Imagen de Vuelo
+                              </>
+                            )}
+                          </span>
+                        </Button>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notas</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} value={field.value || ""} rows={3} data-testid="input-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </CardContent>
           </Card>
 
