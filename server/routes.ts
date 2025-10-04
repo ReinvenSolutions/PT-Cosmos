@@ -307,6 +307,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/quotes/:id/pdf", isAuthenticated, async (req, res) => {
+    try {
+      const quoteWithDetails = await storage.getQuoteWithDetails(req.params.id);
+      if (!quoteWithDetails) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      const fullDetails = {
+        ...quoteWithDetails,
+        destinations: await Promise.all(
+          (quoteWithDetails.quoteDestinations || []).map(async (qd: any) => {
+            const destination = await storage.getDestination(qd.destinationId);
+            const itinerary = await storage.getItineraryDays(qd.destinationId);
+            const hotels = await storage.getHotels(qd.destinationId);
+            const inclusions = await storage.getInclusions(qd.destinationId);
+            const exclusions = await storage.getExclusions(qd.destinationId);
+            return {
+              destination: destination!,
+              itinerary,
+              hotels,
+              inclusions,
+              exclusions,
+            };
+          })
+        ),
+      };
+
+      const { generateQuotePDF } = await import("./pdfGenerator");
+      const doc = generateQuotePDF(fullDetails as any);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="cotizacion-${quoteWithDetails.clientName.replace(/\s+/g, "-")}-${req.params.id.slice(0, 8)}.pdf"`
+      );
+
+      doc.pipe(res);
+      doc.end();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

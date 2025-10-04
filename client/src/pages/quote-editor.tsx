@@ -122,6 +122,36 @@ export default function QuoteEditor() {
     return a.displayOrder - b.displayOrder;
   });
 
+  const handleExportPDF = async () => {
+    if (!quoteId) return;
+    
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/pdf`);
+      if (!response.ok) throw new Error("Failed to export PDF");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cotizacion-${quote?.clientName.replace(/\s+/g, '-')}-${quoteId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "PDF exportado",
+        description: "La cotización ha sido descargada correctamente",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo exportar el PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isEditing && isLoading) {
     return (
       <div className="flex items-center justify-center h-full py-12">
@@ -448,7 +478,7 @@ export default function QuoteEditor() {
               </Button>
             </Link>
             {isEditing && (
-              <Button type="button" variant="outline" data-testid="button-export-pdf">
+              <Button type="button" variant="outline" onClick={handleExportPDF} data-testid="button-export-pdf">
                 <FileDown className="w-4 h-4 mr-2" />
                 Exportar PDF
               </Button>
