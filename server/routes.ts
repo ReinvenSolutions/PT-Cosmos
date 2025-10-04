@@ -364,6 +364,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/quotes/:id/duplicate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const originalQuote = await storage.getQuote(req.params.id);
+      
+      if (!originalQuote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      const { id, createdAt, updatedAt, ...quoteData } = originalQuote;
+      
+      const newQuote = await storage.createQuote({
+        ...quoteData,
+        userId,
+        clientName: `${originalQuote.clientName} (Copia)`,
+        status: "draft",
+      });
+
+      const quoteDestinations = await storage.getQuoteDestinations(req.params.id);
+      for (const qd of quoteDestinations) {
+        await storage.createQuoteDestination({
+          quoteId: newQuote.id,
+          destinationId: qd.destinationId,
+          displayOrder: qd.displayOrder,
+          customPrice: qd.customPrice,
+          customDuration: qd.customDuration,
+        });
+      }
+
+      res.status(201).json(newQuote);
+    } catch (error) {
+      console.error("Error duplicating quote:", error);
+      res.status(500).json({ message: "Failed to duplicate quote" });
+    }
+  });
+
   app.post("/api/quotes/:id/destinations", isAuthenticated, async (req, res) => {
     try {
       const parsed = insertQuoteDestinationSchema.parse({

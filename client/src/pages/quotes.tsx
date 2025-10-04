@@ -1,11 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, FileText } from "lucide-react";
-import { Link } from "wouter";
+import { Plus, Search, FileText, Copy } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import type { Quote } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -17,6 +19,29 @@ import {
 export default function Quotes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      return apiRequest("POST", `/api/quotes/${quoteId}/duplicate`, {});
+    },
+    onSuccess: (newQuote) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      toast({
+        title: "Cotización duplicada",
+        description: "Se ha creado una copia de la cotización",
+      });
+      setLocation(`/quotes/${newQuote.id}`);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo duplicar la cotización",
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: quotes = [], isLoading } = useQuery<Quote[]>({
     queryKey: ["/api/quotes", search, statusFilter],
@@ -106,9 +131,9 @@ export default function Quotes() {
       ) : (
         <div className="space-y-4">
           {quotes.map((quote) => (
-            <Link key={quote.id} href={`/quotes/${quote.id}`}>
-              <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`quote-card-${quote.id}`}>
-                <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <Card key={quote.id} className="hover-elevate" data-testid={`quote-card-${quote.id}`}>
+              <Link href={`/quotes/${quote.id}`}>
+                <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 cursor-pointer active-elevate-2">
                   <div className="flex-1">
                     <CardTitle className="text-xl mb-2">{quote.clientName}</CardTitle>
                     <div className="flex gap-4 text-sm text-muted-foreground flex-wrap">
@@ -139,10 +164,12 @@ export default function Quotes() {
                     </p>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center text-sm">
+              </Link>
+              <CardContent>
+                <div className="flex justify-between items-center gap-4 flex-wrap">
+                  <div className="flex-1">
                     {quote.travelStartDate && (
-                      <div>
+                      <div className="text-sm">
                         <span className="text-muted-foreground">Viaje: </span>
                         <span className="font-medium">
                           {new Date(quote.travelStartDate).toLocaleDateString()}
@@ -152,13 +179,26 @@ export default function Quotes() {
                         )}
                       </div>
                     )}
-                    <div className="text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       Creado: {new Date(quote.createdAt!).toLocaleDateString()}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      duplicateMutation.mutate(quote.id);
+                    }}
+                    disabled={duplicateMutation.isPending}
+                    data-testid={`button-duplicate-${quote.id}`}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Duplicar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
