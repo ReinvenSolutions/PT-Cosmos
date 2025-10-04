@@ -329,11 +329,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotes", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const parsed = insertQuoteSchema.parse({
-        ...req.body,
+      const parsed = insertQuoteSchema.parse(req.body);
+      const quote = await storage.createQuote({
+        ...parsed,
         userId,
       });
-      const quote = await storage.createQuote(parsed);
       res.status(201).json(quote);
     } catch (error) {
       console.error("Error creating quote:", error);
@@ -373,10 +373,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
 
-      const { id, createdAt, updatedAt, ...quoteData } = originalQuote;
+      const { id, createdAt, updatedAt, userId: _, ...quoteData } = originalQuote;
       
       const newQuote = await storage.createQuote({
         ...quoteData,
+        totalPrice: originalQuote.totalPrice,
         userId,
         clientName: `${originalQuote.clientName} (Copia)`,
         status: "draft",

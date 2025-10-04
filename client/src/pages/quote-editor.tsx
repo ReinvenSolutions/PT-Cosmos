@@ -92,10 +92,12 @@ export default function QuoteEditor() {
       };
       
       if (isEditing) {
-        savedQuote = await apiRequest("PATCH", `/api/quotes/${quoteId}`, dataWithImage);
+        const response = await apiRequest("PATCH", `/api/quotes/${quoteId}`, dataWithImage);
+        savedQuote = await response.json();
         await apiRequest("DELETE", `/api/quote-destinations/${quoteId}`);
       } else {
-        savedQuote = await apiRequest("POST", "/api/quotes", dataWithImage);
+        const response = await apiRequest("POST", "/api/quotes", dataWithImage);
+        savedQuote = await response.json();
       }
       
       for (let i = 0; i < selectedDestinations.length; i++) {

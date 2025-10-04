@@ -24,7 +24,8 @@ export default function Quotes() {
 
   const duplicateMutation = useMutation({
     mutationFn: async (quoteId: string) => {
-      return apiRequest("POST", `/api/quotes/${quoteId}/duplicate`, {});
+      const response = await apiRequest("POST", `/api/quotes/${quoteId}/duplicate`, {});
+      return response.json();
     },
     onSuccess: (newQuote) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
