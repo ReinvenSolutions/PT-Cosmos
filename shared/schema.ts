@@ -141,7 +141,8 @@ export const quotes = pgTable("quotes", {
   children: integer("children").default(0),
   status: text("status").default("draft"),
   notes: text("notes"),
-  flightImageUrl: text("flight_image_url"),
+  outboundFlightImages: text("outbound_flight_images").array(),
+  returnFlightImages: text("return_flight_images").array(),
   customItinerary: json("custom_itinerary"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -154,6 +155,10 @@ export const insertQuoteSchema = createInsertSchema(quotes).omit({
   updatedAt: true 
 }).extend({
   totalPrice: z.string().or(z.number()),
+  travelStartDate: z.coerce.date().optional().nullable(),
+  travelEndDate: z.coerce.date().optional().nullable(),
+  outboundFlightImages: z.array(z.string()).optional(),
+  returnFlightImages: z.array(z.string()).optional(),
 });
 export type InsertQuote = z.infer<typeof insertQuoteSchema>;
 export type Quote = typeof quotes.$inferSelect;

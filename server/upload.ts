@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile } from "fs/promises";
 import { join } from "path";
 import { randomBytes } from "crypto";
 
@@ -10,8 +10,6 @@ export async function handleFileUpload(req: Request, res: Response) {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
-
-    await mkdir(PRIVATE_DIR, { recursive: true });
     
     const ext = req.file.originalname.split('.').pop();
     const filename = `${randomBytes(16).toString('hex')}.${ext}`;

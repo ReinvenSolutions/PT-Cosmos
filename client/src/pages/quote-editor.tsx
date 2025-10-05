@@ -39,8 +39,10 @@ export default function QuoteEditor() {
 
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [showDestinationDialog, setShowDestinationDialog] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [flightImageUrl, setFlightImageUrl] = useState<string | null>(null);
+  const [uploadingOutbound, setUploadingOutbound] = useState(false);
+  const [uploadingReturn, setUploadingReturn] = useState(false);
+  const [outboundFlightImages, setOutboundFlightImages] = useState<string[]>([]);
+  const [returnFlightImages, setReturnFlightImages] = useState<string[]>([]);
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations"],
@@ -60,7 +62,8 @@ export default function QuoteEditor() {
       const data = await response.json();
       
       setSelectedDestinations(data.quoteDestinations?.map((qd: any) => qd.destinationId) || []);
-      setFlightImageUrl(data.flightImageUrl || null);
+      setOutboundFlightImages(data.outboundFlightImages || []);
+      setReturnFlightImages(data.returnFlightImages || []);
       
       return data;
     },
@@ -86,17 +89,18 @@ export default function QuoteEditor() {
     mutationFn: async (data: InsertQuote) => {
       let savedQuote: Quote;
       
-      const dataWithImage = {
+      const dataWithImages = {
         ...data,
-        flightImageUrl,
+        outboundFlightImages,
+        returnFlightImages,
       };
       
       if (isEditing) {
-        const response = await apiRequest("PATCH", `/api/quotes/${quoteId}`, dataWithImage);
+        const response = await apiRequest("PATCH", `/api/quotes/${quoteId}`, dataWithImages);
         savedQuote = await response.json();
         await apiRequest("DELETE", `/api/quote-destinations/${quoteId}`);
       } else {
-        const response = await apiRequest("POST", "/api/quotes", dataWithImage);
+        const response = await apiRequest("POST", "/api/quotes", dataWithImages);
         savedQuote = await response.json();
       }
       
@@ -465,45 +469,50 @@ export default function QuoteEditor() {
                 )}
               />
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
-                  <FormLabel>Imagen de Vuelo</FormLabel>
+                  <FormLabel>Imágenes del Vuelo de Ida</FormLabel>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Sube una captura de los detalles del vuelo
+                    Sube capturas de los detalles del vuelo de ida (puedes subir múltiples imágenes)
                   </p>
-                  {flightImageUrl ? (
-                    <div className="space-y-2">
-                      <div className="relative border rounded-md overflow-hidden">
-                        <img 
-                          src={flightImageUrl} 
-                          alt="Flight details" 
-                          className="w-full h-48 object-contain bg-muted"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2"
-                          onClick={() => setFlightImageUrl(null)}
-                          data-testid="button-remove-flight-image"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
+                  {outboundFlightImages.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
+                      {outboundFlightImages.map((url, idx) => (
+                        <div key={idx} className="relative border rounded-md overflow-hidden">
+                          <img 
+                            src={url} 
+                            alt={`Vuelo ida ${idx + 1}`} 
+                            className="w-full h-32 object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-1 right-1 h-6 w-6"
+                            onClick={() => setOutboundFlightImages(outboundFlightImages.filter((_, i) => i !== idx))}
+                            data-testid={`button-remove-outbound-${idx}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        id="flight-image"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      id="outbound-flight-images"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length === 0) return;
 
-                          setUploadingImage(true);
-                          try {
+                        setUploadingOutbound(true);
+                        try {
+                          const uploadedUrls: string[] = [];
+                          for (const file of files) {
                             const formData = new FormData();
                             formData.append("file", file);
                             
@@ -515,49 +524,154 @@ export default function QuoteEditor() {
                             if (!response.ok) throw new Error("Upload failed");
                             
                             const { url } = await response.json();
-                            setFlightImageUrl(url);
-                            
-                            toast({
-                              title: "Imagen subida",
-                              description: "La imagen del vuelo se ha guardado correctamente",
-                            });
-                          } catch (error) {
-                            toast({
-                              title: "Error",
-                              description: "No se pudo subir la imagen",
-                              variant: "destructive",
-                            });
-                          } finally {
-                            setUploadingImage(false);
+                            uploadedUrls.push(url);
                           }
-                        }}
-                        data-testid="input-flight-image"
-                      />
-                      <label htmlFor="flight-image">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full"
-                          disabled={uploadingImage}
-                          asChild
-                        >
-                          <span>
-                            {uploadingImage ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                                Subiendo...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-4 h-4 mr-2" />
-                                Subir Imagen de Vuelo
-                              </>
-                            )}
-                          </span>
-                        </Button>
-                      </label>
+                          
+                          setOutboundFlightImages([...outboundFlightImages, ...uploadedUrls]);
+                          
+                          toast({
+                            title: "Imágenes subidas",
+                            description: `${files.length} imagen(es) del vuelo de ida guardadas`,
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "No se pudieron subir algunas imágenes",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setUploadingOutbound(false);
+                          e.target.value = "";
+                        }
+                      }}
+                      data-testid="input-outbound-images"
+                    />
+                    <label htmlFor="outbound-flight-images">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        disabled={uploadingOutbound}
+                        asChild
+                      >
+                        <span>
+                          {uploadingOutbound ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                              Subiendo...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Subir Imágenes de Vuelo de Ida
+                            </>
+                          )}
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <FormLabel>Imágenes del Vuelo de Regreso</FormLabel>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Sube capturas de los detalles del vuelo de regreso (puedes subir múltiples imágenes)
+                  </p>
+                  {returnFlightImages.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
+                      {returnFlightImages.map((url, idx) => (
+                        <div key={idx} className="relative border rounded-md overflow-hidden">
+                          <img 
+                            src={url} 
+                            alt={`Vuelo regreso ${idx + 1}`} 
+                            className="w-full h-32 object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-1 right-1 h-6 w-6"
+                            onClick={() => setReturnFlightImages(returnFlightImages.filter((_, i) => i !== idx))}
+                            data-testid={`button-remove-return-${idx}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   )}
+                  <div>
+                    <input
+                      type="file"
+                      id="return-flight-images"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length === 0) return;
+
+                        setUploadingReturn(true);
+                        try {
+                          const uploadedUrls: string[] = [];
+                          for (const file of files) {
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            
+                            const response = await fetch("/api/upload", {
+                              method: "POST",
+                              body: formData,
+                            });
+                            
+                            if (!response.ok) throw new Error("Upload failed");
+                            
+                            const { url } = await response.json();
+                            uploadedUrls.push(url);
+                          }
+                          
+                          setReturnFlightImages([...returnFlightImages, ...uploadedUrls]);
+                          
+                          toast({
+                            title: "Imágenes subidas",
+                            description: `${files.length} imagen(es) del vuelo de regreso guardadas`,
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "No se pudieron subir algunas imágenes",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setUploadingReturn(false);
+                          e.target.value = "";
+                        }
+                      }}
+                      data-testid="input-return-images"
+                    />
+                    <label htmlFor="return-flight-images">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        disabled={uploadingReturn}
+                        asChild
+                      >
+                        <span>
+                          {uploadingReturn ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                              Subiendo...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Subir Imágenes de Vuelo de Regreso
+                            </>
+                          )}
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
                 </div>
 
                 <FormField
