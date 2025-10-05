@@ -129,7 +129,7 @@ export default function QuoteEditor() {
   const sortedDestinations = [...destinations].sort((a, b) => {
     if (a.country === "Turkey" && b.country !== "Turkey") return -1;
     if (a.country !== "Turkey" && b.country === "Turkey") return 1;
-    return a.displayOrder - b.displayOrder;
+    return (a.displayOrder || 0) - (b.displayOrder || 0);
   });
 
   const handleExportPDF = async () => {
@@ -245,7 +245,7 @@ export default function QuoteEditor() {
                     <FormItem>
                       <FormLabel>Adultos</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-adults" />
+                        <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-adults" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -258,7 +258,7 @@ export default function QuoteEditor() {
                     <FormItem>
                       <FormLabel>Niños</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-children" />
+                        <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-children" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -447,7 +447,7 @@ export default function QuoteEditor() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Estado</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-status">
                           <SelectValue />
