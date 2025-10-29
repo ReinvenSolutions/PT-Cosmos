@@ -27,7 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const uploadsDir = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
   app.use("/uploads", express.static(uploadsDir));
 
-  app.post("/api/upload", isAuthenticated, upload.single("file"), handleFileUpload);
+  app.post("/api/upload", upload.single("file"), handleFileUpload);
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {

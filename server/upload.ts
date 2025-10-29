@@ -5,13 +5,38 @@ import { randomBytes } from "crypto";
 
 const PRIVATE_DIR = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
 
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp'
+];
+
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
 export async function handleFileUpload(req: Request, res: Response) {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
     
-    const ext = req.file.originalname.split('.').pop();
+    // Validate MIME type
+    if (!ALLOWED_MIME_TYPES.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: "Invalid file type. Only images are allowed." });
+    }
+    
+    // Validate file extension
+    const ext = req.file.originalname.split('.').pop()?.toLowerCase();
+    if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
+      return res.status(400).json({ message: "Invalid file extension. Only image files are allowed." });
+    }
+    
+    // Validate file size (already handled by multer, but double-check)
+    if (req.file.size > 10 * 1024 * 1024) {
+      return res.status(400).json({ message: "File too large. Maximum size is 10MB." });
+    }
+    
     const filename = `${randomBytes(16).toString('hex')}.${ext}`;
     const filepath = join(PRIVATE_DIR, filename);
     

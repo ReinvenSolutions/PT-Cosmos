@@ -51,7 +51,6 @@ export default function QuoteSummary() {
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
-          credentials: "include",
         });
         
         if (!response.ok) {
@@ -71,7 +70,7 @@ export default function QuoteSummary() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudieron subir algunas imágenes. Asegúrate de estar autenticado.",
+        description: "No se pudieron subir algunas imágenes.",
         variant: "destructive",
       });
     } finally {
@@ -94,7 +93,6 @@ export default function QuoteSummary() {
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
-          credentials: "include",
         });
         
         if (!response.ok) {
@@ -114,7 +112,7 @@ export default function QuoteSummary() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudieron subir algunas imágenes. Asegúrate de estar autenticado.",
+        description: "No se pudieron subir algunas imágenes.",
         variant: "destructive",
       });
     } finally {
