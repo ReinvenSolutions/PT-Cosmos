@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Clock, ArrowRight, AlertCircle } from "lucide-react";
+import { getDestinationImage } from "@/lib/destination-images";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -144,38 +145,53 @@ export default function Home() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {dests.map((dest) => {
                     const isSelected = selectedDestinations.includes(dest.id);
+                    const imageUrl = getDestinationImage(dest);
+                    const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
+                    
                     return (
                       <Card
                         key={dest.id}
-                        className={`cursor-pointer transition-all hover:shadow-xl ${
+                        className={`cursor-pointer transition-all hover:shadow-xl overflow-hidden ${
                           isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
                         }`}
                         onClick={() => toggleDestination(dest.id)}
                         data-testid={`destination-card-${dest.id}`}
                       >
-                        {dest.imageUrl && (
-                          <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
+                        <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
+                          {imageUrl && (
                             <img
-                              src={dest.imageUrl}
+                              src={imageUrl}
                               alt={dest.name}
                               className="w-full h-full object-cover"
                             />
-                            {isSelected && (
-                              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
-                                <span className="text-white text-xs">✓</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <CardContent className="p-4">
-                          <h4 className="font-semibold text-lg mb-2 text-gray-800">{dest.name}</h4>
-                          {dest.description && (
-                            <p className="text-sm text-gray-600 mb-3 line-clamp-2">{dest.description}</p>
                           )}
-                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shadow-lg">
+                              <span className="text-white text-xs font-bold">✓</span>
+                            </div>
+                          )}
+                        </div>
+                        <CardContent className="p-4">
+                          <div className="text-xs font-medium text-gray-500 uppercase mb-1">{dest.country}</div>
+                          <h4 className="font-bold text-lg mb-2 text-gray-800">{dest.name}</h4>
+                          
+                          <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-gray-200 py-3">
+                            <div className="text-xs text-gray-500 uppercase">
+                              Precio desde
+                            </div>
+                            <div className="text-right">
+                              <span className="text-2xl font-extrabold text-orange-500">
+                                US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </span>
+                              <div className="text-xs text-gray-500">Porción terrestre</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
                             <Clock className="w-4 h-4" />
                             <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
                           </div>
+                          
                           {dest.isPromotion && (
                             <Badge variant="destructive" className="mt-2">
                               ¡Promoción!
