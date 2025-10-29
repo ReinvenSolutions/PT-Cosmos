@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Descubre los mejores tours por el mundo con Cosmos Industria de Viajes. Tours a Turquía, Europa, Egipto, Tailandia, Perú, Dubái y Grecia.">
+    <meta name="keywords" content="tours, viajes, turismo, Turquía, Europa, Egipto, Tailandia, Perú, Dubái, Grecia">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.cosmosviajes.com/">
+    <meta property="og:title" content="Cosmos Industria de Viajes - Descubre el Mundo">
+    <meta property="og:description" content="Explora nuestros tours exclusivos a los destinos más fascinantes del mundo.">
+    <meta property="og:image" content="https://www.cosmosviajes.com/images/og-image.jpg">
+
+    <title>Cosmos Industria de Viajes - Cotización de Tours</title>
+    
+    <!-- Precargar fuentes críticas -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Carga de Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuración de Fuente Inter y Colores Personalizados --><style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        
+        :root {
+            --color-primary: #0077B6; /* Azul Viajes */
+            --color-secondary: #00B4D8; /* Azul Claro */
+            --color-accent: #FFC300; /* Amarillo/Dorado para Precios */
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa; /* Fondo suave */
+        }
+        .text-primary { color: var(--color-primary); }
+        .bg-primary { background-color: var(--color-primary); }
+        .bg-secondary { background-color: var(--color-secondary); }
+        .text-accent { color: var(--color-accent); }
+        .border-primary { border-color: var(--color-primary); }
+
+        /* Estilo para el recuadro de información */
+        .info-box {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            padding: 0.5rem 1rem;
+            border-top: 3px solid var(--color-accent);
+            transform: translateY(100%);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .tour-card:hover .info-box {
+            transform: translateY(0);
+        }
+
+        .tour-card-content {
+             /* Altura del contenido para que el info-box quede justo debajo de la imagen */
+             padding-bottom: 50px; 
+        }
+
+        /* Estilos responsivos del grid */
+        .tour-grid {
+            display: grid;
+            gap: 2rem; /* Espacio entre tarjetas */
+        }
+        
+        /* Móvil (columna única) */
+        @media (max-width: 639px) {
+            .tour-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Tablet/Pequeño escritorio (2 columnas) */
+        @media (min-width: 640px) and (max-width: 1023px) {
+            .tour-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        /* Escritorio (3 columnas) */
+        @media (min-width: 1024px) {
+            .tour-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Estilos para el botón de WhatsApp */
+        .whatsapp-button {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            animation: whatsappBounce 1s ease-in-out infinite;
+        }
+
+        .whatsapp-button:hover {
+            transform: scale(1.1);
+            animation: none;
+        }
+
+        @keyframes whatsappBounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .whatsapp-tooltip {
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-right: 12px;
+            background-color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .whatsapp-button:hover .whatsapp-tooltip {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header / Navegación --><header class="bg-white shadow-md sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold text-primary tracking-tight">
+                Cosmos <span class="text-secondary font-light">Industria de Viajes</span>
+            </h1>
+            <nav class="hidden md:flex space-x-6 text-gray-600 font-medium">
+                <a href="#tours" class="hover:text-primary transition duration-300">Tours</a>
+                <a href="#" class="hover:text-primary transition duration-300">Sobre Nosotros</a>
+                <a href="#" class="hover:text-primary transition duration-300">Contacto</a>
+            </nav>
+            <button class="md:hidden p-2 rounded-lg text-primary hover:bg-secondary/10 transition duration-300">
+                <!-- Icono de Menú Hamburguesa (SVG) --><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Sección Principal / Módulo de Cotización --><main class="container mx-auto px-4 py-12 lg:py-16">
+        <div class="text-center mb-12">
+            <span class="text-secondary text-lg font-semibold uppercase">Cotiza tu Aventura</span>
+            <h2 class="text-5xl font-extrabold text-gray-800 mt-2 mb-4">Descubre el Mundo con Cosmos</h2>
+            <p class="text-gray-500 max-w-3xl mx-auto">Selecciona tu destino soñado de nuestra colección de tours más populares y empieza a planificar tu viaje inolvidable hoy mismo.</p>
+        </div>
+
+        <!-- Filtros -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Filtro de Destino -->
+                <div class="space-y-2">
+                    <label for="destinationFilter" class="block text-sm font-medium text-gray-700">Destino</label>
+                    <select id="destinationFilter" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                        <option value="">Todos los destinos</option>
+                    </select>
+                </div>
+                
+                <!-- Filtro de Precio -->
+                <div class="space-y-2">
+                    <label for="priceRange" class="block text-sm font-medium text-gray-700">Precio máximo</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="priceRange" class="w-full" min="0" max="5000" step="100">
+                        <span id="priceDisplay" class="text-sm font-semibold text-primary">$5000</span>
+                    </div>
+                </div>
+
+                <!-- Filtro de Fechas -->
+                <div class="space-y-2">
+                    <label for="dateFilter" class="block text-sm font-medium text-gray-700">Temporada</label>
+                    <select id="dateFilter" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                        <option value="">Todas las fechas</option>
+                        <option value="Q1">Ene - Mar 2026</option>
+                        <option value="Q2">Abr - Jun 2026</option>
+                        <option value="Q3">Jul - Sep 2026</option>
+                        <option value="Q4">Oct - Dic 2025</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Botones de Filtro -->
+            <div class="flex justify-end mt-4 space-x-2">
+                <button id="clearFilters" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                    Limpiar Filtros
+                </button>
+                <button id="applyFilters" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                    Aplicar Filtros
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor del Grid de Tours --><section id="tours" class="tour-grid">
+            <!-- Las tarjetas de tour se insertarán aquí mediante JavaScript --></section>
+
+        <!-- Mensaje de no tours (oculto por defecto) --><div id="no-tours-message" class="hidden text-center mt-12 p-8 bg-white rounded-xl shadow-lg">
+            <p class="text-xl text-gray-500">No encontramos tours para los criterios seleccionados. Intenta con otro destino.</p>
+        </div>
+    </main>
+
+    <!-- Footer --><footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-4 py-8 text-center">
+            <p class="text-sm">&copy; 2025 Cosmos Industria de Viajes. Todos los derechos reservados.</p>
+            <p class="text-xs text-gray-400 mt-1">Diseño moderno y responsivo para cotizaciones de tours.</p>
+        </div>
+    </footer>
+
+    <script type="text/javascript">
+        // 1. Datos de los Tours
+        const toursData = [
+            {
+                id: 1,
+                destination: 'Turquía',
+                title: 'Estambul y Capadocia Mágico',
+                dates: 'Nov 2025 - Mar 2026',
+                price: 1850,
+                // Descripción para la imagen:
+                imageDescription: 'Vista aérea de globos aerostáticos sobre las chimeneas de hadas en Capadocia al amanecer, con una mezquita icónica de Estambul en el fondo, estilo fotografía de viaje, vibrante y atractiva.'
+            },
+            {
+                id: 2,
+                destination: 'Europa',
+                title: 'Gran Tour Clásico (9 Países)',
+                dates: 'Abr 2026 - Sep 2026',
+                price: 3200,
+                // Descripción para la imagen:
+                imageDescription: 'Collage de iconos europeos: Torre Eiffel, Coliseo Romano, góndolas de Venecia y el Big Ben de Londres, en una composición de mapa turístico, colores cálidos y acogedores.'
+            },
+            {
+                id: 3,
+                destination: 'Egipto',
+                title: 'Pirámides y Nilo Legendario',
+                dates: 'Oct 2025 - Feb 2026',
+                price: 2100,
+                // Descripción para la imagen:
+                imageDescription: 'Las Grandes Pirámides de Giza y la Esfinge al atardecer, con un crucero tradicional felucca navegando suavemente por el río Nilo en primer plano, iluminación dorada, místico y grandioso.'
+            },
+            {
+                id: 4,
+                destination: 'Tailandia',
+                title: 'Templos y Playas de Ensueño',
+                dates: 'Mar 2026 - May 2026',
+                price: 1550,
+                // Descripción para la imagen:
+                imageDescription: 'Templo budista dorado tradicional tailandés y una playa tropical de arena blanca con palmeras y aguas turquesas, en una toma dividida o composición de doble exposición, exótico y relajante.'
+            },
+            {
+                id: 5,
+                destination: 'Perú',
+                title: 'Machu Picchu y Camino Inca',
+                dates: 'Jun 2026 - Ago 2026',
+                price: 2500,
+                // Descripción para la imagen:
+                imageDescription: 'Vista panorámica de Machu Picchu al amanecer con neblina mística, rodeado de montañas andinas exuberantes, un lama o alpaca en el primer plano, dramático y aventurero.'
+            },
+            {
+                id: 6,
+                destination: 'Dubái',
+                title: 'Lujo y Oasis en el Desierto',
+                dates: 'Dic 2025 - Ene 2026',
+                price: 2800,
+                // Descripción para la imagen:
+                imageDescription: 'Skyline futurista de Dubái con el Burj Khalifa y las fuentes danzantes en la noche, y dunas de arena dorada con un camello en el desierto al amanecer, contraste entre modernidad y tradición, lujoso y grandioso.'
+            },
+            {
+                id: 7,
+                destination: 'Grecia',
+                title: 'Atenas y las Islas Griegas',
+                dates: 'May 2026 - Jul 2026',
+                price: 2350,
+                // Descripción para la imagen:
+                imageDescription: 'Casas blancas con cúpulas azules en Santorini, Akrópolis de Atenas al fondo, y el mar Egeo brillante, soleado y clásico, en una paleta de colores mediterráneos.'
+            }
+        ];
+
+        // 2. Función para formatear el precio como moneda USD/EUR
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('es-CO', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+            }).format(amount);
+        };
+
+        // 3. Función para generar la Tarjeta de Tour
+        const createTourCard = (tour) => {
+            const card = document.createElement('div');
+            card.className = 'tour-card bg-white rounded-xl shadow-xl overflow-hidden transform hover:shadow-2xl hover:scale-[1.02] transition duration-500 group cursor-pointer';
+
+            // Imágenes de Pixabay (Repositorio alternativo)
+            const imageMap = {
+                'Turquía': 'https://cdn.pixabay.com/photo/2019/04/07/12/52/cappadocia-4109395_1280.jpg', 
+                'Europa': 'https://cdn.pixabay.com/photo/2018/04/25/09/26/eiffel-tower-3349075_1280.jpg', 
+                'Egipto': 'https://cdn.pixabay.com/photo/2017/09/22/09/47/pyramids-2774839_1280.jpg', 
+                'Tailandia': 'https://cdn.pixabay.com/photo/2016/11/13/12/52/wat-arun-1820550_1280.jpg', 
+                'Perú': 'https://cdn.pixabay.com/photo/2019/05/15/18/06/machu-picchu-4205353_1280.jpg', 
+                'Dubái': 'https://cdn.pixabay.com/photo/2017/01/08/19/30/dubai-1963945_1280.jpg', 
+                'Grecia': 'https://cdn.pixabay.com/photo/2020/03/11/14/49/santorini-4922205_1280.jpg' 
+            };
+            // Fallback general para cualquier otro destino
+            const imgSrc = imageMap[tour.destination] || 'https://cdn.pixabay.com/photo/2016/01/09/18/27/journey-1130732_1280.jpg';
+
+
+            card.innerHTML = `
+                <div class="p-6 pb-0 flex justify-between items-start">
+                    <div class="cursor-pointer" onclick="tourDetailsSystem.showDetails(${tour.id})">
+                        <!-- Título del Destino (Arriba de la Imagen) -->
+                        <p class="text-sm font-semibold uppercase text-secondary mb-2">${tour.destination}</p>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4 leading-tight">${tour.title}</h3>
+                    </div>
+                    <button class="favorite-btn p-2 rounded-full hover:bg-gray-100 transition-colors" 
+                            data-tour-id="${tour.id}"
+                            aria-label="Agregar a favoritos">
+                        <svg class="w-6 h-6 ${favoritesSystem.isFavorite(tour.id) ? 'text-red-500 fill-current' : 'text-gray-400'}" 
+                             xmlns="http://www.w3.org/2000/svg" 
+                             fill="none" 
+                             viewBox="0 0 24 24" 
+                             stroke="currentColor">
+                            <path stroke-linecap="round" 
+                                  stroke-linejoin="round" 
+                                  stroke-width="2" 
+                                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="relative overflow-hidden tour-card-content">
+                    <!-- Imagen Llamativa con Fallback (onerror) -->
+                    <img src="${imgSrc}"
+                         alt="Tour a ${tour.destination}: ${tour.title}"
+                         loading="lazy"
+                         class="w-full h-56 object-cover transition duration-500 group-hover:opacity-80"
+                         aria-label="${tour.imageDescription}"
+                         onerror="this.onerror=null; this.src='https://placehold.co/600x300/495057/FFFFFF?text=Imagen+No+Disponible';">
+                    
+                    <!-- Recuadro de Información (Debajo de la Imagen - Físicamente fuera del div de la imagen) --><div class="info-box border-primary flex justify-between items-center text-gray-800 group-hover:translate-y-0">
+                        <!-- Fechas Disponibles --><div>
+                            <p class="text-xs uppercase font-medium text-gray-500">Fechas Disponibles</p>
+                            <p class="text-lg font-semibold">${tour.dates}</p>
+                        </div>
+                        <!-- Precio --><div class="text-right">
+                            <p class="text-xs uppercase font-medium text-gray-500">Precio desde</p>
+                            <p class="text-3xl font-extrabold text-accent">${formatCurrency(tour.price)}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón de Cotización --><div class="p-6 pt-4 bg-gray-50/50">
+                    <button 
+                        onclick="handleQuoteClick(${tour.id}, '${tour.title}')"
+                        class="w-full py-3 bg-primary text-white font-bold rounded-lg hover:bg-secondary transition duration-300 shadow-md hover:shadow-lg"
+                        aria-label="Solicitar cotización para tour ${tour.title}"
+                        role="button"
+                        type="button">
+                        <span class="flex items-center justify-center">
+                            <!-- Icono de viaje/cotización -->
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                            </svg>
+                            ¡Cotizar Ahora!
+                        </span>
+                    </button>
+                </div>
+            `;
+            return card;
+        };
+
+        // 4. Función para renderizar todos los tours
+        const renderTours = () => {
+            const gridContainer = document.getElementById('tours');
+            gridContainer.innerHTML = ''; // Limpiar contenido existente
+
+            if (toursData.length === 0) {
+                document.getElementById('no-tours-message').classList.remove('hidden');
+                return;
+            }
+
+            // Crear y añadir las tarjetas con una animación suave
+            toursData.forEach((tour, index) => {
+                const card = createTourCard(tour);
+                // Simple efecto fade-in al montar
+                card.style.opacity = '0';
+                card.style.transition = 'opacity 0.5s ease-out';
+                
+                gridContainer.appendChild(card);
+                
+                // Activar el fade-in con un pequeño retraso
+                setTimeout(() => {
+                    card.style.opacity = '1';
+                }, 50 + index * 100); 
+            });
+        };
+
+        // 5. Sistema de Cotización
+        const quoteSystem = {
+            currentTour: null,
+
+            init() {
+                this.setupModal();
+            },
+
+            setupModal() {
+                // Crear el modal de cotización
+                const modalHTML = `
+                    <div id="quoteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+                        <div class="bg-white rounded-xl shadow-2xl w-11/12 max-w-2xl transform scale-95 transition-transform duration-300">
+                            <div class="p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-2xl font-bold text-gray-900">Solicitar Cotización</h3>
+                                    <button id="closeQuoteModal" class="text-gray-400 hover:text-gray-500">
+                                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <form id="quoteForm" class="space-y-4">
+                                    <div id="tourInfo" class="bg-gray-50 p-4 rounded-lg mb-4">
+                                        <!-- Tour info will be inserted here -->
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="name" class="block text-sm font-medium text-gray-700">Nombre completo</label>
+                                            <input type="text" id="name" name="name" required
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                        </div>
+                                        <div>
+                                            <label for="email" class="block text-sm font-medium text-gray-700">Correo electrónico</label>
+                                            <input type="email" id="email" name="email" required
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                        </div>
+                                        <div>
+                                            <label for="phone" class="block text-sm font-medium text-gray-700">Teléfono</label>
+                                            <input type="tel" id="phone" name="phone" required
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                        </div>
+                                        <div>
+                                            <label for="travelers" class="block text-sm font-medium text-gray-700">Número de viajeros</label>
+                                            <input type="number" id="travelers" name="travelers" min="1" required
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label for="comments" class="block text-sm font-medium text-gray-700">Comentarios adicionales</label>
+                                            <textarea id="comments" name="comments" rows="3"
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end space-x-2 mt-4">
+                                        <button type="button" id="cancelQuote"
+                                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                                            Cancelar
+                                        </button>
+                                        <button type="submit"
+                                            class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-secondary">
+                                            Solicitar Cotización
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+                // Configurar eventos
+                const modal = document.getElementById('quoteModal');
+                document.getElementById('closeQuoteModal').addEventListener('click', () => this.hideModal());
+                document.getElementById('cancelQuote').addEventListener('click', () => this.hideModal());
+                document.getElementById('quoteForm').addEventListener('submit', (e) => this.handleSubmit(e));
+
+                // Cerrar modal al hacer clic fuera
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) this.hideModal();
+                });
+            },
+
+            showModal(tourId) {
+                this.currentTour = toursData.find(tour => tour.id === tourId);
+                const modal = document.getElementById('quoteModal');
+                const tourInfo = document.getElementById('tourInfo');
+
+                tourInfo.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-bold text-lg">${this.currentTour.title}</h4>
+                            <p class="text-gray-600">${this.currentTour.destination}</p>
+                            <p class="text-sm text-gray-500">${this.currentTour.dates}</p>
+                        </div>
+                        <p class="text-xl font-bold text-accent">${formatCurrency(this.currentTour.price)}</p>
+                    </div>
+                `;
+
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.querySelector('.transform').classList.remove('scale-95');
+                }, 10);
+            },
+
+            hideModal() {
+                const modal = document.getElementById('quoteModal');
+                modal.querySelector('.transform').classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    document.getElementById('quoteForm').reset();
+                }, 300);
+            },
+
+            async handleSubmit(e) {
+                e.preventDefault();
+                const form = e.target;
+                const formData = new FormData(form);
+                
+                // Simulación de envío de datos
+                try {
+                    // Aquí iría la llamada real a la API
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    this.hideModal();
+                    alertBox.show(
+                        '¡Solicitud enviada con éxito!',
+                        'Nos pondremos en contacto contigo pronto con tu cotización personalizada.',
+                        'bg-primary'
+                    );
+                } catch (error) {
+                    alertBox.show(
+                        'Error al enviar la solicitud',
+                        'Por favor, intenta nuevamente más tarde.',
+                        'bg-red-600'
+                    );
+                }
+            }
+        };
+
+        // Manejador de click en el botón de cotización
+        const handleQuoteClick = (id, title) => {
+            quoteSystem.showModal(id);
+        };
+
+        // 6. Componente de Alerta (Reemplazo de alert())
+        const alertBox = {
+            element: null,
+            init() {
+                this.element = document.createElement('div');
+                this.element.id = 'custom-alert';
+                this.element.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden';
+                this.element.innerHTML = `
+                    <div id="alert-content" class="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-sm transform scale-95 transition-transform duration-300">
+                        <h4 id="alert-title" class="text-xl font-bold mb-2"></h4>
+                        <p id="alert-message" class="text-gray-600 mb-4"></p>
+                        <button id="alert-close" class="w-full py-2 rounded-lg text-white font-semibold transition duration-300">
+                            Aceptar
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(this.element);
+                
+                document.getElementById('alert-close').addEventListener('click', () => this.hide());
+            },
+            show(title, message, buttonClass) {
+                document.getElementById('alert-title').textContent = title;
+                document.getElementById('alert-message').textContent = message;
+                document.getElementById('alert-close').className = `w-full py-2 rounded-lg text-white font-semibold transition duration-300 ${buttonClass || 'bg-primary'}`;
+                
+                this.element.classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('alert-content').classList.remove('scale-95');
+                }, 10);
+            },
+            hide() {
+                document.getElementById('alert-content').classList.add('scale-95');
+                setTimeout(() => {
+                    this.element.classList.add('hidden');
+                }, 300);
+            }
+        };
+
+
+        // 7. Sistema de Filtros
+        const filterSystem = {
+            init() {
+                this.populateDestinations();
+                this.setupPriceRange();
+                this.setupEventListeners();
+                this.currentFilters = {
+                    destination: '',
+                    maxPrice: 5000,
+                    season: ''
+                };
+            },
+
+            populateDestinations() {
+                const destinations = [...new Set(toursData.map(tour => tour.destination))].sort();
+                const select = document.getElementById('destinationFilter');
+                destinations.forEach(destination => {
+                    const option = document.createElement('option');
+                    option.value = destination;
+                    option.textContent = destination;
+                    select.appendChild(option);
+                });
+            },
+
+            setupPriceRange() {
+                const prices = toursData.map(tour => tour.price);
+                const maxPrice = Math.max(...prices);
+                const priceRange = document.getElementById('priceRange');
+                const priceDisplay = document.getElementById('priceDisplay');
+                
+                priceRange.max = maxPrice;
+                priceRange.value = maxPrice;
+                priceDisplay.textContent = formatCurrency(maxPrice);
+
+                priceRange.addEventListener('input', (e) => {
+                    priceDisplay.textContent = formatCurrency(e.target.value);
+                });
+            },
+
+            setupEventListeners() {
+                document.getElementById('applyFilters').addEventListener('click', () => this.applyFilters());
+                document.getElementById('clearFilters').addEventListener('click', () => this.clearFilters());
+            },
+
+            applyFilters() {
+                this.currentFilters = {
+                    destination: document.getElementById('destinationFilter').value,
+                    maxPrice: parseInt(document.getElementById('priceRange').value),
+                    season: document.getElementById('dateFilter').value
+                };
+
+                const filteredTours = toursData.filter(tour => {
+                    const matchesDestination = !this.currentFilters.destination || 
+                        tour.destination === this.currentFilters.destination;
+                    
+                    const matchesPrice = tour.price <= this.currentFilters.maxPrice;
+                    
+                    const matchesSeason = !this.currentFilters.season || this.matchesSeason(tour.dates, this.currentFilters.season);
+                    
+                    return matchesDestination && matchesPrice && matchesSeason;
+                });
+
+                this.renderFilteredTours(filteredTours);
+            },
+
+            matchesSeason(tourDates, selectedSeason) {
+                const dateRanges = {
+                    'Q1': ['Ene', 'Feb', 'Mar'],
+                    'Q2': ['Abr', 'May', 'Jun'],
+                    'Q3': ['Jul', 'Ago', 'Sep'],
+                    'Q4': ['Oct', 'Nov', 'Dic']
+                };
+
+                const tourMonths = tourDates.split(' - ')[0].split(' ')[0];
+                return dateRanges[selectedSeason].some(month => tourMonths.includes(month));
+            },
+
+            clearFilters() {
+                document.getElementById('destinationFilter').value = '';
+                document.getElementById('priceRange').value = document.getElementById('priceRange').max;
+                document.getElementById('dateFilter').value = '';
+                document.getElementById('priceDisplay').textContent = formatCurrency(document.getElementById('priceRange').max);
+                
+                this.currentFilters = {
+                    destination: '',
+                    maxPrice: parseInt(document.getElementById('priceRange').max),
+                    season: ''
+                };
+
+                this.renderFilteredTours(toursData);
+            },
+
+            renderFilteredTours(filteredTours) {
+                const gridContainer = document.getElementById('tours');
+                const noToursMessage = document.getElementById('no-tours-message');
+
+                gridContainer.innerHTML = '';
+
+                if (filteredTours.length === 0) {
+                    noToursMessage.classList.remove('hidden');
+                    return;
+                }
+
+                noToursMessage.classList.add('hidden');
+                filteredTours.forEach((tour, index) => {
+                    setTimeout(() => {
+                        const card = createTourCard(tour);
+                        card.style.opacity = '0';
+                        gridContainer.appendChild(card);
+                        requestAnimationFrame(() => {
+                            card.style.transition = 'opacity 0.5s ease-out';
+                            card.style.opacity = '1';
+                        });
+                    }, index * 100);
+                });
+            }
+        };
+
+        // 8. Sistema de Favoritos
+        const favoritesSystem = {
+            favorites: [],
+
+            init() {
+                this.loadFavorites();
+                this.setupEventListeners();
+            },
+
+            loadFavorites() {
+                const stored = localStorage.getItem('tourFavorites');
+                this.favorites = stored ? JSON.parse(stored) : [];
+            },
+
+            saveFavorites() {
+                localStorage.setItem('tourFavorites', JSON.stringify(this.favorites));
+            },
+
+            isFavorite(tourId) {
+                return this.favorites.includes(tourId);
+            },
+
+            toggleFavorite(tourId) {
+                const index = this.favorites.indexOf(tourId);
+                if (index === -1) {
+                    this.favorites.push(tourId);
+                    alertBox.show(
+                        'Tour agregado a favoritos',
+                        'Puedes encontrar tus tours favoritos en la sección de favoritos.',
+                        'bg-primary'
+                    );
+                } else {
+                    this.favorites.splice(index, 1);
+                    alertBox.show(
+                        'Tour eliminado de favoritos',
+                        'El tour ha sido eliminado de tu lista de favoritos.',
+                        'bg-gray-600'
+                    );
+                }
+                this.saveFavorites();
+                this.updateFavoriteButtons();
+            },
+
+            setupEventListeners() {
+                document.addEventListener('click', (e) => {
+                    if (e.target.closest('.favorite-btn')) {
+                        const btn = e.target.closest('.favorite-btn');
+                        const tourId = parseInt(btn.dataset.tourId);
+                        this.toggleFavorite(tourId);
+                    }
+                });
+            },
+
+            updateFavoriteButtons() {
+                document.querySelectorAll('.favorite-btn').forEach(btn => {
+                    const tourId = parseInt(btn.dataset.tourId);
+                    const svg = btn.querySelector('svg');
+                    if (this.isFavorite(tourId)) {
+                        svg.classList.add('text-red-500', 'fill-current');
+                        svg.classList.remove('text-gray-400');
+                    } else {
+                        svg.classList.remove('text-red-500', 'fill-current');
+                        svg.classList.add('text-gray-400');
+                    }
+                });
+            },
+
+            getFavoriteTours() {
+                return toursData.filter(tour => this.isFavorite(tour.id));
+            }
+        };
+
+        // 9. Sistema de Detalles del Tour
+        const tourDetailsSystem = {
+            init() {
+                this.setupModal();
+            },
+
+            setupModal() {
+                const modalHTML = `
+                    <div id="tourDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+                        <div class="bg-white rounded-xl shadow-2xl w-11/12 max-w-4xl transform scale-95 transition-transform duration-300 max-h-[90vh] overflow-hidden flex flex-col">
+                            <div class="p-6 flex justify-between items-start border-b">
+                                <div>
+                                    <h3 id="detailsTitle" class="text-3xl font-bold text-gray-900"></h3>
+                                    <p id="detailsDestination" class="text-lg text-secondary mt-1"></p>
+                                </div>
+                                <button id="closeTourDetails" class="text-gray-400 hover:text-gray-500">
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="overflow-y-auto flex-grow">
+                                <div class="relative h-64 md:h-96">
+                                    <img id="detailsImage" src="" alt="" class="w-full h-full object-cover">
+                                </div>
+                                <div class="p-6 space-y-6">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <h4 class="font-semibold text-lg mb-2">Detalles del Tour</h4>
+                                            <ul class="space-y-2 text-gray-600">
+                                                <li id="detailsDates" class="flex items-center">
+                                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <span></span>
+                                                </li>
+                                                <li id="detailsPrice" class="flex items-center">
+                                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span></span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-semibold text-lg mb-2">Descripción</h4>
+                                            <p id="detailsDescription" class="text-gray-600"></p>
+                                        </div>
+                                    </div>
+                                    <div class="border-t pt-6">
+                                        <h4 class="font-semibold text-lg mb-4">Información Adicional</h4>
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                                                <svg class="w-8 h-8 mx-auto text-primary mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <h5 class="font-medium">Duración</h5>
+                                                <p class="text-gray-600">7-10 días</p>
+                                            </div>
+                                            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                                                <svg class="w-8 h-8 mx-auto text-primary mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                                                </svg>
+                                                <h5 class="font-medium">Idioma</h5>
+                                                <p class="text-gray-600">Español</p>
+                                            </div>
+                                            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                                                <svg class="w-8 h-8 mx-auto text-primary mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                </svg>
+                                                <h5 class="font-medium">Grupo</h5>
+                                                <p class="text-gray-600">2-15 personas</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-6 bg-gray-50 border-t">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="text-sm text-gray-500">Precio desde</p>
+                                        <p id="detailsPriceFooter" class="text-3xl font-bold text-accent"></p>
+                                    </div>
+                                    <button id="detailsQuoteBtn" class="px-6 py-3 bg-primary text-white font-bold rounded-lg hover:bg-secondary transition duration-300">
+                                        Solicitar Cotización
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+                // Configurar eventos
+                const modal = document.getElementById('tourDetailsModal');
+                document.getElementById('closeTourDetails').addEventListener('click', () => this.hideModal());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) this.hideModal();
+                });
+                document.getElementById('detailsQuoteBtn').addEventListener('click', () => {
+                    this.hideModal();
+                    quoteSystem.showModal(this.currentTourId);
+                });
+            },
+
+            showDetails(tourId) {
+                this.currentTourId = tourId;
+                const tour = toursData.find(t => t.id === tourId);
+                const modal = document.getElementById('tourDetailsModal');
+
+                // Actualizar contenido
+                document.getElementById('detailsTitle').textContent = tour.title;
+                document.getElementById('detailsDestination').textContent = tour.destination;
+                document.getElementById('detailsImage').src = imageMap[tour.destination];
+                document.getElementById('detailsImage').alt = tour.imageDescription;
+                document.getElementById('detailsDates').querySelector('span').textContent = tour.dates;
+                document.getElementById('detailsPrice').querySelector('span').textContent = formatCurrency(tour.price);
+                document.getElementById('detailsPriceFooter').textContent = formatCurrency(tour.price);
+                document.getElementById('detailsDescription').textContent = tour.imageDescription;
+
+                // Mostrar modal
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.querySelector('.transform').classList.remove('scale-95');
+                }, 10);
+            },
+
+            hideModal() {
+                const modal = document.getElementById('tourDetailsModal');
+                modal.querySelector('.transform').classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+        };
+
+        // 10. Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTours();
+            alertBox.init();
+            filterSystem.init();
+            quoteSystem.init();
+            favoritesSystem.init();
+        });
+
+    </script>
+
+    <!-- Botón flotante de WhatsApp -->
+    <a href="https://wa.me/573001234567?text=Hola,%20me%20interesa%20obtener%20información%20sobre%20los%20tours"
+       target="_blank"
+       rel="noopener noreferrer"
+       class="whatsapp-button"
+       aria-label="Chatear por WhatsApp">
+        <div class="whatsapp-tooltip">¡Chatea con nosotros!</div>
+        <div class="bg-green-500 text-white p-3 rounded-full shadow-lg hover:bg-green-600 transition-colors">
+            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 012.41 5.83c0 4.54-3.7 8.23-8.24 8.23-1.48 0-2.93-.39-4.19-1.15l-.3-.17-3.12.82.83-3.04-.2-.32a8.188 8.188 0 01-1.26-4.38c.01-4.54 3.7-8.24 8.25-8.24zM8.47 7.74c-.18-.33-.37-.35-.54-.36h-.48c-.16 0-.43.06-.65.31-.22.25-.85.83-.85 2.03s.87 2.35.99 2.51c.12.17 1.71 2.73 4.23 3.72 2.09.82 2.51.66 2.96.62.45-.05 1.46-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.07-.1-.23-.16-.48-.27-.25-.14-1.47-.74-1.69-.82-.23-.08-.37-.12-.56.12-.16.25-.64.81-.78.97-.15.17-.29.19-.53.06-.25-.13-1.04-.39-1.98-1.23-.73-.65-1.22-1.45-1.37-1.7-.15-.24-.02-.38.11-.5.11-.11.27-.29.37-.44.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.11-.56-1.35-.77-1.84z"/>
+            </svg>
+        </div>
+    </a>
+</body>
+</html>
