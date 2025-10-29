@@ -1,14 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { type Destination } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, Users, AlertCircle } from "lucide-react";
+import { Calendar, MapPin, Clock, ArrowRight, AlertCircle } from "lucide-react";
 
 export default function Home() {
+  const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("internacional");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
@@ -201,22 +203,20 @@ export default function Home() {
           <div className="fixed bottom-6 right-6 z-50">
             <Button
               size="lg"
-              className="bg-green-600 hover:bg-green-700 text-white shadow-xl"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-xl"
               onClick={() => {
-                const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || "573000000000";
-                const message = `Hola! Quiero cotizar los siguientes destinos: ${selectedDestinations
-                  .map((id) => {
-                    const dest = destinations.find((d) => d.id === id);
-                    return dest ? `${dest.name} (${dest.duration}D/${dest.nights}N)` : "";
-                  })
-                  .filter(Boolean)
-                  .join(", ")}. Fechas: ${startDate || "Por definir"} al ${endDate || "Por definir"}`;
-                window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
+                const selectedData = {
+                  destinations: selectedDestinations,
+                  startDate,
+                  endDate,
+                };
+                sessionStorage.setItem("quoteData", JSON.stringify(selectedData));
+                setLocation("/cotizacion");
               }}
-              data-testid="button-whatsapp"
+              data-testid="button-continue"
             >
-              <Users className="w-5 h-5 mr-2" />
-              Solicitar Cotización por WhatsApp
+              <ArrowRight className="w-5 h-5 mr-2" />
+              Continuar a Cotización
             </Button>
           </div>
         )}

@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import QuoteSummary from "@/pages/quote-summary";
 import Dashboard from "@/pages/dashboard";
 import Quotes from "@/pages/quotes";
 import QuoteEditor from "@/pages/quote-editor";
@@ -34,7 +35,10 @@ function Router() {
   return (
     <Switch>
       {!isAuthenticated ? (
-        <Route path="/" component={Home} />
+        <>
+          <Route path="/" component={Home} />
+          <Route path="/cotizacion" component={QuoteSummary} />
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
