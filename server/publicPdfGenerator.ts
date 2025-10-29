@@ -16,7 +16,7 @@ interface PublicQuoteData {
   grandTotal: number;
 }
 
-export function generatePublicQuotePDF(data: PublicQuoteData): PDFDocument {
+export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<typeof PDFDocument> {
   const doc = new PDFDocument({
     size: "A4",
     margins: { top: 40, bottom: 40, left: 60, right: 60 },
