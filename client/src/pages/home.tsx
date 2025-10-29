@@ -15,12 +15,7 @@ export default function Home() {
   const [endDate, setEndDate] = useState("");
 
   const { data: destinations = [] } = useQuery<Destination[]>({
-    queryKey: ["/api/destinations"],
-    queryFn: async () => {
-      const response = await fetch("/api/destinations?isActive=true");
-      if (!response.ok) throw new Error("Failed to fetch destinations");
-      return response.json();
-    },
+    queryKey: ["/api/destinations?isActive=true"],
   });
 
   const filteredDestinations = destinations.filter((dest) => {
