@@ -54,6 +54,7 @@ export const destinations = pgTable("destinations", {
   nights: integer("nights").notNull(),
   description: text("description"),
   imageUrl: text("image_url"),
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }),
   category: text("category").default("internacional"),
   isPromotion: boolean("is_promotion").default(false),
   displayOrder: integer("display_order").default(999),
