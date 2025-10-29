@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion } from "@shared/schema";
 
 interface PublicQuoteData {
   destinations: Array<{
@@ -8,6 +9,11 @@ interface PublicQuoteData {
     duration: number;
     nights: number;
     basePrice: string;
+    destination?: Destination;
+    itinerary?: ItineraryDay[];
+    hotels?: Hotel[];
+    inclusions?: Inclusion[];
+    exclusions?: Exclusion[];
   }>;
   startDate: string;
   endDate: string;
@@ -147,32 +153,116 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     doc.moveDown(4);
   });
 
-  doc.moveDown(1);
+  doc.moveDown(1.5);
+
+  data.destinations.forEach((dest, destIndex) => {
+    if (!dest.itinerary || dest.itinerary.length === 0) return;
+
+    if (doc.y > 650) {
+      doc.addPage();
+    }
+
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
+    doc.text(`${dest.name.toUpperCase()} - ${dest.country.toUpperCase()}`, leftMargin, doc.y);
+    doc.moveDown(0.8);
+
+    dest.itinerary.forEach((day) => {
+      if (doc.y > 700) {
+        doc.addPage();
+      }
+
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
+      doc.text(`Día ${day.dayNumber} | ${day.title}`, leftMargin, doc.y);
+      doc.moveDown(0.3);
+      
+      doc.font("Helvetica").fontSize(8).fillColor(textColor);
+      doc.text(day.description, leftMargin, doc.y, { width: contentWidth, align: "justify" });
+      doc.moveDown(0.8);
+    });
+
+    doc.moveDown(0.5);
+  });
+
+  const allHotels: Hotel[] = [];
+  data.destinations.forEach(dest => {
+    if (dest.hotels && dest.hotels.length > 0) {
+      allHotels.push(...dest.hotels);
+    }
+  });
+
+  if (allHotels.length > 0) {
+    if (doc.y > 650) {
+      doc.addPage();
+    }
+
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
+    doc.text("Alojamientos Previstos", leftMargin, doc.y);
+    doc.moveDown(0.5);
+
+    doc.font("Helvetica").fontSize(8).fillColor(textColor);
+    const hotelGroups: { [key: string]: Hotel[] } = {};
+    allHotels.forEach(hotel => {
+      const location = hotel.location || "General";
+      if (!hotelGroups[location]) {
+        hotelGroups[location] = [];
+      }
+      hotelGroups[location].push(hotel);
+    });
+
+    Object.entries(hotelGroups).forEach(([location, hotels]) => {
+      const hotelNames = hotels.map(h => `${h.name}${h.category ? ` ${h.category}` : ""}`).join(", ");
+      doc.text(`${location}: ${hotelNames}`, leftMargin, doc.y, { width: contentWidth });
+      doc.moveDown(0.3);
+    });
+
+    doc.moveDown(1);
+  }
 
   if (doc.y > 600) {
     doc.addPage();
   }
+
+  const allInclusions: Inclusion[] = [];
+  const allExclusions: Exclusion[] = [];
+  data.destinations.forEach(dest => {
+    if (dest.inclusions && dest.inclusions.length > 0) {
+      allInclusions.push(...dest.inclusions);
+    }
+    if (dest.exclusions && dest.exclusions.length > 0) {
+      allExclusions.push(...dest.exclusions);
+    }
+  });
+
+  const uniqueInclusions = Array.from(new Set(allInclusions.map(i => i.item)));
+  const uniqueExclusions = Array.from(new Set(allExclusions.map(e => e.item)));
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
   doc.text("I N C L U I D O", leftMargin, doc.y);
   doc.moveDown(0.5);
   
   doc.font("Helvetica").fontSize(8).fillColor(textColor);
-  const included = [
-    `${totalNights} noches de alojamiento en hoteles previstos o categoría similar`,
-    `${totalNights} desayunos`,
-    "Guía autorizado que habla español",
-    "Traslados con asistente autorizado que habla español (IN - OUT)",
-    "Impuesto IVA",
-    "Todas las entradas del itinerario según programa",
-    "Asistencia médica",
-    "Vuelos internacionales - maleta personal + cabina"
-  ];
   
-  included.forEach(item => {
-    doc.text(`• ${item}`, leftMargin + 10, doc.y);
-    doc.moveDown(0.3);
-  });
+  if (uniqueInclusions.length > 0) {
+    uniqueInclusions.forEach(item => {
+      doc.text(`• ${item}`, leftMargin + 10, doc.y);
+      doc.moveDown(0.3);
+    });
+  } else {
+    const defaultIncluded = [
+      `${totalNights} noches de alojamiento en hoteles previstos o categoría similar`,
+      `${totalNights} desayunos`,
+      "Guía autorizado que habla español",
+      "Traslados con asistente autorizado que habla español (IN - OUT)",
+      "Impuesto IVA",
+      "Todas las entradas del itinerario según programa",
+      "Asistencia médica",
+      "Vuelos internacionales - maleta personal + cabina"
+    ];
+    defaultIncluded.forEach(item => {
+      doc.text(`• ${item}`, leftMargin + 10, doc.y);
+      doc.moveDown(0.3);
+    });
+  }
   
   doc.moveDown(1);
 
@@ -181,18 +271,25 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   doc.moveDown(0.5);
   
   doc.font("Helvetica").fontSize(8).fillColor(textColor);
-  const excluded = [
-    "Excursiones opcionales",
-    "Bebidas en las comidas",
-    "Gastos personales",
-    "Equipaje extra",
-    "Propinas del guía y chofer US$ 50 por persona **Obligatorias**"
-  ];
   
-  excluded.forEach(item => {
-    doc.text(`• ${item}`, leftMargin + 10, doc.y);
-    doc.moveDown(0.3);
-  });
+  if (uniqueExclusions.length > 0) {
+    uniqueExclusions.forEach(item => {
+      doc.text(`• ${item}`, leftMargin + 10, doc.y);
+      doc.moveDown(0.3);
+    });
+  } else {
+    const defaultExcluded = [
+      "Excursiones opcionales",
+      "Bebidas en las comidas",
+      "Gastos personales",
+      "Equipaje extra",
+      "Propinas del guía y chofer US$ 50 por persona **Obligatorias**"
+    ];
+    defaultExcluded.forEach(item => {
+      doc.text(`• ${item}`, leftMargin + 10, doc.y);
+      doc.moveDown(0.3);
+    });
+  }
 
   doc.moveDown(2);
 
