@@ -38,8 +38,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Destinations are required" });
       }
       
+      const destinationDetails = await Promise.all(
+        destinations.map(async (dest: any) => {
+          const destination = await storage.getDestination(dest.id);
+          const itinerary = await storage.getItineraryDays(dest.id);
+          const hotels = await storage.getHotels(dest.id);
+          const inclusionsList = await storage.getInclusions(dest.id);
+          const exclusionsList = await storage.getExclusions(dest.id);
+          
+          return {
+            ...dest,
+            destination,
+            itinerary,
+            hotels,
+            inclusions: inclusionsList,
+            exclusions: exclusionsList,
+          };
+        })
+      );
+      
       const pdfDoc = generatePublicQuotePDF({
-        destinations,
+        destinations: destinationDetails,
         startDate,
         endDate,
         flightsAndExtras: Number(flightsAndExtras) || 0,
