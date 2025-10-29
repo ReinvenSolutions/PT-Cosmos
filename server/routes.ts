@@ -107,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/destinations", isAuthenticated, async (req, res) => {
+  app.get("/api/destinations", async (req, res) => {
     try {
       const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
       const destinations = await storage.getDestinations({ isActive });

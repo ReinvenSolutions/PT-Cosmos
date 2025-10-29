@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, Users } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, AlertCircle } from "lucide-react";
 
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("internacional");
@@ -66,9 +66,10 @@ export default function Home() {
               <strong className="text-blue-600">Porciones terrestres garantizadas desde 2 pax</strong> en cualquiera de nuestros programas, sean nacionales o internacionales.
               Incluyen: <span className="font-semibold">guía de habla hispana garantizada desde 2 pax, asistencia al viajero, hoteles, transporte, actividades, impuestos y complementos de programas</span>.
             </p>
-            <p className="text-sm text-gray-600 mt-3 font-medium">
-              ⚠️ Solo montamos vuelos - cotización terrestre únicamente
-            </p>
+            <div className="flex items-center gap-2 mt-3 text-sm text-gray-600 font-medium">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Solo montamos vuelos - cotización terrestre únicamente</span>
+            </div>
           </div>
         </div>
 
@@ -207,6 +208,7 @@ export default function Home() {
               size="lg"
               className="bg-green-600 hover:bg-green-700 text-white shadow-xl"
               onClick={() => {
+                const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || "573000000000";
                 const message = `Hola! Quiero cotizar los siguientes destinos: ${selectedDestinations
                   .map((id) => {
                     const dest = destinations.find((d) => d.id === id);
@@ -214,7 +216,7 @@ export default function Home() {
                   })
                   .filter(Boolean)
                   .join(", ")}. Fechas: ${startDate || "Por definir"} al ${endDate || "Por definir"}`;
-                window.open(`https://wa.me/573000000000?text=${encodeURIComponent(message)}`, "_blank");
+                window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
               }}
               data-testid="button-whatsapp"
             >
