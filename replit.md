@@ -147,6 +147,18 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
 - Database migrations via `npm run db:push`
 
 ## Recent Changes (October 29, 2025)
+- **Pricing and PDF Export**:
+  - Added `basePrice` field to destinations schema (represents land portion only: hotels, tours, transport, activities, guides)
+  - Populated all 31 destinations with realistic base prices ($800-$4500 USD based on destination/duration)
+  - Downloaded and integrated 13 coherent stock images for destinations (Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, Peru, Colombian destinations)
+  - Updated destination cards to prominently display prices with orange accent color
+  - Added "Vuelos + Asistencia + Comisión" input field in quote summary page
+  - Implemented total price calculation (sum of land portions + flights/assistance/commission)
+  - Created public PDF generator (`publicPdfGenerator.ts`) with professional design
+  - Added `/api/public/quote-pdf` endpoint for quote PDF export
+  - Integrated PDF download functionality in quote summary page
+  - Updated WhatsApp message to include total price
+  
 - **Public Customer Flow**:
   - Created public landing page with destination browsing (Nacional/Internacional/Promociones)
   - Updated Colombian destinations to 7 options: Guajira, San Andrés, Eje Cafetero, Medellín, Santander, Amazonas, Cartagena
