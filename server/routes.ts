@@ -15,6 +15,7 @@ import {
 import multer from "multer";
 import { handleFileUpload } from "./upload";
 import express from "express";
+import { generatePublicQuotePDF } from "./publicPdfGenerator";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -28,6 +29,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", express.static(uploadsDir));
 
   app.post("/api/upload", upload.single("file"), handleFileUpload);
+
+  app.post("/api/public/quote-pdf", async (req, res) => {
+    try {
+      const { destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal } = req.body;
+      
+      if (!destinations || !Array.isArray(destinations) || destinations.length === 0) {
+        return res.status(400).json({ message: "Destinations are required" });
+      }
+      
+      const pdfDoc = generatePublicQuotePDF({
+        destinations,
+        startDate,
+        endDate,
+        flightsAndExtras: Number(flightsAndExtras) || 0,
+        landPortionTotal: Number(landPortionTotal) || 0,
+        grandTotal: Number(grandTotal) || 0,
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=cotizacion-${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      pdfDoc.pipe(res);
+      pdfDoc.end();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {

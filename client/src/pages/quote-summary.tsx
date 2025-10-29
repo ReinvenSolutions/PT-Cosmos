@@ -138,9 +138,60 @@ export default function QuoteSummary() {
       .map((d) => `${d.name} (${d.duration}D/${d.nights}N)`)
       .join(", ");
     
-    const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDate || "Por definir"} al ${endDate || "Por definir"}.`;
+    const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDate || "Por definir"} al ${endDate || "Por definir"}. Total: US$ ${grandTotal.toFixed(2)}`;
     
     window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
+  };
+  
+  const handleExportPDF = async () => {
+    try {
+      const response = await fetch("/api/public/quote-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          destinations: selectedDests.map(d => ({
+            id: d.id,
+            name: d.name,
+            country: d.country,
+            duration: d.duration,
+            nights: d.nights,
+            basePrice: d.basePrice || "0",
+          })),
+          startDate,
+          endDate,
+          flightsAndExtras: flightsAndExtrasValue,
+          landPortionTotal,
+          grandTotal,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "PDF generado",
+        description: "Tu cotización ha sido descargada exitosamente",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo generar el PDF. Intenta nuevamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (selectedDests.length === 0) {
@@ -429,12 +480,7 @@ export default function QuoteSummary() {
             size="lg"
             variant="outline"
             className="w-full border-blue-600 text-blue-600 hover:bg-blue-50"
-            onClick={() => {
-              toast({
-                title: "Exportando PDF",
-                description: "Esta funcionalidad estará disponible próximamente",
-              });
-            }}
+            onClick={handleExportPDF}
             data-testid="button-export-pdf"
           >
             <FileText className="w-5 h-5 mr-2" />
