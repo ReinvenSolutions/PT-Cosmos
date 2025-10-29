@@ -5,8 +5,10 @@ import { type Destination } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Upload, X, Send } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getDestinationImage } from "@/lib/destination-images";
 
 export default function QuoteSummary() {
   const [, setLocation] = useLocation();
@@ -18,6 +20,7 @@ export default function QuoteSummary() {
   const [returnImages, setReturnImages] = useState<string[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
+  const [flightsAndExtras, setFlightsAndExtras] = useState("");
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -36,6 +39,14 @@ export default function QuoteSummary() {
   }, [setLocation]);
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
+  
+  const landPortionTotal = selectedDests.reduce((sum, dest) => {
+    const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
+    return sum + basePrice;
+  }, 0);
+  
+  const flightsAndExtrasValue = flightsAndExtras ? parseFloat(flightsAndExtras) : 0;
+  const grandTotal = landPortionTotal + flightsAndExtrasValue;
 
   const handleOutboundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -168,17 +179,48 @@ export default function QuoteSummary() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {selectedDests.map((dest) => (
-                <div key={dest.id} className="flex items-start justify-between p-3 bg-blue-50 rounded-lg">
-                  <div>
-                    <h3 className="font-semibold text-gray-800">{dest.name}</h3>
-                    <p className="text-sm text-gray-600">{dest.country}</p>
-                    <Badge variant="secondary" className="mt-1">
-                      {dest.duration} Días / {dest.nights} Noches
-                    </Badge>
+              {selectedDests.map((dest) => {
+                const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
+                const imageUrl = getDestinationImage(dest);
+                
+                return (
+                  <div key={dest.id} className="flex gap-4 p-3 bg-gradient-to-r from-blue-50 to-white rounded-lg border border-blue-100">
+                    {imageUrl && (
+                      <div className="w-32 h-24 flex-shrink-0 rounded-md overflow-hidden">
+                        <img 
+                          src={imageUrl} 
+                          alt={dest.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold text-gray-800">{dest.name}</h3>
+                        <p className="text-sm text-gray-600">{dest.country}</p>
+                        <Badge variant="secondary" className="mt-1">
+                          {dest.duration} Días / {dest.nights} Noches
+                        </Badge>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-extrabold text-blue-600">
+                          US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </div>
+                        <div className="text-xs text-gray-500">Porción terrestre</div>
+                      </div>
+                    </div>
                   </div>
+                );
+              })}
+              
+              <div className="border-t border-blue-200 pt-3 mt-3">
+                <div className="flex justify-between items-center text-lg font-semibold">
+                  <span className="text-gray-700">Subtotal Porciones Terrestres:</span>
+                  <span className="text-blue-600">
+                    US$ {landPortionTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
-              ))}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -340,15 +382,75 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Button
-          size="lg"
-          className="w-full bg-green-600 hover:bg-green-700 text-white"
-          onClick={handleSendWhatsApp}
-          data-testid="button-send-whatsapp"
-        >
-          <Send className="w-5 h-5 mr-2" />
-          Enviar Cotización por WhatsApp
-        </Button>
+        <Card className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Vuelos, Asistencia y Comisión
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-3">
+              Ingresa el valor total de: Vuelos + Asistencia al Viajero + Comisión
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold text-gray-700">US$</span>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={flightsAndExtras}
+                onChange={(e) => setFlightsAndExtras(e.target.value)}
+                className="text-lg font-semibold"
+                data-testid="input-flights-extras"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-8 bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="text-sm opacity-90 mb-1">Precio Total de la Cotización</div>
+                <div className="text-4xl font-extrabold">
+                  US$ {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="text-right text-sm opacity-90">
+                <div>Porciones Terrestres: US$ {landPortionTotal.toFixed(2)}</div>
+                <div>Vuelos y Extras: US$ {flightsAndExtrasValue.toFixed(2)}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Button
+            size="lg"
+            variant="outline"
+            className="w-full border-blue-600 text-blue-600 hover:bg-blue-50"
+            onClick={() => {
+              toast({
+                title: "Exportando PDF",
+                description: "Esta funcionalidad estará disponible próximamente",
+              });
+            }}
+            data-testid="button-export-pdf"
+          >
+            <FileText className="w-5 h-5 mr-2" />
+            Exportar Cotización (PDF)
+          </Button>
+          
+          <Button
+            size="lg"
+            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            onClick={handleSendWhatsApp}
+            data-testid="button-send-whatsapp"
+          >
+            <Send className="w-5 h-5 mr-2" />
+            Enviar por WhatsApp
+          </Button>
+        </div>
       </main>
     </div>
   );
