@@ -54,6 +54,8 @@ export const destinations = pgTable("destinations", {
   nights: integer("nights").notNull(),
   description: text("description"),
   imageUrl: text("image_url"),
+  category: text("category").default("internacional"),
+  isPromotion: boolean("is_promotion").default(false),
   displayOrder: integer("display_order").default(999),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
