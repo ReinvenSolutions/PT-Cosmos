@@ -177,6 +177,7 @@ export class DatabaseStorage implements IStorage {
         const destinationsWithQuoteId = destinationsData.map(d => ({
           ...d,
           quoteId: quote.id,
+          startDate: typeof d.startDate === 'string' ? new Date(d.startDate) : d.startDate,
         }));
         await tx.insert(quoteDestinations).values(destinationsWithQuoteId);
       }
