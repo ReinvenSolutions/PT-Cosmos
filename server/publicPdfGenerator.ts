@@ -1,5 +1,7 @@
 import PDFDocument from "pdfkit";
 import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion } from "@shared/schema";
+import { getDestinationImages } from "./destination-images";
+import fs from "fs";
 
 interface PublicQuoteData {
   destinations: Array<{
@@ -25,7 +27,7 @@ interface PublicQuoteData {
 export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<typeof PDFDocument> {
   const doc = new PDFDocument({
     size: "A4",
-    margins: { top: 40, bottom: 40, left: 60, right: 60 },
+    margins: { top: 50, bottom: 50, left: 60, right: 60 },
   });
 
   const primaryColor = "#1e40af";
@@ -33,141 +35,175 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   const textColor = "#1f2937";
   const lightGray = "#6b7280";
   const veryLightGray = "#9ca3af";
+  const borderColor = "#3b82f6";
   
   const pageWidth = 595;
+  const pageHeight = 842;
   const leftMargin = 60;
   const rightMargin = 60;
   const contentWidth = pageWidth - leftMargin - rightMargin;
-
-  doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
-  doc.text("RNT No.240799", leftMargin, 40, { align: "right" });
-  doc.moveDown(1);
-
-  doc.font("Helvetica-Bold").fontSize(11).fillColor(lightGray);
-  doc.text("S U   V I A J E   A :", leftMargin, doc.y, { align: "left" });
-  doc.moveDown(2);
 
   const destinationNames = data.destinations.map(d => d.name).join(" + ");
   const totalDuration = data.destinations.reduce((sum, d) => sum + d.duration, 0);
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
-  doc.font("Helvetica-Bold").fontSize(20).fillColor(primaryColor);
-  const titleText = destinationNames.length > 50 
-    ? destinationNames.substring(0, 50) + "..." 
-    : destinationNames;
-  doc.text(titleText.toUpperCase(), leftMargin, doc.y, { align: "left" });
-  doc.moveDown(0.5);
-  
-  doc.font("Helvetica").fontSize(12).fillColor(textColor);
-  doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, doc.y, { align: "left" });
-  doc.moveDown(3);
+  const imagePaths = getDestinationImages(data.destinations);
 
-  const currentDate = new Date().toLocaleDateString("es-ES", { day: '2-digit', month: '2-digit', year: 'numeric' });
-  doc.font("Helvetica").fontSize(8).fillColor(veryLightGray);
-  doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 80, doc.y - 60, { align: "right" });
-
-  doc.moveTo(leftMargin, doc.y).lineTo(pageWidth - rightMargin, doc.y).stroke("#e5e7eb");
-  doc.moveDown(1.5);
-
-  const budgetSectionY = doc.y;
-  
-  doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
-  doc.text("P R E S U P U E S T O    P A R A    S U    V I A J E", leftMargin, budgetSectionY);
-  
-  doc.font("Helvetica").fontSize(10).fillColor(textColor);
-  const startDateFormatted = data.startDate || "Por definir";
-  const endDateFormatted = data.endDate || "Por definir";
-  doc.text(`Salida: ${startDateFormatted}`, leftMargin, budgetSectionY + 25);
-  doc.text(`Regreso: ${endDateFormatted}`, leftMargin, budgetSectionY + 40);
-  
-  const minPayment = Math.round(data.grandTotal * 0.6);
-  doc.font("Helvetica").fontSize(9).fillColor(lightGray);
-  doc.text(`Pago mínimo para separar: US$ ${minPayment.toLocaleString('en-US')}`, leftMargin, budgetSectionY + 60);
+  doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
+  doc.text("RNT No.240799", pageWidth - rightMargin - 100, 30, { align: "right" });
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(lightGray);
-  doc.text("D E S D E :", pageWidth - rightMargin - 140, budgetSectionY, { align: "left" });
+  doc.text("S U   V I A J E   A :", leftMargin, 70);
+
+  const titleY = 95;
+  doc.font("Helvetica-Bold").fontSize(24).fillColor(primaryColor);
+  const titleText = destinationNames.length > 40 
+    ? destinationNames.substring(0, 40) + "..." 
+    : destinationNames;
+  doc.text(titleText.toUpperCase(), leftMargin, titleY, { width: contentWidth - 100 });
   
-  doc.roundedRect(pageWidth - rightMargin - 140, budgetSectionY + 20, 140, 55, 3)
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+  doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, titleY + 35);
+
+  const currentDate = new Date().toLocaleDateString("es-ES", { day: '2-digit', month: '2-digit', year: 'numeric' });
+  doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
+  doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, titleY + 40, { align: "right" });
+
+  const mainImageY = 165;
+  const mainImageHeight = 250;
+  
+  if (imagePaths.length > 0 && fs.existsSync(imagePaths[0])) {
+    try {
+      doc.image(imagePaths[0], leftMargin, mainImageY, {
+        width: contentWidth,
+        height: mainImageHeight,
+        align: "center",
+        valign: "center"
+      });
+      
+      doc.rect(leftMargin, mainImageY, contentWidth, mainImageHeight)
+         .stroke(borderColor);
+    } catch (error) {
+      console.error("Error loading main image:", error);
+    }
+  }
+
+  const budgetY = mainImageY + mainImageHeight + 15;
+  
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
+  doc.text("P R E S U P U E S T O    P A R A    S U    V I A J E", leftMargin, budgetY);
+  
+  doc.font("Helvetica").fontSize(9).fillColor(textColor);
+  const startDateFormatted = data.startDate 
+    ? new Date(data.startDate).toLocaleDateString("es-ES", { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()
+    : "Por definir";
+  const endDateFormatted = data.endDate 
+    ? new Date(data.endDate).toLocaleDateString("es-ES", { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()
+    : "Por definir";
+  
+  doc.text(`Salida de ${startDateFormatted}`, leftMargin, budgetY + 20);
+  doc.text(`Regreso ${endDateFormatted}`, leftMargin, budgetY + 35);
+  
+  const minPayment = Math.round(data.grandTotal * 0.6);
+  doc.font("Helvetica").fontSize(8).fillColor(lightGray);
+  doc.text(`Pago mínimo para separar: $${minPayment.toLocaleString('en-US')}`, leftMargin, budgetY + 52);
+
+  const priceBoxX = pageWidth - rightMargin - 150;
+  const priceBoxY = budgetY;
+  const priceBoxWidth = 150;
+  const priceBoxHeight = 70;
+  
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(lightGray);
+  doc.text("D E S D E :", priceBoxX, priceBoxY);
+  
+  doc.roundedRect(priceBoxX, priceBoxY + 18, priceBoxWidth, priceBoxHeight - 18, 5)
      .fillAndStroke("#fef3c7", "#fbbf24");
   
-  doc.font("Helvetica-Bold").fontSize(22).fillColor(accentColor);
+  doc.font("Helvetica-Bold").fontSize(26).fillColor(accentColor);
   doc.text(
-    `$ ${data.grandTotal.toLocaleString('en-US')}`, 
-    pageWidth - rightMargin - 135, 
-    budgetSectionY + 28,
-    { width: 130, align: "center" }
+    `$ ${data.grandTotal.toLocaleString('en-US')}`,
+    priceBoxX + 5,
+    priceBoxY + 30,
+    { width: priceBoxWidth - 10, align: "center" }
   );
   
-  doc.font("Helvetica").fontSize(8).fillColor(lightGray);
+  doc.font("Helvetica").fontSize(9).fillColor(textColor);
   doc.text(
-    data.destinations.length === 1 ? "por persona" : "por pareja",
-    pageWidth - rightMargin - 135,
-    budgetSectionY + 58,
-    { width: 130, align: "center" }
+    "por Pareja",
+    priceBoxX + 5,
+    priceBoxY + 60,
+    { width: priceBoxWidth - 10, align: "center" }
   );
 
-  doc.moveDown(7);
-
-  doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
-  doc.text("C O M E N T A R I O S", leftMargin, doc.y);
-  doc.moveDown(0.5);
+  const smallImagesY = budgetY + 85;
+  const smallImageWidth = (contentWidth - 20) / 2;
+  const smallImageHeight = 150;
   
-  doc.font("Helvetica").fontSize(8.5).fillColor(textColor);
-  const comments = `Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Las porciones terrestres están garantizadas desde 2 pasajeros en cualquiera de nuestros programas, sean nacionales o internacionales. Incluyen: Guía de habla hispana garantizada desde 2 pax, asistencia al viajero, hoteles, transporte, actividades, impuestos y complementos de programas. Solo montamos vuelos.`;
-  doc.text(comments, leftMargin, doc.y, { width: contentWidth, align: "justify" });
-  doc.moveDown(2);
-
-  doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
-  doc.text("Itinerario", leftMargin, doc.y);
-  doc.moveDown(1);
-
-  data.destinations.forEach((dest, index) => {
-    if (doc.y > 680) {
-      doc.addPage();
+  if (imagePaths.length > 1 && fs.existsSync(imagePaths[1])) {
+    try {
+      doc.image(imagePaths[1], leftMargin, smallImagesY, {
+        width: smallImageWidth,
+        height: smallImageHeight,
+        align: "center",
+        valign: "center"
+      });
+      
+      doc.rect(leftMargin, smallImagesY, smallImageWidth, smallImageHeight)
+         .stroke(borderColor);
+    } catch (error) {
+      console.error("Error loading second image:", error);
     }
+  }
+  
+  if (imagePaths.length > 2 && fs.existsSync(imagePaths[2])) {
+    try {
+      doc.image(imagePaths[2], leftMargin + smallImageWidth + 20, smallImagesY, {
+        width: smallImageWidth,
+        height: smallImageHeight,
+        align: "center",
+        valign: "center"
+      });
+      
+      doc.rect(leftMargin + smallImageWidth + 20, smallImagesY, smallImageWidth, smallImageHeight)
+         .stroke(borderColor);
+    } catch (error) {
+      console.error("Error loading third image:", error);
+    }
+  }
 
-    doc.roundedRect(leftMargin, doc.y, contentWidth, 50, 3)
-       .fillAndStroke("#eff6ff", "#bfdbfe");
-    
-    const itemY = doc.y;
-    
-    doc.font("Helvetica-Bold").fontSize(13).fillColor(primaryColor);
-    doc.text(`${index + 1}`, leftMargin + 15, itemY + 15, { width: 20 });
-    
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
-    doc.text(dest.name, leftMargin + 45, itemY + 12);
-    
-    doc.font("Helvetica").fontSize(9).fillColor(lightGray);
-    doc.text(dest.country, leftMargin + 45, itemY + 27);
-    
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
-    doc.text(
-      `${dest.duration}`,
-      pageWidth - rightMargin - 80,
-      itemY + 15,
-      { width: 30, align: "center" }
-    );
-    doc.font("Helvetica").fontSize(8).fillColor(lightGray);
-    doc.text("Noches", pageWidth - rightMargin - 80, itemY + 30, { width: 30, align: "center" });
-    
-    doc.moveDown(4);
+  const commentsY = smallImagesY + smallImageHeight + 15;
+  
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
+  doc.text("C O M E N T A R I O S", leftMargin, commentsY);
+  
+  doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
+  const comments = `Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. Globo Turquía ¢330mil por persona / 5 salidas **Debe pagar 1 persona / Tarifa desde NO reembolsable, permite cambio con penalidades + diferencia de tarifa. NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 200USD EN HOTELES DE LA MISMA CATEGORIA.`;
+  
+  doc.text(comments, leftMargin, commentsY + 15, { 
+    width: contentWidth, 
+    align: "justify",
+    lineGap: 2
   });
 
+  doc.addPage();
+
+  doc.font("Helvetica-Bold").fontSize(14).fillColor(primaryColor);
+  doc.text("Itinerario Detallado", leftMargin, 60);
   doc.moveDown(1.5);
 
   data.destinations.forEach((dest, destIndex) => {
     if (!dest.itinerary || dest.itinerary.length === 0) return;
 
-    if (doc.y > 650) {
+    if (doc.y > 700) {
       doc.addPage();
     }
 
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
     doc.text(`${dest.name.toUpperCase()} - ${dest.country.toUpperCase()}`, leftMargin, doc.y);
     doc.moveDown(0.8);
 
     dest.itinerary.forEach((day) => {
-      if (doc.y > 700) {
+      if (doc.y > 720) {
         doc.addPage();
       }
 
@@ -191,11 +227,11 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   });
 
   if (allHotels.length > 0) {
-    if (doc.y > 650) {
+    if (doc.y > 680) {
       doc.addPage();
     }
 
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
     doc.text("Alojamientos Previstos", leftMargin, doc.y);
     doc.moveDown(0.5);
 
@@ -236,7 +272,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   const uniqueInclusions = Array.from(new Set(allInclusions.map(i => i.item)));
   const uniqueExclusions = Array.from(new Set(allExclusions.map(e => e.item)));
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
   doc.text("I N C L U I D O", leftMargin, doc.y);
   doc.moveDown(0.5);
   
@@ -244,6 +280,9 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   
   if (uniqueInclusions.length > 0) {
     uniqueInclusions.forEach(item => {
+      if (doc.y > 750) {
+        doc.addPage();
+      }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
     });
@@ -266,7 +305,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   
   doc.moveDown(1);
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
   doc.text("E X C L U I D O", leftMargin, doc.y);
   doc.moveDown(0.5);
   
@@ -274,6 +313,9 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   
   if (uniqueExclusions.length > 0) {
     uniqueExclusions.forEach(item => {
+      if (doc.y > 750) {
+        doc.addPage();
+      }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
     });
@@ -293,11 +335,11 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
 
   doc.moveDown(2);
 
-  if (doc.y > 650) {
+  if (doc.y > 680) {
     doc.addPage();
   }
 
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
   doc.text("Términos Generales y Condiciones", leftMargin, doc.y);
   doc.moveDown(0.5);
   

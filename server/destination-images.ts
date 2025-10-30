@@ -37,26 +37,29 @@ export function getDestinationImagePath(destination: { name: string; country: st
 
 export function getDestinationImages(destinations: Array<{ name: string; country: string }>): string[] {
   const images: string[] = [];
-  const uniqueCountries = new Set<string>();
+  const seenCountries = new Set<string>();
   
   for (const dest of destinations) {
     const imagePath = getDestinationImagePath(dest);
-    if (imagePath && images.length < 3) {
-      if (!uniqueCountries.has(dest.country)) {
+    if (imagePath && images.length < 3 && !seenCountries.has(dest.country)) {
+      images.push(imagePath);
+      seenCountries.add(dest.country);
+    }
+  }
+  
+  if (images.length < 3) {
+    for (const dest of destinations) {
+      const imagePath = getDestinationImagePath(dest);
+      if (imagePath && images.length < 3 && !images.includes(imagePath)) {
         images.push(imagePath);
-        uniqueCountries.add(dest.country);
       }
     }
   }
   
-  while (images.length < 3 && destinations.length > 0) {
-    for (const dest of destinations) {
-      const imagePath = getDestinationImagePath(dest);
-      if (imagePath && !images.includes(imagePath) && images.length < 3) {
-        images.push(imagePath);
-      }
+  if (images.length < 3 && images.length > 0) {
+    while (images.length < 3) {
+      images.push(images[0]);
     }
-    break;
   }
   
   return images.slice(0, 3);
