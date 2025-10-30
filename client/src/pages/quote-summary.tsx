@@ -39,12 +39,18 @@ export default function QuoteSummary() {
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
 
+  const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
+
   const calculateEndDate = (): string => {
     if (!startDate || selectedDests.length === 0) return "";
     
-    const totalDuration = selectedDests.reduce((sum, dest) => {
+    let totalDuration = selectedDests.reduce((sum, dest) => {
       return sum + (dest.duration || 0);
     }, 0);
+
+    if (hasTurkeyDestinations) {
+      totalDuration += 1;
+    }
 
     if (totalDuration === 0) return "";
 
@@ -324,7 +330,8 @@ export default function QuoteSummary() {
                 </p>
                 {endDate && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Duración total: {selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0)} días
+                    Duración total: {selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0)}{hasTurkeyDestinations && " +1"} días
+                    {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
                   </p>
                 )}
               </div>

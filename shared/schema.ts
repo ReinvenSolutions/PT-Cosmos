@@ -59,6 +59,7 @@ export const destinations = pgTable("destinations", {
   isPromotion: boolean("is_promotion").default(false),
   displayOrder: integer("display_order").default(999),
   isActive: boolean("is_active").default(true),
+  requiresTuesday: boolean("requires_tuesday").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

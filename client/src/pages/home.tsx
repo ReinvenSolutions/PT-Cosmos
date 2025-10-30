@@ -1,43 +1,78 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { type Destination } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, ArrowRight, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("internacional");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
   });
 
+  const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
+  
+  const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
+  
+  const turkeyDestinations = selectedDests.filter((d) => d.requiresTuesday);
+  const otherDestinations = selectedDests.filter((d) => !d.requiresTuesday);
+
+  useEffect(() => {
+    if (hasTurkeyDestinations && selectedDestinations.length > 0) {
+      const reorderedIds = [
+        ...turkeyDestinations.map((d) => d.id),
+        ...otherDestinations.map((d) => d.id),
+      ];
+      
+      if (JSON.stringify(reorderedIds) !== JSON.stringify(selectedDestinations)) {
+        setSelectedDestinations(reorderedIds);
+      }
+    }
+  }, [selectedDestinations, hasTurkeyDestinations, turkeyDestinations, otherDestinations]);
+
   const calculateEndDate = (): string => {
     if (!startDate || selectedDestinations.length === 0) return "";
     
-    const totalDuration = selectedDestinations.reduce((sum, destId) => {
+    let totalDuration = selectedDestinations.reduce((sum, destId) => {
       const dest = destinations.find((d) => d.id === destId);
       return sum + (dest?.duration || 0);
     }, 0);
 
+    if (hasTurkeyDestinations) {
+      totalDuration += 1;
+    }
+
     if (totalDuration === 0) return "";
 
-    const start = new Date(startDate);
-    const end = new Date(start);
+    const end = new Date(startDate);
     end.setDate(end.getDate() + totalDuration - 1);
     
     return end.toISOString().split("T")[0];
   };
 
   const endDate = calculateEndDate();
+
+  const isTuesday = (date: Date) => {
+    return date.getDay() === 2;
+  };
+
+  const disableDates = (date: Date) => {
+    if (hasTurkeyDestinations) {
+      return !isTuesday(date) || date < new Date(new Date().setHours(0, 0, 0, 0));
+    }
+    return date < new Date(new Date().setHours(0, 0, 0, 0));
+  };
 
   const filteredDestinations = destinations.filter((dest) => {
     if (selectedCategory === "promociones") {
@@ -90,19 +125,31 @@ export default function Home() {
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          {hasTurkeyDestinations && (
+            <Alert className="mb-4 border-orange-200 bg-orange-50">
+              <Info className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">
+                <strong>Planes de Turquía seleccionados:</strong> Solo puedes seleccionar días <strong>martes</strong> como fecha de inicio. 
+                Los vuelos desde Colombia salen martes y llegan miércoles a Turquía debido al cambio horario (+1 día adicional).
+                {otherDestinations.length > 0 && (
+                  <span className="block mt-1">Los destinos de Turquía se han movido al inicio del itinerario automáticamente.</span>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+              <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 Fecha de Inicio del Viaje
+                {hasTurkeyDestinations && <Badge variant="secondary" className="ml-2">Solo Martes</Badge>}
               </label>
-              <Input
-                type="date"
-                id="startDate"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full"
-                data-testid="input-start-date"
+              <DatePicker
+                date={startDate}
+                onDateChange={setStartDate}
+                placeholder={hasTurkeyDestinations ? "Selecciona un martes" : "Selecciona una fecha"}
+                disabled={disableDates}
               />
             </div>
             
@@ -129,7 +176,8 @@ export default function Home() {
                   Basado en {selectedDestinations.reduce((sum, destId) => {
                     const dest = destinations.find((d) => d.id === destId);
                     return sum + (dest?.duration || 0);
-                  }, 0)} días de viaje
+                  }, 0)}{hasTurkeyDestinations && " +1"} días de viaje
+                  {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
                 </p>
               )}
             </div>
@@ -254,7 +302,7 @@ export default function Home() {
               onClick={() => {
                 const selectedData = {
                   destinations: selectedDestinations,
-                  startDate,
+                  startDate: startDate?.toISOString().split("T")[0] || "",
                 };
                 sessionStorage.setItem("quoteData", JSON.stringify(selectedData));
                 setLocation("/cotizacion");
