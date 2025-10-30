@@ -90,9 +90,25 @@ export default function Home() {
   }, {} as Record<string, Destination[]>);
 
   const toggleDestination = (destId: string) => {
+    const dest = destinations.find((d) => d.id === destId);
+    
     if (selectedDestinations.includes(destId)) {
       setSelectedDestinations(selectedDestinations.filter((id) => id !== destId));
     } else {
+      if (dest?.requiresTuesday && startDate && !isTuesday(startDate)) {
+        const dateStr = startDate.toLocaleDateString("es-CO", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        
+        alert(`⚠️ Advertencia: Los planes de Turquía solo están disponibles con salida los días MARTES.\n\nLa fecha seleccionada (${dateStr}) no es un martes.\n\nPor favor, selecciona una fecha que sea martes para poder incluir destinos de Turquía.`);
+        
+        setStartDate(undefined);
+        return;
+      }
+      
       setSelectedDestinations([...selectedDestinations, destId]);
     }
   };
