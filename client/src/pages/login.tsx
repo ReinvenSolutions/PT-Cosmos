@@ -25,7 +25,7 @@ export default function Login() {
         title: "Inicio de sesión exitoso",
         description: "Bienvenido al sistema",
       });
-      navigate("/dashboard");
+      navigate("/");
     } catch (error: any) {
       toast({
         title: "Error al iniciar sesión",
