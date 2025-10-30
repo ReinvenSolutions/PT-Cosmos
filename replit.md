@@ -132,8 +132,13 @@ The quotation flow is **identical to the original public system** with one addit
   - clientId (varchar, FK to clients)
   - userId (varchar, FK to users)
   - totalPrice (decimal)
+  - originCity (varchar, nullable) - City where the trip originates
+  - flightsAndExtras (decimal, nullable) - Cost of flights and extras
+  - outboundFlightImages (text[], nullable) - URLs of outbound flight images
+  - returnFlightImages (text[], nullable) - URLs of return flight images
   - status (varchar, default "draft")
   - createdAt (timestamp)
+  - updatedAt (timestamp)
 
 - **quote_destinations**: Many-to-many relationship between quotes and destinations
   - id (varchar, UUID)
@@ -141,6 +146,7 @@ The quotation flow is **identical to the original public system** with one addit
   - destinationId (varchar, FK to destinations)
   - startDate (date)
   - passengers (integer)
+  - price (decimal, nullable) - Price at the time of quote creation
   - createdAt (timestamp)
 
 ### Destination Tables (unchanged)
@@ -198,10 +204,23 @@ Quotes are created by advisors and stored in the database. Each quote is associa
 
 ## Recent Changes (October 30, 2025)
 
-### UI y Permisos Actualizados
+### Sistema de Imágenes de Vuelos en Cotizaciones
+- **Schema actualizado**: Agregados campos origin_city, flights_and_extras, outbound_flight_images, return_flight_images a tabla quotes; campo price a quote_destinations
+- **API de carga**: Implementado endpoint POST /api/upload con multer, validación MIME, y almacenamiento en object storage
+- **Guardado de cotizaciones**: handleSaveQuote ahora envía precios individuales por destino, ciudad de origen, precio de vuelos/extras, y arrays de imágenes
+- **Storage layer mejorado**: createQuote, getQuote, listQuotesByUser, listAllQuotes incluyen todos los nuevos campos
+- **Generador PDF mejorado**: 
+  - Página de vuelos de ida insertada después del itinerario detallado con título "VUELO IDA" y "EQUIPAJE CABINA 10KG + PERSONAL 8KG"
+  - Página de vuelos de regreso insertada después de exclusiones con título "VUELO REGRESO" y texto de equipaje
+  - Ambas páginas cargan y muestran imágenes desde object storage
+- **Ruta PDF actualizada**: GET /api/quotes/:id/pdf usa datos almacenados (fechas, precios, imágenes) en lugar de valores en vivo
+- **Bug fix**: Corregido quote-detail.tsx para mostrar precios desde qd.price (no qd.destination.price) evitando "$NaN"
+- **Dropdown de clientes**: SelectContent con position="popper" y sideOffset para renderizado correcto en diálogos
+- **Testing E2E**: Flujo completo verificado desde creación hasta exportación PDF con imágenes
+
+### UI y Permisos Actualizados (Anteriores)
 - **Sidebar del super admin**: Agregada opción "Clientes" para acceder a gestión de clientes
 - **Permisos de cotizaciones**: Super admin ahora puede crear, ver y gestionar cotizaciones (antes solo advisor)
-- **Dropdown de clientes**: Corregido z-index y agregado DialogDescription para mejor accesibilidad
 - **Roles compartidos**: Rutas POST/GET /api/quotes ahora permiten ambos roles (advisor y super_admin)
 
 ### Sistema de Seed Automático de Base de Datos
