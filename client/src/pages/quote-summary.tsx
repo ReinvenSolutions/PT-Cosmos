@@ -21,6 +21,7 @@ export default function QuoteSummary() {
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
   const [flightsAndExtras, setFlightsAndExtras] = useState("");
+  const [originCity, setOriginCity] = useState("");
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -164,6 +165,7 @@ export default function QuoteSummary() {
           flightsAndExtras: flightsAndExtrasValue,
           landPortionTotal,
           grandTotal,
+          originCity: originCity || "",
         }),
       });
       
@@ -294,6 +296,28 @@ export default function QuoteSummary() {
                 <p className="font-semibold text-lg">{endDate || "Por definir"}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Ciudad de Origen y Retorno
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-3">
+              Ingresa las ciudades de origen y retorno (ejemplo: MED - BOG - PEI)
+            </p>
+            <Input
+              type="text"
+              placeholder="MED - BOG - PEI"
+              value={originCity}
+              onChange={(e) => setOriginCity(e.target.value.toUpperCase())}
+              className="text-lg font-semibold"
+              data-testid="input-origin-city"
+            />
           </CardContent>
         </Card>
 

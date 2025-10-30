@@ -22,6 +22,7 @@ interface PublicQuoteData {
   flightsAndExtras: number;
   landPortionTotal: number;
   grandTotal: number;
+  originCity: string;
 }
 
 export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<typeof PDFDocument> {
@@ -199,6 +200,120 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     width: contentWidth, 
     align: "justify",
     lineGap: 2
+  });
+
+  doc.addPage();
+
+  doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor);
+  doc.text("Itinerario", leftMargin, 60);
+  
+  doc.moveTo(leftMargin, 90)
+     .lineTo(leftMargin + 100, 90)
+     .lineWidth(3)
+     .stroke(primaryColor);
+  
+  doc.moveDown(3);
+  
+  const itineraryStartY = 120;
+  const originCityText = data.originCity || "Origen";
+  
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+  doc.text(originCityText, leftMargin, itineraryStartY);
+  doc.font("Helvetica").fontSize(9).fillColor(lightGray);
+  doc.text("Inicio del viaje", pageWidth - rightMargin - 120, itineraryStartY, { 
+    width: 120, 
+    align: "right" 
+  });
+  
+  doc.moveDown(2);
+  
+  interface CityStop {
+    number: number;
+    name: string;
+    country: string;
+    nights: number;
+  }
+  
+  const cityStops: CityStop[] = [];
+  let stopNumber = 1;
+  
+  data.destinations.forEach(dest => {
+    if (dest.itinerary && dest.itinerary.length > 0) {
+      const locationGroups: { [key: string]: number } = {};
+      
+      dest.itinerary.forEach((day, index) => {
+        const titleParts = day.title.split(' - ');
+        const lastLocation = titleParts[titleParts.length - 1].trim();
+        
+        if (index < dest.itinerary!.length - 1) {
+          if (!locationGroups[lastLocation]) {
+            locationGroups[lastLocation] = 0;
+          }
+          locationGroups[lastLocation]++;
+        }
+      });
+      
+      Object.entries(locationGroups).forEach(([location, nightCount]) => {
+        cityStops.push({
+          number: stopNumber++,
+          name: location,
+          country: dest.country,
+          nights: nightCount
+        });
+      });
+    }
+  });
+  
+  let currentY = doc.y;
+  
+  cityStops.forEach((stop) => {
+    if (currentY > 650) {
+      doc.addPage();
+      currentY = 60;
+    }
+    
+    const numberBoxSize = 40;
+    doc.roundedRect(leftMargin, currentY, numberBoxSize, numberBoxSize, 3)
+       .fillAndStroke(primaryColor, primaryColor);
+    
+    doc.font("Helvetica-Bold").fontSize(16).fillColor("white");
+    doc.text(
+      stop.number.toString(), 
+      leftMargin, 
+      currentY + 12, 
+      { width: numberBoxSize, align: "center" }
+    );
+    
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+    doc.text(stop.name, leftMargin + numberBoxSize + 15, currentY + 5);
+    
+    doc.font("Helvetica").fontSize(9).fillColor(lightGray);
+    doc.text(stop.country, leftMargin + numberBoxSize + 15, currentY + 22);
+    
+    const nightsText = stop.nights === 1 ? "Noche" : "Noches";
+    doc.font("Helvetica-Bold").fontSize(14).fillColor(textColor);
+    doc.text(stop.nights.toString(), pageWidth - rightMargin - 60, currentY + 5, { 
+      width: 30, 
+      align: "right" 
+    });
+    
+    doc.font("Helvetica").fontSize(9).fillColor(lightGray);
+    doc.text(nightsText, pageWidth - rightMargin - 60, currentY + 24, { 
+      width: 60, 
+      align: "right" 
+    });
+    
+    currentY += numberBoxSize + 20;
+  });
+  
+  doc.y = currentY + 20;
+  
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+  doc.text(originCityText, leftMargin, doc.y);
+  doc.font("Helvetica").fontSize(9).fillColor(lightGray);
+  doc.text("El final del viaje", pageWidth - rightMargin - 120, doc.y, { 
+    width: 120, 
+    align: "right" 
   });
 
   doc.addPage();
