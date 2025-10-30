@@ -56,7 +56,7 @@ export default function AdvisorDashboard() {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Mis Cotizaciones</h2>
-          <Link href="/advisor/quotes/new">
+          <Link href="/">
             <Button data-testid="button-new-quote">
               <Plus className="w-4 h-4 mr-2" />
               Nueva Cotización
@@ -115,7 +115,7 @@ export default function AdvisorDashboard() {
                 No tienes cotizaciones guardadas aún.
               </p>
               <div className="flex justify-center mt-4">
-                <Link href="/advisor/quotes/new">
+                <Link href="/">
                   <Button data-testid="button-create-first-quote">
                     <Plus className="w-4 h-4 mr-2" />
                     Crear Primera Cotización

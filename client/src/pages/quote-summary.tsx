@@ -1,18 +1,31 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Destination } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+interface Client {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+}
 
 export default function QuoteSummary() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
   const [outboundImages, setOutboundImages] = useState<string[]>([]);
@@ -21,9 +34,39 @@ export default function QuoteSummary() {
   const [uploadingReturn, setUploadingReturn] = useState(false);
   const [flightsAndExtras, setFlightsAndExtras] = useState("");
   const [originCity, setOriginCity] = useState("");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [passengers, setPassengers] = useState(2);
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
+  });
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/admin/clients"],
+  });
+
+  const saveQuoteMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/quotes", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      toast({
+        title: "Cotización guardada",
+        description: "La cotización se ha guardado exitosamente",
+      });
+      setShowSaveDialog(false);
+      setLocation("/advisor");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error al guardar cotización",
+        description: error.message || "Ha ocurrido un error",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -166,6 +209,29 @@ export default function QuoteSummary() {
     window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
   };
   
+  const handleSaveQuote = async () => {
+    if (!selectedClientId) {
+      toast({
+        title: "Cliente requerido",
+        description: "Por favor, selecciona un cliente",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const quoteData = {
+      clientId: selectedClientId,
+      totalPrice: grandTotal,
+      destinations: selectedDestinations.map((destId) => ({
+        destinationId: destId,
+        startDate: startDate,
+        passengers: passengers,
+      })),
+    };
+
+    await saveQuoteMutation.mutateAsync(quoteData);
+  };
+
   const handleExportPDF = async () => {
     try {
       const response = await fetch("/api/public/quote-pdf", {
@@ -539,7 +605,7 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Button
             size="lg"
             variant="outline"
@@ -548,7 +614,7 @@ export default function QuoteSummary() {
             data-testid="button-export-pdf"
           >
             <FileText className="w-5 h-5 mr-2" />
-            Exportar Cotización (PDF)
+            Exportar PDF
           </Button>
           
           <Button
@@ -558,9 +624,74 @@ export default function QuoteSummary() {
             data-testid="button-send-whatsapp"
           >
             <Send className="w-5 h-5 mr-2" />
-            Enviar por WhatsApp
+            WhatsApp
+          </Button>
+
+          <Button
+            size="lg"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => setShowSaveDialog(true)}
+            data-testid="button-save-quote"
+          >
+            <Save className="w-5 h-5 mr-2" />
+            Guardar Cotización
           </Button>
         </div>
+
+        <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Guardar Cotización</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="client">Cliente</Label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger data-testid="select-client">
+                    <SelectValue placeholder="Selecciona un cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} - {client.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="passengers">Número de Pasajeros</Label>
+                <Input
+                  id="passengers"
+                  type="number"
+                  min="1"
+                  value={passengers}
+                  onChange={(e) => setPassengers(Number(e.target.value))}
+                  data-testid="input-passengers"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Resumen</Label>
+                <div className="text-sm space-y-1 text-muted-foreground">
+                  <p>Destinos: {selectedDests.map(d => d.name).join(", ")}</p>
+                  <p>Fecha inicio: {startDate}</p>
+                  <p>Total: US$ {grandTotal.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={handleSaveQuote}
+                disabled={saveQuoteMutation.isPending}
+                data-testid="button-confirm-save"
+              >
+                {saveQuoteMutation.isPending ? "Guardando..." : "Confirmar y Guardar"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

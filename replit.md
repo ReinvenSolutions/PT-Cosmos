@@ -43,24 +43,30 @@ The application is a fully authenticated system with role-based access control u
 - Create and manage destinations
 - View quote statistics (quotes per advisor)
 - View all quotes across all advisors
-- Full access to the system
+- Full access to the quotation system
 
 #### Advisor Features
-- Create quotations with:
-  - Client selection (from global list)
-  - Multi-destination selection
-  - Date specification
-  - Total price calculation
-- View own quotes
-- Generate PDF for quotes
+- **Quotation Flow** (exactly same as public system):
+  - Browse and select destinations
+  - Select travel dates
+  - View itinerary and pricing
+  - **NEW**: Save quotation (associate with client)
+  - Export to PDF
+  - Share via WhatsApp
+- View saved quotations
 - Track quote history
 
-#### Public Endpoints (Unauthenticated)
-- Destination browsing (for reference, from original public system)
-- Public PDF generation endpoint
+#### Quotation System
+The quotation flow is **identical to the original public system** with one addition:
+- Public pages (home.tsx, quote-summary.tsx) are now protected by authentication
+- Users must be logged in as advisor or super admin to access
+- A "Guardar Cotización" button allows saving the quote to the database
+  - Opens dialog to select client and confirm details
+  - Associates quote with the logged-in user
+  - Redirects to advisor dashboard after saving
 
 ### Role-Based Route Protection
-- **Public Routes**:
+- **Public Routes** (Unauthenticated):
   - POST /api/auth/login
   - POST /api/auth/logout
   - GET /api/auth/me
@@ -68,19 +74,26 @@ The application is a fully authenticated system with role-based access control u
   - GET /api/destinations/:id
   - POST /api/public/quote-pdf
 
+- **Protected Frontend Routes** (super_admin or advisor):
+  - / (home.tsx - destination selection)
+  - /cotizacion (quote-summary.tsx - quote review and save)
+
 - **Advisor Routes** (requireRole("advisor")):
-  - POST /api/quotes
-  - GET /api/quotes
-  - GET /api/quotes/:id
-  - GET /api/quotes/:id/pdf
+  - /advisor (advisor dashboard)
+  - POST /api/quotes (create quote)
+  - GET /api/quotes (list own quotes)
+  - GET /api/quotes/:id (view own quote)
+  - GET /api/quotes/:id/pdf (download quote PDF)
 
 - **Super Admin Routes** (requireRole("super_admin")):
-  - POST /api/admin/clients
-  - GET /api/admin/clients
-  - POST /api/admin/destinations
-  - PUT /api/admin/destinations/:id
-  - GET /api/admin/quotes
-  - GET /api/admin/quotes/stats
+  - /admin (admin dashboard)
+  - POST /api/admin/clients (create client)
+  - PUT /api/admin/destinations/:id (update destination)
+  - GET /api/admin/quotes (view all quotes)
+  - GET /api/admin/quotes/stats (quote statistics)
+
+- **Shared Routes** (requireRoles(["super_admin", "advisor"])):
+  - GET /api/admin/clients (list clients for quote creation)
 
 ### System Design Choices
 - Monorepo structure with `/client`, `/server`, and `/shared` directories
@@ -188,9 +201,14 @@ Quotes are created by advisors and stored in the database. Each quote is associa
 - **Added role-based access control**: Super Admin and Advisor roles with distinct permissions
 - **Created authentication layer**: Login, logout, session management with PostgreSQL
 - **Built admin dashboard**: Client management, destination management, quote statistics
-- **Built advisor dashboard**: Quote creation, quote listing, PDF generation
+- **Built advisor dashboard**: Quote listing, view saved quotes
 - **Implemented protected API routes**: All admin/advisor routes secured with requireRole middleware
 - **Added database tables**: users, clients, quotes, quote_destinations, session
 - **Created initial super admin**: Username "admin", password "admin123"
+- **Created test advisor user**: Username "advisor1", password "advisor123"
 - **Security fixes**: Applied requireRole middleware to all protected routes
 - **Frontend routing**: AuthProvider, protected routes, role-based dashboard redirection
+- **Preserved original quotation flow**: Public pages (home.tsx, quote-summary.tsx) kept identical
+  - Only added authentication protection
+  - Added "Guardar Cotización" button in quote-summary.tsx
+  - Quotes can be saved and associated with clients and users
