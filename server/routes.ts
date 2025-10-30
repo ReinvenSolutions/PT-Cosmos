@@ -94,21 +94,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Admin seed database request from user:", req.user.claims.sub);
       
-      const destinationsCount = await storage.getDestinations({ isActive: true });
-      if (destinationsCount.length > 0) {
-        return res.status(400).json({ 
-          message: "Database already contains destinations. To re-seed, please clear the database first.",
-          currentCount: destinationsCount.length
-        });
-      }
+      const result = await seedDatabase();
       
-      await seedDatabase();
-      
-      const newCount = await storage.getDestinations({ isActive: true });
       res.json({ 
-        success: true, 
-        message: "Database seeded successfully!",
-        destinationsCreated: newCount.length
+        success: result.success, 
+        message: result.message,
+        destinationsCreated: result.destinationsCreated,
+        destinationsSkipped: result.destinationsSkipped,
+        totalDestinations: result.totalDestinations
       });
     } catch (error) {
       console.error("Error seeding database:", error);

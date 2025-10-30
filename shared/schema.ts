@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean, json, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, json, index, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -46,22 +46,26 @@ export const insertClientSchema = createInsertSchema(clients).omit({
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 
-export const destinations = pgTable("destinations", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  country: text("country").notNull(),
-  duration: integer("duration").notNull(),
-  nights: integer("nights").notNull(),
-  description: text("description"),
-  imageUrl: text("image_url"),
-  basePrice: decimal("base_price", { precision: 10, scale: 2 }),
-  category: text("category").default("internacional"),
-  isPromotion: boolean("is_promotion").default(false),
-  displayOrder: integer("display_order").default(999),
-  isActive: boolean("is_active").default(true),
-  requiresTuesday: boolean("requires_tuesday").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const destinations = pgTable(
+  "destinations",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    name: text("name").notNull(),
+    country: text("country").notNull(),
+    duration: integer("duration").notNull(),
+    nights: integer("nights").notNull(),
+    description: text("description"),
+    imageUrl: text("image_url"),
+    basePrice: decimal("base_price", { precision: 10, scale: 2 }),
+    category: text("category").default("internacional"),
+    isPromotion: boolean("is_promotion").default(false),
+    displayOrder: integer("display_order").default(999),
+    isActive: boolean("is_active").default(true),
+    requiresTuesday: boolean("requires_tuesday").default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [uniqueIndex("destinations_name_country_unique").on(table.name, table.country)],
+);
 
 export const insertDestinationSchema = createInsertSchema(destinations).omit({ 
   id: true, 

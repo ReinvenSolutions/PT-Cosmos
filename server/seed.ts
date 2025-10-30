@@ -1,19 +1,12 @@
 import { db } from "./db";
 import { destinations, itineraryDays, hotels, inclusions, exclusions } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function seedDatabase() {
   console.log("Starting database seed...");
 
-  // Check if destinations already exist
-  const existingDestinations = await db.select().from(destinations);
-  if (existingDestinations.length > 0) {
-    console.log(`⚠️ Database already has ${existingDestinations.length} destinations. Skipping seed to avoid duplicates.`);
-    return {
-      success: false,
-      message: "Database already seeded",
-      destinationsCreated: 0,
-    };
-  }
+  let destinationsCreated = 0;
+  let destinationsSkipped = 0;
 
   const turkeyDestinations = [
     {
@@ -330,8 +323,22 @@ export async function seedDatabase() {
   ];
 
   for (const dest of allDestinations) {
-    console.log(`Creating destination: ${dest.name}`);
+    // Check if this destination already exists (by name and country)
+    const existing = await db
+      .select()
+      .from(destinations)
+      .where(and(eq(destinations.name, dest.name), eq(destinations.country, dest.country)))
+      .limit(1);
+
+    if (existing.length > 0) {
+      console.log(`⏭️  Skipping ${dest.name} (already exists)`);
+      destinationsSkipped++;
+      continue;
+    }
+
+    console.log(`✨ Creating destination: ${dest.name}`);
     const [createdDest] = await db.insert(destinations).values(dest).returning();
+    destinationsCreated++;
 
     const standardInclusions = [
       "Alojamiento en hoteles seleccionados",
@@ -397,7 +404,15 @@ export async function seedDatabase() {
     await db.insert(hotels).values(hotelValues);
   }
 
-  console.log(`✅ Successfully seeded ${allDestinations.length} destinations!`);
+  console.log(`✅ Seed complete! Created: ${destinationsCreated}, Skipped: ${destinationsSkipped}, Total in DB: ${destinationsCreated + destinationsSkipped}`);
+  
+  return {
+    success: true,
+    message: "Database seeded successfully",
+    destinationsCreated,
+    destinationsSkipped,
+    totalDestinations: destinationsCreated + destinationsSkipped,
+  };
 }
 
 seedDatabase().catch((error) => {
