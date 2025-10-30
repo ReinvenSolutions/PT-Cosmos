@@ -1,12 +1,9 @@
 import mammoth from "mammoth";
 import fs from "fs/promises";
 import path from "path";
-import * as pdfParseModule from "pdf-parse";
 import { db } from "../server/db";
 import { destinations, itineraryDays, hotels, inclusions, exclusions } from "../shared/schema";
 import { eq } from "drizzle-orm";
-
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
 interface ItineraryDay {
   dayNumber: number;
@@ -24,10 +21,6 @@ async function readDocx(filePath: string): Promise<string> {
   const buffer = await fs.readFile(filePath);
   const result = await mammoth.extractRawText({ buffer });
   return result.value;
-}
-
-async function readPdf(filePath: string): Promise<string> {
-  throw new Error("PDF parsing is currently unavailable due to library compatibility issues. Please convert PDF files to DOCX format for processing.");
 }
 
 async function clearDestinationData(destinationId: string) {
@@ -148,7 +141,7 @@ function extractHotels(text: string): Hotel[] {
     }
     
     if (inHotelSection) {
-      if (line.match(/^(Estambul|Capadocia|Dubai|Abu Dhabi|El Cairo|Luxor|Aswan|Cusco|Lima|Paracas|Bangkok|Phuket|Chiang Mai|Chiang Rai|Atenas|Santorini|Mykonos|Hanoi|Hanói|Ho Chi Minh|Da Nang|Hue|Siem Reap)/i)) {
+      if (line.match(/^(Bangkok|Phuket|Chiang Mai|Chiang Rai|Hanoi|Hanói|Ho Chi Minh|Da Nang|Hue|Siem Reap)/i)) {
         currentCity = line;
       } else if (line.length > 10 && currentCity && !line.match(/CIUDAD|similar/i)) {
         const hotelNames = line.split(/\s*-\s*|\s*,\s*/);
@@ -228,59 +221,27 @@ function extractExclusions(text: string): string[] {
   return items.filter(item => item.length > 0);
 }
 
-const FILE_TO_DESTINATION_MAP: Record<string, string> = {
-  "LEYENDAS DE TURQUIA_1759587583702.docx": "Leyendas de Turquía",
-  "TURQUIA EXTRA REGULARES CON ALMUERZOS_1759587583705.docx": "Turquía Extra Regulares con Almuerzos",
-  "TURQUIA EXTRA REGULARES SIN ALMUERZOS_1759587583709.docx": "Turquía Extra Regulares sin Almuerzos",
-  "DUBAI 3D-2N_1759587489610.docx": "Dubái Esencial",
-  "DUBAI 4D-3N_1759587489614.docx": "Dubái Clásico",
-  "DUBAI 5D-4N_1759587489615.docx": "Dubái Completo",
-  "DUBAI 6D-5N_1759587489616.docx": "Dubái Extended",
-  "DUBAI 8D-7N_1759587489618.docx": "Dubái Premium",
-  "EGIPTO 7D-6N_1759587498484.docx": "Egipto Clásico",
-  "EGIPTO 8D-7N_1759587498485.docx": "Egipto Extendido",
-  "EGIPTO 10D-9N_1759587498486.docx": "Egipto Completo",
-  "TOUR DE PEREGRINACION  4  DIAS_1759587498486.docx": "Tour de Peregrinación 4 Días",
-  "TOUR DE PEREGRINACION  5 DIAS ok_1759587498487.docx": "Tour de Peregrinación 5 Días",
-  "CUSCO- 3 DIAS - 2 NOCHES_1759587574124.pdf": "Cusco Express",
-  "CUSCO - 4 DIAS - 3 NOCHES_1759587574116.pdf": "Cusco Clásico",
-  "CUSCO - 5 DIAS - 4 NOCHES_1759587574117.pdf": "Cusco Completo",
-  "CUSCO - 6 DIAS - 5 NOCHES_1759587574118.pdf": "Cusco Extended",
-  "CUSCO + HUACACHINA - 5 DIAS - 4 NOCHES_1759587574122.pdf": "Cusco + Huacachina",
-  "CUSCO + VINI - 4 DIAS - 3 NOCHES_1759587574123.pdf": "Cusco + Viñac",
-  "CUSCO - VINI - 5 DIAS - 4 NOCHES_1759587574121.pdf": "Cusco - Viñac",
-  "CUSCO - HUACACHINA - 6 DIAS - 5 NOCHES_1759587574119.pdf": "Cusco - Huacachina",
-  "CUSCO - HUACACHINA - LIMA - 7 DIAS - 6 NOCHES_1759587574120.pdf": "Cusco - Huacachina - Lima",
-  "CUSCO - PARACAS - LIMA - 9 DIAS - 8 NOCHES_1759587574120.pdf": "Cusco - Paracas - Lima",
-  "TAILANDIA 6D-5N_1759587590768.docx": "Tailandia Esencial",
-  "TAILANDIA 7D-6N_1759587590769.docx": "Tailandia Completa",
-  "TAILANDIA 8D-7N_1759587590769.docx": "Tailandia Extended",
-  "GRECIA 5D-4N_1759587508665.docx": "Grecia Clásica",
-  "VIETNAM 4D -3N_1759587598463.docx": "Vietnam Express",
-  "VIETNAM 5D -4N_1759587598465.docx": "Vietnam Clásico",
-  "VIETNAM 6D -5N_1759587598466.docx": "Vietnam Completo",
+const DESTINATIONS_TO_FIX: Record<string, { name: string; expectedDays: number }> = {
+  "TAILANDIA 6D-5N_1759587590768.docx": { name: "Tailandia Esencial", expectedDays: 6 },
+  "TAILANDIA 7D-6N_1759587590769.docx": { name: "Tailandia Completa", expectedDays: 7 },
+  "TAILANDIA 8D-7N_1759587590769.docx": { name: "Tailandia Extended", expectedDays: 8 },
+  "VIETNAM 4D -3N_1759587598463.docx": { name: "Vietnam Express", expectedDays: 4 },
+  "VIETNAM 5D -4N_1759587598465.docx": { name: "Vietnam Clásico", expectedDays: 5 },
+  "VIETNAM 6D -5N_1759587598466.docx": { name: "Vietnam Completo", expectedDays: 6 },
 };
 
-async function processDestination(fileName: string, destinationName: string) {
+async function processDestination(fileName: string, destinationInfo: { name: string; expectedDays: number }) {
   const assetsDir = path.join(process.cwd(), "attached_assets");
   const filePath = path.join(assetsDir, fileName);
   
   try {
-    let text: string;
-    if (fileName.endsWith('.docx')) {
-      text = await readDocx(filePath);
-    } else if (fileName.endsWith('.pdf')) {
-      text = await readPdf(filePath);
-    } else {
-      console.log(`⚠ Formato no soportado: ${fileName}`);
-      return;
-    }
+    const text = await readDocx(filePath);
     
     const [destination] = await db.select().from(destinations)
-      .where(eq(destinations.name, destinationName));
+      .where(eq(destinations.name, destinationInfo.name));
     
     if (!destination) {
-      console.log(`⚠ Destino no encontrado en BD: ${destinationName}`);
+      console.log(`⚠ Destino no encontrado en BD: ${destinationInfo.name}`);
       return;
     }
     
@@ -328,24 +289,42 @@ async function processDestination(fileName: string, destinationName: string) {
       await db.insert(exclusions).values(exclusionsData);
     }
     
-    console.log(`✓ ${destinationName} - Días: ${itinerary.length}, Hoteles: ${hotelsList.length}, Inclusiones: ${inclusionsList.length}, Exclusiones: ${exclusionsList.length}`);
-  } catch (error: any) {
-    if (fileName.endsWith('.pdf')) {
-      console.log(`⚠ ${destinationName} - PDF parsing no disponible (convertir a DOCX)`);
-    } else {
-      console.error(`✗ Error procesando ${destinationName}:`, error.message);
+    const status = itinerary.length === destinationInfo.expectedDays ? '✓' : '⚠';
+    console.log(`${status} ${destinationInfo.name}`);
+    console.log(`   Esperado: ${destinationInfo.expectedDays} días | Extraído: ${itinerary.length} días`);
+    console.log(`   Hoteles: ${hotelsList.length} | Inclusiones: ${inclusionsList.length} | Exclusiones: ${exclusionsList.length}`);
+    if (itinerary.length !== destinationInfo.expectedDays) {
+      console.log(`   ⚠ ADVERTENCIA: No coincide el número de días esperado`);
     }
+  } catch (error: any) {
+    console.error(`✗ Error procesando ${destinationInfo.name}:`, error.message);
   }
 }
 
 async function main() {
-  console.log("Poblando información de destinos desde documentos...\n");
+  console.log("Corrigiendo datos de Tailandia y Vietnam...\n");
   
-  for (const [fileName, destinationName] of Object.entries(FILE_TO_DESTINATION_MAP)) {
-    await processDestination(fileName, destinationName);
+  for (const [fileName, destinationInfo] of Object.entries(DESTINATIONS_TO_FIX)) {
+    await processDestination(fileName, destinationInfo);
+    console.log();
   }
   
   console.log("\n✓ Proceso completado!");
+  console.log("\nVerificando en base de datos...\n");
+  
+  // Verify the data in the database
+  for (const destinationInfo of Object.values(DESTINATIONS_TO_FIX)) {
+    const [destination] = await db.select().from(destinations)
+      .where(eq(destinations.name, destinationInfo.name));
+    
+    if (destination) {
+      const days = await db.select().from(itineraryDays)
+        .where(eq(itineraryDays.destinationId, destination.id));
+      
+      const status = days.length === destinationInfo.expectedDays ? '✓' : '⚠';
+      console.log(`${status} ${destinationInfo.name}: ${days.length}/${destinationInfo.expectedDays} días en BD`);
+    }
+  }
 }
 
 main().catch(console.error).finally(() => process.exit(0));
