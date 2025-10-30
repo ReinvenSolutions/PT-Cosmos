@@ -50,13 +50,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isAdmin: false,
       });
       
-      req.session.userId = user.id;
-      
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ message: "Error al crear sesión" });
+        }
+        
+        req.session.userId = user.id;
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Error al guardar sesión" });
+          }
+          
+          const { passwordHash: _, ...userWithoutPassword } = user;
+          res.json(userWithoutPassword);
+        });
+      });
     } catch (error: any) {
       console.error("Registration error:", error);
-      res.status(400).json({ message: error.message || "Error al registrar usuario" });
+      res.status(400).json({ message: "Error al registrar usuario" });
     }
   });
 
@@ -74,13 +87,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Email o contraseña incorrectos" });
       }
       
-      req.session.userId = user.id;
-      
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ message: "Error al crear sesión" });
+        }
+        
+        req.session.userId = user.id;
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Error al guardar sesión" });
+          }
+          
+          const { passwordHash: _, ...userWithoutPassword } = user;
+          res.json(userWithoutPassword);
+        });
+      });
     } catch (error: any) {
       console.error("Login error:", error);
-      res.status(400).json({ message: error.message || "Error al iniciar sesión" });
+      res.status(401).json({ message: "Email o contraseña incorrectos" });
     }
   });
 
@@ -450,9 +476,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes", isAuthenticated, async (req: any, res) => {
+  app.get("/api/quotes", isAuthenticated, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.session.userId!;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
       
@@ -464,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/quotes/:id", isAuthenticated, async (req: AuthRequest, res) => {
     try {
       const quoteWithDetails = await storage.getQuoteWithDetails(req.params.id);
       if (!quoteWithDetails) {
@@ -477,9 +503,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quotes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/quotes", isAuthenticated, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.session.userId!;
       const parsed = insertQuoteSchema.parse(req.body);
       const quote = await storage.createQuote({
         ...parsed,
@@ -492,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/quotes/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/quotes/:id", isAuthenticated, async (req: AuthRequest, res) => {
     try {
       const quote = await storage.updateQuote(req.params.id, req.body);
       if (!quote) {
@@ -505,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/quotes/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/quotes/:id", isAuthenticated, async (req: AuthRequest, res) => {
     try {
       await storage.deleteQuote(req.params.id);
       res.status(204).send();
@@ -515,9 +541,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quotes/:id/duplicate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/quotes/:id/duplicate", isAuthenticated, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.session.userId!;
       const originalQuote = await storage.getQuote(req.params.id);
       
       if (!originalQuote) {

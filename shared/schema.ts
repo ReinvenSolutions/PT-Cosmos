@@ -30,12 +30,19 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true, 
   updatedAt: true,
   passwordHash: true,
+  isAdmin: true,
 }).extend({
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  email: z.string().email("Email inválido").transform(email => email.toLowerCase().trim()),
+  password: z.string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .regex(/[A-Z]/, "La contraseña debe contener al menos una mayúscula")
+    .regex(/[0-9]/, "La contraseña debe contener al menos un número"),
+  firstName: z.string().optional().transform(val => val?.trim()),
+  lastName: z.string().optional().transform(val => val?.trim()),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email("Email inválido"),
+  email: z.string().email("Email inválido").transform(email => email.toLowerCase().trim()),
   password: z.string().min(1, "La contraseña es requerida"),
 });
 

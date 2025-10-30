@@ -18,6 +18,8 @@ import DestinationEditor from "@/pages/destination-editor";
 import Clients from "@/pages/clients";
 import ClientEditor from "@/pages/client-editor";
 import AdminTools from "@/pages/admin-tools";
+import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -37,8 +39,9 @@ function Router() {
     <Switch>
       {!isAuthenticated ? (
         <>
-          <Route path="/" component={Home} />
-          <Route path="/cotizacion" component={QuoteSummary} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/register" component={RegisterPage} />
+          <Route path="/" component={LoginPage} />
         </>
       ) : (
         <>
