@@ -149,6 +149,11 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
 ## Recent Changes
 
 ### October 30, 2025
+- **PDF Date Fix - Colombia Timezone**:
+  - Updated PDF generator to use Colombia timezone (America/Bogota, UTC-5)
+  - PDF creation date now displays correct local date instead of server date
+  - Changed locale from "es-ES" to "es-CO" with timeZone parameter
+
 - **Updated Leyendas de Turquía (10 días 9 noches)**:
   - Completely refreshed 10-day itinerary with updated details from new documentation
   - Updated hotel listings (11 hotels across Estambul, Capadocia, Pamukkale, Kusadasi/Esmirna)

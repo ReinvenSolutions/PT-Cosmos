@@ -76,7 +76,12 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, durationY);
 
-  const currentDate = new Date().toLocaleDateString("es-ES", { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const currentDate = new Date().toLocaleDateString("es-CO", { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric',
+    timeZone: 'America/Bogota'
+  });
   doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
   doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, durationY + 5, { align: "right" });
 
