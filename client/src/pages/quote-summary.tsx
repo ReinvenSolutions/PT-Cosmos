@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save } from "lucide-react";
@@ -659,6 +659,9 @@ export default function QuoteSummary() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Guardar Cotización</DialogTitle>
+              <DialogDescription>
+                Selecciona un cliente para asociar esta cotización
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -667,7 +670,7 @@ export default function QuoteSummary() {
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder="Selecciona un cliente" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100]">
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name} - {client.email}
