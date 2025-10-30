@@ -49,6 +49,15 @@ export default function QuoteDetail() {
 
   const { data: quote, isLoading, error } = useQuery<Quote>({
     queryKey: ["/api/quotes", quoteId],
+    queryFn: async () => {
+      const response = await fetch(`/api/quotes/${quoteId}`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Error al cargar la cotización");
+      }
+      return response.json();
+    },
     enabled: !!quoteId,
   });
 

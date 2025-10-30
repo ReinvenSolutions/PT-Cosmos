@@ -218,3 +218,10 @@ Quotes are created by advisors and stored in the database. Each quote is associa
   - SPA navigation using wouter Link component (no page reloads)
   - Collapsible sidebar with toggle button
   - Logout button in sidebar footer
+- **Login flow improvements**: Login now redirects to home (/) instead of dashboard
+- **Quote detail page**: Created dedicated page (/advisor/quotes/:id) to view full quotation details
+  - Shows complete client information
+  - Displays all selected destinations with dates and passengers
+  - Includes PDF download functionality
+  - Professional layout with sidebar navigation
+- **Backend bug fixes**: Fixed date conversion issue when saving quotes (string dates now properly converted to Date objects)
