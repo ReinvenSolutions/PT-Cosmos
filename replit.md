@@ -166,11 +166,20 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
     - Thailand (3 destinations): 6-8 day programs with complete itineraries
     - Vietnam (3 destinations): 4-6 day programs with complete itineraries
 
-- **Enhanced PDF Generator**:
-  - Updated `publicPdfGenerator.ts` to fetch and display complete destination data from database
-  - PDF now shows detailed day-by-day itinerary with titles and full descriptions per destination
-  - Added hotels section grouped by location
-  - Displays actual inclusions and exclusions from database (with fallback to defaults)
+- **Enhanced PDF Generator with Visual First Page**:
+  - Completely redesigned `publicPdfGenerator.ts` to include professional visual first page
+  - **First page features**:
+    - 3 destination images (1 large horizontal + 2 smaller side-by-side)
+    - RNT number, trip title, duration, and creation date
+    - Budget section with departure/return dates and minimum payment
+    - Highlighted total price in yellow box ("DESDE: $X,XXX por Pareja")
+    - Terms and conditions section
+  - Created `server/destination-images.ts` helper to map destinations to stock images
+  - Image selection logic prioritizes unique countries, then allows duplicates to always show 3 images
+  - **Subsequent pages** show complete destination data:
+    - Detailed day-by-day itinerary with titles and full descriptions
+    - Hotels section grouped by location
+    - Actual inclusions and exclusions from database (with fallback to defaults)
   - Updated `/api/public/quote-pdf` endpoint to fetch complete data via storage methods
 
 ### October 29, 2025
