@@ -72,11 +72,15 @@ All destination-related tables use CASCADE deletes to maintain referential integ
 ## Managing Destinations
 Destinations are managed directly in the database using SQL or database management tools. The schema includes:
 - Unique constraint on (name, country) to prevent duplicates
-- Categories: "nacional" or "internacional"
+- Categories: "nacional" (only Colombia) or "internacional" (all other countries)
 - Special flags like `requiresTuesday` for Turkey destinations
 - Display order for controlling listing sequence
 
-Current database contains 66 destinations across multiple countries including Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, Peru, and Colombia.
+**Current database contains 38 destinations:**
+- **Nacional (7)**: Colombia only
+- **Internacional (31)**: Dubái (5), Egipto (5), Grecia (1), Perú (10), Tailandia (3), Turquía (4), Vietnam (3)
+- All destinations have prices defined
+- All names are in Spanish
 
 ## Recent Changes (October 30, 2025)
 - **Removed all administrative features**: Eliminated the admin dashboard, authentication system, client management, and quote management
@@ -84,3 +88,5 @@ Current database contains 66 destinations across multiple countries including Tu
 - **Removed database seed functionality**: Destinations are managed directly in the database
 - **Eliminated authentication**: No login system or user management
 - **Cleaned up codebase**: Removed unused admin pages, routes, and database tables (users, clients, quotes, sessions)
+- **Removed 28 English-named duplicate destinations**: Cleaned database by removing Dubai, Egypt, Greece, Peru, Thailand, Turkey duplicates (without prices)
+- **Finalized categorization**: Colombia (7 destinations) as "nacional", all others (31) as "internacional"
