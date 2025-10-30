@@ -330,7 +330,7 @@ export default function QuoteSummary() {
                 </p>
                 {endDate && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Duración total: {selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0)}{hasTurkeyDestinations && " +1"} días
+                    Duración total: {selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0)}{hasTurkeyDestinations && " +1 día"} de viaje
                     {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
                   </p>
                 )}

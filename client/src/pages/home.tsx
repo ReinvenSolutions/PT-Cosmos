@@ -10,12 +10,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
 import { DatePicker } from "@/components/ui/date-picker";
+import { isTuesday } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("internacional");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const { toast } = useToast();
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -103,7 +106,11 @@ export default function Home() {
           day: "numeric",
         });
         
-        alert(`⚠️ Advertencia: Los planes de Turquía solo están disponibles con salida los días MARTES.\n\nLa fecha seleccionada (${dateStr}) no es un martes.\n\nPor favor, selecciona una fecha que sea martes para poder incluir destinos de Turquía.`);
+        toast({
+          title: "Planes de Turquía solo los Martes",
+          description: `La fecha seleccionada (${dateStr}) no es un martes. Los vuelos desde Colombia salen martes y llegan miércoles a Turquía debido al cambio horario (+1 día adicional). Por favor, selecciona una fecha que sea martes para poder incluir destinos de Turquía.`,
+          variant: "destructive",
+        });
         
         setStartDate(undefined);
         return;
@@ -192,7 +199,7 @@ export default function Home() {
                   Basado en {selectedDestinations.reduce((sum, destId) => {
                     const dest = destinations.find((d) => d.id === destId);
                     return sum + (dest?.duration || 0);
-                  }, 0)}{hasTurkeyDestinations && " +1"} días de viaje
+                  }, 0)}{hasTurkeyDestinations && " +1 día"} de viaje
                   {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
                 </p>
               )}

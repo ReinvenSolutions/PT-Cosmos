@@ -1,268 +1,61 @@
 # Tourist Package Quotation System
 
-## Project Overview
-Dual-mode travel booking platform: public-facing customer quotation system + internal admin dashboard for quote/client/destination management.
+## Overview
+This project is a dual-mode travel booking platform comprising a public-facing customer quotation system and an internal admin dashboard. Its purpose is to streamline the creation, management, and delivery of travel package quotations. The system allows customers to browse destinations, select multiple options, specify travel dates, upload flight details, and request a personalized quote via WhatsApp. For administrators, it provides comprehensive tools for managing destinations, itineraries, client information, and quotes, including generating professional PDF exports. The business model emphasizes guaranteed land portions for groups of two or more with Spanish-speaking guides.
 
-## Key Features
+## User Preferences
+I prefer detailed explanations and iterative development. Ask before making major changes. Do not make changes to the folder `Z` and the file `Y`.
 
-### Public Customer Flow (No Authentication Required)
-- **Landing Page** (`/`) - Browse destinations organized by category:
-  - **Nacional**: 7 Colombian destinations (Guajira, San Andrés, Eje Cafetero, Medellín, Santander, Amazonas, Cartagena)
-  - **Internacional**: Global destinations (Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, Peru)
-  - **Promociones**: Featured promotional packages
-- **Multi-destination Selection**: Customers can select multiple destinations across categories
-- **Date Selection**: Travel start and end date inputs
-- **Quote Summary Page** (`/cotizacion`):
-  - Review selected destinations and dates
-  - Upload multiple flight images (outbound and return)
-  - Send quote request via WhatsApp (+57 3146576500)
-- **Business Model Messaging**: Emphasizes land portions guaranteed from 2 pax with Spanish-speaking guides
+## System Architecture
+The application is built with a clear separation between frontend and backend.
 
-### Authentication & Admin Access
-- Replit Auth integration for admin users
-- Session-based authentication
-- User profiles with email and name
-- Admin dashboard accessible only when authenticated
+### UI/UX Decisions
+- Public-facing interface for browsing destinations and requesting quotes without authentication.
+- Admin dashboard is accessible only to authenticated users.
+- Design incorporates Tailwind CSS and shadcn/ui for a modern, responsive interface.
+- Date selection uses `shadcn DatePicker` with locale support.
+- Professional PDF generation for quotes with company branding, visual itinerary, and detailed breakdown.
+- Emphasis on clear informational banners and toast notifications for user feedback.
 
-### Destination Management (Admin)
-- 31 pre-loaded destination templates
-- Full CRUD operations for destinations
-- Itinerary management by day
-- Hotel tracking
-- Inclusions/exclusions lists
-- Image support via object storage
-- Category management (Nacional/Internacional/Promociones)
+### Technical Implementations
+- **Frontend**: React for the UI, Wouter for routing, TanStack Query for data fetching, Tailwind CSS and shadcn/ui for styling.
+- **Backend**: Express.js with TypeScript for robust API development.
+- **Database**: PostgreSQL hosted on Neon, managed with Drizzle ORM.
+- **Authentication**: Replit Auth with session management for admin access.
+- **Storage**: Replit Object Storage for handling image uploads (destination images and customer flight images).
+- **PDF Generation**: PDFKit is used for creating customized PDF documents.
+- **Routing**: Differentiates access for unauthenticated public users and authenticated admin users.
+- **State Management**: `sessionStorage` is used for persisting customer-selected destinations and dates in the public flow.
+- **Automatic Calculations**: The system automatically calculates trip end dates and total durations based on selected destinations.
+- **"Turkey" Destination Logic**: Specific business rules are implemented for Turkey destinations, requiring Tuesday departures and adding an extra day for travel, with corresponding UI validations and messaging.
 
-### Quote Management (Admin)
-- Create and edit quotes with multiple destinations
-- Auto-populate itinerary from destination templates
-- Flight image management
-- Price and date management
-- Quote status tracking (draft, sent, accepted, rejected)
-- Search and filter capabilities
-- PDF export with professional design
-
-### Client Management (Admin)
-- Client database with contact information
-- Quote history per client
-- Conversion tracking (accepted vs total quotes)
-- Active/inactive status management
-
-### PDF Export
-- Professional quote PDFs with company branding
-- Complete itinerary details
-- Hotel information
-- Inclusions and exclusions
-- Pricing breakdown
-- Terms and conditions
-
-## Technical Stack
-- **Frontend**: React, Wouter (routing), TanStack Query, Tailwind CSS, shadcn/ui
-- **Backend**: Express.js, TypeScript
-- **Database**: PostgreSQL (Neon) via Drizzle ORM
-- **Auth**: Replit Auth with session management
-- **Storage**: Replit Object Storage for images
-- **PDF Generation**: PDFKit
-
-## Project Structure
-- `/client` - React frontend application
-- `/server` - Express backend with API routes
-- `/shared` - Shared TypeScript types and schemas
-- `/attached_assets` - Reference files for destination templates
-
-## Database Schema
-- `users` - User accounts from Replit Auth
-- `clients` - Client contact database
-- `destinations` - Destination templates
-- `itinerary_days` - Day-by-day itinerary for each destination
-- `hotels` - Hotels by destination
-- `inclusions` - Services included per destination  
-- `exclusions` - Services not included per destination
-- `quotes` - Customer quotes
-- `quote_destinations` - Many-to-many relationship between quotes and destinations
-
-## Configuration
-
-### Object Storage
-- Default bucket configured for image uploads
-- Public directory: `/public` (for destination images)
-- Private directory: `/.private` (for customer flight images)
-
-### Public API Endpoints
-The following endpoints are publicly accessible (no authentication required):
-- `GET /api/destinations?isActive=true` - Fetch active destinations for public catalog
-- `POST /api/upload` - Upload flight images (customer flow)
-
-**Security Considerations**:
-- `/api/upload` is public to support unauthenticated customer quotations
-- Current protections:
-  - MIME type validation (images only: jpeg, jpg, png, gif, webp)
-  - File extension validation
-  - 10MB file size limit
-  - Randomized filenames to prevent collisions
-- **Recommended for production**:
-  - Implement rate limiting per IP address
-  - Add session-based upload quotas
-  - Consider signed upload tokens with expiration
-  - Set up automated cleanup of old uploaded files
-  - Monitor storage usage and implement alerts
-
-### Email Integration (TODO)
-Email functionality is implemented but requires configuration. To enable email sending:
-
-1. **Option A - Use Replit Integration:**
-   - Set up Resend connector via Replit integrations
-   - This handles authentication automatically
-
-2. **Option B - Manual SMTP:**
-   - Add these secrets in Replit:
-     - `SMTP_HOST` - Your SMTP server host
-     - `SMTP_PORT` - SMTP port (usually 587)
-     - `SMTP_USER` - SMTP username
-     - `SMTP_PASSWORD` - SMTP password
-     - `SMTP_FROM_EMAIL` - From email address
-     - `SMTP_FROM_NAME` - From name
-
-The email service (`server/email.ts`) is ready and will work once credentials are configured.
-
-## Routing Architecture
-- **Unauthenticated Users**: See public landing page (`/`) and quote summary (`/cotizacion`)
-- **Authenticated Users**: Access admin dashboard with quotes, clients, and destinations management
-- State persistence: `sessionStorage` used for customer-selected destinations and dates
-
-## Future Enhancements (Next Phase)
-- [ ] Rate limiting for public upload endpoint (production security)
-- [ ] Session-based upload quotas and token authentication
-- [ ] Dynamic pricing with seasons and promotions
-- [ ] Role-based access control (admin, senior agent, junior agent)
-- [ ] Quote duplication and versioning
-- [ ] Automated email notifications
-- [ ] Advanced reporting and analytics
-- [ ] Automated cleanup of old uploaded files
-
-## Development
-- Run `npm run dev` to start the development server
-- Backend serves on port 5000
-- Frontend is bundled via Vite
-- Database migrations via `npm run db:push`
-
-## Recent Changes
-
-### October 30, 2025
-- **Automatic End Date Calculation**:
-  - Simplified user experience by eliminating manual end date selection
-  - System now automatically calculates trip end date based on selected destinations
-  - **Landing Page Changes**:
-    - Removed editable end date input field
-    - Added read-only calculated end date display with Spanish locale formatting
-    - Shows helper text indicating total trip duration
-    - Formula: endDate = startDate + sum(destination durations) - 1
-  - **Quote Summary Page Changes**:
-    - Displays calculated end date with "(Calculada)" label
-    - Shows total duration in days below end date
-    - Both dates formatted with es-CO locale
-  - **Data Flow Update**:
-    - sessionStorage now stores only: { destinations: string[], startDate: string }
-    - endDate removed from storage (calculated dynamically on both pages)
-    - Prevents date calculation errors and ensures consistency
-  - **Benefits**:
-    - Users no longer need to manually calculate trip end dates
-    - Eliminates potential date entry errors
-    - Automatically updates when destinations are added/removed
-    - Cleaner, more intuitive user interface
-
-- **Visual Itinerary Page (Page 2) in PDF**:
-  - Added new "Itinerario" page between cover page and detailed itinerary section
-  - **Visual Features**:
-    - Title "Itinerario" with orange decorative underline
-    - Origin city display at start and end with "Inicio del viaje" / "El final del viaje" labels
-    - Numbered city stops with orange square badges (1, 2, 3...)
-    - Night count per city displayed prominently on the right
-    - Auto-extracts cities from itinerary day titles (splits on ' - ', takes last segment)
-    - Aggregates consecutive nights per location across all destinations
-  - Added "Ciudad de Origen y Retorno" input field to quote summary form
-  - Updated `/api/public/quote-pdf` endpoint to receive and pass `originCity` to PDF generator
-  - Data flow: Quote form → Backend API → PDF generator → Visual itinerary page
-
-- **PDF First Page Visual Improvements**:
-  - Increased visibility of "Pago mínimo para separar" text (from 8pt to 10pt, bold, darker color)
-  - Updated PDF generator to use Colombia timezone (America/Bogota, UTC-5)
-  - PDF creation date now displays correct local date instead of server date
-  - Changed locale from "es-ES" to "es-CO" with timeZone parameter
-
-- **Updated Leyendas de Turquía (10 días 9 noches)**:
-  - Completely refreshed 10-day itinerary with updated details from new documentation
-  - Updated hotel listings (11 hotels across Estambul, Capadocia, Pamukkale, Kusadasi/Esmirna)
-  - Updated inclusions (9 nights accommodation, 9 breakfasts, 5 dinners, WiFi on bus, water bottles)
-  - Updated exclusions (optional excursions, drinks, personal expenses, tips)
-  - New itinerary highlights: Ankara-Capadocia route, Ozkonak underground city, Hierapolis, Ephesus ruins, Bursa
-  - Maintained original destination name "Leyendas de Turquía"
-
-- **Complete Destination Data Population**:
-  - Populated all 30 international/national destinations with complete information from original planning documents
-  - Processed 20 DOCX files (Turkey, Dubai, Egypt, Greece, Thailand, Vietnam) and 10 PDF files (Peru/Cusco)
-  - Database now contains complete day-by-day itineraries for all destinations (3-10 days per destination)
-  - Added detailed hotels, inclusions, and exclusions for each destination from source documents
-  - Created processing scripts: `scripts/populate-destinations.ts` (DOCX) and `scripts/populate-cusco-pdfs.ts` (PDF)
-  - Installed document parsing libraries: mammoth (DOCX), poppler_utils/pdftotext (PDF)
-  - Fixed itinerary extraction for Thailand and Vietnam destinations to capture complete multi-day programs
-  - **Total data populated**: 
-    - Turkey (4 destinations): 8-10 day programs with complete itineraries
-    - Dubai (5 destinations): 3-8 day programs with complete itineraries
-    - Egypt (5 destinations): 4-10 day programs with complete itineraries
-    - Greece (1 destination): 5 day program with complete itinerary
-    - Peru/Cusco (10 destinations): 3-9 day programs with complete itineraries
-    - Thailand (3 destinations): 6-8 day programs with complete itineraries
-    - Vietnam (3 destinations): 4-6 day programs with complete itineraries
-
-- **Enhanced PDF Generator with Visual First Page**:
-  - Completely redesigned `publicPdfGenerator.ts` to include professional visual first page
-  - **First page features**:
-    - 3 destination images (1 large horizontal + 2 smaller side-by-side)
-    - Adaptive title font sizing (16-24pt based on length) to prevent text overlap
-    - Dynamic spacing calculation to prevent title/duration overlap
-    - RNT number, trip title, duration, and creation date
-    - Budget section with departure/return dates and minimum payment
-    - Highlighted total price in yellow box ("DESDE: $X,XXX por Pareja")
-    - Terms and conditions section
-  - Created `server/destination-images.ts` helper to map destinations to stock images
-  - Downloaded 28 additional high-quality stock images for all destination countries
-  - **Itinerary Section Enhancement**:
-    - Each destination now displays 3 appealing images below its title
-    - Images positioned horizontally (3 across) with proper spacing
-    - Images auto-selected from curated country-specific image sets
-  - Image selection logic prioritizes unique countries, then allows duplicates to always show 3 images
-  - **Subsequent pages** show complete destination data:
-    - Detailed day-by-day itinerary with titles and full descriptions
-    - Hotels section grouped by location
-    - Actual inclusions and exclusions from database (with fallback to defaults)
-  - Updated `/api/public/quote-pdf` endpoint to fetch complete data via storage methods
-
-### October 29, 2025
-- **Pricing and PDF Export**:
-  - Added `basePrice` field to destinations schema (represents land portion only: hotels, tours, transport, activities, guides)
-  - Populated all 31 destinations with realistic base prices ($800-$4500 USD based on destination/duration)
-  - Downloaded and integrated 13 coherent stock images for destinations (Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, Peru, Colombian destinations)
-  - Updated destination cards to prominently display prices with orange accent color
-  - Added "Vuelos + Asistencia + Comisión" input field in quote summary page
-  - Implemented total price calculation (sum of land portions + flights/assistance/commission)
-  - Created public PDF generator (`publicPdfGenerator.ts`) with professional design
-  - Added `/api/public/quote-pdf` endpoint for quote PDF export
-  - Integrated PDF download functionality in quote summary page
-  - Updated WhatsApp message to include total price
-  
+### Feature Specifications
 - **Public Customer Flow**:
-  - Created public landing page with destination browsing (Nacional/Internacional/Promociones)
-  - Updated Colombian destinations to 7 options: Guajira, San Andrés, Eje Cafetero, Medellín, Santander, Amazonas, Cartagena
-  - Implemented multi-destination selection with date inputs
-  - Added quote summary page (`/cotizacion`) with flight image uploads
-  - Updated WhatsApp integration to +57 3146576500
-  - Made `/api/destinations` and `/api/upload` publicly accessible
-  - Added strict security validations to upload endpoint (MIME, extension, size)
-  
-- **Previous Updates**:
-  - Added client management system with conversion tracking
-  - Implemented flight image upload functionality
-  - Created professional PDF export system
-  - Seeded database with 31 destination templates
-  - Fixed security issue with userId derivation from session
+    - Landing page displays destinations by category (Nacional, Internacional, Promociones).
+    - Multi-destination selection and date input.
+    - Quote summary page for reviewing selections, uploading flight images, and sending requests via WhatsApp.
+- **Admin Features**:
+    - **Authentication**: Replit Auth integration.
+    - **Destination Management**: CRUD operations for 31 pre-loaded destination templates, including itinerary management (day-by-day), hotels, inclusions/exclusions, images, and categories.
+    - **Quote Management**: Create/edit quotes, auto-populate itineraries, manage flight images, set prices/dates, track status, search/filter, and export to PDF.
+    - **Client Management**: Database for client contact info, quote history, and conversion tracking.
+- **PDF Export**: Generates comprehensive, branded PDFs with cover page, visual itinerary overview, detailed day-by-day itinerary, hotel information, inclusions, exclusions, and pricing breakdown.
+
+### System Design Choices
+- Monorepo structure with `/client`, `/server`, and `/shared` directories.
+- Object storage configured with public and private directories for different image types.
+- Public API endpoints are secured with MIME type, file extension, and size validations.
+
+## External Dependencies
+- **PostgreSQL (Neon)**: Relational database for storing all application data.
+- **Replit Auth**: Authentication service for user management.
+- **Replit Object Storage**: Cloud storage for image assets.
+- **PDFKit**: JavaScript library for PDF document generation.
+- **Wouter**: Client-side routing for React.
+- **TanStack Query**: Data fetching and caching library for React.
+- **Tailwind CSS**: Utility-first CSS framework.
+- **shadcn/ui**: Reusable UI components.
+- **Express.js**: Backend web application framework.
+- **TypeScript**: Superset of JavaScript for type safety.
+- **Drizzle ORM**: TypeScript ORM for PostgreSQL.
+- **Resend (Optional)**: Email service integration (via Replit integration or manual SMTP).
