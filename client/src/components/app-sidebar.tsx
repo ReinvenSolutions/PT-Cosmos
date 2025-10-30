@@ -44,6 +44,11 @@ export function AppSidebar() {
       icon: Home,
     },
     {
+      title: "Clientes",
+      url: "/admin",
+      icon: Users,
+    },
+    {
       title: "Nueva Cotización",
       url: "/",
       icon: Plane,
