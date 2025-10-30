@@ -1,9 +1,15 @@
 import type { Request, Response, NextFunction } from "express";
-import type { User } from "@shared/schema";
+import type { User as DbUser } from "@shared/schema";
 
 declare global {
   namespace Express {
-    interface User extends import("@shared/schema").User {}
+    interface User {
+      id: string;
+      username: string;
+      passwordHash: string;
+      role: string;
+      createdAt: Date | null;
+    }
   }
 }
 
@@ -20,7 +26,7 @@ export function requireRole(role: string) {
       return res.status(401).json({ message: "No autenticado" });
     }
 
-    const user = req.user as User;
+    const user = req.user as Express.User;
     if (user.role !== role) {
       return res.status(403).json({ message: "No autorizado" });
     }
@@ -35,7 +41,7 @@ export function requireRoles(roles: string[]) {
       return res.status(401).json({ message: "No autenticado" });
     }
 
-    const user = req.user as User;
+    const user = req.user as Express.User;
     if (!roles.includes(user.role)) {
       return res.status(403).json({ message: "No autorizado" });
     }
