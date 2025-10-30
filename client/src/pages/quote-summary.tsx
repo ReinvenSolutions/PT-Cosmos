@@ -221,12 +221,21 @@ export default function QuoteSummary() {
       return;
     }
 
+    if (!startDate) {
+      toast({
+        title: "Fecha requerida",
+        description: "Por favor, selecciona una fecha de inicio",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const quoteData = {
       clientId: selectedClientId,
       totalPrice: grandTotal,
       destinations: selectedDestinations.map((destId) => ({
         destinationId: destId,
-        startDate: startDate,
+        startDate: new Date(startDate).toISOString().split("T")[0],
         passengers: passengers,
       })),
     };

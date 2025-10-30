@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import {
   Sidebar,
   SidebarContent,
@@ -79,10 +79,10 @@ export function AppSidebar() {
                     isActive={location === item.url}
                     data-testid={`sidebar-${item.title.toLowerCase().replace(/ /g, "-")}`}
                   >
-                    <a href={item.url}>
+                    <Link href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

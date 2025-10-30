@@ -68,10 +68,6 @@ export default function Home() {
 
   const endDate = calculateEndDate();
 
-  const isTuesday = (date: Date) => {
-    return date.getDay() === 2;
-  };
-
   const disableDates = (date: Date) => {
     if (hasTurkeyDestinations) {
       return !isTuesday(date) || date < new Date(new Date().setHours(0, 0, 0, 0));
