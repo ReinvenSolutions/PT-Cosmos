@@ -170,11 +170,18 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
   - Completely redesigned `publicPdfGenerator.ts` to include professional visual first page
   - **First page features**:
     - 3 destination images (1 large horizontal + 2 smaller side-by-side)
+    - Adaptive title font sizing (16-24pt based on length) to prevent text overlap
+    - Dynamic spacing calculation to prevent title/duration overlap
     - RNT number, trip title, duration, and creation date
     - Budget section with departure/return dates and minimum payment
     - Highlighted total price in yellow box ("DESDE: $X,XXX por Pareja")
     - Terms and conditions section
   - Created `server/destination-images.ts` helper to map destinations to stock images
+  - Downloaded 28 additional high-quality stock images for all destination countries
+  - **Itinerary Section Enhancement**:
+    - Each destination now displays 3 appealing images below its title
+    - Images positioned horizontally (3 across) with proper spacing
+    - Images auto-selected from curated country-specific image sets
   - Image selection logic prioritizes unique countries, then allows duplicates to always show 3 images
   - **Subsequent pages** show complete destination data:
     - Detailed day-by-day itinerary with titles and full descriptions

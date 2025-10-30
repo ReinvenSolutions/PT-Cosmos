@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit";
 import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion } from "@shared/schema";
-import { getDestinationImages } from "./destination-images";
+import { getDestinationImages, getDestinationImageSet } from "./destination-images";
 import fs from "fs";
 
 interface PublicQuoteData {
@@ -211,7 +211,34 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
 
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
     doc.text(`${dest.name.toUpperCase()} - ${dest.country.toUpperCase()}`, leftMargin, doc.y);
-    doc.moveDown(0.8);
+    doc.moveDown(0.5);
+
+    const destImages = getDestinationImageSet({ name: dest.name, country: dest.country });
+    if (destImages.length > 0) {
+      const imageWidth = (contentWidth - 20) / 3;
+      const imageHeight = 100;
+      const currentY = doc.y;
+
+      destImages.slice(0, 3).forEach((imagePath, index) => {
+        if (fs.existsSync(imagePath)) {
+          try {
+            const xPos = leftMargin + (index * (imageWidth + 10));
+            doc.image(imagePath, xPos, currentY, {
+              width: imageWidth,
+              height: imageHeight,
+              align: "center",
+              valign: "center"
+            });
+            
+            doc.rect(xPos, currentY, imageWidth, imageHeight).stroke(borderColor);
+          } catch (error) {
+            console.error(`Error loading destination image ${index + 1}:`, error);
+          }
+        }
+      });
+
+      doc.y = currentY + imageHeight + 15;
+    }
 
     dest.itinerary.forEach((day) => {
       if (doc.y > 720) {

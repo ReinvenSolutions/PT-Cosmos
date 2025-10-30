@@ -13,6 +13,49 @@ export const countryImagePaths: Record<string, string> = {
   'Colombia': path.join(ASSETS_PATH, 'cartagena_colombia_c_b5845004.jpg'),
 };
 
+export const countryImageSets: Record<string, string[]> = {
+  'Turquía': [
+    path.join(ASSETS_PATH, 'turkey_istanbul_bosp_82a10332.jpg'),
+    path.join(ASSETS_PATH, 'turkey_cappadocia_ca_3eca4b1c.jpg'),
+    path.join(ASSETS_PATH, 'hagia_sophia_mosque__ecd33474.jpg')
+  ],
+  'Dubái': [
+    path.join(ASSETS_PATH, 'burj_khalifa_dubai_s_0a51b3ef.jpg'),
+    path.join(ASSETS_PATH, 'dubai_skyline_modern_3111f3fa.jpg'),
+    path.join(ASSETS_PATH, 'dubai_desert_safari__a3820616.jpg')
+  ],
+  'Egipto': [
+    path.join(ASSETS_PATH, 'pyramids_of_giza_egy_4d7d81d1.jpg'),
+    path.join(ASSETS_PATH, 'egypt_luxor_ancient__fa66bb4d.jpg'),
+    path.join(ASSETS_PATH, 'egypt_nile_river_cru_eb01b597.jpg')
+  ],
+  'Grecia': [
+    path.join(ASSETS_PATH, 'santorini_greece_whi_25df22f7.jpg'),
+    path.join(ASSETS_PATH, 'greece_athens_parthe_078be842.jpg'),
+    path.join(ASSETS_PATH, 'greece_mykonos_white_034716bc.jpg')
+  ],
+  'Tailandia': [
+    path.join(ASSETS_PATH, 'thai_temple_bangkok__f24eb488.jpg'),
+    path.join(ASSETS_PATH, 'thailand_beach_phi_p_8f5dcfbf.jpg'),
+    path.join(ASSETS_PATH, 'thailand_floating_ma_fee5ff2c.jpg')
+  ],
+  'Vietnam': [
+    path.join(ASSETS_PATH, 'halong_bay_vietnam_b_483ce48e.jpg'),
+    path.join(ASSETS_PATH, 'vietnam_rice_terrace_7063ae8b.jpg'),
+    path.join(ASSETS_PATH, 'vietnam_hoi_an_ancie_5aef2cfa.jpg')
+  ],
+  'Perú': [
+    path.join(ASSETS_PATH, 'machu_picchu_peru_an_85367025.jpg'),
+    path.join(ASSETS_PATH, 'peru_cusco_city_plaz_4a297d1e.jpg'),
+    path.join(ASSETS_PATH, 'peru_sacred_valley_m_89f0ed5a.jpg')
+  ],
+  'Colombia': [
+    path.join(ASSETS_PATH, 'cartagena_colombia_c_b5845004.jpg'),
+    path.join(ASSETS_PATH, 'medellin_colombia_ca_be5f2e82.jpg'),
+    path.join(ASSETS_PATH, 'coffee_plantation_co_803c7456.jpg')
+  ],
+};
+
 export const destinationImagePaths: Record<string, string> = {
   'Cartagena Colonial y Playas de Barú': path.join(ASSETS_PATH, 'cartagena_colombia_c_b5845004.jpg'),
   'Medellín Ciudad de la Eterna Primavera': path.join(ASSETS_PATH, 'medellin_colombia_ca_be5f2e82.jpg'),
@@ -63,4 +106,17 @@ export function getDestinationImages(destinations: Array<{ name: string; country
   }
   
   return images.slice(0, 3);
+}
+
+export function getDestinationImageSet(destination: { name: string; country: string }): string[] {
+  if (countryImageSets[destination.country]) {
+    return countryImageSets[destination.country];
+  }
+  
+  const singleImage = getDestinationImagePath(destination);
+  if (singleImage) {
+    return [singleImage, singleImage, singleImage];
+  }
+  
+  return [];
 }
