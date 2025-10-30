@@ -106,12 +106,14 @@ Deployments posteriores (BD con datos):
 
 ## Actualizar datos en producción
 
+**IMPORTANTE**: El seed automático solo funciona en una base de datos completamente vacía.
+
 Si actualizas destinos en desarrollo y quieres reflejarlos en producción:
 
 1. Exporta nuevamente los datos:
    ```bash
    pg_dump -h $PGHOST -p $PGPORT -U $PGUSER -d $PGDATABASE \
-     -t destinations -t itinerary_days -t hotels -t inclusions -t exclusions \
+     -t users -t clients -t destinations -t itinerary_days -t hotels -t inclusions -t exclusions \
      --data-only --column-inserts > export-production-data.sql
    ```
 
@@ -119,12 +121,23 @@ Si actualizas destinos en desarrollo y quieres reflejarlos en producción:
 
 3. Haz deploy en Replit
 
-4. **Opción A (Automática)**: 
-   - Vacía la tabla destinations en producción
-   - El seed automático detectará la BD vacía y poblará
+4. **Para que el seed automático funcione, debes vaciar completamente la BD de producción**:
+   ```sql
+   -- Ejecutar desde el panel de base de datos de producción
+   TRUNCATE TABLE quote_destinations CASCADE;
+   TRUNCATE TABLE quotes CASCADE;
+   TRUNCATE TABLE exclusions CASCADE;
+   TRUNCATE TABLE inclusions CASCADE;
+   TRUNCATE TABLE hotels CASCADE;
+   TRUNCATE TABLE itinerary_days CASCADE;
+   TRUNCATE TABLE destinations CASCADE;
+   TRUNCATE TABLE clients CASCADE;
+   TRUNCATE TABLE users CASCADE;
+   ```
 
-5. **Opción B (Manual)**:
-   - Ejecuta el SQL manualmente desde el panel de base de datos
+5. **Opción alternativa (Manual)**:
+   - Ejecuta el SQL actualizado manualmente desde el panel de base de datos
+   - Esto permite actualizaciones parciales sin vaciar toda la BD
 
 ## Troubleshooting
 

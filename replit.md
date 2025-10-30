@@ -197,6 +197,18 @@ Quotes are created by advisors and stored in the database. Each quote is associa
 - Total price and status
 
 ## Recent Changes (October 30, 2025)
+
+### Sistema de Seed Automático de Base de Datos
+- **Implementado seed automático**: La base de datos de producción se puebla automáticamente en el deploy
+- **Verificación inteligente**: Solo importa datos si la base de datos está vacía (no sobrescribe)
+- **Archivo**: `server/seed.ts` - Script que verifica estado y puebla datos
+- **Integración**: `server/index.ts` - Ejecuta seed automáticamente en producción (NODE_ENV=production)
+- **Datos incluidos**: 38 destinos completos, usuarios base (admin, advisor1), clientes de ejemplo
+- **Archivo SQL**: `export-production-data.sql` - 1,240 líneas con todos los datos de desarrollo
+- **Logs detallados**: Indica si la BD está vacía o ya poblada al arrancar en producción
+- **Comportamiento**: Igual que otros proyectos de Replit - deploy actualiza schema + datos automáticamente
+
+### Anteriores (antes del seed automático)
 - **Implemented native authentication**: Passport Local Strategy with bcrypt password hashing
 - **Added role-based access control**: Super Admin and Advisor roles with distinct permissions
 - **Created authentication layer**: Login, logout, session management with PostgreSQL

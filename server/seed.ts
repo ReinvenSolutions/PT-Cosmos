@@ -19,16 +19,22 @@ export async function seedDatabaseIfEmpty() {
 
     console.log("📊 Base de datos vacía detectada. Iniciando seed automático...");
 
-    // Verificar y crear usuarios base si no existen
-    await seedBaseUsers();
+    // PRIMERO: Importar datos desde el archivo SQL (incluye usuarios, destinos, etc)
+    const sqlImportSuccess = await importSQLData();
 
-    // Importar datos desde el archivo SQL
-    await importSQLData();
-
-    console.log("✅ Seed completado exitosamente!");
+    // DESPUÉS: Verificar y crear usuarios base que falten (backfill)
+    if (sqlImportSuccess) {
+      await seedBaseUsers();
+      console.log("✅ Seed completado exitosamente!");
+    } else {
+      // Si falla el SQL, intentar crear al menos los usuarios base
+      console.log("⚠️ SQL import falló. Creando usuarios base solamente...");
+      await seedBaseUsers();
+      console.log("⚠️ Seed parcial completado (solo usuarios).");
+    }
     
   } catch (error) {
-    console.error("❌ Error durante el seed automático:", error);
+    console.error("❌ Error crítico durante el seed automático:", error);
     // No lanzar el error para que la aplicación pueda iniciar de todos modos
     console.log("⚠️ La aplicación continuará sin datos iniciales.");
   }
@@ -76,7 +82,7 @@ async function seedBaseUsers() {
   }
 }
 
-async function importSQLData() {
+async function importSQLData(): Promise<boolean> {
   console.log("🌍 Importando datos desde archivo SQL...");
 
   try {
@@ -89,13 +95,18 @@ async function importSQLData() {
 
     console.log("   ✓ Datos importados exitosamente");
     console.log("   📋 Incluye: 38 destinos con itinerarios, hoteles, inclusiones y exclusiones");
+    return true;
   } catch (error: any) {
-    // Si el archivo no existe o hay un error, no es crítico
+    // Si el archivo no existe o hay un error, reportar y retornar false
     if (error.code === 'ENOENT') {
-      console.log("   ⚠️ Archivo export-production-data.sql no encontrado");
+      console.error("   ❌ Archivo export-production-data.sql no encontrado");
       console.log("   💡 Puedes importar datos manualmente desde el panel de base de datos");
     } else {
       console.error("   ❌ Error importando datos SQL:", error.message);
+      if (error.stack) {
+        console.error("   Stack:", error.stack);
+      }
     }
+    return false;
   }
 }
