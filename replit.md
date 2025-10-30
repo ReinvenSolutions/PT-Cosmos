@@ -59,3 +59,29 @@ The application is built with a clear separation between frontend and backend.
 - **TypeScript**: Superset of JavaScript for type safety.
 - **Drizzle ORM**: TypeScript ORM for PostgreSQL.
 - **Resend (Optional)**: Email service integration (via Replit integration or manual SMTP).
+
+## Production Database Seeding
+When deploying to production, the database is initially empty. To populate it with all destinations data:
+
+### Option 1: Admin Tools UI (Recommended)
+1. Deploy your application to production
+2. Log in as an admin user
+3. Navigate to **Admin Tools** from the sidebar
+4. Click the **"Ejecutar Seed de Base de Datos"** button
+5. Confirm the action
+6. Wait for completion (creates 31 destinations with complete data)
+
+### Option 2: API Endpoint
+Send a POST request to `/api/admin/seed-database` (requires authentication):
+```bash
+curl -X POST https://your-production-url/api/admin/seed-database \
+  -H "Cookie: your-session-cookie"
+```
+
+### What Gets Created:
+- 31 destinations across 7 countries (Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, Peru)
+- Complete day-by-day itineraries for each destination
+- Hotel information for each destination
+- Inclusions and exclusions lists
+- Turkey destinations configured with `requiresTuesday=true`
+

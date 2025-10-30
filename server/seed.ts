@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { destinations, itineraryDays, hotels, inclusions, exclusions } from "@shared/schema";
 
-async function seedDatabase() {
+export async function seedDatabase() {
   console.log("Starting database seed...");
 
   const turkeyDestinations = [

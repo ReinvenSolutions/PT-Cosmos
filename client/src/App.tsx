@@ -17,6 +17,7 @@ import Destinations from "@/pages/destinations";
 import DestinationEditor from "@/pages/destination-editor";
 import Clients from "@/pages/clients";
 import ClientEditor from "@/pages/client-editor";
+import AdminTools from "@/pages/admin-tools";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -51,6 +52,7 @@ function Router() {
           <Route path="/destinations" component={Destinations} />
           <Route path="/destinations/new" component={DestinationEditor} />
           <Route path="/destinations/:id" component={DestinationEditor} />
+          <Route path="/admin-tools" component={AdminTools} />
         </>
       )}
       <Route component={NotFound} />

@@ -16,6 +16,7 @@ import multer from "multer";
 import { handleFileUpload } from "./upload";
 import express from "express";
 import { generatePublicQuotePDF } from "./publicPdfGenerator";
+import { seedDatabase } from "./seed";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -86,6 +87,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/admin/seed-database", isAuthenticated, async (req: any, res) => {
+    try {
+      console.log("Admin seed database request from user:", req.user.claims.sub);
+      
+      const destinationsCount = await storage.getDestinations({ isActive: true });
+      if (destinationsCount.length > 0) {
+        return res.status(400).json({ 
+          message: "Database already contains destinations. To re-seed, please clear the database first.",
+          currentCount: destinationsCount.length
+        });
+      }
+      
+      await seedDatabase();
+      
+      const newCount = await storage.getDestinations({ isActive: true });
+      res.json({ 
+        success: true, 
+        message: "Database seeded successfully!",
+        destinationsCreated: newCount.length
+      });
+    } catch (error) {
+      console.error("Error seeding database:", error);
+      res.status(500).json({ 
+        message: "Failed to seed database",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

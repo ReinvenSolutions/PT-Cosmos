@@ -1,4 +1,4 @@
-import { Home, FileText, MapPin, LogOut, Users } from "lucide-react";
+import { Home, FileText, MapPin, LogOut, Users, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -35,6 +35,11 @@ const items = [
     title: "Destinos",
     url: "/destinations",
     icon: MapPin,
+  },
+  {
+    title: "Admin Tools",
+    url: "/admin-tools",
+    icon: Settings,
   },
 ];
 
