@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { hashPassword, comparePassword, isAuthenticated, loadUser, isAdmin, type AuthRequest } from "./auth";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import {
   insertClientSchema,
   insertDestinationSchema,
@@ -11,8 +11,6 @@ import {
   insertExclusionSchema,
   insertQuoteSchema,
   insertQuoteDestinationSchema,
-  insertUserSchema,
-  loginSchema,
 } from "@shared/schema";
 import multer from "multer";
 import { handleFileUpload } from "./upload";
@@ -26,117 +24,10 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.use(loadUser);
+  await setupAuth(app);
 
   const uploadsDir = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
   app.use("/uploads", express.static(uploadsDir));
-
-  app.post("/api/register", async (req: AuthRequest, res) => {
-    try {
-      const validatedData = insertUserSchema.parse(req.body);
-      
-      const existingUser = await storage.getUserByEmail(validatedData.email);
-      if (existingUser) {
-        return res.status(400).json({ message: "El email ya está registrado" });
-      }
-      
-      const passwordHash = await hashPassword(validatedData.password);
-      
-      const user = await storage.createUser({
-        email: validatedData.email,
-        passwordHash,
-        firstName: validatedData.firstName,
-        lastName: validatedData.lastName,
-        isAdmin: false,
-      });
-      
-      req.session.regenerate((err) => {
-        if (err) {
-          console.error("Session regeneration error:", err);
-          return res.status(500).json({ message: "Error al crear sesión" });
-        }
-        
-        req.session.userId = user.id;
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            console.error("Session save error:", saveErr);
-            return res.status(500).json({ message: "Error al guardar sesión" });
-          }
-          
-          const { passwordHash: _, ...userWithoutPassword } = user;
-          res.json(userWithoutPassword);
-        });
-      });
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      res.status(400).json({ message: "Error al registrar usuario" });
-    }
-  });
-
-  app.post("/api/login", async (req: AuthRequest, res) => {
-    try {
-      const validatedData = loginSchema.parse(req.body);
-      
-      const user = await storage.getUserByEmail(validatedData.email);
-      if (!user || !user.passwordHash) {
-        return res.status(401).json({ message: "Email o contraseña incorrectos" });
-      }
-      
-      const isPasswordValid = await comparePassword(validatedData.password, user.passwordHash);
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: "Email o contraseña incorrectos" });
-      }
-      
-      req.session.regenerate((err) => {
-        if (err) {
-          console.error("Session regeneration error:", err);
-          return res.status(500).json({ message: "Error al crear sesión" });
-        }
-        
-        req.session.userId = user.id;
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            console.error("Session save error:", saveErr);
-            return res.status(500).json({ message: "Error al guardar sesión" });
-          }
-          
-          const { passwordHash: _, ...userWithoutPassword } = user;
-          res.json(userWithoutPassword);
-        });
-      });
-    } catch (error: any) {
-      console.error("Login error:", error);
-      res.status(401).json({ message: "Email o contraseña incorrectos" });
-    }
-  });
-
-  app.post("/api/logout", (req: AuthRequest, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Error al cerrar sesión" });
-      }
-      res.json({ message: "Sesión cerrada exitosamente" });
-    });
-  });
-
-  app.get("/api/auth/user", async (req: AuthRequest, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "No autenticado" });
-    }
-    
-    try {
-      const user = await storage.getUser(req.session.userId);
-      if (!user) {
-        return res.status(404).json({ message: "Usuario no encontrado" });
-      }
-      
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Error al obtener usuario" });
-    }
-  });
 
   app.post("/api/upload", upload.single("file"), handleFileUpload);
 
@@ -188,9 +79,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/seed-database", isAuthenticated, isAdmin, async (req: AuthRequest, res) => {
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      console.log("Admin seed database request from user:", req.user?.id);
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/admin/seed-database", isAuthenticated, async (req: any, res) => {
+    try {
+      console.log("Admin seed database request from user:", req.user.claims.sub);
       
       const destinationsCount = await storage.getDestinations({ isActive: true });
       if (destinationsCount.length > 0) {
@@ -476,9 +378,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes", isAuthenticated, async (req: AuthRequest, res) => {
+  app.get("/api/quotes", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user.claims.sub;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
       
@@ -490,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes/:id", isAuthenticated, async (req: AuthRequest, res) => {
+  app.get("/api/quotes/:id", isAuthenticated, async (req, res) => {
     try {
       const quoteWithDetails = await storage.getQuoteWithDetails(req.params.id);
       if (!quoteWithDetails) {
@@ -503,9 +405,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quotes", isAuthenticated, async (req: AuthRequest, res) => {
+  app.post("/api/quotes", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user.claims.sub;
       const parsed = insertQuoteSchema.parse(req.body);
       const quote = await storage.createQuote({
         ...parsed,
@@ -518,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/quotes/:id", isAuthenticated, async (req: AuthRequest, res) => {
+  app.patch("/api/quotes/:id", isAuthenticated, async (req, res) => {
     try {
       const quote = await storage.updateQuote(req.params.id, req.body);
       if (!quote) {
@@ -531,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/quotes/:id", isAuthenticated, async (req: AuthRequest, res) => {
+  app.delete("/api/quotes/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteQuote(req.params.id);
       res.status(204).send();
@@ -541,9 +443,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quotes/:id/duplicate", isAuthenticated, async (req: AuthRequest, res) => {
+  app.post("/api/quotes/:id/duplicate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user.claims.sub;
       const originalQuote = await storage.getQuote(req.params.id);
       
       if (!originalQuote) {

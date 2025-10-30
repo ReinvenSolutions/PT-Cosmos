@@ -7,12 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, LogIn, LayoutDashboard } from "lucide-react";
+import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
 import { DatePicker } from "@/components/ui/date-picker";
 import { isTuesday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -20,7 +19,6 @@ export default function Home() {
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -129,27 +127,6 @@ export default function Home() {
           <h1 className="text-3xl font-extrabold text-blue-600 tracking-tight">
             Cosmos <span className="text-blue-400 font-light">Industria de Viajes</span>
           </h1>
-          <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <Button
-                variant="default"
-                onClick={() => setLocation("/dashboard")}
-                data-testid="button-dashboard"
-              >
-                <LayoutDashboard className="w-4 h-4 mr-2" />
-                Mi Dashboard
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                onClick={() => setLocation("/login")}
-                data-testid="button-login-header"
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                Iniciar Sesión
-              </Button>
-            )}
-          </div>
         </div>
       </header>
 

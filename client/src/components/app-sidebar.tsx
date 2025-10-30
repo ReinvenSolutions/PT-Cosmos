@@ -14,9 +14,6 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 
 const items = [
   {
@@ -47,31 +44,8 @@ const items = [
 ];
 
 export function AppSidebar() {
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const { user } = useAuth();
-  const { toast } = useToast();
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/logout");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.clear();
-      setLocation("/login");
-      toast({
-        title: "Sesión cerrada",
-        description: "Has cerrado sesión correctamente",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error al cerrar sesión",
-        description: "Hubo un problema al cerrar sesión",
-        variant: "destructive",
-      });
-    },
-  });
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
@@ -135,12 +109,13 @@ export function AppSidebar() {
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
+            onClick={() => {
+              window.location.href = "/api/logout";
+            }}
             data-testid="button-logout"
           >
             <LogOut className="w-4 h-4 mr-2" />
-            {logoutMutation.isPending ? "Cerrando..." : "Cerrar Sesión"}
+            Cerrar Sesión
           </Button>
         </div>
       </SidebarFooter>

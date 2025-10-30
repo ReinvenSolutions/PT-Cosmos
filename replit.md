@@ -21,12 +21,11 @@ The application is built with a clear separation between frontend and backend.
 - **Frontend**: React for the UI, Wouter for routing, TanStack Query for data fetching, Tailwind CSS and shadcn/ui for styling.
 - **Backend**: Express.js with TypeScript for robust API development.
 - **Database**: PostgreSQL hosted on Neon, managed with Drizzle ORM.
-- **Authentication**: Native authentication system with bcrypt password hashing and express-session for session management. Users have email/password login.
+- **Authentication**: Replit Auth with session management for admin access.
 - **Storage**: Replit Object Storage for handling image uploads (destination images and customer flight images).
 - **PDF Generation**: PDFKit is used for creating customized PDF documents.
-- **Routing**: Admin dashboard is the primary interface requiring authentication. Unauthenticated users are redirected to login.
-- **User Management**: Users table with support for regular users and administrators (isAdmin flag).
-- **Per-User Quote History**: All quotes are linked to user accounts for tracking and management.
+- **Routing**: Differentiates access for unauthenticated public users and authenticated admin users.
+- **State Management**: `sessionStorage` is used for persisting customer-selected destinations and dates in the public flow.
 - **Automatic Calculations**: The system automatically calculates trip end dates and total durations based on selected destinations.
 - **"Turkey" Destination Logic**: Specific business rules are implemented for Turkey destinations, requiring Tuesday departures and adding an extra day for travel, with corresponding UI validations and messaging.
 
@@ -85,15 +84,4 @@ curl -X POST https://your-production-url/api/admin/seed-database \
 - Hotel information for each destination
 - Inclusions and exclusions lists
 - Turkey destinations configured with `requiresTuesday=true`
-
-
-
-## Credenciales de Administrador de Prueba
-
-Para acceder al sistema en desarrollo, usa las siguientes credenciales:
-
-- **Email**: `admin@example.com`
-- **Password**: `admin123` (debe cambiarse en producción)
-
-Nota: Esta contraseña no cumple con los nuevos requisitos de seguridad (8 caracteres, 1 mayúscula, 1 número). Para crear usuarios en producción, usa el formulario de registro que aplica estas validaciones.
 

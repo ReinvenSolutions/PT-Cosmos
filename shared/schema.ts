@@ -15,39 +15,14 @@ export const sessions = pgTable(
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique().notNull(),
-  passwordHash: varchar("password_hash"),
+  email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  isAdmin: boolean("is_admin").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ 
-  id: true, 
-  createdAt: true, 
-  updatedAt: true,
-  passwordHash: true,
-  isAdmin: true,
-}).extend({
-  email: z.string().email("Email inválido").transform(email => email.toLowerCase().trim()),
-  password: z.string()
-    .min(8, "La contraseña debe tener al menos 8 caracteres")
-    .regex(/[A-Z]/, "La contraseña debe contener al menos una mayúscula")
-    .regex(/[0-9]/, "La contraseña debe contener al menos un número"),
-  firstName: z.string().optional().transform(val => val?.trim()),
-  lastName: z.string().optional().transform(val => val?.trim()),
-});
-
-export const loginSchema = z.object({
-  email: z.string().email("Email inválido").transform(email => email.toLowerCase().trim()),
-  password: z.string().min(1, "La contraseña es requerida"),
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
