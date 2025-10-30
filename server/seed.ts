@@ -12,6 +12,8 @@ export async function seedDatabase() {
       nights: 6,
       description: "Descubre la mágica combinación de Estambul y Capadocia. Visita mezquitas históricas, palacios imperiales y vuela en globo sobre los paisajes únicos de Capadocia.",
       displayOrder: 1,
+      category: "internacional",
+      requiresTuesday: true,
     },
     {
       name: "Leyendas de Turquía",
@@ -20,6 +22,8 @@ export async function seedDatabase() {
       nights: 9,
       description: "Tour completo por las leyendas de Turquía. Explora ciudades antiguas, ruinas históricas y paisajes impresionantes.",
       displayOrder: 2,
+      category: "internacional",
+      requiresTuesday: true,
     },
     {
       name: "Turquía Extra Regulares con Almuerzos",
@@ -28,6 +32,8 @@ export async function seedDatabase() {
       nights: 7,
       description: "Experiencia premium en Turquía con todas las comidas incluidas. Visita los sitios más emblemáticos con guías expertos.",
       displayOrder: 3,
+      category: "internacional",
+      requiresTuesday: true,
     },
     {
       name: "Turquía Extra Regulares sin Almuerzos",
@@ -36,6 +42,8 @@ export async function seedDatabase() {
       nights: 7,
       description: "Tour flexible por Turquía con desayunos incluidos. Explora a tu ritmo los tesoros históricos del país.",
       displayOrder: 4,
+      category: "internacional",
+      requiresTuesday: true,
     },
   ];
 
@@ -47,6 +55,7 @@ export async function seedDatabase() {
       nights: 2,
       description: "Escapada express a Dubai. Visita el Burj Khalifa, Dubai Mall y experimenta el lujo del desierto.",
       displayOrder: 10,
+      category: "internacional",
     },
     {
       name: "Dubai Clásico",
@@ -55,6 +64,7 @@ export async function seedDatabase() {
       nights: 3,
       description: "Tour clásico por Dubai. Incluye safari en el desierto, tour por la ciudad y visita a los principales atractivos.",
       displayOrder: 11,
+      category: "internacional",
     },
     {
       name: "Dubai Completo",
@@ -63,6 +73,7 @@ export async function seedDatabase() {
       nights: 4,
       description: "Experiencia completa en Dubai. Descubre tanto el Dubai moderno como el tradicional, con safari y crucero incluidos.",
       displayOrder: 12,
+      category: "internacional",
     },
     {
       name: "Dubai Extended",
@@ -71,6 +82,7 @@ export async function seedDatabase() {
       nights: 5,
       description: "Tour extendido por Dubai y Abu Dhabi. Visita la Gran Mezquita, Ferrari World y más atracciones.",
       displayOrder: 13,
+      category: "internacional",
     },
     {
       name: "Dubai Premium",
@@ -79,6 +91,7 @@ export async function seedDatabase() {
       nights: 7,
       description: "Experiencia premium en los Emiratos. Incluye Dubai, Abu Dhabi y tiempo libre para compras y relax.",
       displayOrder: 14,
+      category: "internacional",
     },
   ];
 
@@ -90,6 +103,7 @@ export async function seedDatabase() {
       nights: 6,
       description: "Descubre las maravillas del Antiguo Egipto. Visita las Pirámides, el Valle de los Reyes y navega por el Nilo.",
       displayOrder: 20,
+      category: "internacional",
     },
     {
       name: "Egipto Extendido",
@@ -98,6 +112,7 @@ export async function seedDatabase() {
       nights: 7,
       description: "Tour completo por Egipto. Explora Cairo, Luxor, Aswan y relájate en la costa del Mar Rojo.",
       displayOrder: 21,
+      category: "internacional",
     },
     {
       name: "Egipto Completo",
@@ -106,6 +121,7 @@ export async function seedDatabase() {
       nights: 9,
       description: "La experiencia definitiva en Egipto. Incluye todos los sitios principales más Alexandria y el Mar Rojo.",
       displayOrder: 22,
+      category: "internacional",
     },
     {
       name: "Tour de Peregrinación 4 Días",
@@ -114,6 +130,7 @@ export async function seedDatabase() {
       nights: 3,
       description: "Tour espiritual por los sitios religiosos de Egipto. Visita monasterios coptos y lugares sagrados.",
       displayOrder: 23,
+      category: "internacional",
     },
     {
       name: "Tour de Peregrinación 5 Días",
@@ -122,6 +139,7 @@ export async function seedDatabase() {
       nights: 4,
       description: "Tour espiritual extendido. Incluye más sitios religiosos y tiempo para reflexión.",
       displayOrder: 24,
+      category: "internacional",
     },
   ];
 
@@ -133,6 +151,7 @@ export async function seedDatabase() {
       nights: 4,
       description: "Tour por la Grecia Clásica. Visita Atenas, Delfos, Meteora y descubre la cuna de la civilización occidental.",
       displayOrder: 30,
+      category: "internacional",
     },
   ];
 
@@ -144,6 +163,7 @@ export async function seedDatabase() {
       nights: 5,
       description: "Lo mejor de Tailandia. Explora Bangkok, visita templos dorados y disfruta de las playas tropicales.",
       displayOrder: 40,
+      category: "internacional",
     },
     {
       name: "Tailandia Completa",
@@ -152,6 +172,7 @@ export async function seedDatabase() {
       nights: 6,
       description: "Tour completo por Tailandia. Incluye Bangkok, Chiang Mai, mercados flotantes y islas paradisíacas.",
       displayOrder: 41,
+      category: "internacional",
     },
     {
       name: "Tailandia Extended",
@@ -160,6 +181,7 @@ export async function seedDatabase() {
       nights: 7,
       description: "Experiencia extendida en Tailandia. Más tiempo para explorar templos, playas y la cultura tailandesa.",
       displayOrder: 42,
+      category: "internacional",
     },
   ];
 
@@ -171,6 +193,7 @@ export async function seedDatabase() {
       nights: 3,
       description: "Tour express por Vietnam. Visita Hanoi, crucero por la Bahía de Halong y explora la cultura vietnamita.",
       displayOrder: 50,
+      category: "internacional",
     },
     {
       name: "Vietnam Clásico",
@@ -179,6 +202,7 @@ export async function seedDatabase() {
       nights: 4,
       description: "Tour clásico por Vietnam. Incluye el norte, centro y sur del país con sus principales atracciones.",
       displayOrder: 51,
+      category: "internacional",
     },
     {
       name: "Vietnam Completo",
@@ -187,6 +211,7 @@ export async function seedDatabase() {
       nights: 5,
       description: "Experiencia completa en Vietnam. De Hanoi a Ho Chi Minh, pasando por Hoi An y la Bahía de Halong.",
       displayOrder: 52,
+      category: "internacional",
     },
   ];
 
@@ -198,6 +223,7 @@ export async function seedDatabase() {
       nights: 2,
       description: "Escapada rápida a Cusco. Visita Machu Picchu y el Valle Sagrado de los Incas.",
       displayOrder: 60,
+      category: "nacional",
     },
     {
       name: "Cusco Clásico",
@@ -206,6 +232,7 @@ export async function seedDatabase() {
       nights: 3,
       description: "Tour clásico por Cusco. Incluye Machu Picchu, Valle Sagrado y city tour por la capital del Imperio Inca.",
       displayOrder: 61,
+      category: "nacional",
     },
     {
       name: "Cusco Completo",
@@ -214,6 +241,7 @@ export async function seedDatabase() {
       nights: 4,
       description: "Experiencia completa en Cusco. Más tiempo para aclimatarse y explorar todas las maravillas incas.",
       displayOrder: 62,
+      category: "nacional",
     },
     {
       name: "Cusco Extended",
@@ -222,6 +250,7 @@ export async function seedDatabase() {
       nights: 5,
       description: "Tour extendido por Cusco. Incluye sitios adicionales como la Montaña de 7 Colores o Laguna Humantay.",
       displayOrder: 63,
+      category: "nacional",
     },
     {
       name: "Cusco + Huacachina",
@@ -230,6 +259,7 @@ export async function seedDatabase() {
       nights: 4,
       description: "Combina lo mejor de Cusco con el oasis de Huacachina. Machu Picchu y aventura en el desierto.",
       displayOrder: 64,
+      category: "nacional",
     },
     {
       name: "Cusco - Huacachina",
@@ -238,6 +268,7 @@ export async function seedDatabase() {
       nights: 5,
       description: "Tour completo Cusco y Huacachina. Incluye Machu Picchu, sandboarding y paseo en buggy.",
       displayOrder: 65,
+      category: "nacional",
     },
     {
       name: "Cusco - Huacachina - Lima",
@@ -246,6 +277,7 @@ export async function seedDatabase() {
       nights: 6,
       description: "Gran tour por Perú. Combina Cusco, Huacachina y Lima para una experiencia completa.",
       displayOrder: 66,
+      category: "nacional",
     },
     {
       name: "Cusco - Paracas - Lima",
@@ -254,6 +286,7 @@ export async function seedDatabase() {
       nights: 8,
       description: "Tour extendido por Perú. Incluye Cusco, las Islas Ballestas en Paracas y la capital Lima.",
       displayOrder: 67,
+      category: "nacional",
     },
     {
       name: "Cusco + Viñac",
@@ -262,6 +295,7 @@ export async function seedDatabase() {
       nights: 3,
       description: "Cusco con visita a viñedos. Combina historia inca con degustación de vinos peruanos.",
       displayOrder: 68,
+      category: "nacional",
     },
     {
       name: "Cusco - Viñac",
@@ -270,6 +304,7 @@ export async function seedDatabase() {
       nights: 4,
       description: "Tour por Cusco y región vinícola. Machu Picchu y enoturismo en un solo viaje.",
       displayOrder: 69,
+      category: "nacional",
     },
   ];
 
