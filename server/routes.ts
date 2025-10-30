@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/clients", requireAuth, async (req, res) => {
+  app.get("/api/admin/clients", requireRole("super_admin"), async (req, res) => {
     try {
       const clients = await storage.listClients();
       res.json(clients);
@@ -202,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quotes", requireAuth, async (req, res) => {
+  app.post("/api/quotes", requireRole("advisor"), async (req, res) => {
     try {
       const user = req.user as User;
       const { clientId, totalPrice, destinations } = req.body;
@@ -226,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes", requireAuth, async (req, res) => {
+  app.get("/api/quotes", requireRole("advisor"), async (req, res) => {
     try {
       const user = req.user as User;
       const quotes = await storage.listQuotesByUser(user.id);
@@ -237,10 +237,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes/:id", requireAuth, async (req, res) => {
+  app.get("/api/quotes/:id", requireRole("advisor"), async (req, res) => {
     try {
       const user = req.user as User;
-      const quote = await storage.getQuote(req.params.id, user.role === "super_admin" ? undefined : user.id);
+      const quote = await storage.getQuote(req.params.id, user.id);
       
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
@@ -253,10 +253,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes/:id/pdf", requireAuth, async (req, res) => {
+  app.get("/api/quotes/:id/pdf", requireRole("advisor"), async (req, res) => {
     try {
       const user = req.user as User;
-      const quote = await storage.getQuote(req.params.id, user.role === "super_admin" ? undefined : user.id);
+      const quote = await storage.getQuote(req.params.id, user.id);
       
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
