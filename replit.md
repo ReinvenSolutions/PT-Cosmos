@@ -149,6 +149,28 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
 ## Recent Changes
 
 ### October 30, 2025
+- **Automatic End Date Calculation**:
+  - Simplified user experience by eliminating manual end date selection
+  - System now automatically calculates trip end date based on selected destinations
+  - **Landing Page Changes**:
+    - Removed editable end date input field
+    - Added read-only calculated end date display with Spanish locale formatting
+    - Shows helper text indicating total trip duration
+    - Formula: endDate = startDate + sum(destination durations) - 1
+  - **Quote Summary Page Changes**:
+    - Displays calculated end date with "(Calculada)" label
+    - Shows total duration in days below end date
+    - Both dates formatted with es-CO locale
+  - **Data Flow Update**:
+    - sessionStorage now stores only: { destinations: string[], startDate: string }
+    - endDate removed from storage (calculated dynamically on both pages)
+    - Prevents date calculation errors and ensures consistency
+  - **Benefits**:
+    - Users no longer need to manually calculate trip end dates
+    - Eliminates potential date entry errors
+    - Automatically updates when destinations are added/removed
+    - Cleaner, more intuitive user interface
+
 - **Visual Itinerary Page (Page 2) in PDF**:
   - Added new "Itinerario" page between cover page and detailed itinerary section
   - **Visual Features**:
