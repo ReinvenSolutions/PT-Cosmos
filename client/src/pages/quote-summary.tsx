@@ -15,7 +15,6 @@ export default function QuoteSummary() {
   const { toast } = useToast();
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [outboundImages, setOutboundImages] = useState<string[]>([]);
   const [returnImages, setReturnImages] = useState<string[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
@@ -30,16 +29,33 @@ export default function QuoteSummary() {
   useEffect(() => {
     const savedData = sessionStorage.getItem("quoteData");
     if (savedData) {
-      const { destinations: destIds, startDate: start, endDate: end } = JSON.parse(savedData);
+      const { destinations: destIds, startDate: start } = JSON.parse(savedData);
       setSelectedDestinations(destIds);
       setStartDate(start);
-      setEndDate(end);
     } else {
       setLocation("/");
     }
   }, [setLocation]);
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
+
+  const calculateEndDate = (): string => {
+    if (!startDate || selectedDests.length === 0) return "";
+    
+    const totalDuration = selectedDests.reduce((sum, dest) => {
+      return sum + (dest.duration || 0);
+    }, 0);
+
+    if (totalDuration === 0) return "";
+
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + totalDuration - 1);
+    
+    return end.toISOString().split("T")[0];
+  };
+
+  const endDate = calculateEndDate();
   
   const landPortionTotal = selectedDests.reduce((sum, dest) => {
     const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
@@ -289,11 +305,28 @@ export default function QuoteSummary() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Fecha de Inicio</p>
-                <p className="font-semibold text-lg">{startDate || "Por definir"}</p>
+                <p className="font-semibold text-lg" data-testid="text-start-date">
+                  {startDate ? new Date(startDate + "T00:00:00").toLocaleDateString("es-CO", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }) : "Por definir"}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-1">Fecha de Finalización</p>
-                <p className="font-semibold text-lg">{endDate || "Por definir"}</p>
+                <p className="text-sm text-gray-600 mb-1">Fecha de Finalización (Calculada)</p>
+                <p className="font-semibold text-lg" data-testid="text-end-date-summary">
+                  {endDate ? new Date(endDate + "T00:00:00").toLocaleDateString("es-CO", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }) : "Por definir"}
+                </p>
+                {endDate && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Duración total: {selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0)} días
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>

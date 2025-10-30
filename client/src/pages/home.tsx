@@ -15,11 +15,29 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("internacional");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
   });
+
+  const calculateEndDate = (): string => {
+    if (!startDate || selectedDestinations.length === 0) return "";
+    
+    const totalDuration = selectedDestinations.reduce((sum, destId) => {
+      const dest = destinations.find((d) => d.id === destId);
+      return sum + (dest?.duration || 0);
+    }, 0);
+
+    if (totalDuration === 0) return "";
+
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + totalDuration - 1);
+    
+    return end.toISOString().split("T")[0];
+  };
+
+  const endDate = calculateEndDate();
 
   const filteredDestinations = destinations.filter((dest) => {
     if (selectedCategory === "promociones") {
@@ -89,18 +107,31 @@ export default function Home() {
             </div>
             
             <div className="space-y-2">
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+              <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                Fecha de Finalización del Viaje
+                Fecha de Finalización (Calculada Automáticamente)
               </label>
-              <Input
-                type="date"
-                id="endDate"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full"
-                data-testid="input-end-date"
-              />
+              <div className="w-full px-3 py-2 border rounded-md bg-gray-50 text-gray-700 flex items-center" data-testid="text-end-date">
+                {endDate ? (
+                  <span className="font-medium">
+                    {new Date(endDate + "T00:00:00").toLocaleDateString("es-CO", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </span>
+                ) : (
+                  <span className="text-gray-400 italic">Selecciona fecha de inicio y destinos</span>
+                )}
+              </div>
+              {endDate && selectedDestinations.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Basado en {selectedDestinations.reduce((sum, destId) => {
+                    const dest = destinations.find((d) => d.id === destId);
+                    return sum + (dest?.duration || 0);
+                  }, 0)} días de viaje
+                </p>
+              )}
             </div>
           </div>
 
@@ -224,7 +255,6 @@ export default function Home() {
                 const selectedData = {
                   destinations: selectedDestinations,
                   startDate,
-                  endDate,
                 };
                 sessionStorage.setItem("quoteData", JSON.stringify(selectedData));
                 setLocation("/cotizacion");
