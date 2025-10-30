@@ -1,18 +1,22 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Destination } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function QuoteSummary() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
   const [outboundImages, setOutboundImages] = useState<string[]>([]);
@@ -21,6 +25,9 @@ export default function QuoteSummary() {
   const [uploadingReturn, setUploadingReturn] = useState(false);
   const [flightsAndExtras, setFlightsAndExtras] = useState("");
   const [originCity, setOriginCity] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -70,6 +77,66 @@ export default function QuoteSummary() {
   
   const flightsAndExtrasValue = flightsAndExtras ? parseFloat(flightsAndExtras) : 0;
   const grandTotal = landPortionTotal + flightsAndExtrasValue;
+
+  const createQuoteMutation = useMutation({
+    mutationFn: async () => {
+      if (!isAuthenticated) {
+        throw new Error("Debes iniciar sesión para crear una cotización");
+      }
+
+      if (!clientName.trim()) {
+        throw new Error("El nombre del cliente es requerido");
+      }
+
+      const quoteData = {
+        clientName: clientName.trim(),
+        clientEmail: clientEmail.trim() || null,
+        clientPhone: clientPhone.trim() || null,
+        totalPrice: grandTotal.toString(),
+        travelStartDate: startDate || null,
+        travelEndDate: endDate || null,
+        outboundFlightImages: outboundImages.length > 0 ? outboundImages : null,
+        returnFlightImages: returnImages.length > 0 ? returnImages : null,
+        status: "draft",
+        notes: originCity ? `Ciudad de origen: ${originCity}` : null,
+      };
+
+      const quote = await apiRequest<any>("/api/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(quoteData),
+      });
+
+      for (let i = 0; i < selectedDestinations.length; i++) {
+        await apiRequest(`/api/quotes/${quote.id}/destinations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            destinationId: selectedDestinations[i],
+            displayOrder: i,
+          }),
+        });
+      }
+
+      return quote;
+    },
+    onSuccess: (quote) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      toast({
+        title: "Cotización creada",
+        description: "La cotización se ha guardado exitosamente en el sistema",
+      });
+      sessionStorage.removeItem("quoteData");
+      setLocation(`/quotes/${quote.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleOutboundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -522,7 +589,7 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-8 bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0">
+        <Card className="mb-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0">
           <CardContent className="p-6">
             <div className="flex justify-between items-center">
               <div>
@@ -539,6 +606,73 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
+        {isAuthenticated && (
+          <Card className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+            <CardHeader>
+              <CardTitle className="text-green-800">Información del Cliente</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="client-name">Nombre del Cliente *</Label>
+                  <Input
+                    id="client-name"
+                    type="text"
+                    placeholder="Juan Pérez"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-client-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="client-email">Email</Label>
+                  <Input
+                    id="client-email"
+                    type="email"
+                    placeholder="cliente@example.com"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-client-email"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="client-phone">Teléfono</Label>
+                  <Input
+                    id="client-phone"
+                    type="tel"
+                    placeholder="+57 300 123 4567"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-client-phone"
+                  />
+                </div>
+              </div>
+              <Button
+                size="lg"
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => createQuoteMutation.mutate()}
+                disabled={createQuoteMutation.isPending || !clientName.trim()}
+                data-testid="button-create-quote"
+              >
+                {createQuoteMutation.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Creando Cotización...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 mr-2" />
+                    Crear Cotización en el Sistema
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Button
             size="lg"
@@ -551,15 +685,28 @@ export default function QuoteSummary() {
             Exportar Cotización (PDF)
           </Button>
           
-          <Button
-            size="lg"
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-            onClick={handleSendWhatsApp}
-            data-testid="button-send-whatsapp"
-          >
-            <Send className="w-5 h-5 mr-2" />
-            Enviar por WhatsApp
-          </Button>
+          {!isAuthenticated ? (
+            <Button
+              size="lg"
+              variant="default"
+              className="w-full"
+              onClick={() => setLocation("/login")}
+              data-testid="button-login-to-create"
+            >
+              <LogIn className="w-5 h-5 mr-2" />
+              Iniciar Sesión para Crear Cotización
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleSendWhatsApp}
+              data-testid="button-send-whatsapp"
+            >
+              <Send className="w-5 h-5 mr-2" />
+              Enviar por WhatsApp
+            </Button>
+          )}
         </div>
       </main>
     </div>
