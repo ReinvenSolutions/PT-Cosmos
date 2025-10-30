@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { hashPassword, comparePassword, isAuthenticated, loadUser, isAdmin, type AuthRequest } from "./auth";
 import {
   insertClientSchema,
   insertDestinationSchema,
@@ -11,6 +11,8 @@ import {
   insertExclusionSchema,
   insertQuoteSchema,
   insertQuoteDestinationSchema,
+  insertUserSchema,
+  loginSchema,
 } from "@shared/schema";
 import multer from "multer";
 import { handleFileUpload } from "./upload";
@@ -24,10 +26,91 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  await setupAuth(app);
+  app.use(loadUser);
 
   const uploadsDir = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
   app.use("/uploads", express.static(uploadsDir));
+
+  app.post("/api/register", async (req: AuthRequest, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "El email ya está registrado" });
+      }
+      
+      const passwordHash = await hashPassword(validatedData.password);
+      
+      const user = await storage.createUser({
+        email: validatedData.email,
+        passwordHash,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        isAdmin: false,
+      });
+      
+      req.session.userId = user.id;
+      
+      const { passwordHash: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      res.status(400).json({ message: error.message || "Error al registrar usuario" });
+    }
+  });
+
+  app.post("/api/login", async (req: AuthRequest, res) => {
+    try {
+      const validatedData = loginSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(validatedData.email);
+      if (!user || !user.passwordHash) {
+        return res.status(401).json({ message: "Email o contraseña incorrectos" });
+      }
+      
+      const isPasswordValid = await comparePassword(validatedData.password, user.passwordHash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Email o contraseña incorrectos" });
+      }
+      
+      req.session.userId = user.id;
+      
+      const { passwordHash: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      res.status(400).json({ message: error.message || "Error al iniciar sesión" });
+    }
+  });
+
+  app.post("/api/logout", (req: AuthRequest, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Error al cerrar sesión" });
+      }
+      res.json({ message: "Sesión cerrada exitosamente" });
+    });
+  });
+
+  app.get("/api/auth/user", async (req: AuthRequest, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+    
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+      
+      const { passwordHash: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Error al obtener usuario" });
+    }
+  });
 
   app.post("/api/upload", upload.single("file"), handleFileUpload);
 
@@ -79,20 +162,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/seed-database", isAuthenticated, isAdmin, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
-  app.post("/api/admin/seed-database", isAuthenticated, async (req: any, res) => {
-    try {
-      console.log("Admin seed database request from user:", req.user.claims.sub);
+      console.log("Admin seed database request from user:", req.user?.id);
       
       const destinationsCount = await storage.getDestinations({ isActive: true });
       if (destinationsCount.length > 0) {
