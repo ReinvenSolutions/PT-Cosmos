@@ -93,7 +93,9 @@ export type Exclusion = typeof exclusions.$inferSelect;
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name"),
   username: text("username").notNull().unique(),
+  email: text("email").unique(),
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull(),
   createdAt: timestamp("created_at").defaultNow(),

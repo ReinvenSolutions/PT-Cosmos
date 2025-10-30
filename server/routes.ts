@@ -39,6 +39,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { name, email, password } = req.body;
+
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "Nombre, correo y contraseña son requeridos" });
+      }
+
+      const existingUser = await storage.findUserByUsername(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "El correo ya está registrado" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      const newUser = await storage.createUser({
+        name,
+        username: email,
+        email,
+        passwordHash: hashedPassword,
+        role: "advisor",
+      });
+
+      const { passwordHash, ...userWithoutPassword } = newUser;
+      res.status(201).json({ user: userWithoutPassword });
+    } catch (error: any) {
+      console.error("Error en registro:", error);
+      res.status(500).json({ message: "Error al crear usuario" });
+    }
+  });
+
   app.get("/api/auth/me", (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "No autenticado" });
