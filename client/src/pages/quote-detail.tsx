@@ -13,6 +13,7 @@ interface Destination {
   duration: number;
   price: string;
   category: string;
+  basePrice: string | null;
 }
 
 interface QuoteDestination {
@@ -21,6 +22,7 @@ interface QuoteDestination {
   destinationId: string;
   startDate: string;
   passengers: number;
+  price: string | null;
   destination: Destination;
 }
 
@@ -245,8 +247,8 @@ export default function QuoteDetail() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-lg font-semibold">
-                              ${Number(qd.destination.price).toFixed(2)}
+                            <p className="text-lg font-semibold" data-testid={`destination-price-${qd.destinationId}`}>
+                              ${Number(qd.price || qd.destination.basePrice || 0).toFixed(2)}
                             </p>
                             <p className="text-xs text-muted-foreground">por persona</p>
                           </div>
