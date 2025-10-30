@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 interface Client {
   id: string;
@@ -289,23 +291,29 @@ export default function QuoteSummary() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <header className="bg-white shadow-md sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-3xl font-extrabold text-blue-600 tracking-tight">
-            Cosmos <span className="text-blue-400 font-light">Industria de Viajes</span>
-          </h1>
-          <Button
-            variant="ghost"
-            onClick={() => setLocation("/")}
-            data-testid="button-back"
-          >
-            ← Volver
-          </Button>
-        </div>
-      </header>
+    <SidebarProvider>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <header className="bg-white shadow-md border-b">
+            <div className="container mx-auto px-4 py-4 flex items-center gap-4">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
+                Cosmos <span className="text-blue-400 font-light">Industria de Viajes</span>
+              </h1>
+              <Button
+                variant="ghost"
+                onClick={() => setLocation("/")}
+                data-testid="button-back"
+                className="ml-auto"
+              >
+                ← Volver
+              </Button>
+            </div>
+          </header>
 
-      <main className="container mx-auto px-4 py-12 max-w-4xl">
+          <main className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50 to-white">
+            <div className="container mx-auto px-4 py-12 max-w-4xl">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-extrabold text-gray-800 mb-2">Resumen de tu Cotización</h2>
           <p className="text-gray-600">Revisa los detalles y agrega la información de tus vuelos</p>
@@ -692,7 +700,10 @@ export default function QuoteSummary() {
             </div>
           </DialogContent>
         </Dialog>
-      </main>
-    </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }
