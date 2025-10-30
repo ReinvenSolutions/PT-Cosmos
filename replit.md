@@ -78,12 +78,12 @@ The quotation flow is **identical to the original public system** with one addit
   - / (home.tsx - destination selection)
   - /cotizacion (quote-summary.tsx - quote review and save)
 
-- **Advisor Routes** (requireRole("advisor")):
+- **Advisor Routes** (requireRoles(["advisor", "super_admin"])):
   - /advisor (advisor dashboard)
-  - POST /api/quotes (create quote)
-  - GET /api/quotes (list own quotes)
-  - GET /api/quotes/:id (view own quote)
-  - GET /api/quotes/:id/pdf (download quote PDF)
+  - POST /api/quotes (create quote) - both advisor and super_admin
+  - GET /api/quotes (list own quotes) - both advisor and super_admin
+  - GET /api/quotes/:id (view own quote) - both advisor and super_admin
+  - GET /api/quotes/:id/pdf (download quote PDF) - both advisor and super_admin
 
 - **Super Admin Routes** (requireRole("super_admin")):
   - /admin (admin dashboard)
@@ -197,6 +197,12 @@ Quotes are created by advisors and stored in the database. Each quote is associa
 - Total price and status
 
 ## Recent Changes (October 30, 2025)
+
+### UI y Permisos Actualizados
+- **Sidebar del super admin**: Agregada opción "Clientes" para acceder a gestión de clientes
+- **Permisos de cotizaciones**: Super admin ahora puede crear, ver y gestionar cotizaciones (antes solo advisor)
+- **Dropdown de clientes**: Corregido z-index y agregado DialogDescription para mejor accesibilidad
+- **Roles compartidos**: Rutas POST/GET /api/quotes ahora permiten ambos roles (advisor y super_admin)
 
 ### Sistema de Seed Automático de Base de Datos
 - **Implementado seed automático**: La base de datos de producción se puebla automáticamente en el deploy

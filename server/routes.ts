@@ -233,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quotes", requireRole("advisor"), async (req, res) => {
+  app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
       const { clientId, totalPrice, destinations } = req.body;
@@ -257,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes", requireRole("advisor"), async (req, res) => {
+  app.get("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
       const quotes = await storage.listQuotesByUser(user.id);
@@ -268,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes/:id", requireRole("advisor"), async (req, res) => {
+  app.get("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
       const quote = await storage.getQuote(req.params.id, user.id);
@@ -284,7 +284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotes/:id/pdf", requireRole("advisor"), async (req, res) => {
+  app.get("/api/quotes/:id/pdf", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
       const quote = await storage.getQuote(req.params.id, user.id);
