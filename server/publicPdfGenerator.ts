@@ -121,7 +121,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   doc.text(`Regreso ${endDateFormatted}`, leftMargin, budgetY + 35);
   
   const minPayment = Math.round(data.grandTotal * 0.6);
-  doc.font("Helvetica").fontSize(8).fillColor(lightGray);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
   doc.text(`Pago mínimo para separar: $${minPayment.toLocaleString('en-US')}`, leftMargin, budgetY + 52);
 
   const priceBoxX = pageWidth - rightMargin - 150;

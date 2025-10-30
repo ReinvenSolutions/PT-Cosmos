@@ -149,7 +149,8 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
 ## Recent Changes
 
 ### October 30, 2025
-- **PDF Date Fix - Colombia Timezone**:
+- **PDF First Page Visual Improvements**:
+  - Increased visibility of "Pago mínimo para separar" text (from 8pt to 10pt, bold, darker color)
   - Updated PDF generator to use Colombia timezone (America/Bogota, UTC-5)
   - PDF creation date now displays correct local date instead of server date
   - Changed locale from "es-ES" to "es-CO" with timeZone parameter
