@@ -213,7 +213,7 @@ Quotes are created by advisors and stored in the database. Each quote is associa
   - Added "Guardar Cotización" button in quote-summary.tsx
   - Quotes can be saved and associated with clients and users
 - **Added sidebar navigation**: Implemented AppSidebar component with role-based menu items
-  - Sidebar appears on home.tsx and quote-summary.tsx
+  - Sidebar appears on home.tsx, quote-summary.tsx, advisor-dashboard.tsx, and quote-detail.tsx
   - Uses Shadcn sidebar primitives with SidebarProvider
   - SPA navigation using wouter Link component (no page reloads)
   - Collapsible sidebar with toggle button
