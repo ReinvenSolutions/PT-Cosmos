@@ -23,6 +23,8 @@ interface PublicQuoteData {
   landPortionTotal: number;
   grandTotal: number;
   originCity: string;
+  outboundFlightImages?: string[];
+  returnFlightImages?: string[];
 }
 
 export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<typeof PDFDocument> {
@@ -413,6 +415,41 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     doc.moveDown(1);
   }
 
+  if (data.outboundFlightImages && data.outboundFlightImages.length > 0) {
+    doc.addPage();
+    
+    doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text("EQUIPAJE CABINA 10KG + PERSONAL 8KG", leftMargin, 110, { align: "center", width: contentWidth });
+    
+    let flightImageY = 150;
+    data.outboundFlightImages.forEach((imageUrl, index) => {
+      if (imageUrl.startsWith("/uploads/")) {
+        const imagePath = imageUrl.replace("/uploads/", "");
+        const fullPath = `${process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads"}/${imagePath}`;
+        
+        if (fs.existsSync(fullPath)) {
+          try {
+            const imageHeight = 200;
+            if (flightImageY + imageHeight > 750) {
+              doc.addPage();
+              flightImageY = 80;
+            }
+            
+            doc.image(fullPath, leftMargin, flightImageY, {
+              width: contentWidth,
+              fit: [contentWidth, imageHeight],
+              align: "center"
+            });
+            
+            flightImageY += imageHeight + 20;
+          } catch (error) {
+            console.error(`Error loading outbound flight image ${index}:`, error);
+          }
+        }
+      }
+    });
+  }
+
   if (doc.y > 600) {
     doc.addPage();
   }
@@ -493,6 +530,41 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   }
 
   doc.moveDown(2);
+
+  if (data.returnFlightImages && data.returnFlightImages.length > 0) {
+    doc.addPage();
+    
+    doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text("EQUIPAJE CABINA 10KG + PERSONAL 8KG", leftMargin, 110, { align: "center", width: contentWidth });
+    
+    let flightImageY = 150;
+    data.returnFlightImages.forEach((imageUrl, index) => {
+      if (imageUrl.startsWith("/uploads/")) {
+        const imagePath = imageUrl.replace("/uploads/", "");
+        const fullPath = `${process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads"}/${imagePath}`;
+        
+        if (fs.existsSync(fullPath)) {
+          try {
+            const imageHeight = 200;
+            if (flightImageY + imageHeight > 750) {
+              doc.addPage();
+              flightImageY = 80;
+            }
+            
+            doc.image(fullPath, leftMargin, flightImageY, {
+              width: contentWidth,
+              fit: [contentWidth, imageHeight],
+              align: "center"
+            });
+            
+            flightImageY += imageHeight + 20;
+          } catch (error) {
+            console.error(`Error loading return flight image ${index}:`, error);
+          }
+        }
+      }
+    });
+  }
 
   if (doc.y > 680) {
     doc.addPage();

@@ -7,10 +7,17 @@ import passport from "./auth";
 import { requireAuth, requireRole, requireRoles } from "./middleware";
 import bcrypt from "bcrypt";
 import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, type User } from "@shared/schema";
+import multer from "multer";
+import { handleFileUpload } from "./upload";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const uploadsDir = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
   app.use("/uploads", express.static(uploadsDir));
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }
+  });
 
   app.post("/api/auth/login", (req, res, next) => {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
@@ -78,6 +85,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { passwordHash, ...userWithoutPassword } = user;
     res.json({ user: userWithoutPassword });
   });
+
+  app.post("/api/upload", requireAuth, upload.single("file"), handleFileUpload);
 
   app.post("/api/public/quote-pdf", async (req, res) => {
     try {
@@ -236,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
-      const { clientId, totalPrice, destinations } = req.body;
+      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages } = req.body;
 
       if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -246,6 +255,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId,
         userId: user.id,
         totalPrice,
+        originCity: originCity || null,
+        flightsAndExtras: flightsAndExtras || null,
+        outboundFlightImages: outboundFlightImages || null,
+        returnFlightImages: returnFlightImages || null,
         status: "draft",
       };
 
@@ -302,6 +315,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           return {
             id: qd.destination.id,
+            name: qd.destination.name,
+            country: qd.destination.country,
+            duration: qd.destination.duration,
+            nights: qd.destination.nights,
+            basePrice: qd.price ? qd.price.toString() : qd.destination.basePrice || "0",
             startDate: qd.startDate.toISOString(),
             passengers: qd.passengers,
             destination: qd.destination,
@@ -313,14 +331,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
+      const startDate = destinationsWithDetails[0]?.startDate || new Date().toISOString();
+      let totalDuration = destinationsWithDetails.reduce((sum, d) => sum + (d.duration || 0), 0);
+      const hasTurkeyDestinations = quote.destinations.some(qd => qd.destination.requiresTuesday);
+      if (hasTurkeyDestinations) {
+        totalDuration += 1;
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(start);
+      end.setDate(end.getDate() + totalDuration - 1);
+      const endDate = end.toISOString();
+
+      const landPortionTotal = destinationsWithDetails.reduce((sum, d) => sum + parseFloat(d.basePrice), 0);
+      const flightsAndExtras = quote.flightsAndExtras ? parseFloat(quote.flightsAndExtras.toString()) : 0;
+
       const pdfDoc = generatePublicQuotePDF({
         destinations: destinationsWithDetails,
-        startDate: destinationsWithDetails[0]?.startDate || new Date().toISOString(),
-        endDate: new Date().toISOString(),
-        flightsAndExtras: 0,
-        landPortionTotal: Number(quote.totalPrice),
+        startDate,
+        endDate,
+        flightsAndExtras,
+        landPortionTotal,
         grandTotal: Number(quote.totalPrice),
-        originCity: "",
+        originCity: quote.originCity || "",
+        outboundFlightImages: quote.outboundFlightImages || undefined,
+        returnFlightImages: quote.returnFlightImages || undefined,
       });
       
       res.setHeader('Content-Type', 'application/pdf');

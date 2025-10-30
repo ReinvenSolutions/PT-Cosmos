@@ -128,6 +128,10 @@ export const quotes = pgTable("quotes", {
   clientId: varchar("client_id").notNull().references(() => clients.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  originCity: text("origin_city"),
+  flightsAndExtras: decimal("flights_and_extras", { precision: 10, scale: 2 }),
+  outboundFlightImages: text("outbound_flight_images").array(),
+  returnFlightImages: text("return_flight_images").array(),
   status: text("status").notNull().default("draft"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -147,6 +151,7 @@ export const quoteDestinations = pgTable("quote_destinations", {
   destinationId: varchar("destination_id").notNull().references(() => destinations.id),
   startDate: timestamp("start_date").notNull(),
   passengers: integer("passengers").notNull().default(2),
+  price: decimal("price", { precision: 10, scale: 2 }),
 });
 
 export const insertQuoteDestinationSchema = createInsertSchema(quoteDestinations).omit({ 

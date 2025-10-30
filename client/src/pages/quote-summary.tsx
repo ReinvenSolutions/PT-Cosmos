@@ -233,10 +233,15 @@ export default function QuoteSummary() {
     const quoteData = {
       clientId: selectedClientId,
       totalPrice: grandTotal,
-      destinations: selectedDestinations.map((destId) => ({
-        destinationId: destId,
+      originCity: originCity || "",
+      flightsAndExtras: flightsAndExtrasValue,
+      outboundFlightImages: outboundImages,
+      returnFlightImages: returnImages,
+      destinations: selectedDests.map((dest) => ({
+        destinationId: dest.id,
         startDate: new Date(startDate).toISOString().split("T")[0],
         passengers: passengers,
+        price: dest.basePrice ? parseFloat(dest.basePrice) : 0,
       })),
     };
 
@@ -670,7 +675,7 @@ export default function QuoteSummary() {
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder="Selecciona un cliente" />
                   </SelectTrigger>
-                  <SelectContent className="z-[100]">
+                  <SelectContent className="z-[100]" position="popper" sideOffset={5}>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name} - {client.email}
