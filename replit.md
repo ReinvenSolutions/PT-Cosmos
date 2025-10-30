@@ -1,65 +1,146 @@
 # Tourist Package Quotation System
 
 ## Overview
-This is a public-facing travel quotation system where customers can browse travel packages, select destinations, and request personalized quotes. The system allows customers to view destination details, select multiple packages, specify travel dates, and generate professional PDF quotations or share via WhatsApp. The business model emphasizes guaranteed land portions for groups of two or more with Spanish-speaking guides.
+This is an authenticated travel booking system where advisors create and save quotations (associated with clients from a global list), generate professional PDFs with complete destination details, and track their saved quotes. Super admins manage clients, create destinations, and view statistics across all advisors. The system uses native authentication with role-based access control (Super Admin and Advisor roles).
 
 ## User Preferences
 I prefer detailed explanations and iterative development. Ask before making major changes.
 
 ## System Architecture
-The application is a pure public-facing system with no authentication or administrative features.
+The application is a fully authenticated system with role-based access control using native authentication (Passport Local Strategy with bcrypt password hashing).
+
+### Authentication & Authorization
+- **Authentication**: Native implementation using Passport Local Strategy
+- **Password Security**: bcrypt for password hashing (10 salt rounds)
+- **Session Management**: express-session with PostgreSQL session store (connect-pg-simple)
+- **Role-Based Access Control**: Two roles defined - "super_admin" and "advisor"
+- **Middleware**: requireAuth and requireRole middleware for protecting routes
+- **API Protection**: All protected routes enforce role-based access with 401/403 responses
 
 ### UI/UX Decisions
-- Public-facing interface for browsing destinations and requesting quotes
-- No login or authentication required
+- Login page for authentication
+- Role-based dashboard redirection (admin → /admin, advisor → /advisor)
+- Admin dashboard: manage clients, view statistics, create destinations
+- Advisor dashboard: create quotes, view own quotes, generate PDFs
 - Design incorporates Tailwind CSS and shadcn/ui for a modern, responsive interface
-- Date selection uses shadcn DatePicker with locale support
 - Professional PDF generation for quotes with company branding, visual itinerary, and detailed breakdown
-- Emphasis on clear informational banners and toast notifications for user feedback
 
 ### Technical Implementations
 - **Frontend**: React for the UI, Wouter for routing, TanStack Query for data fetching, Tailwind CSS and shadcn/ui for styling
 - **Backend**: Express.js with TypeScript for robust API development
 - **Database**: PostgreSQL hosted on Neon, managed with Drizzle ORM
+- **Authentication**: Passport.js with Local Strategy, bcrypt, express-session
+- **Session Storage**: PostgreSQL session store using connect-pg-simple
 - **PDF Generation**: PDFKit is used for creating customized PDF documents
-- **State Management**: sessionStorage is used for persisting customer-selected destinations and dates in the public flow
+- **API Security**: All admin/advisor routes protected with requireRole middleware
 - **Automatic Calculations**: The system automatically calculates trip end dates and total durations based on selected destinations
 - **Turkey Destination Logic**: Specific business rules are implemented for Turkey destinations, requiring Tuesday departures and adding an extra day for travel, with corresponding UI validations and messaging
 
 ### Feature Specifications
-- **Public Customer Flow**:
-    - Landing page displays destinations by category (Nacional, Internacional)
-    - Multi-destination selection and date input
-    - Quote summary page for reviewing selections and generating quotes
-    - PDF generation with complete destination details (day-by-day itinerary, hotels, inclusions, exclusions)
-    - WhatsApp sharing for quote requests
 
-- **PDF Export**: Generates comprehensive, branded PDFs with:
-    - Cover page with 3 destination images
-    - Visual itinerary overview with numbered cities and night counts
-    - Detailed day-by-day itinerary
-    - Hotel information
-    - Inclusions and exclusions
-    - Final total price (without breakdown)
+#### Super Admin Features
+- Create and manage clients (global list, no duplicates)
+- Create and manage destinations
+- View quote statistics (quotes per advisor)
+- View all quotes across all advisors
+- Full access to the system
+
+#### Advisor Features
+- Create quotations with:
+  - Client selection (from global list)
+  - Multi-destination selection
+  - Date specification
+  - Total price calculation
+- View own quotes
+- Generate PDF for quotes
+- Track quote history
+
+#### Public Endpoints (Unauthenticated)
+- Destination browsing (for reference, from original public system)
+- Public PDF generation endpoint
+
+### Role-Based Route Protection
+- **Public Routes**:
+  - POST /api/auth/login
+  - POST /api/auth/logout
+  - GET /api/auth/me
+  - GET /api/destinations
+  - GET /api/destinations/:id
+  - POST /api/public/quote-pdf
+
+- **Advisor Routes** (requireRole("advisor")):
+  - POST /api/quotes
+  - GET /api/quotes
+  - GET /api/quotes/:id
+  - GET /api/quotes/:id/pdf
+
+- **Super Admin Routes** (requireRole("super_admin")):
+  - POST /api/admin/clients
+  - GET /api/admin/clients
+  - POST /api/admin/destinations
+  - PUT /api/admin/destinations/:id
+  - GET /api/admin/quotes
+  - GET /api/admin/quotes/stats
 
 ### System Design Choices
 - Monorepo structure with `/client`, `/server`, and `/shared` directories
-- Read-only data model - destinations are managed directly in the database
-- Public API endpoints for destination browsing and PDF generation
+- Clients are global entities managed exclusively by super admins (no duplicates)
+- Advisors can only view and create their own quotes
+- Super admins have full visibility across all quotes and statistics
+- PostgreSQL session store for production-ready session management
 - Unique constraint on (name, country) to prevent duplicate destinations
+- All IDs use varchar with gen_random_uuid() for consistency
 
 ## Database Schema
-The system uses the following tables:
+
+### Authentication Tables
+- **users**: User accounts with role-based access
+  - id (varchar, UUID)
+  - username (varchar, unique)
+  - passwordHash (varchar, bcrypt)
+  - role (varchar, "super_admin" | "advisor")
+  - createdAt (timestamp)
+
+- **session**: Express session storage (connect-pg-simple)
+  - sid (varchar, primary key)
+  - sess (json)
+  - expire (timestamp)
+
+### Business Tables
+- **clients**: Global client list managed by super admins
+  - id (varchar, UUID)
+  - name (varchar)
+  - email (varchar, unique)
+  - phone (varchar, nullable)
+  - createdAt (timestamp)
+
+- **quotes**: Saved quotations created by advisors
+  - id (varchar, UUID)
+  - clientId (varchar, FK to clients)
+  - userId (varchar, FK to users)
+  - totalPrice (decimal)
+  - status (varchar, default "draft")
+  - createdAt (timestamp)
+
+- **quote_destinations**: Many-to-many relationship between quotes and destinations
+  - id (varchar, UUID)
+  - quoteId (varchar, FK to quotes)
+  - destinationId (varchar, FK to destinations)
+  - startDate (date)
+  - passengers (integer)
+  - createdAt (timestamp)
+
+### Destination Tables (unchanged)
 - **destinations**: Travel packages with pricing, duration, categories, and settings
 - **itinerary_days**: Day-by-day itinerary for each destination
 - **hotels**: Hotel information for each destination
 - **inclusions**: What's included in each package
 - **exclusions**: What's not included in each package
 
-All destination-related tables use CASCADE deletes to maintain referential integrity.
+All tables use CASCADE deletes to maintain referential integrity.
 
 ## External Dependencies
-- **PostgreSQL (Neon)**: Relational database for storing destination data
+- **PostgreSQL (Neon)**: Relational database for storing all data
 - **PDFKit**: JavaScript library for PDF document generation
 - **Wouter**: Client-side routing for React
 - **TanStack Query**: Data fetching and caching library for React
@@ -68,13 +149,26 @@ All destination-related tables use CASCADE deletes to maintain referential integ
 - **Express.js**: Backend web application framework
 - **TypeScript**: Superset of JavaScript for type safety
 - **Drizzle ORM**: TypeScript ORM for PostgreSQL
+- **Passport.js**: Authentication middleware for Node.js
+- **bcrypt**: Password hashing library
+- **express-session**: Session middleware for Express
+- **connect-pg-simple**: PostgreSQL session store for express-session
 
-## Managing Destinations
-Destinations are managed directly in the database using SQL or database management tools. The schema includes:
-- Unique constraint on (name, country) to prevent duplicates
-- Categories: "nacional" (only Colombia) or "internacional" (all other countries)
-- Special flags like `requiresTuesday` for Turkey destinations
-- Display order for controlling listing sequence
+## Initial Setup
+**Super Admin User**: A super admin user has been created for initial access:
+- Username: `admin`
+- Password: `admin123`
+- Role: `super_admin`
+
+⚠️ **Important**: Change this password after first login in production.
+
+## Managing Data
+
+### Clients
+Clients are managed exclusively by super admins through the admin dashboard. They are global entities with unique email addresses.
+
+### Destinations
+Destinations can be managed by super admins through the admin dashboard or directly in the database using SQL.
 
 **Current database contains 38 destinations:**
 - **Nacional (7)**: Colombia only
@@ -82,11 +176,21 @@ Destinations are managed directly in the database using SQL or database manageme
 - All destinations have prices defined
 - All names are in Spanish
 
+### Quotes
+Quotes are created by advisors and stored in the database. Each quote is associated with:
+- The advisor who created it (userId)
+- A client from the global list (clientId)
+- Multiple destinations with start dates and passenger counts
+- Total price and status
+
 ## Recent Changes (October 30, 2025)
-- **Removed all administrative features**: Eliminated the admin dashboard, authentication system, client management, and quote management
-- **Simplified to public-only system**: Now focuses exclusively on the public customer experience
-- **Removed database seed functionality**: Destinations are managed directly in the database
-- **Eliminated authentication**: No login system or user management
-- **Cleaned up codebase**: Removed unused admin pages, routes, and database tables (users, clients, quotes, sessions)
-- **Removed 28 English-named duplicate destinations**: Cleaned database by removing Dubai, Egypt, Greece, Peru, Thailand, Turkey duplicates (without prices)
-- **Finalized categorization**: Colombia (7 destinations) as "nacional", all others (31) as "internacional"
+- **Implemented native authentication**: Passport Local Strategy with bcrypt password hashing
+- **Added role-based access control**: Super Admin and Advisor roles with distinct permissions
+- **Created authentication layer**: Login, logout, session management with PostgreSQL
+- **Built admin dashboard**: Client management, destination management, quote statistics
+- **Built advisor dashboard**: Quote creation, quote listing, PDF generation
+- **Implemented protected API routes**: All admin/advisor routes secured with requireRole middleware
+- **Added database tables**: users, clients, quotes, quote_destinations, session
+- **Created initial super admin**: Username "admin", password "admin123"
+- **Security fixes**: Applied requireRole middleware to all protected routes
+- **Frontend routing**: AuthProvider, protected routes, role-based dashboard redirection

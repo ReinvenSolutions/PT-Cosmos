@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdvisorDashboard from "@/pages/advisor-dashboard";
+import CreateQuote from "@/pages/create-quote";
 
 function ProtectedRoute({ 
   component: Component, 
@@ -68,6 +69,9 @@ function Router() {
       <Route path="/dashboard" component={DashboardRedirect} />
       <Route path="/admin">
         <ProtectedRoute component={AdminDashboard} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/advisor/quotes/new">
+        <ProtectedRoute component={CreateQuote} allowedRoles={["advisor"]} />
       </Route>
       <Route path="/advisor">
         <ProtectedRoute component={AdvisorDashboard} allowedRoles={["advisor"]} />
