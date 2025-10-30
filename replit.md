@@ -149,13 +149,13 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
 ## Recent Changes
 
 ### October 30, 2025
-- **Updated Turquía Extra 10 días 9 noches**:
-  - Updated destination name from "Leyendas de Turquía" to "Turquía Extra 10 días 9 noches"
-  - Completely refreshed 10-day itinerary with updated details
+- **Updated Leyendas de Turquía (10 días 9 noches)**:
+  - Completely refreshed 10-day itinerary with updated details from new documentation
   - Updated hotel listings (11 hotels across Estambul, Capadocia, Pamukkale, Kusadasi/Esmirna)
   - Updated inclusions (9 nights accommodation, 9 breakfasts, 5 dinners, WiFi on bus, water bottles)
   - Updated exclusions (optional excursions, drinks, personal expenses, tips)
   - New itinerary highlights: Ankara-Capadocia route, Ozkonak underground city, Hierapolis, Ephesus ruins, Bursa
+  - Maintained original destination name "Leyendas de Turquía"
 
 - **Complete Destination Data Population**:
   - Populated all 30 international/national destinations with complete information from original planning documents
