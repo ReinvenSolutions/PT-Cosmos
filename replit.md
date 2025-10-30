@@ -149,6 +149,19 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
 ## Recent Changes
 
 ### October 30, 2025
+- **Visual Itinerary Page (Page 2) in PDF**:
+  - Added new "Itinerario" page between cover page and detailed itinerary section
+  - **Visual Features**:
+    - Title "Itinerario" with orange decorative underline
+    - Origin city display at start and end with "Inicio del viaje" / "El final del viaje" labels
+    - Numbered city stops with orange square badges (1, 2, 3...)
+    - Night count per city displayed prominently on the right
+    - Auto-extracts cities from itinerary day titles (splits on ' - ', takes last segment)
+    - Aggregates consecutive nights per location across all destinations
+  - Added "Ciudad de Origen y Retorno" input field to quote summary form
+  - Updated `/api/public/quote-pdf` endpoint to receive and pass `originCity` to PDF generator
+  - Data flow: Quote form → Backend API → PDF generator → Visual itinerary page
+
 - **PDF First Page Visual Improvements**:
   - Increased visibility of "Pago mínimo para separar" text (from 8pt to 10pt, bold, darker color)
   - Updated PDF generator to use Colombia timezone (America/Bogota, UTC-5)

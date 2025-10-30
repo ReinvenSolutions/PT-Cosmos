@@ -257,7 +257,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
         cityStops.push({
           number: stopNumber++,
           name: location,
-          country: dest.country,
+          country: dest.country || "",
           nights: nightCount
         });
       });
@@ -330,10 +330,11 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     }
 
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
-    doc.text(`${dest.name.toUpperCase()} - ${dest.country.toUpperCase()}`, leftMargin, doc.y);
+    const countryText = dest.country ? dest.country.toUpperCase() : "";
+    doc.text(`${dest.name?.toUpperCase() || "DESTINO"} - ${countryText}`, leftMargin, doc.y);
     doc.moveDown(0.5);
 
-    const destImages = getDestinationImageSet({ name: dest.name, country: dest.country });
+    const destImages = getDestinationImageSet({ name: dest.name || "", country: dest.country || "" });
     if (destImages.length > 0) {
       const imageWidth = (contentWidth - 20) / 3;
       const imageHeight = 100;
