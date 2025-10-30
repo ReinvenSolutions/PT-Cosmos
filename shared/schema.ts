@@ -90,3 +90,65 @@ export const insertExclusionSchema = createInsertSchema(exclusions).omit({
 });
 export type InsertExclusion = z.infer<typeof insertExclusionSchema>;
 export type Exclusion = typeof exclusions.$inferSelect;
+
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+export const clients = pgTable("clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientSchema = createInsertSchema(clients).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Client = typeof clients.$inferSelect;
+
+export const quotes = pgTable("quotes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuoteSchema = createInsertSchema(quotes).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true 
+});
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;
+export type Quote = typeof quotes.$inferSelect;
+
+export const quoteDestinations = pgTable("quote_destinations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  destinationId: varchar("destination_id").notNull().references(() => destinations.id),
+  startDate: timestamp("start_date").notNull(),
+  passengers: integer("passengers").notNull().default(2),
+});
+
+export const insertQuoteDestinationSchema = createInsertSchema(quoteDestinations).omit({ 
+  id: true 
+});
+export type InsertQuoteDestination = z.infer<typeof insertQuoteDestinationSchema>;
+export type QuoteDestination = typeof quoteDestinations.$inferSelect;
