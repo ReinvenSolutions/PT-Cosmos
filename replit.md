@@ -146,7 +146,34 @@ The email service (`server/email.ts`) is ready and will work once credentials ar
 - Frontend is bundled via Vite
 - Database migrations via `npm run db:push`
 
-## Recent Changes (October 29, 2025)
+## Recent Changes
+
+### October 30, 2025
+- **Complete Destination Data Population**:
+  - Populated all 30 international/national destinations with complete information from original planning documents
+  - Processed 20 DOCX files (Turkey, Dubai, Egypt, Greece, Thailand, Vietnam) and 10 PDF files (Peru/Cusco)
+  - Database now contains complete day-by-day itineraries for all destinations (3-10 days per destination)
+  - Added detailed hotels, inclusions, and exclusions for each destination from source documents
+  - Created processing scripts: `scripts/populate-destinations.ts` (DOCX) and `scripts/populate-cusco-pdfs.ts` (PDF)
+  - Installed document parsing libraries: mammoth (DOCX), poppler_utils/pdftotext (PDF)
+  - Fixed itinerary extraction for Thailand and Vietnam destinations to capture complete multi-day programs
+  - **Total data populated**: 
+    - Turkey (4 destinations): 8-10 day programs with complete itineraries
+    - Dubai (5 destinations): 3-8 day programs with complete itineraries
+    - Egypt (5 destinations): 4-10 day programs with complete itineraries
+    - Greece (1 destination): 5 day program with complete itinerary
+    - Peru/Cusco (10 destinations): 3-9 day programs with complete itineraries
+    - Thailand (3 destinations): 6-8 day programs with complete itineraries
+    - Vietnam (3 destinations): 4-6 day programs with complete itineraries
+
+- **Enhanced PDF Generator**:
+  - Updated `publicPdfGenerator.ts` to fetch and display complete destination data from database
+  - PDF now shows detailed day-by-day itinerary with titles and full descriptions per destination
+  - Added hotels section grouped by location
+  - Displays actual inclusions and exclusions from database (with fallback to defaults)
+  - Updated `/api/public/quote-pdf` endpoint to fetch complete data via storage methods
+
+### October 29, 2025
 - **Pricing and PDF Export**:
   - Added `basePrice` field to destinations schema (represents land portion only: hotels, tours, transport, activities, guides)
   - Populated all 31 destinations with realistic base prices ($800-$4500 USD based on destination/duration)
