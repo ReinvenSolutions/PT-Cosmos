@@ -4,6 +4,17 @@ import { destinations, itineraryDays, hotels, inclusions, exclusions } from "@sh
 export async function seedDatabase() {
   console.log("Starting database seed...");
 
+  // Check if destinations already exist
+  const existingDestinations = await db.select().from(destinations);
+  if (existingDestinations.length > 0) {
+    console.log(`⚠️ Database already has ${existingDestinations.length} destinations. Skipping seed to avoid duplicates.`);
+    return {
+      success: false,
+      message: "Database already seeded",
+      destinationsCreated: 0,
+    };
+  }
+
   const turkeyDestinations = [
     {
       name: "Estambul y Capadocia",
