@@ -56,18 +56,29 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   doc.text("S U   V I A J E   A :", leftMargin, 70);
 
   const titleY = 95;
-  doc.font("Helvetica-Bold").fontSize(24).fillColor(primaryColor);
-  const titleText = destinationNames.length > 40 
-    ? destinationNames.substring(0, 40) + "..." 
-    : destinationNames;
-  doc.text(titleText.toUpperCase(), leftMargin, titleY, { width: contentWidth - 100 });
+  const titleText = destinationNames.toUpperCase();
+  
+  let titleFontSize = 24;
+  if (titleText.length > 50) {
+    titleFontSize = 16;
+  } else if (titleText.length > 35) {
+    titleFontSize = 18;
+  } else if (titleText.length > 25) {
+    titleFontSize = 20;
+  }
+  
+  doc.font("Helvetica-Bold").fontSize(titleFontSize).fillColor(primaryColor);
+  doc.text(titleText, leftMargin, titleY, { width: contentWidth - 100, lineGap: 2 });
+  
+  const titleHeight = doc.heightOfString(titleText, { width: contentWidth - 100 });
+  const durationY = titleY + titleHeight + 8;
   
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
-  doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, titleY + 35);
+  doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, durationY);
 
   const currentDate = new Date().toLocaleDateString("es-ES", { day: '2-digit', month: '2-digit', year: 'numeric' });
   doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
-  doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, titleY + 40, { align: "right" });
+  doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, durationY + 5, { align: "right" });
 
   const mainImageY = 165;
   const mainImageHeight = 250;
