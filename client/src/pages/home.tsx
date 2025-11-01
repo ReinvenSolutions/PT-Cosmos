@@ -245,22 +245,11 @@ export default function Home() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="bg-white shadow-md border-b">
             <div className="container mx-auto px-4 py-4">
-              <div className="flex items-center gap-4 mb-3">
+              <div className="flex items-center gap-4">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
                   Cosmos <span className="text-blue-400 font-light">Industria de Viajes</span>
                 </h1>
-              </div>
-              <div className="relative max-w-md">
-                <input
-                  type="text"
-                  placeholder="Buscar destinos por nombre o país..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  data-testid="input-search-destinations"
-                />
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               </div>
             </div>
           </header>
@@ -357,6 +346,20 @@ export default function Home() {
               </div>
             </div>
           )}
+        </div>
+
+        <div className="mb-8 max-w-lg mx-auto">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar destinos por nombre o país..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 pl-12 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+              data-testid="input-search-destinations"
+            />
+            <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
         </div>
 
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
