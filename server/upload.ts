@@ -5,21 +5,16 @@ import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 
 // Use /tmp/uploads as default. Object storage may not be mounted in development.
-let UPLOAD_DIR = "/tmp/uploads";
+const UPLOAD_DIR = "/tmp/uploads";
 
-// Try to use object storage if available, otherwise fall back to /tmp/uploads
+// Always use /tmp/uploads for consistency with PDF generator
 async function getUploadDir(): Promise<string> {
-  const objStorageDir = process.env.PRIVATE_OBJECT_DIR;
-  
-  if (objStorageDir && existsSync(objStorageDir)) {
-    return objStorageDir;
-  }
-  
   // Ensure /tmp/uploads exists
   if (!existsSync(UPLOAD_DIR)) {
     await mkdir(UPLOAD_DIR, { recursive: true });
   }
   
+  console.log('[Upload] Using upload directory:', UPLOAD_DIR);
   return UPLOAD_DIR;
 }
 

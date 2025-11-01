@@ -331,7 +331,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
       console.log(`[PDF Generator] Processing outbound image ${index}:`, imageUrl);
       if (imageUrl.startsWith("/uploads/")) {
         const imagePath = imageUrl.replace("/uploads/", "");
-        const fullPath = `${process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads"}/${imagePath}`;
+        const fullPath = `/tmp/uploads/${imagePath}`;
         console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
         console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
         
@@ -581,7 +581,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
       console.log(`[PDF Generator] Processing return image ${index}:`, imageUrl);
       if (imageUrl.startsWith("/uploads/")) {
         const imagePath = imageUrl.replace("/uploads/", "");
-        const fullPath = `${process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads"}/${imagePath}`;
+        const fullPath = `/tmp/uploads/${imagePath}`;
         console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
         console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
         
