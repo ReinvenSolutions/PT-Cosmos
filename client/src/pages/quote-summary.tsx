@@ -270,6 +270,8 @@ export default function QuoteSummary() {
           landPortionTotal,
           grandTotal,
           originCity: originCity || "",
+          outboundFlightImages: outboundImages,
+          returnFlightImages: returnImages,
         }),
       });
       
