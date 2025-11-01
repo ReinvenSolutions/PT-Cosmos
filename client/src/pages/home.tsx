@@ -196,17 +196,22 @@ export default function Home() {
     const dest = destinations.find((d) => d.id === destId);
     
     if (selectedDestinations.includes(destId)) {
+      // Deseleccionar el destino actual
       setSelectedDestinations(selectedDestinations.filter((id) => id !== destId));
     } else {
       // Verificar si ya hay un destino del mismo país seleccionado (excepto Colombia para destinos nacionales)
       if (dest?.category === "internacional" && dest?.country !== "Colombia") {
         const sameCountrySelected = selectedDests.find((d) => d.country === dest.country && d.id !== destId);
         if (sameCountrySelected) {
+          // Deseleccionar el destino anterior del mismo país y seleccionar el nuevo
+          const updatedSelections = selectedDestinations.filter((id) => id !== sameCountrySelected.id);
+          
           toast({
-            title: "No puedes seleccionar varios destinos del mismo país",
-            description: `Ya has seleccionado "${sameCountrySelected.name}" de ${dest.country}. Solo puedes elegir un destino internacional por país.`,
-            variant: "destructive",
+            title: "Destino reemplazado",
+            description: `Se ha deseleccionado "${sameCountrySelected.name}" y seleccionado "${dest.name}" de ${dest.country}.`,
           });
+          
+          setSelectedDestinations([...updatedSelections, destId]);
           return;
         }
       }
