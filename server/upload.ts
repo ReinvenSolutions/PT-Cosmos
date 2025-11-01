@@ -4,13 +4,23 @@ import { join } from "path";
 import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 
-const PRIVATE_DIR = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
+// Use /tmp/uploads as default. Object storage may not be mounted in development.
+let UPLOAD_DIR = "/tmp/uploads";
 
-// Ensure the upload directory exists
-async function ensureUploadDir() {
-  if (!existsSync(PRIVATE_DIR)) {
-    await mkdir(PRIVATE_DIR, { recursive: true });
+// Try to use object storage if available, otherwise fall back to /tmp/uploads
+async function getUploadDir(): Promise<string> {
+  const objStorageDir = process.env.PRIVATE_OBJECT_DIR;
+  
+  if (objStorageDir && existsSync(objStorageDir)) {
+    return objStorageDir;
   }
+  
+  // Ensure /tmp/uploads exists
+  if (!existsSync(UPLOAD_DIR)) {
+    await mkdir(UPLOAD_DIR, { recursive: true });
+  }
+  
+  return UPLOAD_DIR;
 }
 
 const ALLOWED_MIME_TYPES = [
@@ -45,11 +55,11 @@ export async function handleFileUpload(req: Request, res: Response) {
       return res.status(400).json({ message: "File too large. Maximum size is 10MB." });
     }
     
-    // Ensure upload directory exists
-    await ensureUploadDir();
+    // Get upload directory (object storage or /tmp/uploads)
+    const uploadDir = await getUploadDir();
     
     const filename = `${randomBytes(16).toString('hex')}.${ext}`;
-    const filepath = join(PRIVATE_DIR, filename);
+    const filepath = join(uploadDir, filename);
     
     await writeFile(filepath, req.file.buffer);
     
