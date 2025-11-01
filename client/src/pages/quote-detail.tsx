@@ -289,78 +289,83 @@ export default function QuoteDetail() {
                 </CardContent>
               </Card>
 
-              {(quote.outboundFlightImages && quote.outboundFlightImages.length > 0) || 
-               (quote.returnFlightImages && quote.returnFlightImages.length > 0) ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Plane className="w-5 h-5" />
-                      Adjuntos de Vuelos
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {quote.outboundFlightImages && quote.outboundFlightImages.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold mb-3 flex items-center gap-2">
-                          <Plane className="w-4 h-4 text-blue-600 rotate-45" />
-                          Vuelo de Ida
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {quote.outboundFlightImages.map((imageUrl, index) => (
-                            <div
-                              key={index}
-                              className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                              data-testid={`outbound-flight-image-${index}`}
-                            >
-                              <img
-                                src={imageUrl}
-                                alt={`Vuelo de ida ${index + 1}`}
-                                className="w-full h-48 object-cover"
-                              />
-                              <div className="p-2 bg-muted">
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <ImageIcon className="w-3 h-3" />
-                                  Imagen {index + 1}
-                                </p>
-                              </div>
+              <Card data-testid="card-flight-attachments">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Plane className="w-5 h-5" />
+                    Adjuntos de Vuelos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div data-testid="section-outbound-flights">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Plane className="w-4 h-4 text-blue-600 rotate-45" />
+                      Vuelos de Ida
+                    </h3>
+                    {quote.outboundFlightImages && quote.outboundFlightImages.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {quote.outboundFlightImages.map((imageUrl, index) => (
+                          <div
+                            key={index}
+                            className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                            data-testid={`outbound-flight-image-${index}`}
+                          >
+                            <img
+                              src={imageUrl}
+                              alt={`Vuelo de ida ${index + 1}`}
+                              className="w-full h-48 object-cover"
+                            />
+                            <div className="p-2 bg-muted">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <ImageIcon className="w-3 h-3" />
+                                Imagen {index + 1}
+                              </p>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground" data-testid="text-no-outbound-images">
+                        No hay imágenes de vuelos de ida adjuntadas. Puede agregar imágenes editando la cotización.
+                      </p>
                     )}
-                    
-                    {quote.returnFlightImages && quote.returnFlightImages.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold mb-3 flex items-center gap-2">
-                          <Plane className="w-4 h-4 text-green-600 -rotate-45" />
-                          Vuelo de Regreso
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {quote.returnFlightImages.map((imageUrl, index) => (
-                            <div
-                              key={index}
-                              className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                              data-testid={`return-flight-image-${index}`}
-                            >
-                              <img
-                                src={imageUrl}
-                                alt={`Vuelo de regreso ${index + 1}`}
-                                className="w-full h-48 object-cover"
-                              />
-                              <div className="p-2 bg-muted">
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <ImageIcon className="w-3 h-3" />
-                                  Imagen {index + 1}
-                                </p>
-                              </div>
+                  </div>
+                  
+                  <div data-testid="section-return-flights">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Plane className="w-4 h-4 text-green-600 -rotate-45" />
+                      Vuelos de Regreso
+                    </h3>
+                    {quote.returnFlightImages && quote.returnFlightImages.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {quote.returnFlightImages.map((imageUrl, index) => (
+                          <div
+                            key={index}
+                            className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                            data-testid={`return-flight-image-${index}`}
+                          >
+                            <img
+                              src={imageUrl}
+                              alt={`Vuelo de regreso ${index + 1}`}
+                              className="w-full h-48 object-cover"
+                            />
+                            <div className="p-2 bg-muted">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <ImageIcon className="w-3 h-3" />
+                                Imagen {index + 1}
+                              </p>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground" data-testid="text-no-return-images">
+                        No hay imágenes de vuelos de regreso adjuntadas. Puede agregar imágenes editando la cotización.
+                      </p>
                     )}
-                  </CardContent>
-                </Card>
-              ) : null}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </main>
         </div>
