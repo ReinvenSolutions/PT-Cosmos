@@ -394,6 +394,8 @@ export default function Home() {
                           className={`transition-all hover:shadow-xl overflow-hidden ${
                             isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
                           }`}
+                          onMouseEnter={() => setExpandedCard(dest.id)}
+                          onMouseLeave={() => setExpandedCard(null)}
                           data-testid={`destination-card-${dest.id}`}
                         >
                               <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
@@ -461,18 +463,6 @@ export default function Home() {
                                     ¡Promoción!
                                   </Badge>
                                 )}
-                                
-                                <button
-                                  className="w-full mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedCard(isExpanded ? null : dest.id);
-                                  }}
-                                  data-testid={`button-toggle-info-${dest.id}`}
-                                >
-                                  <Info className="w-4 h-4" />
-                                  {isExpanded ? "Ocultar información" : "Ver información"}
-                                </button>
                               </CardContent>
                               
                               {isExpanded && (
