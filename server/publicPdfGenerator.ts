@@ -320,6 +320,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
 
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
   if (data.outboundFlightImages && data.outboundFlightImages.length > 0) {
+    console.log('[PDF Generator] Outbound flight images:', data.outboundFlightImages);
     doc.addPage();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
@@ -327,9 +328,12 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     
     let flightImageY = 150;
     data.outboundFlightImages.forEach((imageUrl, index) => {
+      console.log(`[PDF Generator] Processing outbound image ${index}:`, imageUrl);
       if (imageUrl.startsWith("/uploads/")) {
         const imagePath = imageUrl.replace("/uploads/", "");
         const fullPath = `${process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads"}/${imagePath}`;
+        console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
+        console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
         
         if (fs.existsSync(fullPath)) {
           try {
@@ -345,10 +349,13 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
               align: "center"
             });
             
+            console.log(`[PDF Generator] Successfully added outbound image ${index}`);
             flightImageY += imageHeight + 20;
           } catch (error) {
-            console.error(`Error loading outbound flight image ${index}:`, error);
+            console.error(`[PDF Generator] Error loading outbound flight image ${index}:`, error);
           }
+        } else {
+          console.error(`[PDF Generator] Image file not found at ${fullPath}`);
         }
       }
     });
@@ -563,6 +570,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
 
   // VUELOS DE REGRESO - última página del PDF
   if (data.returnFlightImages && data.returnFlightImages.length > 0) {
+    console.log('[PDF Generator] Return flight images:', data.returnFlightImages);
     doc.addPage();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
@@ -570,9 +578,12 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     
     let flightImageY = 150;
     data.returnFlightImages.forEach((imageUrl, index) => {
+      console.log(`[PDF Generator] Processing return image ${index}:`, imageUrl);
       if (imageUrl.startsWith("/uploads/")) {
         const imagePath = imageUrl.replace("/uploads/", "");
         const fullPath = `${process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads"}/${imagePath}`;
+        console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
+        console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
         
         if (fs.existsSync(fullPath)) {
           try {
@@ -588,10 +599,13 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
               align: "center"
             });
             
+            console.log(`[PDF Generator] Successfully added return image ${index}`);
             flightImageY += imageHeight + 20;
           } catch (error) {
-            console.error(`Error loading return flight image ${index}:`, error);
+            console.error(`[PDF Generator] Error loading return flight image ${index}:`, error);
           }
+        } else {
+          console.error(`[PDF Generator] Image file not found at ${fullPath}`);
         }
       }
     });

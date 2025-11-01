@@ -91,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/public/quote-pdf", async (req, res) => {
     try {
-      const { destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, originCity } = req.body;
+      const { destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, originCity, outboundFlightImages, returnFlightImages } = req.body;
       
       if (!destinations || !Array.isArray(destinations) || destinations.length === 0) {
         return res.status(400).json({ message: "Destinations are required" });
@@ -124,6 +124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         landPortionTotal: Number(landPortionTotal) || 0,
         grandTotal: Number(grandTotal) || 0,
         originCity: originCity || "",
+        outboundFlightImages: outboundFlightImages || undefined,
+        returnFlightImages: returnFlightImages || undefined,
       });
       
       res.setHeader('Content-Type', 'application/pdf');
