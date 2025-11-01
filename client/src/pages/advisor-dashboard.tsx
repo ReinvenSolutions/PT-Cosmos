@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, FileText, Trash2, Search } from "lucide-react";
+import { Plus, FileText, Trash2, Search, Edit } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useState } from "react";
@@ -155,6 +155,15 @@ export default function AdvisorDashboard() {
                             >
                               <FileText className="w-4 h-4 mr-2" />
                               Ver Detalles
+                            </Button>
+                          </Link>
+                          <Link href={`/advisor/quotes/${quote.id}/edit`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              data-testid={`button-edit-quote-${quote.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
                             </Button>
                           </Link>
                           <Button

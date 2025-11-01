@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, User, Mail, Phone, Calendar, Users } from "lucide-react";
+import { ArrowLeft, Download, User, Mail, Phone, Calendar, Users, Plane, Image as ImageIcon, Edit } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -38,6 +38,10 @@ interface Quote {
   clientId: string;
   userId: string;
   totalPrice: string;
+  originCity: string | null;
+  flightsAndExtras: string | null;
+  outboundFlightImages: string[] | null;
+  returnFlightImages: string[] | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -146,10 +150,18 @@ export default function QuoteDetail() {
                     Volver
                   </Button>
                 </Link>
-                <Button onClick={handleDownloadPDF} data-testid="button-download-pdf">
-                  <Download className="w-4 h-4 mr-2" />
-                  Descargar PDF
-                </Button>
+                <div className="flex gap-2">
+                  <Link href={`/advisor/quotes/${quoteId}/edit`}>
+                    <Button variant="outline" data-testid="button-edit">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Editar
+                    </Button>
+                  </Link>
+                  <Button onClick={handleDownloadPDF} data-testid="button-download-pdf">
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar PDF
+                  </Button>
+                </div>
               </div>
 
               <Card>
@@ -276,6 +288,79 @@ export default function QuoteDetail() {
                   </div>
                 </CardContent>
               </Card>
+
+              {(quote.outboundFlightImages && quote.outboundFlightImages.length > 0) || 
+               (quote.returnFlightImages && quote.returnFlightImages.length > 0) ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Plane className="w-5 h-5" />
+                      Adjuntos de Vuelos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {quote.outboundFlightImages && quote.outboundFlightImages.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                          <Plane className="w-4 h-4 text-blue-600 rotate-45" />
+                          Vuelo de Ida
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {quote.outboundFlightImages.map((imageUrl, index) => (
+                            <div
+                              key={index}
+                              className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                              data-testid={`outbound-flight-image-${index}`}
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`Vuelo de ida ${index + 1}`}
+                                className="w-full h-48 object-cover"
+                              />
+                              <div className="p-2 bg-muted">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <ImageIcon className="w-3 h-3" />
+                                  Imagen {index + 1}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {quote.returnFlightImages && quote.returnFlightImages.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                          <Plane className="w-4 h-4 text-green-600 -rotate-45" />
+                          Vuelo de Regreso
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {quote.returnFlightImages.map((imageUrl, index) => (
+                            <div
+                              key={index}
+                              className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                              data-testid={`return-flight-image-${index}`}
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`Vuelo de regreso ${index + 1}`}
+                                className="w-full h-48 object-cover"
+                              />
+                              <div className="p-2 bg-muted">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <ImageIcon className="w-3 h-3" />
+                                  Imagen {index + 1}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
             </div>
           </main>
         </div>

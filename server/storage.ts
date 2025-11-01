@@ -53,6 +53,7 @@ export interface IStorage {
   findClientById(id: string): Promise<Client | undefined>;
 
   createQuote(quoteData: InsertQuote, destinationsData: InsertQuoteDestination[]): Promise<Quote>;
+  updateQuote(id: string, userId: string, quoteData: Partial<InsertQuote>, destinationsData: InsertQuoteDestination[]): Promise<Quote>;
   listQuotesByUser(userId: string): Promise<(Quote & { client: Client })[]>;
   listAllQuotes(): Promise<(Quote & { client: Client, user: User })[]>;
   getQuote(id: string, userId?: string): Promise<(Quote & { client: Client, destinations: (QuoteDestination & { destination: Destination })[] }) | undefined>;
@@ -184,6 +185,39 @@ export class DatabaseStorage implements IStorage {
       }
       
       return quote;
+    });
+  }
+
+  async updateQuote(id: string, userId: string, quoteData: Partial<InsertQuote>, destinationsData: InsertQuoteDestination[]): Promise<Quote> {
+    return await db.transaction(async (tx) => {
+      const existingQuote = await tx
+        .select()
+        .from(quotes)
+        .where(eq(quotes.id, id))
+        .limit(1);
+      
+      if (!existingQuote[0] || existingQuote[0].userId !== userId) {
+        throw new Error("Quote not found or unauthorized");
+      }
+
+      const [updatedQuote] = await tx
+        .update(quotes)
+        .set({ ...quoteData, updatedAt: new Date() })
+        .where(eq(quotes.id, id))
+        .returning();
+
+      await tx.delete(quoteDestinations).where(eq(quoteDestinations.quoteId, id));
+
+      if (destinationsData.length > 0) {
+        const destinationsWithQuoteId = destinationsData.map(d => ({
+          ...d,
+          quoteId: id,
+          startDate: typeof d.startDate === 'string' ? new Date(d.startDate) : d.startDate,
+        }));
+        await tx.insert(quoteDestinations).values(destinationsWithQuoteId);
+      }
+      
+      return updatedQuote;
     });
   }
 

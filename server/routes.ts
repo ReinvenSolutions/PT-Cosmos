@@ -273,6 +273,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages } = req.body;
+
+      if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const quoteData = {
+        clientId,
+        totalPrice,
+        originCity: originCity || null,
+        flightsAndExtras: flightsAndExtras || null,
+        outboundFlightImages: outboundFlightImages || null,
+        returnFlightImages: returnFlightImages || null,
+      };
+
+      const quote = await storage.updateQuote(req.params.id, user.id, quoteData, destinations);
+      res.json(quote);
+    } catch (error) {
+      console.error("Error updating quote:", error);
+      if (error instanceof Error && error.message.includes("not found or unauthorized")) {
+        res.status(404).json({ message: "Quote not found or unauthorized" });
+      } else {
+        res.status(500).json({ message: "Failed to update quote" });
+      }
+    }
+  });
+
   app.get("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;

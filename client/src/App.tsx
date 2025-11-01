@@ -10,6 +10,7 @@ import Register from "@/pages/register";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdvisorDashboard from "@/pages/advisor-dashboard";
 import QuoteDetail from "@/pages/quote-detail";
+import QuoteEdit from "@/pages/quote-edit";
 import Home from "@/pages/home";
 import QuoteSummary from "@/pages/quote-summary";
 
@@ -74,11 +75,14 @@ function Router() {
       <Route path="/admin">
         <ProtectedRoute component={AdminDashboard} allowedRoles={["super_admin"]} />
       </Route>
+      <Route path="/advisor/quotes/:id/edit">
+        <ProtectedRoute component={QuoteEdit} allowedRoles={["advisor", "super_admin"]} />
+      </Route>
       <Route path="/advisor/quotes/:id">
-        <ProtectedRoute component={QuoteDetail} allowedRoles={["advisor"]} />
+        <ProtectedRoute component={QuoteDetail} allowedRoles={["advisor", "super_admin"]} />
       </Route>
       <Route path="/advisor">
-        <ProtectedRoute component={AdvisorDashboard} allowedRoles={["advisor"]} />
+        <ProtectedRoute component={AdvisorDashboard} allowedRoles={["advisor", "super_admin"]} />
       </Route>
       <Route path="/cotizacion">
         <ProtectedRoute component={QuoteSummary} allowedRoles={["super_admin", "advisor"]} />
