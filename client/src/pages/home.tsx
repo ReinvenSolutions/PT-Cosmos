@@ -14,12 +14,6 @@ import { isTuesday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface DestinationDetail {
   destination: Destination;
@@ -33,6 +27,7 @@ export default function Home() {
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: destinations = [] } = useQuery<Destination[]>({
@@ -383,10 +378,10 @@ export default function Home() {
                   <h3 className="text-2xl font-bold text-gray-800">{country}</h3>
                 </div>
                 
-                <TooltipProvider>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {dests.map((dest) => {
                       const isSelected = selectedDestinations.includes(dest.id);
+                      const isExpanded = expandedCard === dest.id;
                       const imageUrl = getDestinationImage(dest);
                       const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
                       const hotelStars = getHotelStars(dest.id);
@@ -394,15 +389,13 @@ export default function Home() {
                       const tooltipText = getTooltipContent(dest);
                       
                       return (
-                        <Tooltip key={dest.id}>
-                          <TooltipTrigger asChild>
-                            <Card
-                              className={`cursor-pointer transition-all hover:shadow-xl overflow-hidden ${
-                                isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
-                              }`}
-                              onClick={() => toggleDestination(dest.id)}
-                              data-testid={`destination-card-${dest.id}`}
-                            >
+                        <Card
+                          key={dest.id}
+                          className={`transition-all hover:shadow-xl overflow-hidden ${
+                            isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
+                          }`}
+                          data-testid={`destination-card-${dest.id}`}
+                        >
                               <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
                                 {imageUrl && (
                                   <img
@@ -440,7 +433,7 @@ export default function Home() {
                                   </div>
                                 )}
                               </div>
-                              <CardContent className="p-4">
+                              <CardContent className="p-4 cursor-pointer" onClick={() => toggleDestination(dest.id)}>
                                 <div className="text-xs font-medium text-gray-500 uppercase mb-1">{dest.country}</div>
                                 <h4 className="font-bold text-lg mb-2 text-gray-800">{dest.name}</h4>
                                 
@@ -466,17 +459,29 @@ export default function Home() {
                                     ¡Promoción!
                                   </Badge>
                                 )}
+                                
+                                <button
+                                  className="w-full mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedCard(isExpanded ? null : dest.id);
+                                  }}
+                                  data-testid={`button-toggle-info-${dest.id}`}
+                                >
+                                  <Info className="w-4 h-4" />
+                                  {isExpanded ? "Ocultar información" : "Ver información"}
+                                </button>
                               </CardContent>
+                              
+                              {isExpanded && (
+                                <div className="bg-blue-50 border-t border-blue-100 p-4">
+                                  <p className="text-sm text-gray-700">{tooltipText}</p>
+                                </div>
+                              )}
                             </Card>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-xs">
-                            <p className="text-sm">{tooltipText}</p>
-                          </TooltipContent>
-                        </Tooltip>
                       );
                     })}
                   </div>
-                </TooltipProvider>
               </div>
             ))}
 
