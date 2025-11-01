@@ -11,7 +11,8 @@ import multer from "multer";
 import { handleFileUpload } from "./upload";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  const uploadsDir = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
+  // Use /tmp/uploads since object storage may not be mounted in development
+  const uploadsDir = "/tmp/uploads";
   app.use("/uploads", express.static(uploadsDir));
 
   const upload = multer({

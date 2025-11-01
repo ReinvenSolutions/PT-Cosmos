@@ -531,6 +531,36 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
 
   doc.moveDown(2);
 
+  if (doc.y > 680) {
+    doc.addPage();
+  }
+
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
+  doc.text("Términos Generales y Condiciones", leftMargin, doc.y);
+  doc.moveDown(0.5);
+  
+  doc.font("Helvetica").fontSize(7.5).fillColor(lightGray);
+  const terms = `Servicios: Cambios en el itinerario posibles según condiciones y disponibilidad del guía. Hotelería: Alojamiento en hoteles de primera entre 4 y 5 estrellas similares a los planificados. Excursiones: No reembolsos por inasistencias. Traslados: Recogida y salida sin acceso al aeropuerto. Espera máxima de 2 horas tras aterrizaje. Documentación: Colombianos exentos de visado. Pasaporte con mínimo 6 meses de validez. Consultar requerimientos para otras nacionalidades.`;
+  doc.text(terms, leftMargin, doc.y, { width: contentWidth, align: "justify" });
+  
+  doc.moveDown(2);
+
+  doc.fontSize(7).fillColor(veryLightGray);
+  doc.text(
+    "Esta cotización es válida por 7 días. Los precios están sujetos a disponibilidad.",
+    leftMargin,
+    doc.y,
+    { width: contentWidth, align: "center" }
+  );
+  doc.moveDown(0.3);
+  doc.text(
+    "Para más información, contáctanos por WhatsApp: +57 314 657 6500",
+    leftMargin,
+    doc.y,
+    { width: contentWidth, align: "center" }
+  );
+
+  // VUELOS DE REGRESO - última página del PDF
   if (data.returnFlightImages && data.returnFlightImages.length > 0) {
     doc.addPage();
     
@@ -565,35 +595,6 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
       }
     });
   }
-
-  if (doc.y > 680) {
-    doc.addPage();
-  }
-
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
-  doc.text("Términos Generales y Condiciones", leftMargin, doc.y);
-  doc.moveDown(0.5);
-  
-  doc.font("Helvetica").fontSize(7.5).fillColor(lightGray);
-  const terms = `Servicios: Cambios en el itinerario posibles según condiciones y disponibilidad del guía. Hotelería: Alojamiento en hoteles de primera entre 4 y 5 estrellas similares a los planificados. Excursiones: No reembolsos por inasistencias. Traslados: Recogida y salida sin acceso al aeropuerto. Espera máxima de 2 horas tras aterrizaje. Documentación: Colombianos exentos de visado. Pasaporte con mínimo 6 meses de validez. Consultar requerimientos para otras nacionalidades.`;
-  doc.text(terms, leftMargin, doc.y, { width: contentWidth, align: "justify" });
-  
-  doc.moveDown(2);
-
-  doc.fontSize(7).fillColor(veryLightGray);
-  doc.text(
-    "Esta cotización es válida por 7 días. Los precios están sujetos a disponibilidad.",
-    leftMargin,
-    doc.y,
-    { width: contentWidth, align: "center" }
-  );
-  doc.moveDown(0.3);
-  doc.text(
-    "Para más información, contáctanos por WhatsApp: +57 314 657 6500",
-    leftMargin,
-    doc.y,
-    { width: contentWidth, align: "center" }
-  );
 
   return doc;
 }
