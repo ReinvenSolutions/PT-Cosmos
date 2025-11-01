@@ -344,7 +344,6 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
             }
             
             doc.image(fullPath, leftMargin, flightImageY, {
-              width: contentWidth,
               fit: [contentWidth, imageHeight],
               align: "center"
             });
@@ -594,7 +593,6 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
             }
             
             doc.image(fullPath, leftMargin, flightImageY, {
-              width: contentWidth,
               fit: [contentWidth, imageHeight],
               align: "center"
             });
