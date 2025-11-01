@@ -1,11 +1,25 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Trash2, Search } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useState } from "react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 
 interface Quote {
   id: string;
@@ -22,9 +36,46 @@ interface Quote {
 }
 
 export default function AdvisorDashboard() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
+  const [deleteQuoteId, setDeleteQuoteId] = useState<string | null>(null);
+  const { toast } = useToast();
+  
   const { data: quotes, isLoading } = useQuery<Quote[]>({
     queryKey: ["/api/quotes"],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      return apiRequest("DELETE", `/api/quotes/${quoteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      toast({
+        title: "Cotización eliminada",
+        description: "La cotización se eliminó correctamente",
+      });
+      setDeleteQuoteId(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la cotización",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredQuotes = quotes?.filter((quote) => {
+    const matchesSearch = searchQuery === "" || 
+      quote.client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      quote.client.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesClient = clientFilter === "" || 
+      quote.client.name.toLowerCase().includes(clientFilter.toLowerCase());
+    
+    return matchesSearch && matchesClient;
+  }) || [];
 
   const style = {
     "--sidebar-width": "20rem",
@@ -50,11 +101,27 @@ export default function AdvisorDashboard() {
           </header>
 
           <main className="flex-1 overflow-auto p-6">
+            {quotes && quotes.length > 0 && (
+              <div className="mb-6 space-y-4">
+                <div className="relative max-w-md">
+                  <Input
+                    type="text"
+                    placeholder="Buscar por cliente o email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-quotes"
+                  />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                </div>
+              </div>
+            )}
+
             {isLoading ? (
               <p>Cargando cotizaciones...</p>
-            ) : quotes && quotes.length > 0 ? (
+            ) : filteredQuotes.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {quotes.map((quote) => (
+                {filteredQuotes.map((quote) => (
                   <Card key={quote.id} data-testid={`card-quote-${quote.id}`}>
                     <CardHeader>
                       <CardTitle className="text-lg">{quote.client.name}</CardTitle>
@@ -78,22 +145,40 @@ export default function AdvisorDashboard() {
                             {new Date(quote.createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <Link href={`/advisor/quotes/${quote.id}`}>
+                        <div className="flex gap-2 mt-2">
+                          <Link href={`/advisor/quotes/${quote.id}`} className="flex-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              data-testid={`button-view-quote-${quote.id}`}
+                            >
+                              <FileText className="w-4 h-4 mr-2" />
+                              Ver Detalles
+                            </Button>
+                          </Link>
                           <Button
-                            variant="outline"
+                            variant="destructive"
                             size="sm"
-                            className="w-full mt-2"
-                            data-testid={`button-view-quote-${quote.id}`}
+                            onClick={() => setDeleteQuoteId(quote.id)}
+                            data-testid={`button-delete-quote-${quote.id}`}
                           >
-                            <FileText className="w-4 h-4 mr-2" />
-                            Ver Detalles
+                            <Trash2 className="w-4 h-4" />
                           </Button>
-                        </Link>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
+            ) : quotes && quotes.length > 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-center text-muted-foreground">
+                    No se encontraron cotizaciones que coincidan con tu búsqueda.
+                  </p>
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardContent className="pt-6">
@@ -112,6 +197,28 @@ export default function AdvisorDashboard() {
               </Card>
             )}
           </main>
+          
+          <AlertDialog open={deleteQuoteId !== null} onOpenChange={(open) => !open && setDeleteQuoteId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. La cotización será eliminada permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete">Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteQuoteId && deleteMutation.mutate(deleteQuoteId)}
+                  disabled={deleteMutation.isPending}
+                  data-testid="button-confirm-delete"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </SidebarProvider>

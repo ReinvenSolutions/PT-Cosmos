@@ -57,6 +57,7 @@ export interface IStorage {
   listAllQuotes(): Promise<(Quote & { client: Client, user: User })[]>;
   getQuote(id: string, userId?: string): Promise<(Quote & { client: Client, destinations: (QuoteDestination & { destination: Destination })[] }) | undefined>;
   getQuoteStats(): Promise<{ userId: string, username: string, count: number }[]>;
+  deleteQuote(id: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -342,6 +343,23 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(sql`count(${quotes.id})`));
     
     return result;
+  }
+
+  async deleteQuote(id: string, userId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      const quoteResult = await tx
+        .select()
+        .from(quotes)
+        .where(eq(quotes.id, id))
+        .limit(1);
+      
+      if (!quoteResult[0] || quoteResult[0].userId !== userId) {
+        throw new Error("Quote not found or unauthorized");
+      }
+
+      await tx.delete(quoteDestinations).where(eq(quoteDestinations.quoteId, id));
+      await tx.delete(quotes).where(eq(quotes.id, id));
+    });
   }
 }
 

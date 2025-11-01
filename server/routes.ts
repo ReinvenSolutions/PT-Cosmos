@@ -372,6 +372,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const quote = await storage.getQuote(req.params.id, user.id);
+      
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      await storage.deleteQuote(req.params.id, user.id);
+      res.json({ message: "Quote deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting quote:", error);
+      res.status(500).json({ message: "Failed to delete quote" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
