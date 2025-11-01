@@ -7,24 +7,68 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Menu } from "lucide-react";
+import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Menu, Hotel, UtensilsCrossed, Star } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
 import { DatePicker } from "@/components/ui/date-picker";
 import { isTuesday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+interface DestinationDetail {
+  destination: Destination;
+  hotels: any[];
+  itinerary: any[];
+}
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("internacional");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
   });
+  
+  const [destinationDetails, setDestinationDetails] = useState<Record<string, DestinationDetail>>({});
+  
+  useEffect(() => {
+    const loadDestinationDetails = async () => {
+      for (const dest of destinations) {
+        if (!destinationDetails[dest.id]) {
+          try {
+            const response = await fetch(`/api/destinations/${dest.id}`);
+            if (response.ok) {
+              const data = await response.json();
+              setDestinationDetails(prev => ({
+                ...prev,
+                [dest.id]: {
+                  destination: dest,
+                  hotels: data.hotels || [],
+                  itinerary: data.itinerary || [],
+                }
+              }));
+            }
+          } catch (error) {
+            console.error(`Error loading details for ${dest.id}:`, error);
+          }
+        }
+      }
+    };
+    
+    if (destinations.length > 0) {
+      loadDestinationDetails();
+    }
+  }, [destinations]);
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
   
@@ -75,11 +119,74 @@ export default function Home() {
     return date < new Date(new Date().setHours(0, 0, 0, 0));
   };
 
-  const filteredDestinations = destinations.filter((dest) => {
-    if (selectedCategory === "promociones") {
-      return dest.isPromotion;
+  const getHotelStars = (destId: string): number => {
+    const details = destinationDetails[destId];
+    if (!details || !details.hotels || details.hotels.length === 0) return 4;
+    
+    const starCounts = details.hotels.map(hotel => {
+      if (!hotel.category) return 4;
+      const match = hotel.category.match(/(\d+)\s*\*/);
+      return match ? parseInt(match[1]) : 4;
+    });
+    
+    return Math.max(...starCounts, 4);
+  };
+  
+  const getMealsInfo = (destId: string): { breakfasts: number; lunches: number; dinners: number; total: number } => {
+    const details = destinationDetails[destId];
+    if (!details || !details.itinerary || details.itinerary.length === 0) {
+      const dest = destinations.find(d => d.id === destId);
+      const nights = dest?.nights || 0;
+      return { breakfasts: nights, lunches: 0, dinners: 0, total: nights };
     }
-    return dest.category === selectedCategory;
+    
+    let breakfasts = 0;
+    let lunches = 0;
+    let dinners = 0;
+    
+    details.itinerary.forEach((day: any) => {
+      if (day.meals && Array.isArray(day.meals)) {
+        day.meals.forEach((meal: string) => {
+          const lowerMeal = meal.toLowerCase();
+          if (lowerMeal.includes('desayuno') || lowerMeal.includes('breakfast')) breakfasts++;
+          if (lowerMeal.includes('almuerzo') || lowerMeal.includes('lunch') || lowerMeal.includes('comida')) lunches++;
+          if (lowerMeal.includes('cena') || lowerMeal.includes('dinner')) dinners++;
+        });
+      }
+    });
+    
+    const dest = destinations.find(d => d.id === destId);
+    if (breakfasts === 0 && dest?.nights) {
+      breakfasts = dest.nights;
+    }
+    
+    return { breakfasts, lunches, dinners, total: breakfasts + lunches + dinners };
+  };
+  
+  const getTooltipContent = (dest: Destination): string => {
+    if (dest.requiresTuesday) {
+      const otherCountries = Array.from(new Set(
+        destinations
+          .filter(d => d.category === "internacional" && d.country !== dest.country && d.country !== "Colombia")
+          .map(d => d.country)
+      )).join(", ");
+      
+      return `Salidas todos los miércoles. Combinable con: ${otherCountries || "otros destinos"} (salidas diarias). Turquía siempre va primero en la ruta.`;
+    }
+    
+    return `Salidas diarias. Combinable con todos los destinos. Si combinas con Turquía, ten en cuenta que Turquía tiene salidas los miércoles y será el primer destino en tu ruta.`;
+  };
+  
+  const filteredDestinations = destinations.filter((dest) => {
+    const matchesCategory = selectedCategory === "promociones" 
+      ? dest.isPromotion 
+      : dest.category === selectedCategory;
+    
+    const matchesSearch = searchQuery === "" || 
+      dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dest.country.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesCategory && matchesSearch;
   });
 
   const groupedByCountry = filteredDestinations.reduce((acc, dest) => {
@@ -96,6 +203,19 @@ export default function Home() {
     if (selectedDestinations.includes(destId)) {
       setSelectedDestinations(selectedDestinations.filter((id) => id !== destId));
     } else {
+      // Verificar si ya hay un destino del mismo país seleccionado (excepto Colombia para destinos nacionales)
+      if (dest?.category === "internacional" && dest?.country !== "Colombia") {
+        const sameCountrySelected = selectedDests.find((d) => d.country === dest.country && d.id !== destId);
+        if (sameCountrySelected) {
+          toast({
+            title: "No puedes seleccionar varios destinos del mismo país",
+            description: `Ya has seleccionado "${sameCountrySelected.name}" de ${dest.country}. Solo puedes elegir un destino internacional por país.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      
       if (dest?.requiresTuesday && startDate && !isTuesday(startDate)) {
         const dateStr = startDate.toLocaleDateString("es-CO", {
           weekday: "long",
@@ -124,11 +244,24 @@ export default function Home() {
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="bg-white shadow-md border-b">
-            <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
-                Cosmos <span className="text-blue-400 font-light">Industria de Viajes</span>
-              </h1>
+            <div className="container mx-auto px-4 py-4">
+              <div className="flex items-center gap-4 mb-3">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+                <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
+                  Cosmos <span className="text-blue-400 font-light">Industria de Viajes</span>
+                </h1>
+              </div>
+              <div className="relative max-w-md">
+                <input
+                  type="text"
+                  placeholder="Buscar destinos por nombre o país..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  data-testid="input-search-destinations"
+                />
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </div>
             </div>
           </header>
 
@@ -247,66 +380,100 @@ export default function Home() {
                   <h3 className="text-2xl font-bold text-gray-800">{country}</h3>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {dests.map((dest) => {
-                    const isSelected = selectedDestinations.includes(dest.id);
-                    const imageUrl = getDestinationImage(dest);
-                    const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
-                    
-                    return (
-                      <Card
-                        key={dest.id}
-                        className={`cursor-pointer transition-all hover:shadow-xl overflow-hidden ${
-                          isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
-                        }`}
-                        onClick={() => toggleDestination(dest.id)}
-                        data-testid={`destination-card-${dest.id}`}
-                      >
-                        <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
-                          {imageUrl && (
-                            <img
-                              src={imageUrl}
-                              alt={dest.name}
-                              className="w-full h-full object-cover"
-                            />
-                          )}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shadow-lg">
-                              <span className="text-white text-xs font-bold">✓</span>
-                            </div>
-                          )}
-                        </div>
-                        <CardContent className="p-4">
-                          <div className="text-xs font-medium text-gray-500 uppercase mb-1">{dest.country}</div>
-                          <h4 className="font-bold text-lg mb-2 text-gray-800">{dest.name}</h4>
-                          
-                          <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-gray-200 py-3">
-                            <div className="text-xs text-gray-500 uppercase">
-                              Precio desde
-                            </div>
-                            <div className="text-right">
-                              <span className="text-2xl font-extrabold text-orange-500">
-                                US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                              </span>
-                              <div className="text-xs text-gray-500">Porción terrestre</div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                            <Clock className="w-4 h-4" />
-                            <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
-                          </div>
-                          
-                          {dest.isPromotion && (
-                            <Badge variant="destructive" className="mt-2">
-                              ¡Promoción!
-                            </Badge>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                <TooltipProvider>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {dests.map((dest) => {
+                      const isSelected = selectedDestinations.includes(dest.id);
+                      const imageUrl = getDestinationImage(dest);
+                      const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
+                      const hotelStars = getHotelStars(dest.id);
+                      const mealsInfo = getMealsInfo(dest.id);
+                      const tooltipText = getTooltipContent(dest);
+                      
+                      return (
+                        <Tooltip key={dest.id}>
+                          <TooltipTrigger asChild>
+                            <Card
+                              className={`cursor-pointer transition-all hover:shadow-xl overflow-hidden ${
+                                isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
+                              }`}
+                              onClick={() => toggleDestination(dest.id)}
+                              data-testid={`destination-card-${dest.id}`}
+                            >
+                              <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
+                                {imageUrl && (
+                                  <img
+                                    src={imageUrl}
+                                    alt={dest.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                )}
+                                
+                                <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md flex items-center gap-1">
+                                  <Hotel className="w-3 h-3 text-blue-600" />
+                                  <div className="flex">
+                                    {Array.from({ length: hotelStars }).map((_, i) => (
+                                      <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                    ))}
+                                  </div>
+                                </div>
+                                
+                                <div className="absolute bottom-2 left-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md">
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <UtensilsCrossed className="w-3 h-3 text-orange-600" />
+                                    <span className="font-medium text-gray-700">
+                                      {mealsInfo.total} comidas incluidas
+                                      {mealsInfo.breakfasts > 0 && ` (${mealsInfo.breakfasts} desayunos`}
+                                      {mealsInfo.lunches > 0 && `, ${mealsInfo.lunches} almuerzos`}
+                                      {mealsInfo.dinners > 0 && `, ${mealsInfo.dinners} cenas`}
+                                      {mealsInfo.breakfasts > 0 && ')'}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {isSelected && (
+                                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shadow-lg z-10">
+                                    <span className="text-white text-xs font-bold">✓</span>
+                                  </div>
+                                )}
+                              </div>
+                              <CardContent className="p-4">
+                                <div className="text-xs font-medium text-gray-500 uppercase mb-1">{dest.country}</div>
+                                <h4 className="font-bold text-lg mb-2 text-gray-800">{dest.name}</h4>
+                                
+                                <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-gray-200 py-3">
+                                  <div className="text-xs text-gray-500 uppercase">
+                                    Precio desde
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-2xl font-extrabold text-orange-500">
+                                      US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </span>
+                                    <div className="text-xs text-gray-500">Porción terrestre</div>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                                  <Clock className="w-4 h-4" />
+                                  <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
+                                </div>
+                                
+                                {dest.isPromotion && (
+                                  <Badge variant="destructive" className="mt-2">
+                                    ¡Promoción!
+                                  </Badge>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p className="text-sm">{tooltipText}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
               </div>
             ))}
 
