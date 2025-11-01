@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Menu, Hotel, UtensilsCrossed, Star } from "lucide-react";
+import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Menu, Building2, UtensilsCrossed, Star } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
 import { DatePicker } from "@/components/ui/date-picker";
 import { isTuesday } from "date-fns";
@@ -406,7 +406,7 @@ export default function Home() {
                                 )}
                                 
                                 <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md flex items-center gap-1">
-                                  <Hotel className="w-3 h-3 text-blue-600" />
+                                  <Building2 className="w-3 h-3 text-blue-600" />
                                   <div className="flex">
                                     {Array.from({ length: hotelStars }).map((_, i) => (
                                       <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
@@ -418,11 +418,13 @@ export default function Home() {
                                   <div className="flex items-center gap-1 text-xs">
                                     <UtensilsCrossed className="w-3 h-3 text-orange-600" />
                                     <span className="font-medium text-gray-700">
-                                      {mealsInfo.total} comidas incluidas
-                                      {mealsInfo.breakfasts > 0 && ` (${mealsInfo.breakfasts} desayunos`}
-                                      {mealsInfo.lunches > 0 && `, ${mealsInfo.lunches} almuerzos`}
-                                      {mealsInfo.dinners > 0 && `, ${mealsInfo.dinners} cenas`}
-                                      {mealsInfo.breakfasts > 0 && ')'}
+                                      {(() => {
+                                        const parts = [];
+                                        if (mealsInfo.breakfasts > 0) parts.push(`${mealsInfo.breakfasts} desayuno${mealsInfo.breakfasts > 1 ? 's' : ''}`);
+                                        if (mealsInfo.lunches > 0) parts.push(`${mealsInfo.lunches} almuerzo${mealsInfo.lunches > 1 ? 's' : ''}`);
+                                        if (mealsInfo.dinners > 0) parts.push(`${mealsInfo.dinners} cena${mealsInfo.dinners > 1 ? 's' : ''}`);
+                                        return parts.length > 0 ? parts.join(' + ') : `${mealsInfo.total} comida${mealsInfo.total > 1 ? 's' : ''}`;
+                                      })()}
                                     </span>
                                   </div>
                                 </div>
