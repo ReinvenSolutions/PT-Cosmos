@@ -194,18 +194,23 @@ export default function Home() {
 
   const toggleDestination = (destId: string) => {
     const dest = destinations.find((d) => d.id === destId);
+    console.log('toggleDestination called', { destId, dest: dest?.name, category: dest?.category, country: dest?.country });
     
     if (selectedDestinations.includes(destId)) {
       // Deseleccionar el destino actual
+      console.log('Deselecting destination');
       setSelectedDestinations(selectedDestinations.filter((id) => id !== destId));
     } else {
+      console.log('Attempting to select destination');
       // Verificar si ya hay un destino del mismo país seleccionado (excepto Colombia para destinos nacionales)
       if (dest?.category === "internacional" && dest?.country !== "Colombia") {
         const sameCountrySelected = selectedDests.find((d) => d.country === dest.country && d.id !== destId);
+        console.log('Checking for same country', { sameCountrySelected: sameCountrySelected?.name });
         if (sameCountrySelected) {
           // Deseleccionar el destino anterior del mismo país y seleccionar el nuevo
           const updatedSelections = selectedDestinations.filter((id) => id !== sameCountrySelected.id);
           
+          console.log('Replacing destination', { from: sameCountrySelected.name, to: dest.name });
           toast({
             title: "Destino reemplazado",
             description: `Se ha deseleccionado "${sameCountrySelected.name}" y seleccionado "${dest.name}" de ${dest.country}.`,
@@ -224,6 +229,7 @@ export default function Home() {
           day: "numeric",
         });
         
+        console.log('Turkey date validation failed');
         toast({
           title: "Planes de Turquía solo los Martes",
           description: `La fecha seleccionada (${dateStr}) no es un martes. Los vuelos desde Colombia salen martes y llegan miércoles a Turquía debido al cambio horario (+1 día adicional). Por favor, selecciona una fecha que sea martes para poder incluir destinos de Turquía.`,
@@ -234,6 +240,7 @@ export default function Home() {
         return;
       }
       
+      console.log('Adding destination to selection');
       setSelectedDestinations([...selectedDestinations, destId]);
     }
   };
