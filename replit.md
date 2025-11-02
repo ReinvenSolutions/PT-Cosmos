@@ -24,8 +24,11 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
 
 ### Feature Specifications
 - **Super Admin**: Manages clients (global list), creates and manages destinations, views quote statistics across all advisors, and has full access to the system.
-- **Advisor**: Creates, views, and edits personal quotations, associates quotes with clients, uploads flight images, and generates detailed PDFs. The quotation flow mirrors the original public system but is now protected by authentication.
+- **Advisor**: Creates, views, and edits personal quotations, associates quotes with clients, uploads flight images, customizes baggage options, and generates detailed PDFs. The quotation flow mirrors the original public system but is now protected by authentication.
 - **Quotation System**: Allows browsing and selecting destinations, setting travel dates, viewing itineraries, and saving quotes associated with clients and the logged-in user.
+  - **Flight Sections**: Both public (`/cotizacion`) and advisor edit pages include flight upload sections with customizable baggage options
+  - **Baggage Customization**: Users can select "Equipaje de cabina 10kg" and "Equipaje de bodega 23kg" independently for outbound and return flights (Personal 8kg is always included)
+  - **Conditional PDF Generation**: If no flight images are uploaded AND no baggage checkboxes are selected, the PDF generates as land-only (no flight pages). If any flight data exists (images OR baggage selections), flight pages are included in the PDF with dynamic baggage text
 - **Role-Based Access**: Public routes are accessible without authentication, while advisor and super admin routes require specific roles, enforced by `requireAuth` and `requireRole` middleware.
 
 ### System Design Choices

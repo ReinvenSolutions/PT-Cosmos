@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
@@ -39,6 +40,10 @@ export default function QuoteSummary() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [passengers, setPassengers] = useState(2);
+  const [outboundCabinBaggage, setOutboundCabinBaggage] = useState(false);
+  const [outboundHoldBaggage, setOutboundHoldBaggage] = useState(false);
+  const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
+  const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -230,6 +235,10 @@ export default function QuoteSummary() {
       return;
     }
 
+    const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
+                          outboundCabinBaggage || outboundHoldBaggage || 
+                          returnCabinBaggage || returnHoldBaggage;
+
     const quoteData = {
       clientId: selectedClientId,
       totalPrice: grandTotal,
@@ -237,6 +246,11 @@ export default function QuoteSummary() {
       flightsAndExtras: flightsAndExtrasValue,
       outboundFlightImages: outboundImages,
       returnFlightImages: returnImages,
+      includeFlights: hasFlightData,
+      outboundCabinBaggage,
+      outboundHoldBaggage,
+      returnCabinBaggage,
+      returnHoldBaggage,
       destinations: selectedDests.map((dest) => ({
         destinationId: dest.id,
         startDate: new Date(startDate).toISOString().split("T")[0],
@@ -250,6 +264,10 @@ export default function QuoteSummary() {
 
   const handleExportPDF = async () => {
     try {
+      const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
+                            outboundCabinBaggage || outboundHoldBaggage || 
+                            returnCabinBaggage || returnHoldBaggage;
+
       const response = await fetch("/api/public/quote-pdf", {
         method: "POST",
         headers: {
@@ -272,6 +290,11 @@ export default function QuoteSummary() {
           originCity: originCity || "",
           outboundFlightImages: outboundImages,
           returnFlightImages: returnImages,
+          includeFlights: hasFlightData,
+          outboundCabinBaggage,
+          outboundHoldBaggage,
+          returnCabinBaggage,
+          returnHoldBaggage,
         }),
       });
       
@@ -516,6 +539,35 @@ export default function QuoteSummary() {
                 </Button>
               </label>
             </div>
+
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="outbound-cabin"
+                    checked={outboundCabinBaggage}
+                    onCheckedChange={(checked) => setOutboundCabinBaggage(checked as boolean)}
+                    data-testid="checkbox-outbound-cabin"
+                  />
+                  <Label htmlFor="outbound-cabin" className="cursor-pointer">
+                    Equipaje de cabina 10kg
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="outbound-hold"
+                    checked={outboundHoldBaggage}
+                    onCheckedChange={(checked) => setOutboundHoldBaggage(checked as boolean)}
+                    data-testid="checkbox-outbound-hold"
+                  />
+                  <Label htmlFor="outbound-hold" className="cursor-pointer">
+                    Equipaje de bodega 23kg
+                  </Label>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -583,6 +635,35 @@ export default function QuoteSummary() {
                   </span>
                 </Button>
               </label>
+            </div>
+
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="return-cabin"
+                    checked={returnCabinBaggage}
+                    onCheckedChange={(checked) => setReturnCabinBaggage(checked as boolean)}
+                    data-testid="checkbox-return-cabin"
+                  />
+                  <Label htmlFor="return-cabin" className="cursor-pointer">
+                    Equipaje de cabina 10kg
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="return-hold"
+                    checked={returnHoldBaggage}
+                    onCheckedChange={(checked) => setReturnHoldBaggage(checked as boolean)}
+                    data-testid="checkbox-return-hold"
+                  />
+                  <Label htmlFor="return-hold" className="cursor-pointer">
+                    Equipaje de bodega 23kg
+                  </Label>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -318,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
-      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages } = req.body;
+      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage } = req.body;
 
       if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -331,6 +331,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         flightsAndExtras: flightsAndExtras || null,
         outboundFlightImages: outboundFlightImages || null,
         returnFlightImages: returnFlightImages || null,
+        includeFlights: includeFlights ?? false,
+        outboundCabinBaggage: outboundCabinBaggage ?? false,
+        outboundHoldBaggage: outboundHoldBaggage ?? false,
+        returnCabinBaggage: returnCabinBaggage ?? false,
+        returnHoldBaggage: returnHoldBaggage ?? false,
       };
 
       const quote = await storage.updateQuote(req.params.id, user.id, quoteData, destinations);
