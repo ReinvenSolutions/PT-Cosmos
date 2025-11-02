@@ -8,9 +8,7 @@ import { requireAuth, requireRole, requireRoles } from "./middleware";
 import bcrypt from "bcrypt";
 import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, type User } from "@shared/schema";
 import multer from "multer";
-import { handleFileUpload, getImagePath } from "./upload";
-import { readFile } from "fs/promises";
-import { existsSync } from "fs";
+import { handleFileUpload, getImageBuffer } from "./upload";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const upload = multer({
@@ -97,13 +95,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid filename" });
       }
       
-      const imagePath = getImagePath(filename);
-      
-      if (!existsSync(imagePath)) {
-        return res.status(404).json({ message: "Image not found" });
-      }
-      
-      const imageBuffer = await readFile(imagePath);
+      // Get image buffer from Object Storage or local filesystem
+      const imageBuffer = await getImageBuffer(filename);
       
       // Determine content type based on extension
       const ext = filename.split('.').pop()?.toLowerCase();
@@ -122,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.send(imageBuffer);
     } catch (error) {
       console.error("Error serving image:", error);
-      res.status(500).json({ message: "Failed to serve image" });
+      res.status(404).json({ message: "Image not found" });
     }
   });
 
@@ -153,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
-      const pdfDoc = generatePublicQuotePDF({
+      const pdfDoc = await generatePublicQuotePDF({
         destinations: destinationDetails,
         startDate,
         endDate,
@@ -426,7 +419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const landPortionTotal = destinationsWithDetails.reduce((sum, d) => sum + parseFloat(d.basePrice), 0);
       const flightsAndExtras = quote.flightsAndExtras ? parseFloat(quote.flightsAndExtras.toString()) : 0;
 
-      const pdfDoc = generatePublicQuotePDF({
+      const pdfDoc = await generatePublicQuotePDF({
         destinations: destinationsWithDetails,
         startDate,
         endDate,

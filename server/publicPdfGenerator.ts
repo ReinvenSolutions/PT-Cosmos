@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD, formatDate } from "@shared/schema";
 import { getDestinationImages, getDestinationImageSet } from "./destination-images";
-import { getImagePath } from "./upload";
+import { getImagePathForPDF } from "./upload";
 import fs from "fs";
 
 interface PublicQuoteData {
@@ -33,7 +33,7 @@ interface PublicQuoteData {
   returnHoldBaggage?: boolean;
 }
 
-export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<typeof PDFDocument> {
+export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<InstanceType<typeof PDFDocument>> {
   const doc = new PDFDocument({
     size: "A4",
     margins: { top: 50, bottom: 50, left: 60, right: 60 },
@@ -339,38 +339,43 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
     let flightImageY = 150;
-    data.outboundFlightImages.forEach((imageUrl, index) => {
+    for (let index = 0; index < data.outboundFlightImages.length; index++) {
+      const imageUrl = data.outboundFlightImages[index];
       console.log(`[PDF Generator] Processing outbound image ${index}:`, imageUrl);
       // Extract filename from URL (format: /api/images/filename.ext)
       const filename = imageUrl.split('/').pop();
       if (filename) {
-        const fullPath = getImagePath(filename);
-        console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
-        console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
-        
-        if (fs.existsSync(fullPath)) {
-          try {
-            const imageHeight = 200;
-            if (flightImageY + imageHeight > 750) {
-              doc.addPage();
-              flightImageY = 80;
+        try {
+          const fullPath = await getImagePathForPDF(filename);
+          console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
+          console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
+          
+          if (fs.existsSync(fullPath)) {
+            try {
+              const imageHeight = 200;
+              if (flightImageY + imageHeight > 750) {
+                doc.addPage();
+                flightImageY = 80;
+              }
+              
+              doc.image(fullPath, leftMargin, flightImageY, {
+                fit: [contentWidth, imageHeight],
+                align: "center"
+              });
+              
+              console.log(`[PDF Generator] Successfully added outbound image ${index}`);
+              flightImageY += imageHeight + 20;
+            } catch (error) {
+              console.error(`[PDF Generator] Error loading outbound flight image ${index}:`, error);
             }
-            
-            doc.image(fullPath, leftMargin, flightImageY, {
-              fit: [contentWidth, imageHeight],
-              align: "center"
-            });
-            
-            console.log(`[PDF Generator] Successfully added outbound image ${index}`);
-            flightImageY += imageHeight + 20;
-          } catch (error) {
-            console.error(`[PDF Generator] Error loading outbound flight image ${index}:`, error);
+          } else {
+            console.error(`[PDF Generator] Image file not found at ${fullPath}`);
           }
-        } else {
-          console.error(`[PDF Generator] Image file not found at ${fullPath}`);
+        } catch (error) {
+          console.error(`[PDF Generator] Error getting image path for ${filename}:`, error);
         }
       }
-    });
+    }
   }
 
   doc.addPage();
@@ -600,38 +605,43 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
     let flightImageY = 150;
-    data.returnFlightImages.forEach((imageUrl, index) => {
+    for (let index = 0; index < data.returnFlightImages.length; index++) {
+      const imageUrl = data.returnFlightImages[index];
       console.log(`[PDF Generator] Processing return image ${index}:`, imageUrl);
       // Extract filename from URL (format: /api/images/filename.ext)
       const filename = imageUrl.split('/').pop();
       if (filename) {
-        const fullPath = getImagePath(filename);
-        console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
-        console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
-        
-        if (fs.existsSync(fullPath)) {
-          try {
-            const imageHeight = 200;
-            if (flightImageY + imageHeight > 750) {
-              doc.addPage();
-              flightImageY = 80;
+        try {
+          const fullPath = await getImagePathForPDF(filename);
+          console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
+          console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
+          
+          if (fs.existsSync(fullPath)) {
+            try {
+              const imageHeight = 200;
+              if (flightImageY + imageHeight > 750) {
+                doc.addPage();
+                flightImageY = 80;
+              }
+              
+              doc.image(fullPath, leftMargin, flightImageY, {
+                fit: [contentWidth, imageHeight],
+                align: "center"
+              });
+              
+              console.log(`[PDF Generator] Successfully added return image ${index}`);
+              flightImageY += imageHeight + 20;
+            } catch (error) {
+              console.error(`[PDF Generator] Error loading return flight image ${index}:`, error);
             }
-            
-            doc.image(fullPath, leftMargin, flightImageY, {
-              fit: [contentWidth, imageHeight],
-              align: "center"
-            });
-            
-            console.log(`[PDF Generator] Successfully added return image ${index}`);
-            flightImageY += imageHeight + 20;
-          } catch (error) {
-            console.error(`[PDF Generator] Error loading return flight image ${index}:`, error);
+          } else {
+            console.error(`[PDF Generator] Image file not found at ${fullPath}`);
           }
-        } else {
-          console.error(`[PDF Generator] Image file not found at ${fullPath}`);
+        } catch (error) {
+          console.error(`[PDF Generator] Error getting image path for ${filename}:`, error);
         }
       }
-    });
+    }
   }
 
   return doc;

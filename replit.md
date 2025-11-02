@@ -15,11 +15,19 @@ The system features a modern, responsive interface built with React, Wouter for 
 The frontend is built with React, Wouter, and TanStack Query, styled with Tailwind CSS and shadcn/ui. The backend uses Express.js with TypeScript. PostgreSQL, hosted on Neon, serves as the database, managed by Drizzle ORM. Authentication is handled by Passport.js with Local Strategy, bcrypt for password hashing, and express-session with `connect-pg-simple` for PostgreSQL session storage. PDF generation is powered by PDFKit. The system automatically calculates trip dates and durations, implements specific business rules for Turkey destinations, and uses Replit Object Storage for persistent flight attachment images. Quote updates utilize database transactions for consistency.
 
 **Image Storage Architecture**: Flight attachment images use persistent storage that automatically adapts to the environment:
-- **Production**: Stores images in Replit Object Storage (`PRIVATE_OBJECT_DIR`) for permanent persistence across deployments and restarts
+- **Production**: Stores images in Replit Object Storage via Google Cloud Storage client for permanent persistence across deployments and restarts
+  - Uses `ObjectStorageService` in `server/objectStorage.ts` to interact with Replit's Object Storage
+  - Images are uploaded to `PRIVATE_OBJECT_DIR/uploads/` with UUID-based filenames
+  - Production uses Google Cloud Storage backend accessed through Replit's sidecar endpoint
 - **Development**: Stores images in `/home/runner/workspace/uploads` for persistence during local development
-- The system automatically detects the environment and selects the appropriate storage location
+- The system automatically detects the environment and selects the appropriate storage location on startup
 - Images are served via authenticated endpoint `/api/images/:filename` which requires user authentication
-- The PDF generator accesses images using the `getImagePath()` helper function that automatically resolves to the correct storage location
+- The PDF generator accesses images using the async `getImagePathForPDF()` helper function:
+  - In production: Downloads images from Object Storage to `/tmp/pdf-images/` for PDF generation
+  - In development: Returns direct filesystem path to uploaded images
+- The upload flow uses `handleFileUpload()` in `server/upload.ts` which validates file types, sizes, and security
+- All monetary values are formatted with `formatUSD()` utility (thousands separators, no decimals)
+- All dates are formatted with `formatDate()` utility in DD/MM/AAAA format
 - This ensures images persist across server restarts in both development and production environments
 
 ### Feature Specifications
