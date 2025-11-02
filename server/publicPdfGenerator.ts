@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion } from "@shared/schema";
 import { getDestinationImages, getDestinationImageSet } from "./destination-images";
+import { getImagePath } from "./upload";
 import fs from "fs";
 
 interface PublicQuoteData {
@@ -329,9 +330,10 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     let flightImageY = 150;
     data.outboundFlightImages.forEach((imageUrl, index) => {
       console.log(`[PDF Generator] Processing outbound image ${index}:`, imageUrl);
-      if (imageUrl.startsWith("/uploads/")) {
-        const imagePath = imageUrl.replace("/uploads/", "");
-        const fullPath = `/tmp/uploads/${imagePath}`;
+      // Extract filename from URL (format: /api/images/filename.ext)
+      const filename = imageUrl.split('/').pop();
+      if (filename) {
+        const fullPath = getImagePath(filename);
         console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
         console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
         
@@ -578,9 +580,10 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
     let flightImageY = 150;
     data.returnFlightImages.forEach((imageUrl, index) => {
       console.log(`[PDF Generator] Processing return image ${index}:`, imageUrl);
-      if (imageUrl.startsWith("/uploads/")) {
-        const imagePath = imageUrl.replace("/uploads/", "");
-        const fullPath = `/tmp/uploads/${imagePath}`;
+      // Extract filename from URL (format: /api/images/filename.ext)
+      const filename = imageUrl.split('/').pop();
+      if (filename) {
+        const fullPath = getImagePath(filename);
         console.log(`[PDF Generator] Full path for image ${index}:`, fullPath);
         console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
         

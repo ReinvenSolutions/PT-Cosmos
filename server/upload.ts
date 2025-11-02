@@ -4,18 +4,18 @@ import { join } from "path";
 import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 
-// Use /tmp/uploads as default. Object storage may not be mounted in development.
-const UPLOAD_DIR = "/tmp/uploads";
+// Use Object Storage for persistent image storage in production
+// Fall back to /tmp/uploads in development if PRIVATE_OBJECT_DIR is not set
+const PRIVATE_OBJECT_DIR = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
 
-// Always use /tmp/uploads for consistency with PDF generator
 async function getUploadDir(): Promise<string> {
-  // Ensure /tmp/uploads exists
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true });
+  // Ensure upload directory exists
+  if (!existsSync(PRIVATE_OBJECT_DIR)) {
+    await mkdir(PRIVATE_OBJECT_DIR, { recursive: true });
   }
   
-  console.log('[Upload] Using upload directory:', UPLOAD_DIR);
-  return UPLOAD_DIR;
+  console.log('[Upload] Using upload directory:', PRIVATE_OBJECT_DIR);
+  return PRIVATE_OBJECT_DIR;
 }
 
 const ALLOWED_MIME_TYPES = [
@@ -58,11 +58,18 @@ export async function handleFileUpload(req: Request, res: Response) {
     
     await writeFile(filepath, req.file.buffer);
     
-    const url = `/uploads/${filename}`;
+    // Return the filename (not full path) to be used with /api/images/:filename endpoint
+    const url = `/api/images/${filename}`;
     
+    console.log('[Upload] File uploaded successfully:', { filename, url });
     res.json({ url });
   } catch (error) {
     console.error("File upload error:", error);
     res.status(500).json({ message: "Failed to upload file" });
   }
+}
+
+// Export function to get image path for PDF generation
+export function getImagePath(filename: string): string {
+  return join(PRIVATE_OBJECT_DIR, filename);
 }

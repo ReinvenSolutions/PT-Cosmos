@@ -8,13 +8,11 @@ import { requireAuth, requireRole, requireRoles } from "./middleware";
 import bcrypt from "bcrypt";
 import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, type User } from "@shared/schema";
 import multer from "multer";
-import { handleFileUpload } from "./upload";
+import { handleFileUpload, getImagePath } from "./upload";
+import { readFile } from "fs/promises";
+import { existsSync } from "fs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Use /tmp/uploads since object storage may not be mounted in development
-  const uploadsDir = "/tmp/uploads";
-  app.use("/uploads", express.static(uploadsDir));
-
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }
@@ -88,6 +86,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/upload", requireAuth, upload.single("file"), handleFileUpload);
+
+  // Endpoint to serve images from Object Storage with authentication
+  app.get("/api/images/:filename", requireAuth, async (req, res) => {
+    try {
+      const { filename } = req.params;
+      
+      // Security: validate filename to prevent directory traversal
+      if (!filename || filename.includes("..") || filename.includes("/")) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+      
+      const imagePath = getImagePath(filename);
+      
+      if (!existsSync(imagePath)) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      
+      const imageBuffer = await readFile(imagePath);
+      
+      // Determine content type based on extension
+      const ext = filename.split('.').pop()?.toLowerCase();
+      const contentTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp'
+      };
+      
+      const contentType = contentTypes[ext || ''] || 'application/octet-stream';
+      
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error("Error serving image:", error);
+      res.status(500).json({ message: "Failed to serve image" });
+    }
+  });
 
   app.post("/api/public/quote-pdf", async (req, res) => {
     try {
