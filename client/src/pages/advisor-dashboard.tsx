@@ -9,7 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useState } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { formatUSD } from "@shared/schema";
+import { formatUSD, formatDate } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -143,7 +143,7 @@ export default function AdvisorDashboard() {
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Fecha:</span>
                           <span>
-                            {new Date(quote.createdAt).toLocaleDateString()}
+                            {formatDate(quote.createdAt)}
                           </span>
                         </div>
                         <div className="flex gap-2 mt-2">

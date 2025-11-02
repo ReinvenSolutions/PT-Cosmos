@@ -12,7 +12,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { formatUSD } from "@shared/schema";
+import { formatUSD, formatDate } from "@shared/schema";
 
 interface Client {
   id: string;
@@ -614,7 +614,7 @@ export default function QuoteEdit() {
                               {qd.destination.country} • {qd.destination.duration} días
                             </p>
                             <p className="text-sm mt-1">
-                              Fecha: {new Date(qd.startDate).toLocaleDateString("es-ES")} • Pasajeros: {qd.passengers}
+                              Fecha: {formatDate(qd.startDate)} • Pasajeros: {qd.passengers}
                             </p>
                           </div>
                           <div className="text-right">

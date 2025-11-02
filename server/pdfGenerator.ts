@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { Quote, Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD } from "@shared/schema";
+import { Quote, Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD, formatDate } from "@shared/schema";
 
 interface QuoteWithFullDetails extends Quote {
   destinations: Array<{
@@ -35,8 +35,8 @@ export function generateQuotePDF(quote: QuoteWithFullDetails): PDFDocument {
   doc.text(`Adultos: ${quote.adults} | Niños: ${quote.children}`);
   
   if (quote.travelStartDate && quote.travelEndDate) {
-    const startDate = new Date(quote.travelStartDate).toLocaleDateString("es-ES");
-    const endDate = new Date(quote.travelEndDate).toLocaleDateString("es-ES");
+    const startDate = formatDate(new Date(quote.travelStartDate));
+    const endDate = formatDate(new Date(quote.travelEndDate));
     doc.text(`Fechas de viaje: ${startDate} - ${endDate}`);
   }
   doc.moveDown(1.5);
@@ -148,7 +148,7 @@ export function generateQuotePDF(quote: QuoteWithFullDetails): PDFDocument {
   doc.moveDown(1);
   doc.fontSize(8).fillColor(lightGray);
   doc.text("Esta cotización es válida por 7 días. Los precios están sujetos a disponibilidad.", { align: "center" });
-  doc.text(`Generado el ${new Date().toLocaleDateString("es-ES")}`, { align: "center" });
+  doc.text(`Generado el ${formatDate(new Date())}`, { align: "center" });
 
   return doc;
 }

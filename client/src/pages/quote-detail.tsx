@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, User, Mail, Phone, Calendar, Users, Plane, Image as ImageIcon, Edit } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { formatUSD } from "@shared/schema";
+import { formatUSD, formatDate } from "@shared/schema";
 
 interface Destination {
   id: string;
@@ -216,11 +216,7 @@ export default function QuoteDetail() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Fecha de Creación:</span>
                     <span data-testid="text-quote-date">
-                      {new Date(quote.createdAt).toLocaleDateString("es-ES", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {formatDate(quote.createdAt)}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -272,7 +268,7 @@ export default function QuoteDetail() {
                             <div>
                               <p className="text-muted-foreground">Fecha de Inicio</p>
                               <p className="font-medium">
-                                {new Date(qd.startDate).toLocaleDateString("es-ES")}
+                                {formatDate(qd.startDate)}
                               </p>
                             </div>
                           </div>

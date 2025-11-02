@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD } from "@shared/schema";
+import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD, formatDate } from "@shared/schema";
 import { getDestinationImages, getDestinationImageSet } from "./destination-images";
 import { getImagePath } from "./upload";
 import fs from "fs";
@@ -85,12 +85,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, durationY);
 
-  const currentDate = new Date().toLocaleDateString("es-CO", { 
-    day: '2-digit', 
-    month: '2-digit', 
-    year: 'numeric',
-    timeZone: 'America/Bogota'
-  });
+  const currentDate = formatDate(new Date());
   doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
   doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, durationY + 5, { align: "right" });
 
@@ -120,10 +115,10 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   
   doc.font("Helvetica").fontSize(9).fillColor(textColor);
   const startDateFormatted = data.startDate 
-    ? new Date(data.startDate).toLocaleDateString("es-ES", { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()
+    ? formatDate(new Date(data.startDate))
     : "Por definir";
   const endDateFormatted = data.endDate 
-    ? new Date(data.endDate).toLocaleDateString("es-ES", { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()
+    ? formatDate(new Date(data.endDate))
     : "Por definir";
   
   doc.text(`Salida de ${startDateFormatted}`, leftMargin, budgetY + 20);

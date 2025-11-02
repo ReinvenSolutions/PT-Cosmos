@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { type Destination, formatUSD } from "@shared/schema";
+import { type Destination, formatUSD, formatDate } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -211,7 +211,10 @@ export default function QuoteSummary() {
       .map((d) => `${d.name} (${d.duration}D/${d.nights}N)`)
       .join(", ");
     
-    const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDate || "Por definir"} al ${endDate || "Por definir"}. Total: US$ ${formatUSD(grandTotal)}`;
+    const startDateFormatted = startDate ? formatDate(new Date(startDate + "T00:00:00")) : "Por definir";
+    const endDateFormatted = endDate ? formatDate(new Date(endDate + "T00:00:00")) : "Por definir";
+    
+    const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDateFormatted} al ${endDateFormatted}. Total: US$ ${formatUSD(grandTotal)}`;
     
     window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
   };
@@ -425,21 +428,13 @@ export default function QuoteSummary() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Fecha de Inicio</p>
                 <p className="font-semibold text-lg" data-testid="text-start-date">
-                  {startDate ? new Date(startDate + "T00:00:00").toLocaleDateString("es-CO", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  }) : "Por definir"}
+                  {startDate ? formatDate(new Date(startDate + "T00:00:00")) : "Por definir"}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Fecha de Finalización (Calculada)</p>
                 <p className="font-semibold text-lg" data-testid="text-end-date-summary">
-                  {endDate ? new Date(endDate + "T00:00:00").toLocaleDateString("es-CO", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  }) : "Por definir"}
+                  {endDate ? formatDate(new Date(endDate + "T00:00:00")) : "Por definir"}
                 </p>
                 {endDate && (
                   <p className="text-xs text-gray-500 mt-1">
