@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion } from "@shared/schema";
+import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD } from "@shared/schema";
 import { getDestinationImages, getDestinationImageSet } from "./destination-images";
 import { getImagePath } from "./upload";
 import fs from "fs";
@@ -131,7 +131,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   
   const minPayment = Math.round(data.grandTotal * 0.6);
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
-  doc.text(`Pago mínimo para separar: $${minPayment.toLocaleString('en-US')}`, leftMargin, budgetY + 52);
+  doc.text(`Pago mínimo para separar: $${formatUSD(minPayment)}`, leftMargin, budgetY + 52);
 
   const priceBoxX = pageWidth - rightMargin - 150;
   const priceBoxY = budgetY;
@@ -146,7 +146,7 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   
   doc.font("Helvetica-Bold").fontSize(26).fillColor(accentColor);
   doc.text(
-    `$ ${data.grandTotal.toLocaleString('en-US')}`,
+    `$ ${formatUSD(data.grandTotal)}`,
     priceBoxX + 5,
     priceBoxY + 30,
     { width: priceBoxWidth - 10, align: "center" }

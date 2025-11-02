@@ -12,6 +12,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatUSD } from "@shared/schema";
 
 interface Client {
   id: string;
@@ -617,7 +618,7 @@ export default function QuoteEdit() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold">${parseFloat(qd.price).toFixed(2)}</p>
+                            <p className="font-semibold">${formatUSD(qd.price)}</p>
                             <p className="text-xs text-muted-foreground">por persona</p>
                           </div>
                         </div>

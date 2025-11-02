@@ -1,6 +1,8 @@
 // Email service ready for SMTP configuration
 // Configure via Replit secrets: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL, SMTP_FROM_NAME
 
+import { formatUSD } from "@shared/schema";
+
 interface EmailOptions {
   to: string;
   subject: string;
@@ -50,7 +52,7 @@ export function generateQuoteEmailHtml(quote: any, pdfUrl: string): string {
           
           <p><strong>Detalles de la Cotización:</strong></p>
           <ul>
-            <li>Precio Total: ${quote.currency} ${Number(quote.totalPrice).toFixed(2)}</li>
+            <li>Precio Total: ${quote.currency} ${formatUSD(quote.totalPrice)}</li>
             <li>Adultos: ${quote.adults}</li>
             <li>Niños: ${quote.children}</li>
           </ul>

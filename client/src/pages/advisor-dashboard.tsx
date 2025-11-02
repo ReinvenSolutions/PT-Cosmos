@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useState } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { formatUSD } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,7 +133,7 @@ export default function AdvisorDashboard() {
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Total:</span>
                           <span className="font-semibold">
-                            ${Number(quote.totalPrice).toFixed(2)}
+                            ${formatUSD(quote.totalPrice)}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">

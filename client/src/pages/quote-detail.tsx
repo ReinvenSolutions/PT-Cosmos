@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, User, Mail, Phone, Calendar, Users, Plane, Image as ImageIcon, Edit } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { formatUSD } from "@shared/schema";
 
 interface Destination {
   id: string;
@@ -231,7 +232,7 @@ export default function QuoteDetail() {
                   <div className="flex justify-between text-lg font-semibold pt-3 border-t">
                     <span>Precio Total:</span>
                     <span data-testid="text-total-price">
-                      ${Number(quote.totalPrice).toFixed(2)} USD
+                      ${formatUSD(quote.totalPrice)} USD
                     </span>
                   </div>
                 </CardContent>
@@ -260,7 +261,7 @@ export default function QuoteDetail() {
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold" data-testid={`destination-price-${qd.destinationId}`}>
-                              ${Number(qd.price || qd.destination.basePrice || 0).toFixed(2)}
+                              ${formatUSD(qd.price || qd.destination.basePrice || 0)}
                             </p>
                             <p className="text-xs text-muted-foreground">por persona</p>
                           </div>

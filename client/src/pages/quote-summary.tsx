@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { type Destination } from "@shared/schema";
+import { type Destination, formatUSD } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -211,7 +211,7 @@ export default function QuoteSummary() {
       .map((d) => `${d.name} (${d.duration}D/${d.nights}N)`)
       .join(", ");
     
-    const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDate || "Por definir"} al ${endDate || "Por definir"}. Total: US$ ${grandTotal.toFixed(2)}`;
+    const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDate || "Por definir"} al ${endDate || "Por definir"}. Total: US$ ${formatUSD(grandTotal)}`;
     
     window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
   };
@@ -699,12 +699,12 @@ export default function QuoteSummary() {
               <div>
                 <div className="text-sm opacity-90 mb-1">Precio Total de la Cotización</div>
                 <div className="text-4xl font-extrabold">
-                  US$ {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  US$ {formatUSD(grandTotal)}
                 </div>
               </div>
               <div className="text-right text-sm opacity-90">
-                <div>Porciones Terrestres: US$ {landPortionTotal.toFixed(2)}</div>
-                <div>Vuelos y Extras: US$ {flightsAndExtrasValue.toFixed(2)}</div>
+                <div>Porciones Terrestres: US$ {formatUSD(landPortionTotal)}</div>
+                <div>Vuelos y Extras: US$ {formatUSD(flightsAndExtrasValue)}</div>
               </div>
             </div>
           </CardContent>
@@ -785,7 +785,7 @@ export default function QuoteSummary() {
                 <div className="text-sm space-y-1 text-muted-foreground">
                   <p>Destinos: {selectedDests.map(d => d.name).join(", ")}</p>
                   <p>Fecha inicio: {startDate}</p>
-                  <p>Total: US$ {grandTotal.toFixed(2)}</p>
+                  <p>Total: US$ {formatUSD(grandTotal)}</p>
                 </div>
               </div>
 

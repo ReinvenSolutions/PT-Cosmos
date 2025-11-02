@@ -164,3 +164,11 @@ export const insertQuoteDestinationSchema = createInsertSchema(quoteDestinations
 });
 export type InsertQuoteDestination = z.infer<typeof insertQuoteDestinationSchema>;
 export type QuoteDestination = typeof quoteDestinations.$inferSelect;
+
+export function formatUSD(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return num.toLocaleString('en-US', { 
+    minimumFractionDigits: 0, 
+    maximumFractionDigits: 0 
+  });
+}

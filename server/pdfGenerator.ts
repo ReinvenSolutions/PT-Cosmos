@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { Quote, Destination, ItineraryDay, Hotel, Inclusion, Exclusion } from "@shared/schema";
+import { Quote, Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD } from "@shared/schema";
 
 interface QuoteWithFullDetails extends Quote {
   destinations: Array<{
@@ -136,7 +136,7 @@ export function generateQuotePDF(quote: QuoteWithFullDetails): PDFDocument {
   doc.moveDown(1);
 
   doc.font("Helvetica-Bold").fontSize(18).fillColor(primaryColor);
-  doc.text(`PRECIO TOTAL: ${quote.currency} ${Number(quote.totalPrice).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { align: "center" });
+  doc.text(`PRECIO TOTAL: ${quote.currency} ${formatUSD(quote.totalPrice)}`, { align: "center" });
   doc.moveDown(1);
 
   if (quote.notes) {
