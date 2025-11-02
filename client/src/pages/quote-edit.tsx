@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { ArrowLeft, Upload, X, Save } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -41,6 +43,11 @@ interface Quote {
   flightsAndExtras: string | null;
   outboundFlightImages: string[] | null;
   returnFlightImages: string[] | null;
+  includeFlights: boolean | null;
+  outboundCabinBaggage: boolean | null;
+  outboundHoldBaggage: boolean | null;
+  returnCabinBaggage: boolean | null;
+  returnHoldBaggage: boolean | null;
   status: string;
   client: Client;
   destinations: QuoteDestination[];
@@ -60,6 +67,11 @@ export default function QuoteEdit() {
   const [returnImages, setReturnImages] = useState<string[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
+  const [includeFlights, setIncludeFlights] = useState(false);
+  const [outboundCabinBaggage, setOutboundCabinBaggage] = useState(false);
+  const [outboundHoldBaggage, setOutboundHoldBaggage] = useState(false);
+  const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
+  const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
 
   const { data: quote, isLoading } = useQuery<Quote>({
     queryKey: ["/api/quotes", quoteId],
@@ -92,6 +104,11 @@ export default function QuoteEdit() {
       setFlightsAndExtras(quote.flightsAndExtras || "");
       setOutboundImages(quote.outboundFlightImages || []);
       setReturnImages(quote.returnFlightImages || []);
+      setIncludeFlights(quote.includeFlights ?? false);
+      setOutboundCabinBaggage(quote.outboundCabinBaggage ?? false);
+      setOutboundHoldBaggage(quote.outboundHoldBaggage ?? false);
+      setReturnCabinBaggage(quote.returnCabinBaggage ?? false);
+      setReturnHoldBaggage(quote.returnHoldBaggage ?? false);
     }
   }, [quote]);
 
@@ -229,6 +246,11 @@ export default function QuoteEdit() {
       flightsAndExtras: flightsAndExtras ? parseFloat(flightsAndExtras) : null,
       outboundFlightImages: outboundImages.length > 0 ? outboundImages : null,
       returnFlightImages: returnImages.length > 0 ? returnImages : null,
+      includeFlights,
+      outboundCabinBaggage,
+      outboundHoldBaggage,
+      returnCabinBaggage,
+      returnHoldBaggage,
       destinations: quote.destinations.map(qd => ({
         destinationId: qd.destinationId,
         startDate: qd.startDate.split("T")[0],
@@ -359,133 +381,217 @@ export default function QuoteEdit() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Vuelos de Ida</CardTitle>
+                  <CardTitle>Adjuntar Vuelos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {outboundImages.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                      {outboundImages.map((url, idx) => (
-                        <div key={idx} className="relative border rounded-md overflow-hidden">
-                          <img 
-                            src={url} 
-                            alt={`Vuelo ida ${idx + 1}`} 
-                            className="w-full h-32 object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-1 right-1 h-6 w-6"
-                            onClick={() => setOutboundImages(outboundImages.filter((_, i) => i !== idx))}
-                            data-testid={`button-remove-outbound-${idx}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div>
-                    <input
-                      type="file"
-                      id="outbound-flight-images"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleOutboundUpload}
-                      data-testid="input-outbound-images"
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="include-flights"
+                      checked={includeFlights}
+                      onCheckedChange={(checked) => setIncludeFlights(checked as boolean)}
+                      data-testid="checkbox-include-flights"
                     />
-                    <label htmlFor="outbound-flight-images">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        disabled={uploadingOutbound}
-                        asChild
-                      >
-                        <span>
-                          {uploadingOutbound ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                              Subiendo...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4 mr-2" />
-                              Subir Imágenes de Vuelo de Ida
-                            </>
-                          )}
-                        </span>
-                      </Button>
-                    </label>
+                    <Label htmlFor="include-flights" className="cursor-pointer">
+                      Incluir páginas de vuelos en el PDF
+                    </Label>
                   </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Si no seleccionas esta opción, el PDF funcionará como una cotización de porción terrestre sin páginas de vuelos.
+                  </p>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Vuelos de Regreso</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {returnImages.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                      {returnImages.map((url, idx) => (
-                        <div key={idx} className="relative border rounded-md overflow-hidden">
-                          <img 
-                            src={url} 
-                            alt={`Vuelo regreso ${idx + 1}`} 
-                            className="w-full h-32 object-cover"
-                          />
+              {includeFlights && (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Vuelos de Ida</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {outboundImages.length > 0 && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
+                          {outboundImages.map((url, idx) => (
+                            <div key={idx} className="relative border rounded-md overflow-hidden">
+                              <img 
+                                src={url} 
+                                alt={`Vuelo ida ${idx + 1}`} 
+                                className="w-full h-32 object-cover"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-1 right-1 h-6 w-6"
+                                onClick={() => setOutboundImages(outboundImages.filter((_, i) => i !== idx))}
+                                data-testid={`button-remove-outbound-${idx}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div>
+                        <input
+                          type="file"
+                          id="outbound-flight-images"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleOutboundUpload}
+                          data-testid="input-outbound-images"
+                        />
+                        <label htmlFor="outbound-flight-images">
                           <Button
                             type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-1 right-1 h-6 w-6"
-                            onClick={() => setReturnImages(returnImages.filter((_, i) => i !== idx))}
-                            data-testid={`button-remove-return-${idx}`}
+                            variant="outline"
+                            className="w-full"
+                            disabled={uploadingOutbound}
+                            asChild
                           >
-                            <X className="w-3 h-3" />
+                            <span>
+                              {uploadingOutbound ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                                  Subiendo...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  Subir Imágenes de Vuelo de Ida
+                                </>
+                              )}
+                            </span>
                           </Button>
+                        </label>
+                      </div>
+
+                      <div className="mt-4 space-y-3 pt-4 border-t">
+                        <p className="text-sm font-medium">Equipajes Incluidos:</p>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="outbound-cabin-baggage"
+                            checked={outboundCabinBaggage}
+                            onCheckedChange={(checked) => setOutboundCabinBaggage(checked as boolean)}
+                            data-testid="checkbox-outbound-cabin"
+                          />
+                          <Label htmlFor="outbound-cabin-baggage" className="cursor-pointer">
+                            Equipaje de cabina 10kg
+                          </Label>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  <div>
-                    <input
-                      type="file"
-                      id="return-flight-images"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleReturnUpload}
-                      data-testid="input-return-images"
-                    />
-                    <label htmlFor="return-flight-images">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        disabled={uploadingReturn}
-                        asChild
-                      >
-                        <span>
-                          {uploadingReturn ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                              Subiendo...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4 mr-2" />
-                              Subir Imágenes de Vuelo de Regreso
-                            </>
-                          )}
-                        </span>
-                      </Button>
-                    </label>
-                  </div>
-                </CardContent>
-              </Card>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="outbound-hold-baggage"
+                            checked={outboundHoldBaggage}
+                            onCheckedChange={(checked) => setOutboundHoldBaggage(checked as boolean)}
+                            data-testid="checkbox-outbound-hold"
+                          />
+                          <Label htmlFor="outbound-hold-baggage" className="cursor-pointer">
+                            Equipaje de bodega 23kg
+                          </Label>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          * Personal 8kg siempre está incluido
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Vuelos de Regreso</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {returnImages.length > 0 && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
+                          {returnImages.map((url, idx) => (
+                            <div key={idx} className="relative border rounded-md overflow-hidden">
+                              <img 
+                                src={url} 
+                                alt={`Vuelo regreso ${idx + 1}`} 
+                                className="w-full h-32 object-cover"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-1 right-1 h-6 w-6"
+                                onClick={() => setReturnImages(returnImages.filter((_, i) => i !== idx))}
+                                data-testid={`button-remove-return-${idx}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div>
+                        <input
+                          type="file"
+                          id="return-flight-images"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleReturnUpload}
+                          data-testid="input-return-images"
+                        />
+                        <label htmlFor="return-flight-images">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            disabled={uploadingReturn}
+                            asChild
+                          >
+                            <span>
+                              {uploadingReturn ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                                  Subiendo...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  Subir Imágenes de Vuelo de Regreso
+                                </>
+                              )}
+                            </span>
+                          </Button>
+                        </label>
+                      </div>
+
+                      <div className="mt-4 space-y-3 pt-4 border-t">
+                        <p className="text-sm font-medium">Equipajes Incluidos:</p>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="return-cabin-baggage"
+                            checked={returnCabinBaggage}
+                            onCheckedChange={(checked) => setReturnCabinBaggage(checked as boolean)}
+                            data-testid="checkbox-return-cabin"
+                          />
+                          <Label htmlFor="return-cabin-baggage" className="cursor-pointer">
+                            Equipaje de cabina 10kg
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="return-hold-baggage"
+                            checked={returnHoldBaggage}
+                            onCheckedChange={(checked) => setReturnHoldBaggage(checked as boolean)}
+                            data-testid="checkbox-return-hold"
+                          />
+                          <Label htmlFor="return-hold-baggage" className="cursor-pointer">
+                            Equipaje de bodega 23kg
+                          </Label>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          * Personal 8kg siempre está incluido
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
 
               <Card>
                 <CardHeader>
