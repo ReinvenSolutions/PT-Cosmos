@@ -14,7 +14,13 @@ The system features a modern, responsive interface built with React, Wouter for 
 ### Technical Implementations
 The frontend is built with React, Wouter, and TanStack Query, styled with Tailwind CSS and shadcn/ui. The backend uses Express.js with TypeScript. PostgreSQL, hosted on Neon, serves as the database, managed by Drizzle ORM. Authentication is handled by Passport.js with Local Strategy, bcrypt for password hashing, and express-session with `connect-pg-simple` for PostgreSQL session storage. PDF generation is powered by PDFKit. The system automatically calculates trip dates and durations, implements specific business rules for Turkey destinations, and uses Replit Object Storage for persistent flight attachment images. Quote updates utilize database transactions for consistency.
 
-**Image Storage Architecture**: Flight attachment images are stored in Replit Object Storage (PRIVATE_OBJECT_DIR) for production persistence. Images are served via authenticated endpoint `/api/images/:filename` which requires user authentication. The PDF generator accesses images directly from Object Storage using the `getImagePath()` helper function. This ensures images persist across deployments and server restarts, solving the previous issue where images stored in `/tmp/uploads` were lost on restart.
+**Image Storage Architecture**: Flight attachment images use persistent storage that automatically adapts to the environment:
+- **Production**: Stores images in Replit Object Storage (`PRIVATE_OBJECT_DIR`) for permanent persistence across deployments and restarts
+- **Development**: Stores images in `/home/runner/workspace/uploads` for persistence during local development
+- The system automatically detects the environment and selects the appropriate storage location
+- Images are served via authenticated endpoint `/api/images/:filename` which requires user authentication
+- The PDF generator accesses images using the `getImagePath()` helper function that automatically resolves to the correct storage location
+- This ensures images persist across server restarts in both development and production environments
 
 ### Feature Specifications
 - **Super Admin**: Manages clients (global list), creates and manages destinations, views quote statistics across all advisors, and has full access to the system.

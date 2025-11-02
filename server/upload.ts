@@ -1,21 +1,55 @@
 import type { Request, Response } from "express";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, access } from "fs/promises";
 import { join } from "path";
 import { randomBytes } from "crypto";
 import { existsSync } from "fs";
+import { constants } from "fs";
 
-// Use Object Storage for persistent image storage in production
-// Fall back to /tmp/uploads in development if PRIVATE_OBJECT_DIR is not set
-const PRIVATE_OBJECT_DIR = process.env.PRIVATE_OBJECT_DIR || "/tmp/uploads";
+// Determine the correct upload directory based on environment
+// In production: Use Object Storage (PRIVATE_OBJECT_DIR)
+// In development: Use persistent workspace directory
+let UPLOAD_DIR: string | null = null;
 
-async function getUploadDir(): Promise<string> {
-  // Ensure upload directory exists
-  if (!existsSync(PRIVATE_OBJECT_DIR)) {
-    await mkdir(PRIVATE_OBJECT_DIR, { recursive: true });
+async function initializeUploadDir(): Promise<string> {
+  if (UPLOAD_DIR) {
+    return UPLOAD_DIR;
+  }
+
+  // Try to use Object Storage if PRIVATE_OBJECT_DIR is set and accessible
+  const objectStorageDir = process.env.PRIVATE_OBJECT_DIR;
+  
+  if (objectStorageDir) {
+    try {
+      // Attempt to create or access the Object Storage directory
+      if (!existsSync(objectStorageDir)) {
+        await mkdir(objectStorageDir, { recursive: true });
+      }
+      
+      // Verify write access
+      await access(objectStorageDir, constants.W_OK);
+      
+      UPLOAD_DIR = objectStorageDir;
+      console.log('[Upload] Using Object Storage directory:', UPLOAD_DIR);
+      return UPLOAD_DIR;
+    } catch (error) {
+      console.log('[Upload] Object Storage not accessible:', error);
+      console.log('[Upload] Falling back to local workspace directory');
+    }
   }
   
-  console.log('[Upload] Using upload directory:', PRIVATE_OBJECT_DIR);
-  return PRIVATE_OBJECT_DIR;
+  // Fallback to workspace directory for development
+  UPLOAD_DIR = '/home/runner/workspace/uploads';
+  
+  if (!existsSync(UPLOAD_DIR)) {
+    await mkdir(UPLOAD_DIR, { recursive: true });
+  }
+  
+  console.log('[Upload] Using local workspace directory:', UPLOAD_DIR);
+  return UPLOAD_DIR;
+}
+
+async function getUploadDir(): Promise<string> {
+  return await initializeUploadDir();
 }
 
 const ALLOWED_MIME_TYPES = [
@@ -70,6 +104,15 @@ export async function handleFileUpload(req: Request, res: Response) {
 }
 
 // Export function to get image path for PDF generation
+// This must be synchronous for PDF generation, so we use the cached UPLOAD_DIR
 export function getImagePath(filename: string): string {
-  return join(PRIVATE_OBJECT_DIR, filename);
+  if (!UPLOAD_DIR) {
+    // If not initialized yet, initialize synchronously using the fallback
+    const objectStorageDir = process.env.PRIVATE_OBJECT_DIR;
+    if (objectStorageDir && existsSync(objectStorageDir)) {
+      return join(objectStorageDir, filename);
+    }
+    return join('/home/runner/workspace/uploads', filename);
+  }
+  return join(UPLOAD_DIR, filename);
 }
