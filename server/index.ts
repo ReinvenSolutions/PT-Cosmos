@@ -8,6 +8,10 @@ import passport from "./auth";
 import { seedDatabaseIfEmpty } from "./seed";
 
 const app = express();
+
+// Trust proxy - required for secure cookies behind Replit's load balancer
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -29,7 +33,11 @@ app.use(
       httpOnly: true,
       sameSite: process.env.NODE_ENV === "production" ? "lax" : "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
+      // Domain should not be set - let the browser handle it automatically
+      // This ensures cookies work on both replit.app and custom domains
     },
+    // Ensure session is saved on every response
+    proxy: process.env.NODE_ENV === "production",
   })
 );
 
