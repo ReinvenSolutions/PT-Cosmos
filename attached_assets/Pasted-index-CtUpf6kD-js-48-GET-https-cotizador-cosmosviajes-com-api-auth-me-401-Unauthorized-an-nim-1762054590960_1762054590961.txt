@@ -1,0 +1,86 @@
+index-CtUpf6kD.js:48 
+ GET https://cotizador.cosmosviajes.com/api/auth/me 401 (Unauthorized)
+(anónimas)	@	index-CtUpf6kD.js:48
+o	@	index-CtUpf6kD.js:48
+b	@	index-CtUpf6kD.js:48
+start	@	index-CtUpf6kD.js:48
+fetch	@	index-CtUpf6kD.js:48
+ea	@	index-CtUpf6kD.js:48
+onSubscribe	@	index-CtUpf6kD.js:48
+subscribe	@	index-CtUpf6kD.js:48
+(anónimas)	@	index-CtUpf6kD.js:48
+E1	@	index-CtUpf6kD.js:38
+_u	@	index-CtUpf6kD.js:40
+Lo	@	index-CtUpf6kD.js:40
+Ug	@	index-CtUpf6kD.js:40
+ws	@	index-CtUpf6kD.js:38
+B2	@	index-CtUpf6kD.js:40
+ks	@	index-CtUpf6kD.js:40
+aS	@	index-CtUpf6kD.js:40
+C	@	index-CtUpf6kD.js:25
+D	@	index-CtUpf6kD.js:25
+
+index-CtUpf6kD.js:48 
+ GET https://cotizador.cosmosviajes.com/api/auth/me 401 (Unauthorized)
+(anónimas)	@	index-CtUpf6kD.js:48
+o	@	index-CtUpf6kD.js:48
+b	@	index-CtUpf6kD.js:48
+start	@	index-CtUpf6kD.js:48
+fetch	@	index-CtUpf6kD.js:48
+(anónimas)	@	index-CtUpf6kD.js:48
+(anónimas)	@	index-CtUpf6kD.js:48
+batch	@	index-CtUpf6kD.js:48
+refetchQueries	@	index-CtUpf6kD.js:48
+(anónimas)	@	index-CtUpf6kD.js:48
+batch	@	index-CtUpf6kD.js:48
+invalidateQueries	@	index-CtUpf6kD.js:48
+onSuccess	@	index-CtUpf6kD.js:248
+execute	@	index-CtUpf6kD.js:48
+await in execute		
+mutate	@	index-CtUpf6kD.js:48
+i	@	index-CtUpf6kD.js:248
+u	@	index-CtUpf6kD.js:248
+aT	@	index-CtUpf6kD.js:37
+cT	@	index-CtUpf6kD.js:37
+uT	@	index-CtUpf6kD.js:37
+mg	@	index-CtUpf6kD.js:37
+h1	@	index-CtUpf6kD.js:37
+(anónimas)	@	index-CtUpf6kD.js:37
+xm	@	index-CtUpf6kD.js:40
+Fb	@	index-CtUpf6kD.js:37
+gd	@	index-CtUpf6kD.js:37
+Qh	@	index-CtUpf6kD.js:37
+jT	@	index-CtUpf6kD.js:37
+index-CtUpf6kD.js:48 
+ GET https://cotizador.cosmosviajes.com/api/admin/clients 401 (Unauthorized)
+(anónimas)	@	index-CtUpf6kD.js:48
+o	@	index-CtUpf6kD.js:48
+b	@	index-CtUpf6kD.js:48
+start	@	index-CtUpf6kD.js:48
+fetch	@	index-CtUpf6kD.js:48
+ea	@	index-CtUpf6kD.js:48
+onSubscribe	@	index-CtUpf6kD.js:48
+subscribe	@	index-CtUpf6kD.js:48
+(anónimas)	@	index-CtUpf6kD.js:48
+E1	@	index-CtUpf6kD.js:38
+_u	@	index-CtUpf6kD.js:40
+Lo	@	index-CtUpf6kD.js:40
+B2	@	index-CtUpf6kD.js:40
+ks	@	index-CtUpf6kD.js:40
+Ug	@	index-CtUpf6kD.js:40
+ws	@	index-CtUpf6kD.js:38
+(anónimas)	@	index-CtUpf6kD.js:40
+index-CtUpf6kD.js:298 
+ POST https://cotizador.cosmosviajes.com/api/upload 401 (Unauthorized)
+Be	@	index-CtUpf6kD.js:298
+aT	@	index-CtUpf6kD.js:37
+cT	@	index-CtUpf6kD.js:37
+uT	@	index-CtUpf6kD.js:37
+mg	@	index-CtUpf6kD.js:37
+h1	@	index-CtUpf6kD.js:37
+(anónimas)	@	index-CtUpf6kD.js:37
+xm	@	index-CtUpf6kD.js:40
+Fb	@	index-CtUpf6kD.js:37
+gd	@	index-CtUpf6kD.js:37
+Qh	@	index-CtUpf6kD.js:37
+jT	@	index-CtUpf6kD.js:37
