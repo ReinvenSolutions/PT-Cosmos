@@ -23,10 +23,12 @@ const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 // Initialize storage on module load
 async function initializeStorage() {
   try {
-    // Try to initialize Object Storage
-    objectStorageService = new ObjectStorageService();
-    const privateDir = objectStorageService.getPrivateObjectDir();
-    if (privateDir) {
+    // Check if Object Storage environment variables are set
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    
+    if (bucketId) {
+      // Try to initialize Object Storage
+      objectStorageService = new ObjectStorageService();
       useObjectStorage = true;
       console.log('[Upload] Using Replit Object Storage');
       return;

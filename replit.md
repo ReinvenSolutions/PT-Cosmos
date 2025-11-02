@@ -15,10 +15,10 @@ The system features a modern, responsive interface built with React, Wouter for 
 The frontend is built with React, Wouter, and TanStack Query, styled with Tailwind CSS and shadcn/ui. The backend uses Express.js with TypeScript. PostgreSQL, hosted on Neon, serves as the database, managed by Drizzle ORM. Authentication is handled by Passport.js with Local Strategy, bcrypt for password hashing, and express-session with `connect-pg-simple` for PostgreSQL session storage. PDF generation is powered by PDFKit. The system automatically calculates trip dates and durations, implements specific business rules for Turkey destinations, and uses Replit Object Storage for persistent flight attachment images. Quote updates utilize database transactions for consistency.
 
 **Image Storage Architecture**: Flight attachment images use persistent storage that automatically adapts to the environment:
-- **Production**: Stores images in Replit Object Storage via Google Cloud Storage client for permanent persistence across deployments and restarts
-  - Uses `ObjectStorageService` in `server/objectStorage.ts` to interact with Replit's Object Storage
-  - Images are uploaded to `PRIVATE_OBJECT_DIR/uploads/` with UUID-based filenames
-  - Production uses Google Cloud Storage backend accessed through Replit's sidecar endpoint
+- **Production**: Stores images in Replit Object Storage using native `@replit/object-storage` package for permanent persistence
+  - Uses `ObjectStorageService` in `server/objectStorage.ts` with Replit's native Client
+  - Images are uploaded to `uploads/` directory with UUID-based filenames
+  - Automatically detects bucket via `DEFAULT_OBJECT_STORAGE_BUCKET_ID` environment variable
 - **Development**: Stores images in `/home/runner/workspace/uploads` for persistence during local development
 - The system automatically detects the environment and selects the appropriate storage location on startup
 - Images are served via authenticated endpoint `/api/images/:filename` which requires user authentication

@@ -1,27 +1,6 @@
-import { Storage, File } from "@google-cloud/storage";
+import { Client } from "@replit/object-storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
-
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-
-// The object storage client is used to interact with the object storage service
-export const objectStorageClient = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -31,87 +10,76 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
-// The object storage service is used to interact with the object storage service
+// The object storage service using Replit's native client
 export class ObjectStorageService {
-  constructor() {}
-
-  // Gets the private object directory
-  getPrivateObjectDir(): string {
-    const dir = process.env.PRIVATE_OBJECT_DIR || "";
-    if (!dir) {
-      throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
-      );
-    }
-    return dir;
+  private client: Client;
+  
+  constructor() {
+    // Initialize with default bucket
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    this.client = bucketId ? new Client({ bucketId }) : new Client();
   }
 
   // Upload a file to object storage
   async uploadFile(filename: string, buffer: Buffer): Promise<string> {
-    const privateObjectDir = this.getPrivateObjectDir();
     const objectId = randomUUID();
     const ext = filename.split('.').pop();
-    const objectName = `${objectId}.${ext}`;
-    const fullPath = `${privateObjectDir}/uploads/${objectName}`;
+    const objectName = `uploads/${objectId}.${ext}`;
 
-    const { bucketName, objectName: objectPath } = parseObjectPath(fullPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectPath);
-
-    await file.save(buffer, {
-      metadata: {
-        contentType: getContentType(ext || ''),
-      },
-    });
-
-    // Return just the filename for the URL
-    return objectName;
-  }
-
-  // Download a file from object storage
-  async downloadFile(filename: string): Promise<Buffer> {
-    const privateObjectDir = this.getPrivateObjectDir();
-    const fullPath = `${privateObjectDir}/uploads/${filename}`;
-
-    const { bucketName, objectName } = parseObjectPath(fullPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-
-    const [exists] = await file.exists();
-    if (!exists) {
-      throw new ObjectNotFoundError();
+    const result = await this.client.uploadFromBytes(objectName, buffer);
+    
+    if (!result.ok) {
+      console.error('[ObjectStorage] Upload failed:', result.error);
+      throw new Error('Failed to upload to Object Storage');
     }
 
-    const [buffer] = await file.download();
-    return buffer;
+    // Return just the filename (without 'uploads/' prefix) for the URL
+    return `${objectId}.${ext}`;
+  }
+
+  // Download a file from object storage as Buffer
+  async downloadFile(filename: string): Promise<Buffer> {
+    const objectName = `uploads/${filename}`;
+    const result = await this.client.downloadAsBytes(objectName);
+    
+    if (!result.ok) {
+      if (result.error?.message?.includes('not found') || result.error?.message?.includes('404')) {
+        throw new ObjectNotFoundError();
+      }
+      console.error('[ObjectStorage] Download failed:', result.error);
+      throw new Error('Failed to download from Object Storage');
+    }
+
+    // downloadAsBytes returns [Buffer] (array with one Buffer)
+    return result.value[0];
   }
 
   // Stream a file from object storage to HTTP response
   async streamFile(filename: string, res: Response): Promise<void> {
-    const privateObjectDir = this.getPrivateObjectDir();
-    const fullPath = `${privateObjectDir}/uploads/${filename}`;
+    const objectName = `uploads/${filename}`;
+    
+    // downloadAsStream returns a Readable directly (not wrapped in Result)
+    const stream = this.client.downloadAsStream(objectName);
 
-    const { bucketName, objectName } = parseObjectPath(fullPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-
-    const [exists] = await file.exists();
-    if (!exists) {
-      throw new ObjectNotFoundError();
-    }
-
-    const [metadata] = await file.getMetadata();
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    const contentType = getContentType(ext);
     
     res.set({
-      'Content-Type': metadata.contentType || 'application/octet-stream',
-      'Content-Length': metadata.size,
+      'Content-Type': contentType,
       'Cache-Control': 'private, max-age=31536000',
     });
 
-    const stream = file.createReadStream();
-    stream.on('error', (err) => {
-      console.error('Stream error:', err);
+    stream.on('error', (err: Error) => {
+      console.error('[ObjectStorage] Stream error:', err);
+      
+      // Check if it's a "not found" error
+      if (err.message?.includes('not found') || err.message?.includes('404')) {
+        if (!res.headersSent) {
+          res.status(404).json({ error: 'File not found' });
+        }
+        return;
+      }
+      
       if (!res.headersSent) {
         res.status(500).json({ error: 'Error streaming file' });
       }
@@ -119,27 +87,6 @@ export class ObjectStorageService {
 
     stream.pipe(res);
   }
-}
-
-function parseObjectPath(path: string): {
-  bucketName: string;
-  objectName: string;
-} {
-  if (!path.startsWith("/")) {
-    path = `/${path}`;
-  }
-  const pathParts = path.split("/");
-  if (pathParts.length < 3) {
-    throw new Error("Invalid path: must contain at least a bucket name");
-  }
-
-  const bucketName = pathParts[1];
-  const objectName = pathParts.slice(2).join("/");
-
-  return {
-    bucketName,
-    objectName,
-  };
 }
 
 function getContentType(ext: string): string {
