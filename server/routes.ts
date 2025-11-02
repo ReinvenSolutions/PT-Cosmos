@@ -163,6 +163,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originCity: originCity || "",
         outboundFlightImages: outboundFlightImages || undefined,
         returnFlightImages: returnFlightImages || undefined,
+        includeFlights: true,
+        outboundCabinBaggage: false,
+        outboundHoldBaggage: false,
+        returnCabinBaggage: false,
+        returnHoldBaggage: false,
       });
       
       res.setHeader('Content-Type', 'application/pdf');
@@ -426,6 +431,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originCity: quote.originCity || "",
         outboundFlightImages: quote.outboundFlightImages || undefined,
         returnFlightImages: quote.returnFlightImages || undefined,
+        includeFlights: quote.includeFlights ?? false,
+        outboundCabinBaggage: quote.outboundCabinBaggage ?? false,
+        outboundHoldBaggage: quote.outboundHoldBaggage ?? false,
+        returnCabinBaggage: quote.returnCabinBaggage ?? false,
+        returnHoldBaggage: quote.returnHoldBaggage ?? false,
       });
       
       res.setHeader('Content-Type', 'application/pdf');

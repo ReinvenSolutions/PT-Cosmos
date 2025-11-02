@@ -26,6 +26,11 @@ interface PublicQuoteData {
   originCity: string;
   outboundFlightImages?: string[];
   returnFlightImages?: string[];
+  includeFlights?: boolean;
+  outboundCabinBaggage?: boolean;
+  outboundHoldBaggage?: boolean;
+  returnCabinBaggage?: boolean;
+  returnHoldBaggage?: boolean;
 }
 
 export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<typeof PDFDocument> {
@@ -320,12 +325,23 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   });
 
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
-  if (data.outboundFlightImages && data.outboundFlightImages.length > 0) {
+  if (data.includeFlights && data.outboundFlightImages && data.outboundFlightImages.length > 0) {
     console.log('[PDF Generator] Outbound flight images:', data.outboundFlightImages);
     doc.addPage();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
-    doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text("EQUIPAJE CABINA 10KG + PERSONAL 8KG", leftMargin, 110, { align: "center", width: contentWidth });
+    
+    // Generar texto de equipajes dinámicamente
+    const baggageItems = ["PERSONAL 8KG"];
+    if (data.outboundCabinBaggage) {
+      baggageItems.push("CABINA 10KG");
+    }
+    if (data.outboundHoldBaggage) {
+      baggageItems.push("BODEGA 23KG");
+    }
+    const baggageText = baggageItems.join(" + ");
+    
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
     let flightImageY = 150;
     data.outboundFlightImages.forEach((imageUrl, index) => {
@@ -570,12 +586,23 @@ export function generatePublicQuotePDF(data: PublicQuoteData): InstanceType<type
   );
 
   // VUELOS DE REGRESO - última página del PDF
-  if (data.returnFlightImages && data.returnFlightImages.length > 0) {
+  if (data.includeFlights && data.returnFlightImages && data.returnFlightImages.length > 0) {
     console.log('[PDF Generator] Return flight images:', data.returnFlightImages);
     doc.addPage();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
-    doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text("EQUIPAJE CABINA 10KG + PERSONAL 8KG", leftMargin, 110, { align: "center", width: contentWidth });
+    
+    // Generar texto de equipajes dinámicamente
+    const baggageItems = ["PERSONAL 8KG"];
+    if (data.returnCabinBaggage) {
+      baggageItems.push("CABINA 10KG");
+    }
+    if (data.returnHoldBaggage) {
+      baggageItems.push("BODEGA 23KG");
+    }
+    const baggageText = baggageItems.join(" + ");
+    
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
     let flightImageY = 150;
     data.returnFlightImages.forEach((imageUrl, index) => {
