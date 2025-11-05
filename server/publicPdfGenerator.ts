@@ -658,51 +658,79 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     }
   }
 
+  // Helper function to normalize text for Turkey detection
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, ""); // Remove accents
+  };
+
+  // ACTIVIDADES OPCIONALES - Detectar si incluye Turquía
+  const hasTurkeyDestinations = data.destinations.some((dest) => {
+    const country = normalizeText(dest.country || "");
+    const name = normalizeText(dest.name || "");
+    return country.includes("turqu") || country.includes("turkey") || 
+           name.includes("turqu") || name.includes("turkey");
+  });
+
   // PÁGINA DE ASISTENCIA MÉDICA - Siempre incluida al final
   doc.addPage();
   
+  const topMargin = 80;
+  const bottomMargin = 50;
+  const availableHeight = pageHeight - topMargin - bottomMargin;
+  
   doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor);
-  doc.text("ASISTENCIA MEDICA PARA TU VIAJE", leftMargin, 80, { align: "center", width: contentWidth });
+  doc.text("ASISTENCIA MEDICA PARA TU VIAJE", leftMargin, topMargin, { align: "center", width: contentWidth });
   
   doc.moveDown(2);
   
   // Agregar imagen de asistencia médica
   const medicalAssistanceImagePath = path.join(__dirname, "assets", "medical-assistance.png");
   
+  // Calcular altura de imagen de asistencia médica basado en si hay actividades opcionales
+  const medicalImageHeight = hasTurkeyDestinations ? 240 : 400;
+  
   if (fs.existsSync(medicalAssistanceImagePath)) {
     try {
-      const imageY = doc.y;
-      const imageHeight = 300; // Altura ajustada para dejar espacio a actividades opcionales
-      
-      doc.image(medicalAssistanceImagePath, leftMargin, imageY, {
-        fit: [contentWidth, imageHeight],
-        align: "center"
-      });
-      
-      doc.y = imageY + imageHeight + 20;
-      
-      console.log('[PDF Generator] Medical assistance page added successfully');
+      const stats = fs.statSync(medicalAssistanceImagePath);
+      if (stats.size > 0) {
+        const imageY = doc.y;
+        
+        doc.image(medicalAssistanceImagePath, leftMargin, imageY, {
+          fit: [contentWidth, medicalImageHeight],
+          align: "center"
+        });
+        
+        doc.y = imageY + medicalImageHeight + 20;
+        
+        console.log('[PDF Generator] Medical assistance page added successfully');
+      } else {
+        console.warn('[PDF Generator] Medical assistance image file is empty');
+      }
     } catch (error) {
       console.error('[PDF Generator] Error loading medical assistance image:', error);
     }
   } else {
-    console.error(`[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`);
+    console.warn(`[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`);
   }
 
-  // ACTIVIDADES OPCIONALES - Solo si incluye Turquía
-  const hasTurkeyDestinations = data.destinations.some((dest) => {
-    const country = dest.country?.toLowerCase() || "";
-    const name = dest.name?.toLowerCase() || "";
-    return country.includes("turqu") || country.includes("turkey") || 
-           name.includes("turqu") || name.includes("turkey");
-  });
-
   if (hasTurkeyDestinations) {
-    // Verificar si hay espacio suficiente, si no, agregar nueva página
-    if (doc.y > 550) {
+    // Calcular espacio requerido para actividades opcionales
+    const titleHeight = 30;
+    const activitiesImageHeight = 280;
+    const requiredSpace = titleHeight + activitiesImageHeight + 40;
+    
+    // Verificar si hay espacio suficiente en la página actual
+    const remainingSpace = pageHeight - doc.y - bottomMargin;
+    
+    if (remainingSpace < requiredSpace) {
+      // No hay espacio, crear nueva página
       doc.addPage();
-      doc.y = 80;
+      doc.y = topMargin;
     } else {
+      // Hay espacio, agregar separación
       doc.moveDown(2);
     }
 
@@ -713,7 +741,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     
     // Intentar cargar imagen de actividades opcionales desde múltiples ubicaciones
     const turkeyActivitiesImages = [
-      path.join(__dirname, "assets", "turkey-optional-activities.png"),
       path.join(__dirname, "..", "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
       path.join(process.cwd(), "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
     ];
@@ -722,25 +749,29 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     for (const imagePath of turkeyActivitiesImages) {
       if (fs.existsSync(imagePath)) {
         try {
-          const imageY = doc.y;
-          const imageHeight = 350;
-          
-          doc.image(imagePath, leftMargin, imageY, {
-            fit: [contentWidth, imageHeight],
-            align: "center"
-          });
-          
-          console.log('[PDF Generator] Turkey optional activities image added successfully from:', imagePath);
-          imageAdded = true;
-          break;
+          const stats = fs.statSync(imagePath);
+          if (stats.size > 0) {
+            const imageY = doc.y;
+            
+            doc.image(imagePath, leftMargin, imageY, {
+              fit: [contentWidth, activitiesImageHeight],
+              align: "center"
+            });
+            
+            console.log('[PDF Generator] Turkey optional activities image added successfully from:', imagePath);
+            imageAdded = true;
+            break;
+          } else {
+            console.warn(`[PDF Generator] Turkey activities image file is empty at ${imagePath}`);
+          }
         } catch (error) {
-          console.error(`[PDF Generator] Error loading Turkey activities image from ${imagePath}:`, error);
+          console.warn(`[PDF Generator] Error loading Turkey activities image from ${imagePath}:`, error);
         }
       }
     }
     
     if (!imageAdded) {
-      console.error('[PDF Generator] Turkey optional activities image not found in any location');
+      console.warn('[PDF Generator] Turkey optional activities image not found in any location');
     }
   }
 
