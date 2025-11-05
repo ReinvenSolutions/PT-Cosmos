@@ -672,12 +672,14 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (fs.existsSync(medicalAssistanceImagePath)) {
     try {
       const imageY = doc.y;
-      const imageHeight = 500; // Altura suficiente para mostrar la imagen completa
+      const imageHeight = 300; // Altura ajustada para dejar espacio a actividades opcionales
       
       doc.image(medicalAssistanceImagePath, leftMargin, imageY, {
         fit: [contentWidth, imageHeight],
         align: "center"
       });
+      
+      doc.y = imageY + imageHeight + 20;
       
       console.log('[PDF Generator] Medical assistance page added successfully');
     } catch (error) {
@@ -685,6 +687,61 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     }
   } else {
     console.error(`[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`);
+  }
+
+  // ACTIVIDADES OPCIONALES - Solo si incluye Turquía
+  const hasTurkeyDestinations = data.destinations.some((dest) => {
+    const country = dest.country?.toLowerCase() || "";
+    const name = dest.name?.toLowerCase() || "";
+    return country.includes("turqu") || country.includes("turkey") || 
+           name.includes("turqu") || name.includes("turkey");
+  });
+
+  if (hasTurkeyDestinations) {
+    // Verificar si hay espacio suficiente, si no, agregar nueva página
+    if (doc.y > 550) {
+      doc.addPage();
+      doc.y = 80;
+    } else {
+      doc.moveDown(2);
+    }
+
+    doc.font("Helvetica-Bold").fontSize(16).fillColor(textColor);
+    doc.text("ACTIVIDADES OPCIONALES", leftMargin, doc.y, { align: "center", width: contentWidth });
+    
+    doc.moveDown(1);
+    
+    // Intentar cargar imagen de actividades opcionales desde múltiples ubicaciones
+    const turkeyActivitiesImages = [
+      path.join(__dirname, "assets", "turkey-optional-activities.png"),
+      path.join(__dirname, "..", "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
+      path.join(process.cwd(), "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
+    ];
+    
+    let imageAdded = false;
+    for (const imagePath of turkeyActivitiesImages) {
+      if (fs.existsSync(imagePath)) {
+        try {
+          const imageY = doc.y;
+          const imageHeight = 350;
+          
+          doc.image(imagePath, leftMargin, imageY, {
+            fit: [contentWidth, imageHeight],
+            align: "center"
+          });
+          
+          console.log('[PDF Generator] Turkey optional activities image added successfully from:', imagePath);
+          imageAdded = true;
+          break;
+        } catch (error) {
+          console.error(`[PDF Generator] Error loading Turkey activities image from ${imagePath}:`, error);
+        }
+      }
+    }
+    
+    if (!imageAdded) {
+      console.error('[PDF Generator] Turkey optional activities image not found in any location');
+    }
   }
 
   return doc;

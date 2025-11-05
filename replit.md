@@ -43,6 +43,7 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
   - **Baggage Customization**: Users can select "Equipaje de cabina 10kg" and "Equipaje de bodega 23kg" independently for outbound and return flights (Personal 8kg is always included)
   - **Conditional PDF Generation**: If no flight images are uploaded AND no baggage checkboxes are selected, the PDF generates as land-only (no flight pages). If any flight data exists (images OR baggage selections), flight pages are included in the PDF with dynamic baggage text
   - **Medical Assistance Page**: All PDFs automatically include a final page with title "ASISTENCIA MEDICA PARA TU VIAJE" and medical assistance coverage details (image stored in `server/assets/medical-assistance.png`)
+  - **Turkey Optional Activities**: When a quotation includes Turkey/Turquía destinations, the medical assistance page also displays a section titled "ACTIVIDADES OPCIONALES" with pricing table for optional tours in Turkey (image stored in `attached_assets/Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png`). Detection is based on destination country or name containing "turqu" or "turkey" (case-insensitive)
 - **Role-Based Access**: Public routes are accessible without authentication, while advisor and super admin routes require specific roles, enforced by `requireAuth` and `requireRole` middleware.
 
 ### System Design Choices
