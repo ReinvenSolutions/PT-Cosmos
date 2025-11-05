@@ -79,6 +79,14 @@ export function getDestinationImagePath(destination: { name: string; country: st
 }
 
 export function getDestinationImages(destinations: Array<{ name: string; country: string }>): string[] {
+  // Si hay solo un destino, usar el set de imágenes del país para mostrar 3 imágenes diferentes
+  if (destinations.length === 1) {
+    const imageSet = getDestinationImageSet(destinations[0]);
+    if (imageSet.length >= 3) {
+      return imageSet.slice(0, 3);
+    }
+  }
+
   const images: string[] = [];
   const seenCountries = new Set<string>();
   
