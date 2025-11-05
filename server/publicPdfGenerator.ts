@@ -741,7 +741,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     
     // Intentar cargar imagen de actividades opcionales desde múltiples ubicaciones
     const turkeyActivitiesImages = [
-      path.join(__dirname, "..", "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
       path.join(process.cwd(), "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
     ];
     
