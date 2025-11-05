@@ -34,6 +34,11 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
 - **Super Admin**: Manages clients (global list), creates and manages destinations, views quote statistics across all advisors, and has full access to the system.
 - **Advisor**: Creates, views, and edits personal quotations, associates quotes with clients, uploads flight images, customizes baggage options, and generates detailed PDFs. The quotation flow mirrors the original public system but is now protected by authentication.
 - **Quotation System**: Allows browsing and selecting destinations, setting travel dates, viewing itineraries, and saving quotes associated with clients and the logged-in user.
+  - **Passenger Selection**: Users can select 1-10 passengers in `/cotizacion`. The system multiplies the land portion price by the number of passengers to calculate the total. Price display shows both per-person and total amounts.
+  - **Dynamic PDF Text**: PDF quotations display context-aware passenger text:
+    - 1 passenger: "por Persona"
+    - 2 passengers: "por Pareja" + adds "2X1" suffix to destination title
+    - 3+ passengers: "por Grupo de X" (where X is the passenger count)
   - **Flight Sections**: Both public (`/cotizacion`) and advisor edit pages include flight upload sections with customizable baggage options
   - **Baggage Customization**: Users can select "Equipaje de cabina 10kg" and "Equipaje de bodega 23kg" independently for outbound and return flights (Personal 8kg is always included)
   - **Conditional PDF Generation**: If no flight images are uploaded AND no baggage checkboxes are selected, the PDF generates as land-only (no flight pages). If any flight data exists (images OR baggage selections), flight pages are included in the PDF with dynamic baggage text
