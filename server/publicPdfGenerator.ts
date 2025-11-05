@@ -687,7 +687,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.moveDown(2);
   
   // Agregar imagen de asistencia médica
-  const medicalAssistanceImagePath = path.join(__dirname, "assets", "medical-assistance.png");
+  const medicalAssistanceImagePath = path.join(process.cwd(), "server", "assets", "medical-assistance.png");
   
   // Calcular altura de imagen de asistencia médica basado en si hay actividades opcionales
   const medicalImageHeight = hasTurkeyDestinations ? 240 : 400;
