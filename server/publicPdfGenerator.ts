@@ -3,6 +3,7 @@ import { Destination, ItineraryDay, Hotel, Inclusion, Exclusion, formatUSD, form
 import { getDestinationImages, getDestinationImageSet } from "./destination-images";
 import { getImagePathForPDF } from "./upload";
 import fs from "fs";
+import path from "path";
 
 interface PublicQuoteData {
   destinations: Array<{
@@ -655,6 +656,35 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
         }
       }
     }
+  }
+
+  // PÁGINA DE ASISTENCIA MÉDICA - Siempre incluida al final
+  doc.addPage();
+  
+  doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor);
+  doc.text("ASISTENCIA MEDICA PARA TU VIAJE", leftMargin, 80, { align: "center", width: contentWidth });
+  
+  doc.moveDown(2);
+  
+  // Agregar imagen de asistencia médica
+  const medicalAssistanceImagePath = path.join(__dirname, "assets", "medical-assistance.png");
+  
+  if (fs.existsSync(medicalAssistanceImagePath)) {
+    try {
+      const imageY = doc.y;
+      const imageHeight = 500; // Altura suficiente para mostrar la imagen completa
+      
+      doc.image(medicalAssistanceImagePath, leftMargin, imageY, {
+        fit: [contentWidth, imageHeight],
+        align: "center"
+      });
+      
+      console.log('[PDF Generator] Medical assistance page added successfully');
+    } catch (error) {
+      console.error('[PDF Generator] Error loading medical assistance image:', error);
+    }
+  } else {
+    console.error(`[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`);
   }
 
   return doc;
