@@ -113,11 +113,12 @@ export default function QuoteSummary() {
 
   const endDate = calculateEndDate();
   
-  const landPortionTotal = selectedDests.reduce((sum, dest) => {
+  const landPortionPerPerson = selectedDests.reduce((sum, dest) => {
     const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
     return sum + basePrice;
   }, 0);
   
+  const landPortionTotal = landPortionPerPerson * passengers;
   const flightsAndExtrasValue = flightsAndExtras ? parseFloat(flightsAndExtras) : 0;
   const grandTotal = landPortionTotal + flightsAndExtrasValue;
 
@@ -298,6 +299,7 @@ export default function QuoteSummary() {
           outboundHoldBaggage,
           returnCabinBaggage,
           returnHoldBaggage,
+          passengers,
         }),
       });
       
@@ -443,6 +445,43 @@ export default function QuoteSummary() {
                   </p>
                 )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Cantidad de Pasajeros
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-3">
+              Selecciona la cantidad de personas que viajarán
+            </p>
+            <Select 
+              value={passengers.toString()} 
+              onValueChange={(value) => setPassengers(parseInt(value))}
+            >
+              <SelectTrigger className="w-full" data-testid="select-passengers">
+                <SelectValue placeholder="Selecciona cantidad" />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                  <SelectItem key={num} value={num.toString()}>
+                    {num} {num === 1 ? 'persona' : 'personas'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Precio por persona:</span> US$ {formatUSD(landPortionPerPerson)}
+              </p>
+              <p className="text-lg font-bold text-blue-600 mt-1">
+                <span className="font-semibold">Total ({passengers} {passengers === 1 ? 'persona' : 'personas'}):</span> US$ {formatUSD(landPortionTotal)}
+              </p>
             </div>
           </CardContent>
         </Card>

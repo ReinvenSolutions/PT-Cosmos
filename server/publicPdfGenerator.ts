@@ -31,6 +31,17 @@ interface PublicQuoteData {
   outboundHoldBaggage?: boolean;
   returnCabinBaggage?: boolean;
   returnHoldBaggage?: boolean;
+  passengers?: number;
+}
+
+function getPassengerText(passengers: number): string {
+  if (passengers === 1) {
+    return "por Persona";
+  } else if (passengers === 2) {
+    return "por Pareja";
+  } else {
+    return `por Grupo de ${passengers}`;
+  }
 }
 
 export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<InstanceType<typeof PDFDocument>> {
@@ -65,7 +76,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text("S U   V I A J E   A :", leftMargin, 70);
 
   const titleY = 95;
-  const titleText = destinationNames.toUpperCase();
+  const passengers = data.passengers || 2;
+  const titleSuffix = passengers === 2 ? " 2X1" : "";
+  const titleText = destinationNames.toUpperCase() + titleSuffix;
   
   let titleFontSize = 24;
   if (titleText.length > 50) {
@@ -149,7 +162,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   
   doc.font("Helvetica").fontSize(9).fillColor(textColor);
   doc.text(
-    "por Pareja",
+    getPassengerText(passengers),
     priceBoxX + 5,
     priceBoxY + 60,
     { width: priceBoxWidth - 10, align: "center" }
