@@ -744,8 +744,13 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       path.join(process.cwd(), "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
     ];
     
+    console.log('[PDF Generator] Looking for Turkey activities image at:', turkeyActivitiesImages[0]);
+    console.log('[PDF Generator] process.cwd():', process.cwd());
+    console.log('[PDF Generator] File exists check:', fs.existsSync(turkeyActivitiesImages[0]));
+    
     let imageAdded = false;
     for (const imagePath of turkeyActivitiesImages) {
+      console.log('[PDF Generator] Checking path:', imagePath);
       if (fs.existsSync(imagePath)) {
         try {
           const stats = fs.statSync(imagePath);
