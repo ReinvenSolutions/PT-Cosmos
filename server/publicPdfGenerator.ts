@@ -739,38 +739,52 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     
     doc.moveDown(1);
     
-    // Intentar cargar imagen de actividades opcionales desde múltiples ubicaciones
-    const turkeyActivitiesImages = [
-      path.join(process.cwd(), "attached_assets", "Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png"),
-    ];
+    // Buscar imagen de actividades opcionales de Turquía (el archivo más reciente)
+    const assetsDir = path.join(process.cwd(), "attached_assets");
+    let turkeyActivitiesImagePath: string | null = null;
     
-    console.log('[PDF Generator] Looking for Turkey activities image at:', turkeyActivitiesImages[0]);
-    console.log('[PDF Generator] process.cwd():', process.cwd());
-    console.log('[PDF Generator] File exists check:', fs.existsSync(turkeyActivitiesImages[0]));
+    try {
+      const files = fs.readdirSync(assetsDir);
+      // Buscar archivos que coincidan con el patrón de screenshot de actividades opcionales
+      const turkeyFiles = files.filter(f => 
+        f.toLowerCase().includes('screenshot') && 
+        f.toLowerCase().includes('2025-11-05') &&
+        f.toLowerCase().includes('3.01.29')
+      );
+      
+      if (turkeyFiles.length > 0) {
+        // Ordenar por fecha de modificación (más reciente primero)
+        turkeyFiles.sort((a, b) => {
+          const statA = fs.statSync(path.join(assetsDir, a));
+          const statB = fs.statSync(path.join(assetsDir, b));
+          return statB.mtime.getTime() - statA.mtime.getTime();
+        });
+        turkeyActivitiesImagePath = path.join(assetsDir, turkeyFiles[0]);
+        console.log('[PDF Generator] Found Turkey activities image:', turkeyActivitiesImagePath);
+      }
+    } catch (error) {
+      console.warn('[PDF Generator] Error searching for Turkey activities image:', error);
+    }
     
     let imageAdded = false;
-    for (const imagePath of turkeyActivitiesImages) {
-      console.log('[PDF Generator] Checking path:', imagePath);
-      if (fs.existsSync(imagePath)) {
-        try {
-          const stats = fs.statSync(imagePath);
-          if (stats.size > 0) {
-            const imageY = doc.y;
-            
-            doc.image(imagePath, leftMargin, imageY, {
-              fit: [contentWidth, activitiesImageHeight],
-              align: "center"
-            });
-            
-            console.log('[PDF Generator] Turkey optional activities image added successfully from:', imagePath);
-            imageAdded = true;
-            break;
-          } else {
-            console.warn(`[PDF Generator] Turkey activities image file is empty at ${imagePath}`);
-          }
-        } catch (error) {
-          console.warn(`[PDF Generator] Error loading Turkey activities image from ${imagePath}:`, error);
+    if (turkeyActivitiesImagePath && fs.existsSync(turkeyActivitiesImagePath)) {
+      try {
+        const stats = fs.statSync(turkeyActivitiesImagePath);
+        if (stats.size > 0) {
+          const imageY = doc.y;
+          
+          doc.image(turkeyActivitiesImagePath, leftMargin, imageY, {
+            fit: [contentWidth, activitiesImageHeight],
+            align: "center"
+          });
+          
+          console.log('[PDF Generator] Turkey optional activities image added successfully from:', turkeyActivitiesImagePath);
+          imageAdded = true;
+        } else {
+          console.warn(`[PDF Generator] Turkey activities image file is empty at ${turkeyActivitiesImagePath}`);
         }
+      } catch (error) {
+        console.warn(`[PDF Generator] Error loading Turkey activities image from ${turkeyActivitiesImagePath}:`, error);
       }
     }
     
