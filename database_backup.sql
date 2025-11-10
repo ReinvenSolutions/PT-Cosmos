@@ -1,0 +1,1674 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 16.9 (165f042)
+-- Dumped by pg_dump version 16.9
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: clients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.clients (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    email text NOT NULL,
+    phone text,
+    created_at timestamp without time zone DEFAULT now()
+);
+
+
+--
+-- Name: destinations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.destinations (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    country text NOT NULL,
+    duration integer NOT NULL,
+    nights integer NOT NULL,
+    description text,
+    image_url text,
+    display_order integer DEFAULT 999,
+    is_active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT now(),
+    category text DEFAULT 'internacional'::text,
+    is_promotion boolean DEFAULT false,
+    base_price numeric(10,2),
+    requires_tuesday boolean DEFAULT false
+);
+
+
+--
+-- Name: exclusions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.exclusions (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    destination_id character varying NOT NULL,
+    item text NOT NULL,
+    display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: hotels; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hotels (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    destination_id character varying NOT NULL,
+    name text NOT NULL,
+    category text,
+    location text,
+    image_url text,
+    nights integer
+);
+
+
+--
+-- Name: inclusions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.inclusions (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    destination_id character varying NOT NULL,
+    item text NOT NULL,
+    display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: itinerary_days; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.itinerary_days (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    destination_id character varying NOT NULL,
+    day_number integer NOT NULL,
+    title text NOT NULL,
+    location text,
+    description text NOT NULL,
+    activities text[],
+    meals text[],
+    accommodation text
+);
+
+
+--
+-- Name: quote_destinations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.quote_destinations (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    quote_id character varying NOT NULL,
+    destination_id character varying NOT NULL,
+    start_date timestamp without time zone NOT NULL,
+    passengers integer DEFAULT 2 NOT NULL,
+    price numeric(10,2)
+);
+
+
+--
+-- Name: quotes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.quotes (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    client_id character varying NOT NULL,
+    user_id character varying NOT NULL,
+    total_price numeric(10,2) NOT NULL,
+    status text DEFAULT 'draft'::text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    origin_city text,
+    flights_and_extras numeric(10,2),
+    outbound_flight_images text[],
+    return_flight_images text[],
+    include_flights boolean DEFAULT false,
+    outbound_cabin_baggage boolean DEFAULT false,
+    outbound_hold_baggage boolean DEFAULT false,
+    return_cabin_baggage boolean DEFAULT false,
+    return_hold_baggage boolean DEFAULT false
+);
+
+
+--
+-- Name: sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sessions (
+    sid character varying NOT NULL,
+    sess json NOT NULL,
+    expire timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id character varying DEFAULT gen_random_uuid() NOT NULL,
+    username text NOT NULL,
+    password_hash text NOT NULL,
+    role text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    name text,
+    email text
+);
+
+
+--
+-- Data for Name: clients; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.clients (id, name, email, phone, created_at) FROM stdin;
+1bc8b253-dca7-4367-89b2-8e342b7e3694	Client-A43a9j	clientTcKVW-@test.com	555-1234	2025-10-30 04:27:08.926883
+2c9b1dbd-5a02-49a1-b85f-daf53e56e193	Client-0LTZa-	clientDmhQkS@test.com	555-1234	2025-10-30 04:33:27.777022
+24659541-abc7-432e-a39f-b33460130ac2	Test Client E2E	test-e2e-NrvRYK@example.com	555-9999	2025-10-30 07:03:30.335438
+ea86e4d2-ccc4-4451-b3c4-56d6bd251014	Test Client E2E	test-e2e-8K3O_T@example.com	555-9999	2025-10-30 07:09:38.325201
+\.
+
+
+--
+-- Data for Name: destinations; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.destinations (id, name, country, duration, nights, description, image_url, display_order, is_active, created_at, category, is_promotion, base_price, requires_tuesday) FROM stdin;
+5099c499-78ed-453c-9fd7-d0cae36d5e6d	Leyendas de Turquía	Turquía	10	9	Tour completo por las leyendas de Turquía. Explora ciudades antiguas, ruinas históricas y paisajes impresionantes.	\N	2	t	2025-10-04 14:44:51.963878	internacional	f	670.00	t
+e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Cusco + Huacachina	Perú	5	4	Combina lo mejor de Cusco con el oasis de Huacachina. Machu Picchu y aventura en el desierto.	\N	64	t	2025-10-04 14:43:10.239783	internacional	f	900.00	f
+b3d7b805-e20b-4fec-97b4-ae33ce95a273	Cusco + Viñac	Perú	4	3	Cusco con visita a viñedos. Combina historia inca con degustación de vinos peruanos.	\N	68	t	2025-10-04 14:43:12.485415	internacional	f	900.00	f
+4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Cusco Extended	Perú	6	5	Tour extendido por Cusco. Incluye sitios adicionales como la Montaña de 7 Colores o Laguna Humantay.	\N	63	t	2025-10-04 14:43:09.685589	internacional	f	1200.00	f
+68e078c2-74fb-4390-a039-b17d6d7c7a54	Cusco - Huacachina - Lima	Perú	7	6	Gran tour por Perú. Combina Cusco, Huacachina y Lima para una experiencia completa.	\N	66	t	2025-10-04 14:43:11.378889	internacional	f	1200.00	f
+a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Estambul y Capadocia	Turquía	7	6	Descubre la mágica combinación de Estambul y Capadocia. Visita mezquitas históricas, palacios imperiales y vuela en globo sobre los paisajes únicos de Capadocia.	\N	1	t	2025-10-04 14:44:51.643639	internacional	f	1200.00	t
+f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Turquía Extra Regulares con Almuerzos	Turquía	8	7	Experiencia premium en Turquía con todas las comidas incluidas. Visita los sitios más emblemáticos con guías expertos.	\N	3	t	2025-10-04 14:42:57.784686	internacional	f	1800.00	t
+af281d14-a347-4f9c-8f2a-21308a321254	Turquía Extra Regulares sin Almuerzos	Turquía	8	7	Tour flexible por Turquía con desayunos incluidos. Explora a tu ritmo los tesoros históricos del país.	\N	4	t	2025-10-04 14:42:58.337612	internacional	f	1800.00	t
+c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Dubái Esencial	Dubái	3	2	Escapada express a Dubai. Visita el Burj Khalifa, Dubai Mall y experimenta el lujo del desierto.	\N	10	t	2025-10-04 14:42:58.895153	internacional	f	2200.00	f
+e5a2c7c1-1953-4d88-a677-7eb944fe8611	Dubái Clásico	Dubái	4	3	Tour clásico por Dubai. Incluye safari en el desierto, tour por la ciudad y visita a los principales atractivos.	\N	11	t	2025-10-04 14:42:59.399864	internacional	f	2200.00	f
+4d6107a7-853c-48c9-ac68-75581775e8cd	Dubái Extended	Dubái	6	5	Tour extendido por Dubai y Abu Dhabi. Visita la Gran Mezquita, Ferrari World y más atracciones.	\N	13	t	2025-10-04 14:43:00.441006	internacional	f	2200.00	f
+04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Egipto Extendido	Egipto	8	7	Tour completo por Egipto. Explora Cairo, Luxor, Aswan y relájate en la costa del Mar Rojo.	\N	21	t	2025-10-04 14:43:02.14637	internacional	f	1500.00	f
+c8cb4562-e3f4-434d-b638-39494cfe9f3b	Tour de Peregrinación 4 Días	Egipto	4	3	Tour espiritual por los sitios religiosos de Egipto. Visita monasterios coptos y lugares sagrados.	\N	23	t	2025-10-04 14:43:03.265037	internacional	f	1500.00	f
+9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Grecia Clásica	Grecia	5	4	Tour por la Grecia Clásica. Visita Atenas, Delfos, Meteora y descubre la cuna de la civilización occidental.	\N	30	t	2025-10-04 14:43:04.352697	internacional	f	1300.00	f
+828163d2-cfd7-46f5-9d41-92e538bae766	Tailandia Extended	Tailandia	8	7	Experiencia extendida en Tailandia. Más tiempo para explorar templos, playas y la cultura tailandesa.	\N	42	t	2025-10-04 14:43:05.960822	internacional	f	1400.00	f
+424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Vietnam Express	Vietnam	4	3	Tour express por Vietnam. Visita Hanoi, crucero por la Bahía de Halong y explora la cultura vietnamita.	\N	50	t	2025-10-04 14:43:06.524693	internacional	f	1100.00	f
+094a5ae7-416e-477a-85f7-6c3d02417bab	Cartagena Colonial y Playas de Barú	Colombia	4	3	Recorre la ciudad amurallada de Cartagena, Patrimonio de la Humanidad, y relájate en las playas de arena blanca de Isla Barú y el Parque Rosario.	\N	3	t	2025-10-29 22:50:29.159345	nacional	f	600.00	f
+c024eeaa-4d65-4307-8a97-048681a090f2	La Guajira y Cabo de la Vela	Colombia	4	3	Explora el desierto de La Guajira, visita Cabo de la Vela, Punta Gallinas y conoce la cultura wayúu en el extremo norte de Sudamérica.	\N	1	t	2025-10-29 23:09:03.652387	nacional	f	600.00	f
+8a709aed-8b86-413a-bfcb-575185e69d53	Vietnam Clásico	Vietnam	5	4	Tour clásico por Vietnam. Incluye el norte, centro y sur del país con sus principales atracciones.	\N	51	t	2025-10-04 14:44:54.337488	internacional	f	1100.00	f
+c3e06106-518d-46da-b1db-4228b126be43	Vietnam Completo	Vietnam	6	5	Experiencia completa en Vietnam. De Hanoi a Ho Chi Minh, pasando por Hoi An y la Bahía de Halong.	\N	52	t	2025-10-04 14:44:54.460586	internacional	f	1100.00	f
+f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Cusco Express	Perú	3	2	Escapada rápida a Cusco. Visita Machu Picchu y el Valle Sagrado de los Incas.	\N	60	t	2025-10-04 14:44:54.596874	internacional	f	900.00	f
+de9eb689-7a5f-4095-a254-57e4d4276338	Cusco Clásico	Perú	4	3	Tour clásico por Cusco. Incluye Machu Picchu, Valle Sagrado y city tour por la capital del Imperio Inca.	\N	61	t	2025-10-04 14:44:54.733134	internacional	f	900.00	f
+6997b7ff-f839-45be-b81e-0282087fe1dd	Cusco Completo	Perú	5	4	Experiencia completa en Cusco. Más tiempo para aclimatarse y explorar todas las maravillas incas.	\N	62	t	2025-10-04 14:44:54.863325	internacional	f	900.00	f
+49b95345-1239-4687-83e2-fa735553ca5d	Medellín Ciudad de la Eterna Primavera	Colombia	4	3	Descubre Medellín, su innovación urbana, el metrocable, Guatapé, la Piedra del Peñol y la cultura paisa en la ciudad más innovadora.	\N	4	t	2025-10-29 23:09:03.652387	nacional	f	600.00	f
+ba24d18c-c63c-4b80-a5e0-6b47a6484313	Eje Cafetero y Cultura Paisa	Colombia	5	4	Descubre la zona cafetera de Colombia, visita fincas tradicionales, aprende sobre el proceso del café y disfruta de los paisajes montañosos del eje cafetero.	\N	2	t	2025-10-29 22:50:29.159345	nacional	f	850.00	f
+9c80b7c9-5040-45db-8c83-c9476adb3052	Amazonas Selvático y Aventura	Colombia	5	4	Adéntrate en la selva amazónica, conoce comunidades indígenas, navega por el río Amazonas y descubre la biodiversidad más rica del planeta.	\N	4	t	2025-10-29 22:50:29.159345	nacional	f	850.00	f
+5df7975b-cdc3-4c7d-b6c4-09ea2a2bf2a7	San Andrés y Providencia	Colombia	5	4	Disfruta del mar de los 7 colores, playas paradisíacas, cayos coralinos y la cultura raizal del archipiélago de San Andrés.	\N	2	t	2025-10-29 23:09:03.652387	nacional	f	850.00	f
+f1388f85-c87c-4875-8ad2-7523977b1196	Cusco - Viñac	Perú	5	4	Tour por Cusco y región vinícola. Machu Picchu y enoturismo en un solo viaje.	\N	69	t	2025-10-04 14:44:55.733587	internacional	f	900.00	f
+493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Cusco - Huacachina	Perú	6	5	Tour completo Cusco y Huacachina. Incluye Machu Picchu, sandboarding y paseo en buggy.	\N	65	t	2025-10-04 14:44:55.232153	internacional	f	1200.00	f
+4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Dubái Completo	Dubái	5	4	Experiencia completa en Dubai. Descubre tanto el Dubai moderno como el tradicional, con safari y crucero incluidos.	\N	12	t	2025-10-04 14:44:52.612121	internacional	f	2200.00	f
+a3a1fa45-57de-4905-92ad-7fe67f091c9d	Dubái Premium	Dubái	8	7	Experiencia premium en los Emiratos. Incluye Dubai, Abu Dhabi y tiempo libre para compras y relax.	\N	14	t	2025-10-04 14:44:52.863686	internacional	f	2200.00	f
+4a457002-eba2-4864-96a1-0a7039b379d5	Egipto Clásico	Egipto	7	6	Descubre las maravillas del Antiguo Egipto. Visita las Pirámides, el Valle de los Reyes y navega por el Nilo.	\N	20	t	2025-10-04 14:44:52.989872	internacional	f	1500.00	f
+88be8f27-1395-44ba-9f5b-58ac9ea9f387	Egipto Completo	Egipto	10	9	La experiencia definitiva en Egipto. Incluye todos los sitios principales más Alexandria y el Mar Rojo.	\N	22	t	2025-10-04 14:44:53.234311	internacional	f	1500.00	f
+e95e6dde-a4ad-462a-afa5-0e7d667a920d	Tour de Peregrinación 5 Días	Egipto	5	4	Tour espiritual extendido. Incluye más sitios religiosos y tiempo para reflexión.	\N	24	t	2025-10-04 14:44:53.508136	internacional	f	1500.00	f
+a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Tailandia Esencial	Tailandia	6	5	Lo mejor de Tailandia. Explora Bangkok, visita templos dorados y disfruta de las playas tropicales.	\N	40	t	2025-10-04 14:44:53.77128	internacional	f	1400.00	f
+9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Tailandia Completa	Tailandia	7	6	Tour completo por Tailandia. Incluye Bangkok, Chiang Mai, mercados flotantes y islas paradisíacas.	\N	41	t	2025-10-04 14:44:53.897638	internacional	f	1400.00	f
+f2db34e2-0381-4efa-a25f-6af768737c7a	Cusco - Paracas - Lima	Perú	9	8	Tour extendido por Perú. Incluye Cusco, las Islas Ballestas en Paracas y la capital Lima.	\N	67	t	2025-10-04 14:44:55.475279	internacional	f	1200.00	f
+f1f209b8-cbd7-4f3c-8e3d-143ef65b292c	Santander y Aventura Extrema	Colombia	5	4	Vive la aventura en San Gil, rafting en el río Fonce, parapente, visita Barichara y el Cañón del Chicamocha en Santander.	\N	5	t	2025-10-29 23:09:03.652387	nacional	f	850.00	f
+\.
+
+
+--
+-- Data for Name: exclusions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.exclusions (id, destination_id, item, display_order) FROM stdin;
+1b8fd23b-93e3-4383-a3d0-b9b4c3dafecc	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Vuelos domésticos Estambul-Capadocia-Estambul (obligatorios, aprox 250 USD)	1
+5df1c8d7-878f-4cdf-8a01-02d05576bed9	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Excursiones opcionales	2
+0cbad041-b8dc-48c9-b4d4-5551d6996fa0	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Bebidas en las comidas	3
+d004afa2-fd69-4741-94e5-b228936a6a3e	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Gastos personales	4
+9459d6e3-0178-4484-a0ae-260d4eaccfdd	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Equipaje extra	5
+a9dfbbcf-5498-484f-80f8-036393ec6dca	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Propinas del guía y chofer US$ 50 por persona (obligatorias)	6
+be0e641e-33fc-464b-bf36-ac49903c10f1	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Vuelos internacionales.	1
+34aec80d-8691-4746-a5a7-9b6c3e6395fd	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Excursiones opcionales.	2
+6c848bc7-f889-4c84-bed7-5422a17451e5	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Bebidas en las comidas.	3
+7b2a9871-5ea5-4402-824e-fee1bd2f8b4c	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Gastos personales.	4
+34cfb1de-2440-4c8a-af72-fdab8c8c9380	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Equipaje extra.	5
+91f1f738-e03e-4c6f-bf74-9ccc0ea4d984	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Almuerzos	6
+1397ca4d-497a-4cd4-baea-758cc7326566	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Propina para el guía y conductor. (Sugerido 50 USD P.P)	7
+2cbcecbf-2d6f-493e-8dd1-bb3a20e4315a	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Seguro de viaje y salud/Tarjeta de asistencia medica	8
+116444a1-3c97-4f65-8420-44f74ab7fb0c	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Fee bancario 2.5%	9
+3a16bf4f-070b-471d-97bd-d94a5da7655c	af281d14-a347-4f9c-8f2a-21308a321254	Vuelos internacionales.	1
+89e31136-3819-483d-92ec-a2792a6ba82c	af281d14-a347-4f9c-8f2a-21308a321254	Excursiones opcionales.	2
+844cc70e-1b3b-41d6-a6eb-6000d3468261	af281d14-a347-4f9c-8f2a-21308a321254	Bebidas en las comidas.	3
+65b6f0ac-fabf-4484-8d4c-a69243fdfefd	af281d14-a347-4f9c-8f2a-21308a321254	Gastos personales.	4
+a100a0e3-c4c6-497d-bcd9-8b1d04088242	af281d14-a347-4f9c-8f2a-21308a321254	Equipaje extra.	5
+d36e94a2-8d18-433b-a057-ddbd28dc30a5	af281d14-a347-4f9c-8f2a-21308a321254	Almuerzos	6
+cb0f9102-9248-440d-b1e2-1317145ec81a	af281d14-a347-4f9c-8f2a-21308a321254	Propina para el guía y conductor. (Sugerido 50 USD P.P)	7
+82ea1e2b-2748-42f1-8e4c-16fbe1a4d2d5	af281d14-a347-4f9c-8f2a-21308a321254	Seguro de viaje y salud/Tarjeta de asistencia medica	8
+f5265923-c5d9-48b5-b90e-ed64c1871a03	af281d14-a347-4f9c-8f2a-21308a321254	Fee bancario 2.5%	9
+bd13d06b-e605-4a4f-9c73-62deb62cc96d	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Visado	1
+acc36269-0822-400f-b833-2adf47172198	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Propinas durante todo el viaje.	2
+43f2a6d2-5fb9-422d-ae7d-ea37eea50025	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Todo extra no mencionado en el itinerario.	3
+c70be5ae-f318-4079-b9a3-6f7512c497f1	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Los impuestos de hotel (TDF) 15$ por noche por cuarto se paga directo por el cliente a la llegada.	4
+0b60aa76-1fb5-4255-b75b-63782b329937	e5a2c7c1-1953-4d88-a677-7eb944fe8611	Visado	1
+ad9ff8d4-9cad-4523-8073-0c24a44999db	e5a2c7c1-1953-4d88-a677-7eb944fe8611	Propinas durante todo el viaje.	2
+76fdad30-1609-4efc-99fc-1fba08bf82bc	e5a2c7c1-1953-4d88-a677-7eb944fe8611	Todo extra no mencionado en el itinerario.	3
+44c839c7-4d0e-4b77-9dae-fb159e7b9b2a	e5a2c7c1-1953-4d88-a677-7eb944fe8611	Los impuestos de hotel (TDF) 15$ por noche por cuarto se paga directo por el cliente a la llegada	4
+ed78974b-c226-402a-ad51-12cddad03cb5	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Visado	1
+58f3414d-4e15-4aef-9250-028d0c237fbc	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Propinas durante todo el viaje.	2
+c95887b5-9e54-44e2-925e-7c6f45d23ccc	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Todo extra no mencionado en el itinerario.	3
+74e0cfaa-d6f7-42c9-abe3-5b4a04000d30	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Los impuestos de hotel (TDF) 15$ por noche por cuarto se paga directo por el cliente a la llegada	4
+92f99b66-476c-482d-a9e4-8ac9f30b8562	4d6107a7-853c-48c9-ac68-75581775e8cd	Visado 95 $ por persona.	1
+196d7a64-44a7-44a9-a4f8-85c70683523a	4d6107a7-853c-48c9-ac68-75581775e8cd	Propinas durante todo el viaje.	2
+e5e1cd9a-ead7-4409-b036-8614a717833c	4d6107a7-853c-48c9-ac68-75581775e8cd	Todo extra no mencionado en el itinerario.	3
+439b6d1d-5ac9-4c16-84e4-00ce1683e32b	4d6107a7-853c-48c9-ac68-75581775e8cd	Seguro de viaje.	4
+ab2cbc3b-607c-4710-b225-dab81f651710	4d6107a7-853c-48c9-ac68-75581775e8cd	Los impuestos de hotel (TDF) 6$ por noche por cuarto se paga directo por el cliente a la llegada	5
+aaeef57f-6ca4-4969-bc33-6e77f1259617	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Visado	1
+e4fdf50d-57e1-404c-ba1d-05885d93a5dd	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Propinas durante todo el viaje.	2
+bcdc0acd-631e-441d-800d-23f01106d87c	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Todo extra no mencionado en el itinerario.	3
+85c6ab8b-8cf6-482d-84f8-b0628ea557d9	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Los impuestos de hotel (TDF) 6$ por noche por cuarto se paga directo por el cliente a la llegada	4
+3997d502-bdcf-4679-9bfe-f88128391e01	4a457002-eba2-4864-96a1-0a7039b379d5	Visado 30 USD por persona. (Pago obligatorio en destino).	1
+5f98b6c6-1895-407a-a19a-4824fd57910c	4a457002-eba2-4864-96a1-0a7039b379d5	Propinas durante todo el viaje.	2
+3edcd663-debe-4d33-90bb-b342bb46ff6a	4a457002-eba2-4864-96a1-0a7039b379d5	Todo extra no mencionado en el itinerario.	3
+556d894f-2005-4012-b13f-3c9c23478ed7	4a457002-eba2-4864-96a1-0a7039b379d5	Vuelos demóticos.	4
+a8778c2b-b72d-46f3-8e31-ac74e6032f7a	4a457002-eba2-4864-96a1-0a7039b379d5	Cuota de servicio según de la temperada.	5
+75cd886c-ffef-405d-9296-915098f1a7bb	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Visado 30 USD por persona. (Pago obligatorio en destino).	1
+0a84326c-d653-4a87-8af4-649d049ae56a	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Propinas durante todo el viaje.	2
+dd8ed5a2-12f6-4d24-8df1-6babe6636656	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Todo extra no mencionado en el itinerario.	3
+953a61d8-36a5-48af-9b4c-668046e6f929	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Vuelos demóticos.	4
+a9a7b197-b2fe-4eee-b8bf-42c806dc9985	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Cuota de servicio según de la temperada.	5
+e4df8fcc-2f96-428d-97f8-0bacc6ff225c	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Visado 30 USD por persona. (Pago obligatorio en destino).	1
+3c81a9af-aa3d-43f8-8207-d7afa4f459cb	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Propinas durante todo el viaje.	2
+b0fffc78-580d-44dd-b07d-f40b0032fc41	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Todo extra no mencionado en el itinerario.	3
+7d9755bc-d8d9-4732-818b-1044496fd7d4	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Cuota de servicio según de la temperada.	4
+08f19b6b-0074-4c98-996a-94aac8a7e6bf	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Visitas Opcionales	5
+a87ea1b2-0f4e-4e34-b20a-437ade595a2b	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Visado 30 USD por persona. (Pago obligatorio en destino).	1
+991cbd3b-d5b1-42ea-8ec0-f4f9576c9f8a	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Propinas durante todo el viaje.	2
+7d0ebac0-2a53-4e9a-8338-3cd7ff6b1642	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Todo extra no mencionado en el itinerario.	3
+50ea339e-26ef-4439-b23b-269a253e6e9b	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Vuelos demóticos.	4
+97bb8b82-1d73-42f6-b8bc-689ea81a6df1	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Cuota de servicio según de la temperada.	5
+93da47e3-c0ff-40a5-8169-7a5ebb43b68e	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Ciudad	6
+f92dfb29-cedc-4aab-81dc-70781a0cc47c	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Hotel Zona Piramides	7
+ecc74fca-2344-4b3e-83ee-7fdaf5d82da6	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Hoteles en el Cairo 5*	8
+8c7712ce-ca7d-4c60-953d-a5a8eabc47dd	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Hotel Pyramids Parke & Resort o Oases	9
+22f981c1-461d-4c05-a7af-cc492fc8431d	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Hoteles El Cairo 5*	10
+7385bc8c-6cae-47a4-a5a3-e862c5cd3fad	c8cb4562-e3f4-434d-b638-39494cfe9f3b	de Lujo	11
+06753cfe-c408-4cb0-8ab7-32d5aa6e9476	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Hotel Grand Nile Tower o Safair El Dokki o Sheraton Heliopolis o Tulipe Golden Plaza	12
+8479445e-0759-4929-b965-bb6ee2683b95	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Crucero 5*	13
+1df6b7ef-19da-4534-851b-0467308662f3	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Princesa Sara por el Nilo o Concierto 2 , Radamis o similar	14
+296c7ba6-c4d9-4fb6-a469-c727d2c34566	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Realizaremos una visita a la necrópolis de Sakkara y la ciudad de Menfis, capital del imperio antiguo.	1
+9d24f8b5-459c-47f1-a032-317edaba6299	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Opcional:- Por la noche podemos ir a disfrutar de un Espectáculo de Luz y Sonido de las Pirámides. Regreso al hotel en El Cairo.	2
+7270a09d-0697-4dc4-9074-d9b26667ebb7	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Día 3 – EL CAIRO (Desayuno y almuerzo).	3
+d5ad074e-58f0-476b-9722-81007a3cd5a5	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Desayuno en el hotel. Tendremos una visita de día completo a la ciudad de El Cairo: El Museo de Arte Faraónico, la Ciudadela de Saladino con su Mezquita de Alabastro, el Mercado de Khan el Khalili y el Barrio Copto.	4
+dcece601-6f0e-4bd5-acf1-927bb0a61a65	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Regreso al hotel en El Cairo.	5
+15afa88d-e93e-484f-b8e2-c3e7a01c9185	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Día 4 – EL CAIRO -SANTA CATALINA (Desayuno y cena).	6
+a1df6ae0-071b-479e-9c7d-c37d9bb03143	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Desayuno. Salida hacia la península del Sinaí vía el túnel de Ahmed Hamdy por debajo del canal de Suez, pasando de África a Asia. Visitaremos Ayun Musa o las fuentes de Moisés (Mara) para luego seguir hacia la ciudad de Santa Catalina.	7
+85640eeb-e73a-42c6-901d-745558235b17	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Llegada al hotel. Cena y alojamiento en Santa Catalina.	8
+355f78df-ec0a-46ed-814e-ea040aa2081f	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Día 5 – SINAI (Desayuno y almuerzo).	9
+5012d055-e948-4b6e-97f3-cab88267f716	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Por la mañana temprano, subir el Monte Sinaí, donde podemos ver a la hora de la madrugada un hermoso espectáculo. Descenso de la Montaña. Regreso al hotel, tomar el desayuno y descanso. Visita al monasterio de Santa Catalina. Traslado a la frontera de Taba con Israel y fin de nuestro servicio.	10
+be6cf09c-c78e-42a5-afa2-83ba15b95bff	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Chocolates de Bienvenida.	11
+8b10274e-d3a7-4c16-ac88-d3f1c36b19e4	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Alojamiento en hotel en El Cairo por 3 noches con desayuno.	12
+32b597be-e41e-4e6d-b0ef-e327819ecf46	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Alojamiento en hotel en Sinaí por 1 noche con desayuno.	13
+cea11c73-a784-4dee-a37d-349ca3cd64bd	e95e6dde-a4ad-462a-afa5-0e7d667a920d	02 almuerzos en un restaurante local en El Cairo.	14
+20037a83-a1ce-4d33-9d44-50ab530a4595	e95e6dde-a4ad-462a-afa5-0e7d667a920d	01 almuerzos en un restaurante local en el Sinaí.	15
+50be5f57-87f5-4064-8368-380e357ddd7e	e95e6dde-a4ad-462a-afa5-0e7d667a920d	02 botellas de agua por persona durante los tours.	16
+fb82e7e4-9a38-46e4-9db1-c5d62ac35cac	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Todos los traslados en autobús privado A\\C.	17
+b2d5ca14-c35f-4018-acce-2524c6e410bc	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Guía oficial egipcio que habla hispana.	18
+391064cf-a71a-4dbb-9834-202654b76abf	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Impuestos y servicios.	19
+c99b528c-61e3-47d6-b8bd-78b2d24b83f1	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Transporte de El Cairo a Taba en autobús privado (8 horas).	20
+93bbd623-5da5-42ef-8ff8-e123bb757b88	e95e6dde-a4ad-462a-afa5-0e7d667a920d	WIFI gratuito durante los tours.	21
+628fb325-3da8-4a0a-b9f0-0188ee54f8ab	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Gastos personales.	22
+0df59821-6229-47de-a6ec-74719e37a304	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Visitas opcionales.	23
+e6131cc2-2e99-446a-b4c4-7b91e4625df5	e95e6dde-a4ad-462a-afa5-0e7d667a920d	25$ Visa de entrada a Egipto.	24
+236d4a00-530f-438d-b922-5b059a53182a	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Propinas.	25
+079a7cdf-26e4-4015-b918-66a50b7cc85f	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Cuota de servicio según de la temperada	26
+220aadba-79d5-4ebb-b8e2-6b24c2dea486	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Ciudad	27
+5e26633d-4109-43b1-a595-7db02308cc66	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Hotel Zona Piramides	28
+c6ad5475-1eb6-44c6-b594-d79054e150c5	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Hoteles El Cairo 5*	29
+79f5caed-9030-43b6-9416-de426714dc6c	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Hotel Pyramids Parke & Resort o Oases	30
+4ecf3363-e8c9-4ff9-8f7a-0e6cef5be584	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Hoteles 5* de Lujo	31
+47071512-ba42-422f-bdc1-48113e6efeff	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Hotel Grand Nile Tower o Safair El Dokki o Sheraton Heliopolis o Tulipe Golden Plaza	32
+8f6054d3-292d-4c0a-a823-58302a4eccbc	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Santa Catalina	33
+9dbc8475-d00b-42f5-ac6e-4847dc241a24	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Morgan Land	34
+05f88fce-778a-44a3-96f9-775d09e7139e	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Excursiones opcionales	0
+40639b0d-729a-4a9e-9026-54ce0bde7ffc	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Bebidas en las comidas	0
+e91081de-2829-4bb7-9f23-d59ea273fc37	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Gastos personales	0
+3b525d74-2a57-4916-877f-dd161e59da37	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Equipaje extra	0
+3acabe66-861a-4b42-9098-7d1ffe426005	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Propinas del guía y chofer US$ 50 por persona (Obligatorias)	0
+2cbf4f14-b10c-4f8a-ac4c-329126845cf0	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Dia 2- BANGKOK (Desayuno).	1
+16124e70-104d-4132-b4ce-87f342448265	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Después del desayuno, Visita a tres de los templos budistas más populares de la ciudad. Empezaremos por el Wat Traimit, situado en el extremo de Chinatown, en Yaowarat Road, cerca de la estación de tren Hualampong. Wat Traimit alberga el Buda de oro macizo más grande del mundo, midiendo casi cinco metros de altura con un peso de cinco toneladas y media. La excursión continuará hacia Wat Pho, el templo más grande de Bangkok. El templo del enorme Buda reclinado y los Chedis de los Reyes. Este se encuentra detrás del Templo del Buda. Es uno de los mayores templos de la ciudad y famoso por su gigantesco Buda reclinado que mide 46 metros de largo y está cubierto de oro. A continuación, visitarán el Palacio Real, que es sin duda, el monumento más famoso de la ciudad. Construido en 1782, por 150 años fue la casa del rey de Tailandia, la corte real y la sede administrativa del gobierno. El Gran Palacio de Bangkok es un edificio antiguo que continua impresionando a sus visitantes por su hermosa arquitectura y detalles. Dentro del complejo, se encuentra Wat Phra Kaew o el Templo del Buda Esmeralda (oficialmente conocido como Wat Phra Sri Rattana Satsadaram), considerado como el templo budista más importante de Tailandia, consagra el Buda más reverenciado tallado en un solo bloque de jade.	2
+39f7d0cb-853b-40cf-9e6e-0b35c18fa559	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Traslados incluidos.	3
+a1c2cd88-ad86-4d9e-a888-eee57e6c8c02	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Alojamiento en hotel	4
+66f1d1c0-4ea0-4b92-99a3-1ab784dc96ed	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Día 3 – BANGKOK – CHIANG RAI (Desayuno, Almuerzo y cena).	5
+dc3e1b04-3e58-461b-b8e7-6d36ccbbda02	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Después del desayuno traslado al aeropuerto para tomar el vuelo hacia Chiang Rai	6
+dca9a26d-147a-4e32-bf33-0b5c1f81f261	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Llegada a Chiang Rai con el vuelo no más tarde que las 10.00 AM.	7
+9a7a459b-95f6-4259-994c-04fb44098591	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Proceder a Chui Fong, una hermosa cultivadora de té. En un ambiente rodeado de plantaciones en las laderas de pequeñas colinas, podrán disfrutar de varias delicias como helado de té, torta de té (a gasto propio) y un almuerzo en el restaurante local cercano. Próximamente, pasaremos por un museo de opio antes de salir hacia el distrito de Mae Chan al norte de Chiang Rai. Luego continuaremos a pie, subiendo por las colinas a través de calles angostas para visitar una aldea de las minorías étnicas Akha y Yao. Nuestro último destino del día será una de las aldeas Karen, donde conoceremos a esta famosa tribu montañera – el grupo étnico minoritario más grande de Tailandia. Esta tribu originaria de Tíbet emigró a lo que hoy se conoce como Myanmar hace unos dos mil años. Durante el siglo XVIII, se estima que el conflicto político y la persecución fomentaron su migración masiva hacia el norte de Tailandia, donde todavía al día de hoy se encuentran sin un estado residencial oficial. La tribu es más reconocida por las mujeres Kayan – un subgrupo de los Po (Karen rojo) – cuyos cuellos están adornados en anillos de latón. A veces hasta empezando desde los cinco años, la presión constante empuja sus clavículas y costillas hacia abajo, dando la impresión de un cuello extendido; la razón detrás de su apodo ‘mujeres jirafa’ – una vista asombrosa. Al concluir, traslado de regreso al hotel.	8
+7f14d64c-ee16-413e-b6bc-72e36cab67f0	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Cena y alojamiento en hotel.	9
+6bcc1248-11ba-43f8-b306-e2b80b6d14c4	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Día 4 – CHIANG RAI – CHIANG MAI. (Desayuno, Almuerzo y cena).	10
+9985d04a-9750-42f9-8e48-f7356cac9b0a	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Desayuno en el hotel.	11
+22b7919c-04f8-4497-8ea6-1b92c098294b	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	En la mañana nos trasladaremos al muelle y tomarnos un placentero paseo en bote tradicional por el río Kok visitando las tribus Karen que viven en cabañas de bambú en plena selva. Continuaremos con la visita al Templo Wat Rong Suea Tean, también conocido como el Templo Azul, otro templo budista moderno inusual que se distingue por su intenso color azul y sus estatuas elaboradas.	12
+0ef284cc-c540-426a-9370-7eb8b4724d1b	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Estos precios son válidos solo para las agencias de viajes, en destino los precios pueden cambiar depende de la situación y disponibilidad.	2
+4a9fc549-2741-4eca-b03d-a524a32f3b64	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Los guías pueden cambiar el día de las excursiones dependiendo de situaciones no previstas.	3
+d5ceec7f-aa21-4f71-bfba-3ada9a08725e	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Política de tarifas de niños de 0 a 2 años es free en servicios terrestres y el 20% del valor del tiquete aéreo tomando como referencia el precio del adulto. La tarjeta de asistencia se debe emitir sin excepción.	4
+54fd3251-fb5a-4eb9-a056-2219ac308771	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Política de tarifas de niños de Niños de 3 a 5 años, 11 meses y 29 días: 50% de descuento de la tarifa del adulto en servicios terrestres. El tiquete aéreo se paga normal como un adulto. La tarjeta de asistencia se debe emitir sin excepción.	5
+e1334c12-8e9a-4eff-b7b8-e5bd2581db8f	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Los niños se deben acomodar con los padres, máximo 2 niños menores de 12 años con dos adultos. La acomodación para 4 personas son dos camas dobles.	6
+54f2494c-d2ab-4f10-b2e9-5f852f0ce4e4	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Los niños mayores a 6 años pagan con tarifa de adulto.	7
+4fb2b83a-354f-434a-9003-6e76b4e92435	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Para ocupaciones triples o cuádruples la acomodación será de dos camas dobles, en algunos hoteles de acuerdo con la disponibilidad se podría solicitar un catre, sujeto al espacio de la habitación.	8
+e05cb8b1-8993-422f-994e-e2479fcacb91	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	El horario de registro en los hoteles es a partir de las 14:00 horas. La hora de check-out es a las 12:00 horas.	9
+e0613655-7529-42ca-bcec-dbddc0f082ac	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Los precios de las excursiones opcionales se mantienen solo si se hace efectivo el pago de estas antes de cualquier modificación realizada por Dorak Latín ya que estas tarifas tendrán un incremento el cual se informará de acuerdo a las políticas y ajustes de precios de Gobierno.	10
+536c4fa6-5541-4e21-8011-596caea48374	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Seguidamente visitaremos el famoso templo blanco de Wat Rong Khun. Después de la visita nos dirigiremos desde Chiang Rai a Chiang Mai por carretera (3 Hrs). Llegada a Chiang Mai y almuerzo en restaurante local.	13
+ba51b273-d100-4072-b312-9e2728b39f9a	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Visita al complejo de templos Wat Doi Suthep, el más conocido de Chiang Mai, situado en la cima de una pequeña colina a 15 Kms al noroeste de la ciudad.	14
+8c2b188c-3629-4eb7-80f3-2b80d6aaa7d5	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Cean y alojamiento en hotel	15
+931634f6-6e99-4849-b5f9-3b251d6852bc	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Día 5 – CHIANG MAI (Desayuno, Almuerzo y cena).	16
+a18579f2-9964-418c-ac98-f64393295f11	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Desayuno en el hotel.	17
+ae93fee8-5cd9-410c-b892-d482d7c57800	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Por la mañana visitaremos algunas fábricas de artesanías locales .También se visita una fábrica de esculturas de madera donde es posible comprar antigüedades birmanas. Salida hacia el valle de Mae Sa visitando la granja de las orquídeas.	18
+529cd1fe-bb58-4413-9e30-8ebb5e6dbeb2	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Almuerzo en restaurante local. Después nos trasladaremos al santuario de elefantes para aprender sobre estos animales, y realizar diversas actividades incluso darles comida y tomar un baño, una experiencia inolvidable.	19
+1dcd1855-fb00-492a-98a0-f141ee48576f	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Cena Kantoke. Regreso al hotel.	20
+165b50b4-d4c4-47ae-a6df-c8b4972f8524	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Alojamiento en el hotel.	21
+e60bf861-d56b-4739-b32a-2792eb700029	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Día 6 – CHIANG MAI (Desayuno).	22
+ad56cd35-904b-4845-8858-7285d35445cc	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Desayuno en el hotel.	23
+cc7bcb3d-6c15-4886-b533-d68869739db8	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Traslado al aeropuerto de Chiang Mai para conectar con el vuelo a su próximo destino.	24
+32ddbe0d-604b-4538-a626-00115245b521	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	HOTELES	25
+e792dc9c-9a6a-4507-a322-c590c2495de4	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	La solicitud de cambio de la habitación está sujeta a disponibilidad y puede acarrear costes extras.	26
+13a25773-56eb-400b-bd85-e125f9f40bce	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Ciudad	27
+1068b2cf-0e85-46d5-8744-8f75f35f668a	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Standard	28
+f689e5d3-e7df-4f4e-a15a-a3769999f90a	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Superior	29
+957ee45b-4a49-4bfe-920a-46a7055af4b7	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Deluxe	30
+38f9edac-7e6a-4169-9ab7-84fa93476d47	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Gold Deluxe	31
+e370c020-77f4-49eb-98db-6f47e18fc216	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Bangkok	32
+7e7fcfb7-b20e-4ea8-8cbf-f7fab8218c76	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	MANDARIN HOTEL BY CENTRE POINT	33
+5b8a8d18-4891-4171-b6fc-2ce771454ed9	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Deluxe o similar	34
+58af8d82-1dcd-4a0a-a0dc-a37326b5b0f0	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	BEST WESTERN CLICK SATHORN 11	35
+fff82a5c-af9d-44b6-b652-ebdae4728433	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Superior o similar	36
+cd663f54-de3c-4916-8d3c-ade790b6eb63	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	HILTON GARDEN INN BANGKOK SILOM	37
+918b2abd-c8b2-438b-900e-080cd3b62537	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	o similarHab. Guest room	38
+e414a47c-1112-487f-8d69-ea63c2a287f1	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	JC KEVIN SATHORN BANGKOK HOTEL	39
+4bafb597-08b2-4179-8fc8-0cf2d1ab09f0	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	o similar	40
+38d8b53f-7786-4023-9296-b055bcff6577	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. One Bedroom Suite	41
+85acb7eb-1a3f-41bb-8291-4ed908a915a0	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	MONTIEN SURAWONG o similar	42
+6f9e5261-ee63-48fc-a164-4d0711e80c95	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Deluxe	43
+a870a337-3a12-40d2-90c7-e81305d58234	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	PULLMAN BANGKOK HOTEL G	44
+2e5f6cf3-7574-4751-b79f-a5b7f806a8ab	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Premium Deluxe room o similar	45
+c3bc492f-d588-401f-8fdf-c43a03ff39de	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	SO BANGKOK o similar	46
+38a535f8-4263-45be-9c69-bf64a639394b	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. So Cozy	47
+9a67cf86-4e17-41b8-a89b-72af8fada7aa	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Chiang Rai	48
+600d5ba0-46f3-41df-9fca-7be5ecafd5dc	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	LALUNA HOTEL & RESORT	49
+a4b800ac-8687-48c6-8f58-9586499115e0	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Garden Bungalow	50
+d4c27868-f71b-4cea-90d7-72cc933fbf91	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	PHOWADOL o similar	51
+dd3b20c6-f143-4f2d-8a48-9601f75bf55d	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Standard	52
+901117bb-6d28-482c-8c94-9c24c566aa44	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	WIANG INN HOTEL	53
+097fd72d-027c-482c-9ffe-676e1e124807	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	o similar	54
+b3490f6f-652d-491e-8ed1-e978d1e9200d	de9eb689-7a5f-4095-a254-57e4d4276338	Boletos aéreos LIMA – CUSCO – LIMA	1
+0d009311-166f-4085-a83c-c41744b96088	de9eb689-7a5f-4095-a254-57e4d4276338	4 Almuerzos	2
+68ff1935-e465-4079-8542-58025465c7bf	de9eb689-7a5f-4095-a254-57e4d4276338	Cenas	3
+e62759d2-a086-4cc3-87d8-97e2a2f83954	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Vuelos Lima - Cusco - Lima	1
+ecc91099-2e71-4df0-89f6-6fd5c3757782	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Almuerzos y cenas	2
+6ba7d4d4-4b2d-46d5-ab1c-f4303b0a7ad8	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Gastos personales	3
+90a74e87-e201-4c73-9abd-fbdd6dbf31dd	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Propinas	4
+86f2ce1e-9d39-459f-bb95-fbfc68b0f4fd	6997b7ff-f839-45be-b81e-0282087fe1dd	Boletos aéreos LIMA – CUSCO – LIMA	1
+40b10d02-45ff-436e-8443-3ff52c556885	6997b7ff-f839-45be-b81e-0282087fe1dd	5 Almuerzos	2
+0706be8e-8ecc-419a-9cf6-8e985ad7ad8a	6997b7ff-f839-45be-b81e-0282087fe1dd	Cenas	3
+718b237f-b015-4ee2-b8e2-ea53c79e06b7	6997b7ff-f839-45be-b81e-0282087fe1dd	Cenas	4
+12962418-5447-4073-a596-538f6f972671	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Boletos aéreos LIMA – CUSCO – LIMA	1
+7eeef681-0960-42ca-acb1-d0c839003bb0	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	6 Almuerzos	2
+ac2113af-d335-4def-881e-a94695110ade	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Cenas	3
+dcd35a07-59b9-4056-ba3a-965b0b667aaf	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Cenas	4
+f31fb529-ed5b-4117-8e07-8cb0777017c8	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Boletos aéreos LIMA – CUSCO – LIMA	1
+6078703c-9a75-4568-8032-ed58328daa0a	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	5 Almuerzos	2
+33027aec-de5d-4be9-86ff-5b396c6be0f0	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Cenas	3
+5d88300c-467e-431a-a594-c515fbe250b9	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Cenas	4
+851a080d-726b-4b64-9698-cdd4cc03dc30	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Boletos aéreos LIMA – CUSCO – LIMA	1
+f07f33fe-1b62-4470-855d-7d46fc79464e	b3d7b805-e20b-4fec-97b4-ae33ce95a273	4 Almuerzos	2
+3ea77ff4-5f2a-4f28-a545-d2c3eb28344d	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Cenas	3
+868ed129-4995-429b-af42-a19ba1c0d31d	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Cenas	4
+e0270f44-c092-4018-9adf-bb80ebb6cb6b	f1388f85-c87c-4875-8ad2-7523977b1196	Boletos aéreos LIMA – CUSCO – LIMA	1
+4a3ad73c-f7ce-49a2-8405-e36ce52b7889	f1388f85-c87c-4875-8ad2-7523977b1196	5 Almuerzos	2
+457b918e-4a27-4b48-bdaf-4a134371c9b9	f1388f85-c87c-4875-8ad2-7523977b1196	Cenas	3
+3fd703c0-071a-4b2b-8796-79d897da27af	f1388f85-c87c-4875-8ad2-7523977b1196	Cenas	4
+e9df053e-9cd0-4135-a39e-34d1948190f8	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Boletos aéreos LIMA – CUSCO – LIMA	1
+8d4aa622-b4d2-4f83-98a2-965b021b5323	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Almuerzos	2
+fe46f3b1-0b1a-455b-8088-be3193f46660	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Cenas	3
+fc66ad86-a205-4c26-9ae0-1c2a71e62c1b	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Cenas	4
+387c1448-a040-4b6a-84b8-b9fbf8ad3931	68e078c2-74fb-4390-a039-b17d6d7c7a54	Boletos aéreos LIMA – CUSCO – LIMA	1
+c91b4429-dced-4364-9654-0a9f39eddc00	68e078c2-74fb-4390-a039-b17d6d7c7a54	Almuerzos	2
+7c5f9fe2-66bf-4603-b723-b86a16ccb62c	68e078c2-74fb-4390-a039-b17d6d7c7a54	Cenas	3
+16e5119a-07a3-4051-be87-dc0dcc4339b2	68e078c2-74fb-4390-a039-b17d6d7c7a54	Cenas	4
+4c3fc1a7-6b44-4404-9d48-40c8a5fa8873	f2db34e2-0381-4efa-a25f-6af768737c7a	Boletos aéreos LIMA – CUSCO – LIMA	1
+4aae065d-0aa1-43f2-964a-170d8f302bd7	f2db34e2-0381-4efa-a25f-6af768737c7a	6 Almuerzos	2
+bf07e718-a014-40b5-bc36-e8eb5d64b42b	f2db34e2-0381-4efa-a25f-6af768737c7a	Cenas	3
+f2c2d4da-175f-4198-b6d8-0f7b1418fdb9	f2db34e2-0381-4efa-a25f-6af768737c7a	Cenas	4
+871d41d2-51ba-4fcf-84b9-1b681c6aaebe	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Superior	55
+1d575c0b-fb43-4401-8ea2-9d14bd4b49c0	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	LEGEND	56
+f9296fad-4c9f-4b2a-9a13-a78578ce97b4	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	o similar	57
+133c3912-df7d-4084-ad19-7b9ea97d4eff	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Superior	58
+559a0b0a-0923-433d-9385-1c1101d926e1	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	THE RIVERIE by Katathani	59
+22410b68-fe46-422d-ad6a-0cfb977a7ba8	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	o similar	60
+0c57909e-9533-4855-85e6-79d6dd90df70	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Deluxe Garden	61
+cec7a0b6-915a-433e-97d1-bc000259abb6	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	LE MERIDIEN	62
+ee5fbb65-a32a-4d1b-9cc9-61d9a998af3b	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	o similar	63
+bbab6c01-5de2-4cf5-b4fc-df686d60f06d	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Deluxe Garden	64
+890524ac-f099-4ae2-a28b-44e971fcd094	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Chiang Mai	65
+b0de0415-d73b-4592-b6ff-779602d29872	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	IBIS CHIANG NIMMAN JOURNEYHUB	66
+793b5f29-78ea-4865-b2ea-c67b81756c6e	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	o similarHab. Standard	67
+fbabf153-5883-49f1-a670-79afac95a9e1	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	NOVOTEL NIMMAN	68
+2446317b-b12d-4b9d-8ba5-e38a4e26cd87	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Superior Balcony	69
+dbc23bc6-6502-41a2-b26c-25e149b6a70d	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	TRAVELODGE NIMMAN o similar	70
+a4f1b484-42be-48e7-b33c-e900af461271	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Superior	71
+9720c1ea-e3a2-4a7f-9e97-598d979d3a07	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	MELIA CHIANG MAI	72
+b2a41ddc-4c1b-4fa1-b726-8479575b2b7c	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Melia room o similar	73
+3ba6d2a0-2983-4f97-9e13-a7d80fdb795e	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	SHANGRI-LA CHIANG MAI  o similar	74
+7f1cc339-f12a-4c8a-a03a-c61d1ffc3ce1	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Hab. Deluxe	75
+5cbcaba1-7629-4531-9d1f-d46b752b803c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Dia 2- BANGKOK (Desayuno).	1
+3ac4098b-157f-4503-88ca-6c5be9480072	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Después del desayuno, Visita a dos de los templos budistas más inusuales de la ciudad. Empezaremos por Wat Traimit, situado en el extremo de Chinatown en la calle Yaowarat, cerca de la estación de tren Hualampong. Wat Traimit alberga el Buda de oro macizo más grande del mundo, midiendo casi cinco metros de altura con un peso de cinco toneladas y media. La excursión continuará hacia Wat Pho, el templo más grande de Bangkok, donde se encuentra el enorme Buda reclinado y los Chedis de los Reyes. Es uno de los mayores templos de la ciudad, famoso por su gigantesco Buda reclinado que mide 46 metros de largo y está cubierto de oro.	2
+39758cdd-9d23-4ab9-8355-17355af6fdbe	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Traslados incluidos.	3
+ef9ed93c-9f3e-46e4-b3c9-2fcd548531d0	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Alojamiento en el hotel.	4
+12c00f6b-c78c-4dcf-84e4-9fa2622952bb	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	OPCIONAL: Grand Palace	5
+6e164d62-bc80-429d-937e-f06a194c1608	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	El Gran Palacio es uno de los monumentos más famoso de la ciudad. Construido en 1782, sirvió por 150 años como la casa del rey de Tailandia, la corte real y la sede administrativa del gobierno. El Gran Palacio de Bangkok es un edificio antiguo que continúa impresionando a sus visitantes con su hermosa arquitectura y detalles intricados. Dentro del complejo, se encuentra Wat Phra Kaew – ‘el Templo del Buda Esmeralda’ (oficialmente Wat Phra Sri Rattana Satsadaram) – considerado el templo budista más importante de Tailandia. Es aquí que se consagra la imagen de buda más reverenciada del país, meticulosamente tallada en un solo bloque de jade.	6
+4e0eb2cc-11b5-4f0b-9665-abf5cad3404b	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Neto por persona, USD	7
+9ae1c08a-1afc-446e-8d84-d6a69153412d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	USD 25	8
+4c011d2a-a3f4-4614-8739-d0f3d357f7cc	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Día 3 – BANGKOK – AYUTTHAYA – ANG THONG – SUKHOTHAI (Desayuno y Almuerzo).	9
+8abc1e44-53e7-46b2-8625-69f7698bc10d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Después del desayuno, salida desde Bangkok hacia el norte.	10
+5704a706-80b5-492c-b3b3-886327846667	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Haremos la primera parada en la ciudad de Ayutthaya – la antigua capital del reino de Siam y centro arqueológico del país – donde visitaremos sus templos y restos de sus fortificaciones más icónicas. Declarada como patrimonio de la humanidad por la UNESCO en 1991, Ayutthaya permanece un lugar mágico e imperdible para los amantes de la historia y civilizaciones antiguas.	11
+a8ee7899-e8b7-4d15-a54b-d2bfad97f504	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Próximamente, nos dirigiremos hacia la ciudad de Ang Thong donde podremos visitar el templo Wat Muang, famoso debido a que alberga la estatua de buda sentado más grande de Tailandia (novena mayor del mundo) con casi 100 metros de altura.	12
+14a83cd8-fa1f-425c-9c3f-136658b32b5d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Continuación hacia Sukhothai – Almuerzo, paisajes naturales	13
+c4f5a60b-22b9-448c-978e-cf349414717c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Durante el trayecto seremos testigos del cambio en el paisaje, que va enverdeciendo y poniendose cada vez más frondoso; adelantando ya los paisajes selváticos que cubren la mayoría del norte del país.	14
+f7f9b889-0092-46fd-9728-9ad7e9e0de92	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Llegaremos al alojamiento en Sukhothai por la tarde.	15
+669f8c8a-8aab-402a-b019-12ff0b3b86a3	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Día 4 – SUKHOTHAI – CHIANG RAI (Desayuno y Almuerzo).	16
+9e1b751c-cfe2-473f-8e11-92886e4142f9	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Desayuno en el hotel.	17
+5675b04a-5891-49e7-8be0-fe2d7dddfe0d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	El punto más destacado del día de hoy es el Parque Arqueológico de Sukhothai, declarado como un Patrimonio de la Humanidad por UNESCO debido a su increíble belleza y exposición de varios siglos de prosperidad de la civilización tailandesa (demostrado a través de los gran monumentos y templos sofisticados erigidos en la zona).	18
+0489549b-662b-490a-ae9d-9f9309bbf6aa	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Una vez finalizada visita, nos dirigiremos a Chiang Rai vía Lampang mientras disfrutamos de las maravillosas vistas y el famoso lago Payao.	19
+3f389532-a5b2-4d93-b1f2-15fe651116aa	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Almuerzo por el camino.	20
+e71806da-0f44-4012-8a57-ffdd2d535303	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Llegada al alojamiento en Chiang Rai por la tarde.	21
+f220f4a6-482e-4bd2-9643-90b7e5f3d341	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Día 5 – CHIANG RAI – CHIANG MAI (Desayuno y Almuerzo).	22
+d48df1bd-1ba8-44f0-90c7-020d197499a8	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Desayuno en el hotel.	23
+f04903bd-28e0-400a-a628-79d1bd773e4f	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Visita al “Triángulo de Oro” del río Mekong, que abarca zonas de Tailandia, Laos y Birmania antiguamente dedicadas al tráfico del opio. Una vez allí, aprovecharemos para realizar una visita al museo Casa del Opio ubicado en la población de Chiang Rai. Luego nos dirigiremos al novedoso y llamativo Wat Rong Suea Ten (Templo azul), donde se pueden encontrar pinturas con un estilo similar al Templo Blanco, ya que fue allí donde se formó su arquitecto durante años. Parada en el espectacular y contemporáneo Wat Rong Khun, cuyo color blanco significa la pureza y el cristal representa la sabiduría de Buda como la "luz que brilla en el mundo y el universo".	24
+f15c2937-06c9-49eb-bd2e-4fa76112acf0	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Retomando el viaje hacia Chiang Mai, almorzaremos por el camino.	25
+900fd952-6d00-48f7-9b2e-11c96548f49c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Llegada a Chiang Mai por la tarde; alojamiento.	26
+254082e0-a4be-459c-bd15-8b96be126ea0	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Día 6 – CHIANG MAI (Desayuno y Almuerzo).	27
+ce0f9ff0-7196-4bbc-b721-992600a88764	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Desayuno en el hotel.	28
+f2bb47a9-0a74-40db-bbb2-ee06a31b483c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Por la mañana partimos hacia el conocido Wat Phra That Doi Suthep; un templo magnífico ubicado a 1000 metros de elevación en las laderas de la montaña Doi Suthep. Requiriendo una subida de 306 escalones con barandillas de serpientes Naga, este templo sagrado ofrece una vista panorámica espectacular de la ciudad, así como una gran variedad de imágenes y frescos a aquellos que estén dispuestos a emprender la escalada.	29
+2d475522-ded2-44b8-9bf9-0c21ee0f61e8	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Almuerzo en restaurante local.	30
+b1114d52-da83-4971-8484-2ff679c6d563	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Por la tarde, nos dirigiremos al Santuario de Elefantes para aprender sobre estos animales y realizar diversas actividades incluyendo dándoles de comer y bañándolos – una experiencia inolvidable.	31
+543a730d-c403-4f9a-aef7-bcab78aaba00	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Traslado de regreso al hotel, resto de la tarde libre a su disposición.	32
+5000e540-4d9e-41f6-b965-b76a80e5c0dc	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Día 7 – CHIANG MAI – SALIDA (Desayuno).	33
+6b990635-c901-47d3-9a2c-62012ef1b2c2	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Desayuno en el hotel.	34
+c2710dc0-a4e4-4dc7-9755-7d6aace685ec	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	A la hora indicada, traslado al aeropuerto para tomar su vuelo hacia su siguiente destino.	35
+fb83dcd9-e992-4068-8864-d98d9b76bfa6	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Ciudad	36
+a627905f-d15a-4dda-b4d6-5a43b4c0a172	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Standard	37
+3892be12-1dbd-4e14-a240-7fea6f3922f8	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Superior	38
+29cdad1e-3fd2-4d5c-a62f-5d5d57fb7e97	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Deluxe	39
+cadb60f3-e3c1-4364-bb47-0a1df15d8ab1	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Gold Deluxe	40
+6285c438-8571-4ee0-8769-a81930b32495	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Bangkok	41
+cc67601a-bbf7-4f5d-8bef-f1382728e4ae	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	MANDARIN HOTEL BY CENTRE POINT	42
+b88319a4-7d86-4345-bd26-1ab02c3d4ce5	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe o similar	43
+ac58c28b-750a-4952-b84d-a8dafc87ce35	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	BEST WESTERN CLICK SATHORN 11	44
+cf485cea-7a00-4d6f-807e-fa6826be1583	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior o similar	45
+db36f7e9-b350-4338-bbba-e4ea2412f9fe	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	HILTON GARDEN INN BANGKOK SILOM	46
+70ec2a85-8ba7-42c9-a000-adf2fbd9b787	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similarHab. Guest room	47
+235d7e1b-2851-43f6-b49b-2fd09386eb33	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	JC KEVIN SATHORN BANGKOK HOTEL	48
+3e87b88c-692d-42b2-b8ca-44f0a31dfea9	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similar	49
+fa87ba95-b9da-429c-8a73-354bb3fe3dbe	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. One Bedroom Suite	50
+e2b022eb-9a35-4935-9ee6-d1cd4b71a5b9	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	MONTIEN SURAWONG o similar	51
+76480c7d-bc67-42eb-b19e-9ba7f674c39f	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe	52
+1d71b518-7f31-4761-9e02-2511f85159fa	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	PULLMAN BANGKOK HOTEL G	53
+ab99377a-90e2-4f35-94bc-949be47281a7	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Premium Deluxe room o similar	54
+49558641-25db-4e39-adc3-6dbbbbecc637	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SO BANGKOK o similar	55
+cbaa2e62-b336-4684-a2bb-f0e84a87c895	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. So Cozy	56
+16ef77d6-f802-4bb6-b8f7-e0b7b69937ed	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Sukhothai	57
+80081950-bbbc-41e9-b397-6c09ec645e4f	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SUKHOTHAI TREASURE RESORT & SPA o similar	58
+ac203d96-cf9b-4e9a-a8bc-70dfb30d5b19	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	59
+a8eff37d-69ea-45e7-92b5-958a3186f17b	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SRIWILAI SUKHOTHAI o similar	60
+b0defb23-771a-4d42-be26-a6b9e6ed75ad	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	61
+e0289b3d-bb54-4cd9-811d-980a9a6d4e5c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Chiang Rai	62
+b6221b8c-1078-4a59-96e1-770cb749b040	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	LALUNA HOTEL & RESORT	63
+cfc049ca-813e-44dc-917f-f891bec610f3	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Garden Bungalow	64
+e2e13d49-47b2-4e27-9c77-15546d518915	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	WIANG INN HOTEL	65
+de71af49-41ca-48da-9bce-084e3c01fd44	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similar	66
+62a72acc-456d-4531-9a76-ed6c87dc9d6e	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	67
+6a6f2002-f069-436e-9471-d5306a067a15	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	LEGEND o similar	68
+0adabb4c-017b-4ab6-8a94-a5216f3aadf2	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	69
+07d07324-55db-4669-afd2-2b048f7733aa	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	THE RIVERIE BY KATATHANI o similar	70
+2efc54e7-e465-4c11-b702-6f6b1ea039fe	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe Garden	71
+412c7495-cd0e-4d4d-a19c-f0846903b10c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	LE MERIDIEN o similar	72
+097268da-c9d8-4fec-a041-a2c473c7cb35	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe Garden	73
+6aa850c5-63e6-486d-96bc-49fb4b4845e5	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Chiang Mai	74
+5b514ba2-b2f8-4e83-a53f-522645ed3e5c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	IBIS CHIANG NIMMAN JOURNEYHUB	75
+debbf08f-35f4-4f61-b55a-62efcf3b2349	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similarHab. Standard	76
+72c471fb-2953-41c4-92d4-059d9e93f0c1	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	NOVOTEL NIMMAN	77
+ec4a686d-77ba-4b4a-8b17-9cc51d64b10d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior Balcony	78
+ba21d186-05e7-4a0c-8540-74872eb58db8	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	TRAVELODGE NIMMAN o similar	79
+0457ccce-0439-46be-8088-dd0cc3a8db66	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	80
+1e067c69-c79e-4183-92be-903f321b18a7	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	MELIA CHIANG MAI	81
+6ef85ef4-e312-4f02-a809-cf4108b48bba	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Melia room o similar	82
+f061928c-f0f1-481a-ae26-532b2d8318c0	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	AKYRA MANOR CHIANG MAI	83
+c501ec33-5175-4704-b80c-74fe1832b15d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe o similar	84
+7c43a691-7d44-4854-a6c7-eedda70e2584	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SHANGRI-LA CHIANG MAI  o similar	85
+14ab44dd-b994-4db2-9213-eeaa7e2e9eed	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe	86
+53adf73a-6425-4ac7-a41a-8bd5a3de4701	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	HOTELES	87
+b719de15-b9fb-448b-b674-e92e1e4f93c7	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	La solicitud de cambio de la habitación está sujeta a disponibilidad y puede acarrear costes extras.	88
+7cb9d397-0607-4206-8c6e-61577a425ab8	828163d2-cfd7-46f5-9d41-92e538bae766	Dia 2- BANGKOK (Desayuno).	1
+2267db33-eed5-49ea-a44c-33e1fd0c98fd	828163d2-cfd7-46f5-9d41-92e538bae766	Después del desayuno, Visita a tres de los templos budistas más populares de la ciudad. Empezaremos por el Wat Traimit, situado en el extremo de Chinatown, en Yaowarat Road, cerca de la estación de tren Hualampong. Wat Traimit alberga el Buda de oro macizo más grande del mundo, midiendo casi cinco metros de altura con un peso de cinco toneladas y media. La excursión continuará hacia Wat Pho, el templo más grande de Bangkok. El templo del enorme Buda reclinado y los Chedis de los Reyes. Este se encuentra detrás del Templo del Buda. Es uno de los mayores templos de la ciudad y famoso por su gigantesco Buda reclinado que mide 46 metros de largo y está cubierto de oro. A continuación, visitarán el Palacio Real, que es sin duda, el monumento más famoso de la ciudad. Construido en 1782, por 150 años fue la casa del rey de Tailandia, la corte real y la sede administrativa del gobierno. El Gran Palacio de Bangkok es un edificio antiguo que continúa impresionando a sus visitantes por su hermosa arquitectura y detalles. Dentro del complejo, se encuentra Wat Phra Kaew o el Templo del Buda Esmeralda (oficialmente conocido como Wat Phra Sri Rattana Satsadaram), considerado como el templo budista más importante de Tailandia, consagra el Buda más reverenciado tallado en un solo bloque de jade.	2
+d0b129b2-1cc7-486e-8ebd-9d72c4735900	828163d2-cfd7-46f5-9d41-92e538bae766	Traslados incluidos.	3
+f500cb9c-7f52-4c9c-8f25-faf0130fe9b9	828163d2-cfd7-46f5-9d41-92e538bae766	Alojamiento en hotel	4
+f8898127-8706-435f-94a9-2bea37dbc48e	828163d2-cfd7-46f5-9d41-92e538bae766	Día 3 – BANGKOK – AYUTTHAYA – ANG THONG – SUKHOTHAI (Desayuno, almuerzo y cena).	5
+90228295-52cc-4c3c-966f-be65d1224c74	828163d2-cfd7-46f5-9d41-92e538bae766	Desayuno en el hotel.	6
+47f4ab1a-92f9-4990-9b88-3723b2a16681	828163d2-cfd7-46f5-9d41-92e538bae766	Salida desde Bangkok hacia Ayuthaya, antigua capital del país, para visitar sus maravillosos templos entre los cuales Wat Chaiwathanaram y Wat Mahathat.	7
+8ec853ba-64c1-4921-ab05-3c1d2396528a	828163d2-cfd7-46f5-9d41-92e538bae766	Almuerzo en restaurante local.	8
+043a8391-313d-4a8a-9477-a0a66158cc39	828163d2-cfd7-46f5-9d41-92e538bae766	Por la tarde salida hacia Lopburi, visita al Templo de los Monos, Prang Sam Yod (la Pagoda Sagrada)	9
+65c7cedd-abdc-47d0-bb03-731b9ec7cbc7	828163d2-cfd7-46f5-9d41-92e538bae766	Continuación hasta Sukhothai. Cena y alojamiento en hotel.	10
+e87f21bd-5a28-48ac-b061-ad2e73bda492	828163d2-cfd7-46f5-9d41-92e538bae766	Día 4 – SUKHOTHAI – CHIANG RAI (Desayuno, almuerzo y cena)	11
+a8deb5d0-2bb6-4dab-8988-2234ea390c90	828163d2-cfd7-46f5-9d41-92e538bae766	Desayuno en el hotel.	12
+a160f18b-a03a-4057-9c6f-73c3c7120342	828163d2-cfd7-46f5-9d41-92e538bae766	Salida desde el hotel y visita Parque Histórico de Sukhothai, declarado Patrimonio Cultural de la Humanidad por la UNESCO. Allí se realiza un paseo en bicicleta por los jardines entre sus ruinas y lagunas. Desde aquí se contempla uno de los íconos más importantes, el gran Buda Blanco de Wat Sri Chum.	13
+46fa498a-2451-4fbf-a57b-67277074621b	828163d2-cfd7-46f5-9d41-92e538bae766	Almuerzo en restaurante local.	14
+25864766-e2e9-4925-b9c3-7ea59954075b	828163d2-cfd7-46f5-9d41-92e538bae766	Continuación hacia Chiang Rai, en el camino se realiza una parada en el Lago Payao.	15
+47a34a89-db0a-4c88-b358-dbfec8d77306	828163d2-cfd7-46f5-9d41-92e538bae766	Cena y alojamiento en hotel.	16
+d4c14cfb-b14c-4fe0-a444-56cc0e8b38a0	828163d2-cfd7-46f5-9d41-92e538bae766	Día 5 – CHIANG RAI (Desayuno, almuerzo y cena)	17
+76e41b2c-3583-43c8-8f05-345245cbe348	828163d2-cfd7-46f5-9d41-92e538bae766	Desayuno en el hotel.	18
+c6c084fb-34f5-4535-83fb-006d8cfc0db3	828163d2-cfd7-46f5-9d41-92e538bae766	Tras el desayuno, visita a Mae Chan, antiguamente centro de trabajos de plata, posteriormente convertido en un centro de transacciones comerciales entre las tribus Yao y Akha donde es posible ver a miembros de las diferentes etnias. Visita al poblado de las famosas Mujeres Jirafas.  Almuerzo. A media mañana paseo por el río Mekkong en lancha tradicional tailandesa. Este río sirve de frontera natural entre Myanmar (ex Birmania), Laos y Tailandia. Visita a la Casa del Opio.	19
+574bdc4d-ac64-4303-8c1a-01f5e6eeb2aa	828163d2-cfd7-46f5-9d41-92e538bae766	Alojamiento en hotel.	20
+c7faec0a-2915-4b63-a3b8-3d14f1b6db3d	828163d2-cfd7-46f5-9d41-92e538bae766	Día 6 – CHIANG RAI - CHIANG MAI (Desayuno, almuerzo y cena)	21
+d4a1dd75-6a86-44dc-9b89-46712dad5028	828163d2-cfd7-46f5-9d41-92e538bae766	Desayuno en el hotel.	22
+41dd0d90-06cb-4513-a60a-477fbf171872	828163d2-cfd7-46f5-9d41-92e538bae766	Salida desde el hotel al muelle y en barco tradicional visita a los pueblos de las minorías étnicas Karen, Lahu (Muser) a lo largo del río Kok. Visita al Wat Rong Khun, el famoso templo blanco.Salida desde Chiang Rai a Chiang Mai por carretera (3 hrs).	23
+9fba9d80-ade8-4554-b3a2-c44193f3ab10	828163d2-cfd7-46f5-9d41-92e538bae766	Almuerzo en ruta en un restaurante local.	24
+95f27d4d-4b20-4b98-b7f5-c1b59ed63329	828163d2-cfd7-46f5-9d41-92e538bae766	Llegada en Chiang Mai, por la tarde, visita al templo más conocido de la ciudad, Wat Doi Suthep, situado en la cima de una pequeña colina a 15 Kms al noroeste.  Traslado y check in en el hotel.	25
+1c80c3ac-b68b-428e-9e5c-d993766168ed	828163d2-cfd7-46f5-9d41-92e538bae766	Cena Kantoke, con comida y danzas típicas del Norte de Tailandia	26
+55ffc647-65b6-40a8-a4a4-ff8dd04b171d	828163d2-cfd7-46f5-9d41-92e538bae766	Alojamiento en hotel.	27
+6bb037ce-00a1-4488-8518-e539e32f2ed6	828163d2-cfd7-46f5-9d41-92e538bae766	Día 7 – CHIANG MAI (Desayuno, almuerzo y cena).	28
+23cd158a-0df6-4c45-b7bd-155f43724062	828163d2-cfd7-46f5-9d41-92e538bae766	Desayuno en el hotel.	29
+745b6ca3-7578-4c7a-bcd4-5ff0f29e81e7	828163d2-cfd7-46f5-9d41-92e538bae766	Por la mañana visitaremos algunas fábricas de artesanías, donde veremos el proceso de trabajo local. Seguidamente, salida hacia el valle de Mae Sa visitando la granja de las orquídeas.	30
+c516dbca-7151-49f4-aefc-21210c3367d6	828163d2-cfd7-46f5-9d41-92e538bae766	Almuerzo en restaurante local. Después nos trasladaremos al santuario de elefantes para aprender sobre estos animales, y realizar diversas actividades incluso darles comida y tomar un baño, una experiencia inolvidable.	31
+c402cbfb-2046-45ec-a1bb-5a96cea17b47	828163d2-cfd7-46f5-9d41-92e538bae766	Cena y alojamiento en hotel.	32
+7b287136-5cb4-45fd-860f-73f5619240ee	828163d2-cfd7-46f5-9d41-92e538bae766	Día 8 – CHIANG MAI – SALIDA (Desayuno).	33
+a51f3a8a-2403-49b5-a2aa-b7d1cebd663a	828163d2-cfd7-46f5-9d41-92e538bae766	Desayuno en el hotel.	34
+bc1703fb-30db-42ee-8719-7fa49a9691a6	828163d2-cfd7-46f5-9d41-92e538bae766	Traslado al aeropuerto de Chiang Mai para conectar con el vuelo a su próximo destino.	35
+b9394d8f-3e63-4df3-886b-7c960cb1578d	828163d2-cfd7-46f5-9d41-92e538bae766	Ciudad	36
+10eb3540-a84f-41da-ba9e-cc1970f72a04	828163d2-cfd7-46f5-9d41-92e538bae766	Standard	37
+706eabac-2101-4bb5-93c8-8c70c7d1b7d2	828163d2-cfd7-46f5-9d41-92e538bae766	Superior	38
+479b6ee6-91a5-46eb-852b-62f8aee06a05	828163d2-cfd7-46f5-9d41-92e538bae766	Deluxe	39
+dd2344bd-8a96-4738-93ce-2e9d58635566	828163d2-cfd7-46f5-9d41-92e538bae766	Gold Deluxe	40
+234b81b0-f405-4e4f-a38b-f08d02d8a191	828163d2-cfd7-46f5-9d41-92e538bae766	Bangkok	41
+60df61d3-6885-4d63-b9a6-d524dfca2eac	828163d2-cfd7-46f5-9d41-92e538bae766	MANDARIN HOTEL BY CENTRE POINT	42
+f05ee416-8a18-4680-a5a6-4ffe17496143	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Deluxe o similar	43
+dacbffd5-c645-4113-8714-51eee7983143	828163d2-cfd7-46f5-9d41-92e538bae766	BEST WESTERN CLICK SATHORN 11	44
+14378325-1e35-46ed-abcb-7dd7c9c7a578	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Superior o similar	45
+1ccd8ae5-253a-4176-b870-b4b507dffe46	828163d2-cfd7-46f5-9d41-92e538bae766	HILTON GARDEN INN BANGKOK SILOM	46
+1fa0aef3-63ba-4b3e-ba50-f82f601bd949	828163d2-cfd7-46f5-9d41-92e538bae766	o similarHab. Guest room	47
+4ddbc21d-aea5-4afa-ac7b-189b2476dc4e	828163d2-cfd7-46f5-9d41-92e538bae766	JC KEVIN SATHORN BANGKOK HOTEL	48
+613eb8d0-9d1d-46d4-a4ae-e1255a5046a5	828163d2-cfd7-46f5-9d41-92e538bae766	o similar	49
+deea782d-16f4-491f-b3b2-2452c1a810a2	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. One Bedroom Suite	50
+20ec45e6-987c-4af2-af93-da22738d2c2b	828163d2-cfd7-46f5-9d41-92e538bae766	MONTIEN SURAWONG o similar	51
+4c510ff3-5f0a-4671-b2a8-60965fb06ff0	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Deluxe	52
+bb416429-67ba-4a53-bece-e4efb514dd78	828163d2-cfd7-46f5-9d41-92e538bae766	PULLMAN BANGKOK HOTEL G	53
+46bc5eee-2b1a-4d59-a8af-77c9c72a0e30	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Premium Deluxe room o similar	54
+95ff5a56-3fc5-4da0-a947-2cc820100fd5	828163d2-cfd7-46f5-9d41-92e538bae766	SO BANGKOK o similar	55
+64367c4a-8634-4c5c-8a38-104aa508152e	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. So Cozy	56
+4db86ee3-47d3-486c-8577-fe6ef86c9c78	828163d2-cfd7-46f5-9d41-92e538bae766	Sukhothai	57
+28e58caa-cf29-451d-82a3-b3cbb9c66e41	828163d2-cfd7-46f5-9d41-92e538bae766	SUKHOTHAI TREASURE RESORT & SPA o similar	58
+4c1b7de5-02ef-4512-b94d-4a1d950ac01f	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Superior	59
+0eb1d08e-3177-42cd-88ea-43d858194c01	828163d2-cfd7-46f5-9d41-92e538bae766	SRIWILAI SUKHOTHAI o similar	60
+88b49c56-db44-4991-9721-68fe4eeb4754	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Superior	61
+e53b3693-3a49-45e9-abc4-a281b88358fc	828163d2-cfd7-46f5-9d41-92e538bae766	Chiang Rai	62
+3616399b-85e8-4e16-ab9d-7182c9c0ee6c	828163d2-cfd7-46f5-9d41-92e538bae766	LALUNA HOTEL & RESORT	63
+26f18163-3fa6-4c3f-a9b1-12d833353d03	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Garden Bungalow	64
+eb3cd8f0-8250-4bfd-b973-5117c05ba0b5	828163d2-cfd7-46f5-9d41-92e538bae766	WIANG INN HOTEL	65
+8eb338e2-5603-4ad8-9930-fb1578a31670	828163d2-cfd7-46f5-9d41-92e538bae766	o similar	66
+a1d0aa5a-f996-4e5e-ab9f-8a977844855c	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Superior	67
+9d34d041-b1a7-47f9-a920-6de6a7099e53	828163d2-cfd7-46f5-9d41-92e538bae766	LEGEND o similar	68
+e2f770b8-af20-4fc2-800d-cc888f160f73	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Superior	69
+cd736f0d-011c-40ce-af83-e9375378d3d1	828163d2-cfd7-46f5-9d41-92e538bae766	THE RIVERIE BY KATATHANI o similar	70
+cc207716-16e9-44a3-9cc6-c2e440533503	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Deluxe Garden	71
+a66d3ed1-a17c-4715-8c46-ae940809d3b5	828163d2-cfd7-46f5-9d41-92e538bae766	LE MERIDIEN o similar	72
+759c86df-c1ba-494b-94b6-9c581368d386	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Deluxe Garden	73
+427d48ed-5d53-4563-a37c-2f24e35a15dd	828163d2-cfd7-46f5-9d41-92e538bae766	Chiang Mai	74
+866a82a1-8491-42b8-b9a7-bf70038415fc	828163d2-cfd7-46f5-9d41-92e538bae766	IBIS CHIANG NIMMAN JOURNEYHUB	75
+f7f488a7-846d-4a9e-91ae-94f02167afa5	828163d2-cfd7-46f5-9d41-92e538bae766	o similarHab. Standard	76
+abac7e0a-f700-4b07-b0d0-89e9879a7174	828163d2-cfd7-46f5-9d41-92e538bae766	NOVOTEL NIMMAN	77
+4d473c24-cde6-4d4c-8f9a-890fdb2b30d2	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Superior Balcony	78
+ff6632a9-b37a-465b-8da4-e34c32ad8730	828163d2-cfd7-46f5-9d41-92e538bae766	TRAVELODGE NIMMAN o similar	79
+31cb0afd-da81-48a8-af75-47123cc8ea68	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Superior	80
+4a00ac82-cc0c-438b-a19c-c90c947b0361	828163d2-cfd7-46f5-9d41-92e538bae766	MELIA CHIANG MAI	81
+0dafb1c0-1d12-42f2-8c04-5f0e110fae38	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Melia room o similar	82
+26262073-da8d-47fe-ab75-4a01e31d45ba	828163d2-cfd7-46f5-9d41-92e538bae766	AKYRA MANOR CHIANG MAI	83
+396010fd-7c01-4439-8461-b8959e3f1fb0	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Deluxe o similar	84
+75b83d12-5b78-4b9c-8fcc-b9e00fd15394	828163d2-cfd7-46f5-9d41-92e538bae766	SHANGRI-LA CHIANG MAI  o similar	85
+4fd9c280-a172-4999-9d44-9ace6dca1a52	828163d2-cfd7-46f5-9d41-92e538bae766	Hab. Deluxe	86
+c031fbd5-ebc4-4a63-bd45-3cb433a2752c	828163d2-cfd7-46f5-9d41-92e538bae766	HOTELES	87
+905e939b-e2eb-40b3-be49-12d9a9c98a00	828163d2-cfd7-46f5-9d41-92e538bae766	La solicitud de cambio de la habitación está sujeta a disponibilidad y puede acarrear costes extras.	88
+b072a197-0af5-4d28-b830-e5f368c40e80	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Bebidas	1
+dec66483-dda2-477e-9740-b399b71093d0	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Gastos personales y propinas	2
+90dfb848-83e1-4947-8b9e-65ecc88745a3	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Tarifas aéreas de vuelos domésticos en Vietnam	3
+e7994de0-5473-4ac8-97b8-29e448434b94	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Tarifas aéreas de vuelos internacionales de entrada/salida de Vietnam	4
+6d2858b8-a5a1-41c1-9deb-01038a540897	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	E- visado a Vietnam: 50 USD por persona, entrada simple	5
+0b4eea35-8a39-4a2d-9afc-977c4fa5f0d9	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Tasa de visado de Vietnam: 25 USD por persona, entrada simple	6
+21da7722-f6c0-436f-a27a-8a5607bb2ea0	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Todos los conceptos no mencionados en SERVICIOS INCLUIDOS	7
+e1804d1b-8b3c-4948-91d4-4aded3c444ad	8a709aed-8b86-413a-bfcb-575185e69d53	Bebidas	1
+5c91b94b-1227-4a71-9bad-24e816049cd1	8a709aed-8b86-413a-bfcb-575185e69d53	Gastos personales y propinas	2
+9eb87abb-af2b-4213-b67e-406f43b18959	8a709aed-8b86-413a-bfcb-575185e69d53	Tarifas aéreas de vuelos domésticos en Vietnam	3
+e0579dd7-9235-4665-aaa7-f47b3e5ad9af	8a709aed-8b86-413a-bfcb-575185e69d53	Tarifas aéreas de vuelos internacionales de entrada/salida de Vietnam	4
+9552c755-a087-40cd-b8ff-f3ee0eb8a592	8a709aed-8b86-413a-bfcb-575185e69d53	E- visado a Vietnam: 50 USD por persona, entrada simple	5
+dfccbd54-1b75-46ad-a60a-b5ddc2a1017f	8a709aed-8b86-413a-bfcb-575185e69d53	Tasa de visado de Vietnam: 25 USD por persona, entrada simple	6
+79baac86-c96a-444c-aba8-19134842fad6	8a709aed-8b86-413a-bfcb-575185e69d53	Todos los conceptos no mencionados en SERVICIOS INCLUIDOS	7
+e6af82d9-c6d0-4887-81e7-53d47062d225	c3e06106-518d-46da-b1db-4228b126be43	Bebidas	1
+71e36358-ffc3-420a-834d-aae12d9b958f	c3e06106-518d-46da-b1db-4228b126be43	Gastos personales y propinas	2
+65986970-74da-4727-9422-c187d2f18355	c3e06106-518d-46da-b1db-4228b126be43	Tarifas aéreas de vuelos domésticos en Vietnam	3
+fd099925-130d-48d2-a00d-2b9cb2f4a035	c3e06106-518d-46da-b1db-4228b126be43	Tarifas aéreas de vuelos internacionales de entrada/salida de Vietnam	4
+1bf3e449-ab70-4739-8fec-467e53e55dfb	c3e06106-518d-46da-b1db-4228b126be43	E- visado a Vietnam: 50 USD por persona, entrada simple	5
+4b3b0796-7b5d-440d-a8e3-7f25e4a48752	c3e06106-518d-46da-b1db-4228b126be43	Tasa de visado de Vietnam: 25 USD por persona, entrada simple	6
+55e5acce-393f-4a6c-9d50-719849ca150b	c3e06106-518d-46da-b1db-4228b126be43	Todos los conceptos no mencionados en SERVICIOS INCLUIDOS	7
+f57aada7-642e-470f-8ef3-5c7f8248ba94	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Los precios están sujetos a cambio sin previo aviso antes de la confirmación de la reserva.	1
+\.
+
+
+--
+-- Data for Name: hotels; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.hotels (id, destination_id, name, category, location, image_url, nights) FROM stdin;
+b8dafc31-fbe5-43b2-84a6-b6e4dd88f4c2	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Hotel categoría turista superior o similar	Turista Superior	Estambul	\N	\N
+98a0ddb2-ce78-4d34-9f23-9fe80fc4f9e8	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Hotel categoría primera o similar	Primera	Capadocia	\N	\N
+c3bbfeb2-f4ae-43cd-8902-b74fa812066c	de9eb689-7a5f-4095-a254-57e4d4276338	ILLA HOTEL	3 estrellas	Cusco	\N	\N
+ac8508c3-0800-4648-b24c-d540037f99c2	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Hotel turista	Turista	Cusco	\N	\N
+c649a818-2f3e-4089-a8c2-be31dcf7ccfd	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Pullman Istanbul Airport and Convention Center Hotel	5*	Estambul	\N	\N
+edd89d44-b039-4fdf-95ae-f33f7112ff93	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Royal Stay Palace	5*	Estambul	\N	\N
+2e736864-6ec1-4811-b741-3bc72ac113bc	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Ramada Plaza Tekstilkent	5*	Estambul	\N	\N
+4554d23e-27e9-4ba6-8b4e-9afb6708f186	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Ramada by Wyndham Cappadocia	5*	Capadocia	\N	\N
+e11f0892-45f8-4568-902d-309709e32d9e	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Avrasya Cappadocia	5*	Capadocia	\N	\N
+9ab3658c-e78f-4be6-8cf4-8fabd2b6577c	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Richmond Pamukkale Thermal	5*	Pamukkale	\N	\N
+4fcc2aeb-b567-428d-88cd-010e011eed39	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Pam Thermal Hotel Pamukkale	5*	Pamukkale	\N	\N
+df00f75b-3d27-4fe8-8bdf-5b906c16559a	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Hampton by Hilton Izmir Aliaga	4*	Kusadasi o Esmirna	\N	\N
+ad784fcb-c0a1-4537-a471-61ea540b02c7	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Hampton By Hilton	4*	Kusadasi o Esmirna	\N	\N
+33d62b94-598b-4db5-8d1b-3dfe06f58472	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Ramada By Wyndham Izmir	4*	Kusadasi o Esmirna	\N	\N
+fd4bec9f-95bc-49ff-815a-8a4b368347a1	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Faustina Hotel	4*	Kusadasi o Esmirna	\N	\N
+159bd872-bc42-4d4c-a48e-4c05a02a50ef	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Royal Stay Palace 4*	4 estrellas	Estambul	\N	\N
+e230742b-5441-4189-89d3-0529d530c3fb	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Ramada Plaza	\N	Estambul	\N	\N
+ff6236ef-4fe6-4523-a319-ba65dd569110	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Tekstilkent 4*	4 estrellas	Estambul	\N	\N
+5ca06e5d-376b-4a39-a889-d6e3509563f9	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Pulman Istambul 4*	4 estrellas	Estambul	\N	\N
+f81761eb-21cb-4b72-a2c4-d0f9851d8654	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Ramada Cappadocia 5*	5 estrellas	Capadocia	\N	\N
+94af2a69-0491-42c1-b3c9-6cfb8b84c02d	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Double Tree by Hilton 5*	5 estrellas	Capadocia	\N	\N
+5ea8dfb6-5e8b-459d-8d92-b5d0ffa8593a	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Avrasya Capadocia Hotel 5*	5 estrellas	Capadocia	\N	\N
+94b70e8f-176a-49d8-a72f-86d58b2c02cc	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Pam Thermal Hotel Pamukkale 5*	5 estrellas	Capadocia	\N	\N
+fe092fa1-7b5b-42e8-b893-9b9d0043c909	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Richmond Thermal 5*	5 estrellas	Capadocia	\N	\N
+d9b260f3-b37b-4979-8275-c6c48d1bc1ca	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Esmirna / Kusadasi	\N	Capadocia	\N	\N
+066d1793-ea1d-42a2-b961-82739446a29d	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Hampton By Hilton 4*	4 estrellas	Capadocia	\N	\N
+5a32e51b-195c-4cac-a54b-9e8a6e09d088	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Ramada By Wyndham Esmirna 4*	4 estrellas	Capadocia	\N	\N
+f0ddb349-7927-4455-b320-8a9b4c11f15f	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Faustina Hotel 4*	4 estrellas	Capadocia	\N	\N
+c7e9df04-39a0-46e7-aff4-c44ab2c9112c	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	(Salidas Regulares todos los Miercoles y Sabados de Mayo a Noviembre	\N	Capadocia	\N	\N
+b9ac9f93-2f4d-4b1e-a7c4-6c368594e26e	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	con el minimo de 2 pasajeros)	\N	Capadocia	\N	\N
+9ba3f0b1-b61c-4a1e-a37b-297c727c902b	af281d14-a347-4f9c-8f2a-21308a321254	Royal Stay Palace 4*	4 estrellas	Estambul	\N	\N
+535652d4-2896-4979-8193-a79ff63375d6	af281d14-a347-4f9c-8f2a-21308a321254	Ramada Plaza	\N	Estambul	\N	\N
+65f86a0f-338d-4b79-b2ca-2d2077cdf959	af281d14-a347-4f9c-8f2a-21308a321254	Tekstilkent 4*	4 estrellas	Estambul	\N	\N
+43f25be8-65d8-4478-89aa-68f961d52e23	af281d14-a347-4f9c-8f2a-21308a321254	Pulman Istambul 4*	4 estrellas	Estambul	\N	\N
+f3ad5271-d131-4167-91e5-c99167e88642	af281d14-a347-4f9c-8f2a-21308a321254	Avrasya Capadocia Hotel 5*	5 estrellas	Capadocia	\N	\N
+abb90b8a-fd1b-4206-a781-e96950bd9cf8	af281d14-a347-4f9c-8f2a-21308a321254	Ramada Cappadocia 5*	5 estrellas	Capadocia	\N	\N
+84593ded-519b-4404-a7ef-aaab1e1ca734	af281d14-a347-4f9c-8f2a-21308a321254	Pam Thermal Hotel Pamukkale 5*	5 estrellas	Capadocia	\N	\N
+60b48cf3-46ff-4af1-b825-261a7174cb4b	af281d14-a347-4f9c-8f2a-21308a321254	Richmond Thermal 5*	5 estrellas	Capadocia	\N	\N
+ad138d7d-a474-48fb-84a0-0be30a47665f	af281d14-a347-4f9c-8f2a-21308a321254	Esmirna / Kusadasi	\N	Capadocia	\N	\N
+6c273da6-621d-42cd-8025-88312544b780	af281d14-a347-4f9c-8f2a-21308a321254	Hampton By Hilton 4*	4 estrellas	Capadocia	\N	\N
+26f5ed42-44df-4041-8092-8bdf38e03ef4	af281d14-a347-4f9c-8f2a-21308a321254	Ramada By Wyndham Esmirna 4*	4 estrellas	Capadocia	\N	\N
+c76cb5cc-b3ab-4bc8-aef2-7b98783ff4af	af281d14-a347-4f9c-8f2a-21308a321254	Faustina Hotel 4*	4 estrellas	Capadocia	\N	\N
+9f36d6f5-138e-46ca-9448-cbe2cdc0843f	af281d14-a347-4f9c-8f2a-21308a321254	(Salidas Regulares todos los Miercoles y Sabados de Mayo a Noviembre	\N	Capadocia	\N	\N
+b82507a1-d51d-4f86-9bdf-7994098bd483	af281d14-a347-4f9c-8f2a-21308a321254	con el minimo de 2 pasajeros)	\N	Capadocia	\N	\N
+\.
+
+
+--
+-- Data for Name: inclusions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.inclusions (id, destination_id, item, display_order) FROM stdin;
+2e1482f9-26b3-4418-bbfe-7ee65eccc782	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	7 noches de alojamiento en hoteles previstos o categoría similar	1
+a88bb26f-2ef8-473e-b18f-3357f4b92b16	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	7 desayunos	2
+2e5449c4-fc2f-41ac-b70d-ac51041b96c4	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	3 cenas en Capadocia	3
+512a3685-f14b-47d6-9131-0cb5574b5d1b	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Guía autorizado que habla español	4
+aafbd4f5-4a78-4daa-a37a-537dd449ae38	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Traslados con asistente autorizado que habla español (IN - OUT)	5
+77a8169f-c51c-4f82-8c02-b6c284936571	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Todas las entradas del itinerario según programa	6
+bd1b1127-2ac8-4579-b2de-c07b1801b0d3	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Impuesto IVA	7
+852139b6-0a26-4dd9-a47c-9338eed74263	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	Asistencia médica internacional	8
+e1648b54-0333-4643-8ef3-aa61b7c748c9	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	9 noches de alojamiento en hoteles previstos o categoría similar con desayuno.	1
+47263833-de2f-4430-a6cd-eec501b82de3	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	5 almuerzos.	2
+6ee4ae0a-a66f-43dc-8cc8-57cb3aca2dc7	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	5 cenas en hoteles del circuito, excepto Estambul.	3
+d6400ed1-1703-4ac3-b7c7-2e3c400a9323	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Guía autorizado que habla español o portugués Traslados con asistente autorizado que habla español (IN - OUT)	4
+9a132925-5875-4b3a-8513-b8f65dbd959d	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Impuesto IVA	5
+cfb5a0ae-145d-4cc0-9364-f1cdc82bac40	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	Todas las entradas del itinerario.	6
+0a9f4ea4-46a1-430a-9dfa-18face14c574	af281d14-a347-4f9c-8f2a-21308a321254	9 noches de alojamiento en hoteles previstos o categoría similar con desayuno.	1
+67a5cb81-8945-4556-9e9b-c7ad701323a9	af281d14-a347-4f9c-8f2a-21308a321254	5 cenas en hoteles del circuito, excepto Estambul	2
+766150f1-1c08-4cda-a67c-cd43608653ed	af281d14-a347-4f9c-8f2a-21308a321254	Guía autorizado que habla español o portugués Traslados con asistente autorizado que habla español (IN - OUT)	3
+7d4dc930-206d-45b4-a99e-7dfa90ad5f5d	af281d14-a347-4f9c-8f2a-21308a321254	Impuesto IVA	4
+1838129d-91e4-42be-9cbb-cd5e3a43e615	af281d14-a347-4f9c-8f2a-21308a321254	Todas las entradas del itinerario.	5
+a32ce5ab-4305-4ff8-85a2-22f5e13c362b	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	02 noches de hotel en Dubai en base a desayuno y alojamiento.	1
+a88caf37-516d-4ad4-979f-fbf6cbd22d56	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Safari por el desierto con cena BBQ.	2
+9826b7c5-a8a6-4d3b-be8e-d761476e164a	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Todos los traslados se realizan en coches A/C.	3
+d5b54276-bd03-4cc4-8522-8c4974474a58	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	Traslado aeropuerto - hotel - aeropuerto con asistencia de habla hispana o portuguesa.	4
+ac5b0e38-f8cd-4005-82ef-f22f1985bf45	e5a2c7c1-1953-4d88-a677-7eb944fe8611	03 noches de hotel en Dubai en base a desayuno y alojamiento.	1
+0c178920-cf4f-468e-832d-88a2320d7469	e5a2c7c1-1953-4d88-a677-7eb944fe8611	Safari por el desierto con cena BBQ.	2
+26405ec4-fda0-4549-b85d-95b8ab98af3f	e5a2c7c1-1953-4d88-a677-7eb944fe8611	Todos los traslados se realizan en coches A/C.	3
+811427d4-521c-4924-a69f-1f8244c0ad9d	e5a2c7c1-1953-4d88-a677-7eb944fe8611	Traslado aeropuerto - hotel - aeropuerto con asistencia de habla hispana o portuguesa.	4
+341ab4ef-bb91-41be-8fa7-bcef3cc4b555	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	04 Noches de hotel en Dubái en base de alojamiento y desayuno.	1
+56ab2059-5c6b-45b5-b0ac-9ae6c8d33e58	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Visita de Dubái.	2
+297afb1c-e8c9-4b45-b31a-52fa3e3959a4	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Visita de Abu Dhabi con almuerzo.	3
+6e895ef2-2059-4b35-b30d-4e38ee815d53	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Safari por el desierto con cena BBQ.	4
+4a822bb0-faed-47ba-a49d-8e4fe56c8ee5	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Cena a bordo de un barco tradicional Dhow.	5
+ab929a5a-971f-4b26-9ad8-e68726715808	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Todos los traslados se realizan en coches A/C.	6
+b49bd060-5d81-4a9f-b6c1-a4bdcbd044c1	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	Traslado aeropuerto - hotel - aeropuerto con asistencia de habla hispana o portuguesa.	7
+060f5319-ca85-4619-bed5-cc2feae44d5b	4d6107a7-853c-48c9-ac68-75581775e8cd	Día 3 – DUBAI / VISITA ABU DHABI / DUBAI (Desayuno y almuerzo).	1
+837f2e9f-b37e-48c9-ba98-ec8dc66513cd	4d6107a7-853c-48c9-ac68-75581775e8cd	Desayuno en el hotel. Vamos a descubrir el impresionante paisaje de Abu Dhabi, capital de los Emiratos Árabes Unidos, también conocida como la joya de Arabia. Sheikh Zayed Grand Mosque: Esta hermosa casa de culto es uno de los lugares más espectaculares de la ciudad, es la tercera mezquita más grande del mundo; con capacidad para 40 mil personas. Toda construida en mármol de Carrara, fue inaugurada en el otoño de 2007. Su impresionante arquitectura complementa el paisaje urbano de Abu Dhabi. La visita es una oportunidad única para conocer detalles interesantes sobre la arquitectura de esta estructura y aprender más acerca de la religión y la cultura de la gente de Abu Dhabi. Continuación hasta el puente de Al Maqta pasando por una de las áreas más ricas de Abu Dhabi, el área de los ministros. Llegada a la calle Corniche que es comparada con Manhattan. Parada para fotos en el hotel Emirates Palace. Este hotel tiene su propio helipuerto y puerto. Continuamos a Al Batee Area, donde se encuentran los palacios de la familia Real.	2
+6d03c750-bb87-49fe-9004-1a24bc27f592	4d6107a7-853c-48c9-ac68-75581775e8cd	Visita, panorámica al parque de Ferrari (breve tiempo para sacar fotos y ver tiendas). Regreso a Dubái. Alojamiento.	3
+33fa75bd-ea84-4a7a-82c0-7705144968ca	4d6107a7-853c-48c9-ac68-75581775e8cd	Día 4 – DUBAI/SAFARI (Desayuno y cena).	4
+9fd5af5d-899a-4183-9153-110b4ec516ed	4d6107a7-853c-48c9-ac68-75581775e8cd	Desayuno en el hotel. Mañana libre para descubrir los encantos de esta ciudad. Por la tarde salida al “safari del desierto”. Esta encantadora aventura comienza en el momento que entra en el vehículo 4x4. Las dunas y el clima desértico los llevan a otro mundo. En el medio del Tour encontramos un oasis natural y una granja de camellos, un paisaje espectacular para sacar preciosas fotos. Después de la aventura en las dunas del desierto, hay una parada para admirar la puesta de sol árabe disfrutando de la serenidad y la belleza del desierto. En el campamento beduino, el turista tendrá la oportunidad de montar en camello, fumar narguile y hacer el famoso tatuaje de henna, o simplemente disfrutar de la noche con una deliciosa barbacoa de la moda de los árabes. (Paseo en camello & barbacoa árabe están incluidas en el programa). Alojamiento	5
+b2d22417-beec-48a3-bb22-c44718ce65d3	4d6107a7-853c-48c9-ac68-75581775e8cd	Día 5 – DUBAI/CRUCERO DHOW. ( Desayuno y cena)	6
+be0257ab-493b-4323-ab00-dfc9f481128a	4d6107a7-853c-48c9-ac68-75581775e8cd	Desayuno en el hotel. Mañana libre para descubrir los encantos de esta ciudad. Por la noche cena a bordo Del Dhow cruise (embarcación tradicional árabe, es ideal para un entorno verdaderamente romántico por la noche, todo iluminado y decorado, desliza a lo largo de la famosa cala de Dubái. Es difícil elegir entre la deliciosa variedad de comida que se sirve en el buffet a bordo. El rescate de la memoria nostálgica del espíritu aventurero árabe, el Dhow crucero Dubái se remonta a los días confinados a una tribu cuya economía estaba basada en la explotación y el comercio de perlas. Disfrute de una vista encantadora de la vibrante noche de Dubái y la frescura de la brisa del mar (Cena buffet incluida en el programa). Alojamiento.	7
+ccb76e8d-4aa9-405b-a8b4-bd574855b1db	4d6107a7-853c-48c9-ac68-75581775e8cd	Día 6 – DUBÁI (Desayuno).	8
+6ec5a63a-19a3-4254-b425-a46bc3700a04	4d6107a7-853c-48c9-ac68-75581775e8cd	Desayuno en el hotel. A la hora indicada traslado al aeropuerto de DXB para tomar vuelo de salida internacional.	9
+5d6078ab-5fb3-4cdd-9bb4-413d87458961	4d6107a7-853c-48c9-ac68-75581775e8cd	05 Noches de hotel en Dubai en base de alojamiento y desayuno.	10
+c2eb3ba4-4e61-44ba-90e7-8971701d4118	4d6107a7-853c-48c9-ac68-75581775e8cd	Visita de Dubai.	11
+2e200f69-b777-4366-a10e-99f9cd763317	4d6107a7-853c-48c9-ac68-75581775e8cd	Visita de Abu Dhabi sin almuerzo.	12
+8e8b5be3-f4a9-4602-bf69-0da68c2fc901	4d6107a7-853c-48c9-ac68-75581775e8cd	Safari por el desierto con cena BBQ.	13
+e9b4d8d3-3a7d-4c73-b089-7fa9c86f614f	4d6107a7-853c-48c9-ac68-75581775e8cd	Cena a bordo de un barco tradicional Dhow.	14
+f9ddbd99-ade2-45d6-b4cb-86901b07fcb6	4d6107a7-853c-48c9-ac68-75581775e8cd	Todos los traslados se realizan en coches A/C.	15
+f60bbac5-77a5-4bda-a066-7a4e67fde2be	4d6107a7-853c-48c9-ac68-75581775e8cd	Traslado aeropuerto - hotel - aeropuerto con asistencia de habla hispana  .	16
+d68c445a-ff1d-4f53-a9de-6e28c76533d6	a3a1fa45-57de-4905-92ad-7fe67f091c9d	07 noches de hotel en Dubai en base de alojamiento 4* y desayuno diario.	1
+58ecf5ea-34b0-4e66-b340-a06f0a4e8e38	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Visita de Dubai.	2
+865b3cd9-b76a-456d-afcb-34fcb30fff36	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Visita de Abu Dhabi con almuerzo.	3
+cec6d596-d1ae-4b0a-b33b-26562cc667e9	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Safari por el desierto con cena BBQ.	4
+51fd5ad3-8838-4eaa-812a-c0876a9c1d95	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Cena a bordo de un barco tradicional Dhow.	5
+8e6d3485-d60b-41aa-8afb-b1dc126dc9d8	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Visita de los Emiratos Sharjah y Fujeirah con almuerzo.	6
+143ef2d7-2560-487d-b4fb-c205edfcb2c1	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Todos los traslados se realizan en coches A/C.	7
+d80ac8c8-5e48-482d-98a5-8ca8078692c2	a3a1fa45-57de-4905-92ad-7fe67f091c9d	Traslado aeropuerto - hotel - aeropuerto con asistencia de habla hispana o portuguesa.	8
+4d9e4649-6ab8-43db-9b68-b80b106fd9dc	4a457002-eba2-4864-96a1-0a7039b379d5	Opcional visitando la pirámide escalonada en Sakkara, diseñada por el arquitecto Imhotep para el rey Zoser. Almuerzo en un restaurante local de buena calidad.	1
+2fed945f-234f-4de5-aad9-5e4ceca81c0a	4a457002-eba2-4864-96a1-0a7039b379d5	Día 3 – EL CAIRO (Desayuno)	2
+8edd7a8c-d149-46ce-a119-93a52000d6e7	4a457002-eba2-4864-96a1-0a7039b379d5	Desayuno. Día libre	3
+7b56cb4b-3c89-41d5-a362-d81906edce7b	4a457002-eba2-4864-96a1-0a7039b379d5	Opcionalmente Salida para visitar el Barrio Copto donde se encuentra la Iglesia de Santa María la Virgen, más conocida como la Iglesia Colgante, la Iglesia de San Jorge y la Iglesia de San Sergio. Continuación en el Museo de Arte Egipcio, que alberga numerosas estatuas, pinturas, relieves, elementos funerarios y otros muchos objetos de la época de los Faraones; la Mezquita de Mohamed Ali Pasha, más conocida como la Mezquita de Alabastro, la Ciudadela de Salah El aDin (Saladino, quien fuera Sultán de Egipto), declarada Patrimonio de la Humanidad y el Gran Bazar de Khan el Khalili donde podremos callejear para realizar compras o tomar un té en un café de la zona.	4
+96d28b39-aa84-432b-9c52-445a3e7a31fb	4a457002-eba2-4864-96a1-0a7039b379d5	Traslado al hotel y alojamiento..	5
+a28ba3f8-f655-4d4d-9c39-7c1264ef8ee3	4a457002-eba2-4864-96a1-0a7039b379d5	Día 4 – EL CAIRO - SHAM EL SHEIHK	6
+66e010bb-5065-4446-bf48-52d2e142d43b	4a457002-eba2-4864-96a1-0a7039b379d5	Desayuno, traslado al Aeropuerto Internacional de El Cairo y continúe. Tomará un vuelo desde El Cairo hasta el encantador destino de Sharm El Sheikh. A su llegada al aeropuerto de Sharm El Sheikh, Luego lo acompañará a su hotel para realizar el check-in sin inconvenientes. Tendrá tiempo libre por la tarde y la noche para relajarse y disfrutar de la serenidad de este paraíso costero. Pase una cómoda noche en su hotel en Sharm El Sheikh, donde le esperan la relajación y la belleza.	7
+798f6a84-bcc8-4afd-903b-8cabb2689599	4a457002-eba2-4864-96a1-0a7039b379d5	Día 5 – QUAD BIKE EN SHAM EL SHEIHK (Desayuno).	8
+3bc5e4d9-2101-4627-b4b0-2259c0035028	4a457002-eba2-4864-96a1-0a7039b379d5	Desayuno, día libre	9
+c70bb1c5-c803-4a4d-8a30-66d7f8f95a3b	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Desayuno. Disfrutando de la playa.	16
+f814d9c8-812b-4c05-8703-33fe63a003ae	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Opcional por la tarde Safari beduino atardecer disfrutando con el espectáculo beduino y danza folclórica.	17
+ad4b55a0-90c0-4732-96da-604854759cc7	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Comidas: Desayuno, Almuerzo y Cena	18
+58e4e592-9b23-40ef-8d53-0cd916ca01a1	4a457002-eba2-4864-96a1-0a7039b379d5	Opcionalmente ¡Prepárate para una emocionante aventura! horas, tu guía turístico privado te recibirá en tu hotel. Desde allí, te dirigirás al Quad Bike Centre, que se encuentra a unos 15 minutos de viaje. Después de una breve pero importante orientación sobre seguridad e instrucciones de conducción, comenzará tu aventura en quad en Sharm. Tomarás el control de tu quad y partirás a través del fascinante desierto del Sinaí, donde podrás disfrutar de impresionantes vistas del paisaje. 20 Después de aproximadamente una hora de emocionante conducción, llegarás al punto más alto de tu viaje. Aquí, tendrás la oportunidad de tomar un merecido descanso y saborear un té de hierbas beduino tradicional, sumergiéndote en la auténtica cultura de la región.	10
+aeb4d736-e027-4414-b4f5-cabff3c080a4	4a457002-eba2-4864-96a1-0a7039b379d5	Una vez que hayas recargado energías,. Desde allí, serás trasladado de regreso a tu hotel en la comodidad de un vehículo con aire acondicionado. La noche es para que la disfrutes a tu aire.	11
+fb9aec83-5585-4a2e-b1e9-7746616c11c8	4a457002-eba2-4864-96a1-0a7039b379d5	Disfruta de una tranquila noche en tu hotel de Sharm, donde podrás reflexionar sobre la emocionante aventura del día.	12
+3055de3b-214f-4546-8a42-44a415ce8618	4a457002-eba2-4864-96a1-0a7039b379d5	Día 6 – QUAD BIKE EN SHAM EL SHEIHK (Desayuno).	13
+7ee85cda-f963-4234-82bb-cba1381aaf51	4a457002-eba2-4864-96a1-0a7039b379d5	Desayuno, día libre	14
+477a3304-160b-4afa-94fa-d98c5d434561	4a457002-eba2-4864-96a1-0a7039b379d5	Opcionalmente, salida de su hotel. Lo llevarán al muelle marítimo, donde se embarcará en un barco con destino al Parque Nacional Ras Mohamed. Este extraordinario santuario marino es un paraíso para los entusiastas de las actividades submarinas, con más de 130 especies de arrecifes de coral y la asombrosa cantidad de 1000 variedades de peces vibrantes y coloridos. Durante su viaje, el barco hará tres paradas, lo que le brindará la oportunidad de participar en aventuras de natación y esnórquel en las aguas cristalinas del Mar Rojo. Se servirá un delicioso almuerzo a bordo mientras disfruta de la belleza de este mundo submarino. Al final del día, el barco regresará a la actividad de esnórquel en el Mar Rojo y lo transportarán de regreso a su hotel. Disfrute de otra cómoda estadía de una noche en su hotel de Sharm El Sheikh..	15
+b8d46f76-1c79-41fc-b6bb-1a772087d7a8	4a457002-eba2-4864-96a1-0a7039b379d5	Día 7 –EL CAIRO (Desayuno).	16
+732f1684-47c8-4d1e-b9a2-951e7be88a0b	4a457002-eba2-4864-96a1-0a7039b379d5	Desayuno en el hotel y prepárese para el check-out y trasladado al aeropuerto para tomar el vuelo de regreso al Aeropuerto Internacional de El Cairo. Después  último destino para tomar su último vuelo de regreso a casa. Fin del viaje y de nuestros servicios.	17
+6f6a091c-140a-4fda-a22e-8e2bf6afde8d	4a457002-eba2-4864-96a1-0a7039b379d5	Chocolates de bienvenida.	18
+d43370bf-a592-485f-af3b-21da106ee71b	4a457002-eba2-4864-96a1-0a7039b379d5	02 botellas de agua para cada viaje.	19
+ac06d49a-525f-4ca5-b274-4f020d6332ef	4a457002-eba2-4864-96a1-0a7039b379d5	03 noches Cairo y 03 noches en Sharm El Shikh	20
+c6f574c2-0d73-4de4-999e-b82305303544	4a457002-eba2-4864-96a1-0a7039b379d5	Traslados regulares en coches A/C.	21
+d2ac98ca-cdb9-4cde-a249-975b43d8e115	4a457002-eba2-4864-96a1-0a7039b379d5	Visitas según itinerario.	22
+ef63ad26-b365-4b23-873b-004f9d5ea6b0	4a457002-eba2-4864-96a1-0a7039b379d5	Guía local de habla hispana durante las visitas.	23
+87ae8e1a-e675-4f68-9f32-3b697ec99269	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Opcional visitando la pirámide escalonada en Sakkara, diseñada por el arquitecto Imhotep para el rey Zoser. Almuerzo en un restaurante local de buena calidad.	1
+913a8d40-4cb4-492f-8948-c3b948f0c4be	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Día 3 – EL CAIRO –LUXOR - El Templo de Karnak - Templo de Luxor  (Pensión Completa).	2
+d41880c3-1e10-47c5-8f27-2fc33b901b63	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Desayuno. Salida según plan de vuelos. Tomar el vuelo con destino al Luxor. Llegada a Luxor Traslado en vehículo privado con aire acondicionado al Crucero por el Nilo. Donde te recibirán y trasladarán para embarcar en un crucero de lujo de 5 estrellas por el Nilo. Pensión completa.	3
+2a160c06-e946-42e5-ba01-2213d2ef3ff5	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Salida para visitar El Templo de Karnak erigido en honor al dios Amón y principal recinto de culto en Egipto desde las dinastías que conformaron el Imperio Nuevo y que cuenta, entre otros, con una magnífica sala hipóstila de 23 metros de altura que alberga en su recinto nada menos que 134 columnas y el Templo de Luxor, más pequeño que el de Karnak y comunicado con éste por una impresionante avenida de esfinges con cabeza de carnero, más conocida como la Avenida de las esfinges. Regreso a la motonave, y noche a bordo.	4
+0244a70e-b754-4a94-924c-b9f62074e625	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Día 4 – LUXOR - ESNA - EDFU (Pensión Completa).	5
+3cd36a9a-c489-4a66-8869-f36de53b38ca	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Pensión completa. Desayuno. Salida para Visitar: el Valle de los Reyes, declarado por la Unesco Patrimonio de la Humanidad y que alberga la mayoría de las tumbas de los faraones del Imperio Nuevo. El Templo de la Reina Hatshepsut, que fue la primera mujer en ocupar la posición de faraón; el templo, situado en Deir El Bahari, es uno de los pocos templos construidos directamente en la roca y consta de varias terrazas que ejercían como vestíbulos para albergar a multitud de personas durante las festividades religiosas. Los Colosos de Memnon, gigantescas estatuas que representan al faraón Amenhotep III y que permanecen en posición sedente desde hace más de 3.500 años. Regreso a la motonave, navegación hacia Edfú y noche a bordo.	6
+c9964ef6-4262-40e3-a8e1-0d5c709d6e1a	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Día 5 – EDFU - KOM OMBO – ASWAN (Pensión Completa).	7
+80b6f192-e884-4f67-ae69-0669a1ce54c5	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Pensión completa. Desayuno. Salida para realizar la visita al Templo de Edfú, erigido en honor del dios Horus con cabeza de halcón. El templo, situado en la orilla occidental del río Nilo es uno de los más grandes de Egipto y el mejor conservado hasta el momento. Las inscripciones en sus paredes proporcionan información importante sobre el lenguaje, la mitología y la religión durante el periodo grecorromano. Regreso a la motonave y navegación.	8
+f62dff9d-dbce-4367-a79c-4d5f8e7f1ee7	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Llegada a Kom Ombo y salida para realizar la visita del único templo en Egipto dedicado simultáneamente a dos dioses, el dios Sobek con cabeza de cocodrilo y el dios Haroeris con cabeza de halcón. Regreso a la motonave, navegación y noche a bordo.	9
+6aba4729-7974-4288-be07-478d6b578df6	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Día 6 – ASWAN (Pensión Completa).	10
+ab1576f6-bcb6-455d-a091-fa68c9203f41	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Pensión completa. Desayuno.Salida para realizar la visita del Templo de Philae, construido en honor de la diosa Isis y considerado la joya del Nilo.	11
+cc33e3f6-dc23-4714-aff4-569a408129d6	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Alojamiento con desayuno en Atenas	1
+6aedf873-ba81-4394-bbed-d44003b480d8	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Día 3 – ATENAS – MYKONOS (Desayuno)	2
+d8f8d16a-c871-4356-9dd9-f0b808da1657	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Traslado hotel / puerto del Pireo con asistencia en español	3
+ebf1a302-612c-42b9-81b2-48a77fba8380	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Tiquete de barco ferry Atenas / Mykonos en clase economy	4
+31e79620-337f-426a-bdfe-8de9a75d3e3e	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Llegada a Mykonos y traslado al hotel con asistencia en español.	5
+ebbae5be-53a3-4555-99f5-9b55b2241471	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Alojamiento con desayuno en Mykonos	6
+3c4471fd-8cc2-4af9-ae74-0b47cfe0da60	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Día 4 – MYKONOS – SANTORINI (Desayuno)	7
+f053ee6d-e21c-4dc4-aa91-3ccff9de6c82	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Traslado hotel / puerto de Mykonos con asistencia en español.	8
+0a2d5336-9902-4bd2-9b46-8bbddcd225ee	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Tiquete de barco catamarán Mykonos / Santorini en clase economy	9
+6a66865c-706c-4276-8a2d-48fce6d12108	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Llegada a Santorini y traslado al hotel con asistencia en español.	10
+a7240b1e-36fd-48df-8fce-1646891c6f0c	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Alojamiento con desayuno en Santorini	11
+bb6ae57c-34d2-415b-8b8e-0f7d883d212d	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	Día 5 – SANTORINI.	12
+55171a5a-de26-46a6-acb4-d00436ecb6fc	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	ATENAS: Hotel International Atene 4*, habitaciones standard (ubicado en el centro de Atenas)	13
+507480b8-e8bb-4d5d-8409-cae1c5410f41	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	MYKONOS: Hotel Adonis 4*, habitaciones standard garden view (ubicado en la ciudad de Mykonos)	14
+bcdc707e-5fa0-4782-a010-6c1850d3b2da	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	SANTORINI: Hotel Daedalus 4*, habitaciones standard (ubicado en Fira, la capital de Santorini)	15
+c16e8c78-0ff4-4f47-b9ef-daddf683fded	5099c499-78ed-453c-9fd7-d0cae36d5e6d	9 noches de alojamiento en hoteles previstos o similar (4 y 5 estrellas)	0
+8057d684-c00a-4025-89b2-0f955bfcc675	5099c499-78ed-453c-9fd7-d0cae36d5e6d	9 desayunos	0
+10d445f8-b79c-420e-9bcf-84fe2b5074cc	5099c499-78ed-453c-9fd7-d0cae36d5e6d	5 cenas en hoteles del circuito (excepto Estambul)	0
+7ab570ed-7f8a-40e4-a644-b1e4fd24d685	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Vuelos internacionales (maleta personal + cabina)	0
+603bc630-5255-43ce-8149-747e48e1e24b	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Guía autorizado que habla español o portugués	0
+8cd6700d-d41b-4ae8-a31e-33c16113bcfb	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Traslados con asistente autorizado que habla español (IN - OUT)	0
+9e62e1dd-60ad-4b34-a0b2-9a803a9d1415	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Todas las entradas del itinerario	0
+b0903b11-167f-47f5-b488-6d41fde879ac	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Impuesto IVA	0
+a9cfbbb6-a818-4406-8b63-b335fa515db7	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Wi-Fi en el autobús y 0,5L de agua mineral por persona y día en el vehículo	0
+8d6fa6e0-3f8c-4523-b394-b7c997748ba5	5099c499-78ed-453c-9fd7-d0cae36d5e6d	Asistencia médica	0
+5e94a5d3-46c1-41f5-9f85-9726788d7984	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Por la tarde, realizaremos un paseo en faluca o motora por el Nilo. (En caso de que por falta de tiempo no pueda realizarse en Aswan, el paseo se realizará en El Cairo o en Luxor).	12
+8bf472dc-da1b-436d-9492-78863eb3c2eb	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Regreso a la motonave y noche a bordo.	13
+bfb84eae-ded7-4060-8676-a4aa7572a739	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Opcional: Posibilidad de realizar por carretera la visita opcional a los majestuosos Templos de Abu Simbel.	14
+5537c01a-58c0-4fe7-bffb-39e4aae340bd	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	El templo de Abu Simbel, junto con el templo de Nefertari forma el complejo de Abu Simbel, y fue mandado erigir por el Faraón Ramsés II, uno en su propio honor y otro en el de su esposa. Son uno de los seis templos edificados en roca en la zona nubia y tuvieron que ser trasladados de su emplazamiento original tras la construcción de la gran presa de Aswan.	15
+559ca98f-eaa0-4207-b9b7-4579eb784e94	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Día 7 – ASWAN - EL CAIRO (Desayuno).	16
+608a6c18-4d06-4ea2-b248-473240b14947	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Desayuno y día libre. A la hora prevista desembarque y traslado al aeropuerto para volar con destino a El Cairo. Recepción y traslado al hotel y alojamiento.	17
+a7f93dee-faa0-4a9f-806d-ce0095e47078	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Opcional: Salida para visitar el Barrio Copto donde se encuentra la Iglesia de Santa María la Virgen, más conocida como la Iglesia Colgante, la Iglesia de San Jorge y la Iglesia de San Sergio. Continuación en el Museo de Arte Egipcio, que alberga numerosas estatuas, pinturas, relieves, elementos funerarios y otros muchos objetos de la época de los Faraones; la Mezquita de Mohamed Ali Pasha, más conocida como la Mezquita de Alabastro, la Ciudadela de Salah El aDin (Saladino, quien fuera Sultán de Egipto), declarada Patrimonio de la Humanidad y el Gran Bazar de Khan el Khalili donde podremos callejear para realizar compras o tomar un té en un café de la zona. Traslado al hotel y alojamiento.	18
+f3fac54c-664c-4c35-95f7-65a757055e93	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Día 8 – EL CAIRO (Desayuno).	19
+aa4f4f04-17ae-410e-b3ee-da09a26c2860	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Desayuno. A la hora convenida traslado al aeropuerto  y según plan de vuelos, con destino España. Llegada. Fin del viaje y de nuestros servicios.	20
+a85d571f-4969-4ca9-be2c-cd7365332aba	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Chocolates de Bienvenida.	21
+6266e65c-eade-4171-a67a-930e35205b52	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	02 botellas de agua para cada viaje.	22
+fbc2016d-4ffb-4953-b626-0fdeeb0c8a53	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	WIFI gratito en el autobús.	23
+3bb8a556-8119-4589-b44a-03ca8d33976b	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	03 noches Cairo	24
+e2b0671d-fd15-4401-b12b-5a6d5149f2b6	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	04 noches en Crucero.	25
+92f5d54b-8da8-45d5-b04e-0c146d9db010	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Traslados regulares en coches A/C.	26
+ed74e984-8839-4f03-a245-c217eb9e7e6d	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Visitas según itinerario.	27
+802449cf-5799-48be-8217-547671046e5e	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	Guía local de habla hispana durante las visitas	28
+ca923896-bcad-4945-b5ca-ce1b1934e6c5	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Opcional: Continuación en de Arte Egipcio, Entre los preciados objetos de la colección del El Museo Egipcio se pueden ver estatuas, pinturas, relieves y elementos funerarios entre otros numerosos objetos, aunque si hay dos áreas que destacan sobre el resto de las exposiciones se trata de las salas de Tutankamón, donde se exponen los tesoros que se encontraron en su tumba, y la sala de las momias, donde reposan los restos momificados de importantes faraones. Después La Ciudadela de Salah El Al Din (Saladino, quien fuera Sultán de Egipto), a Ciudadela de Saladino en El Cairo En árabe es Qalaat Salaḥ ad-Din. Es una fortaleza grande en el Cairo. Construido entre los años 1176 y 1183 para proteger la ciudad.Fue una fortificación medieval islámico en El Cairo, Egipto. En Mokattam colina cerca del centro de El Cairo, fue famoso por su brisa fresca y grande vistas de la ciudad. Ahora es un sitio históricoconservado, con mezquitas y museos en su interior y traslado al hotel y Alojamiento. Comidas: Desayuno, Almuerzo.	1
+2b3d56ec-a3cc-49d6-8b6f-ce043ce40740	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 3 EL CAIRO – ASWAN  (Pensión Completa).	2
+a73022d6-257a-4a9d-8ee3-d337efa63ad8	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Desayuno. Traslado Aeropuerto para tomar el vuelo hacia Aswan donde te recibirán y trasladarán para embarcar en un crucero por el Nilo. Cena y noche abordo.	3
+09dde670-5718-4664-a6f7-2e203b05b714	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 4 – ASUÁN - KOM OMBO – EDFU (Pensión Completa).	4
+7f611c73-d607-4728-8085-27ac59a0890e	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Pensión completa. Desayuno.	5
+f3b29fe9-401f-42bb-a769-cf886de2c817	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Opcional: Posibilidad de realizar por carretera la visita opcional a los majestuosos Templos de Abu Simbel. El templo de Abu Simbel, junto con el templo de Nefertari forma el complejo de Abu Simbel, y fue mandado erigir por el Faraón Ramsés II, uno en su propio honor y otro en el de su esposa. Son uno de los seis templos edificados en roca en la zona nubia y tuvieron que ser trasladados de su emplazamiento original tras la construcción de la gran presa de Aswan. Salida para realizar la visita del Templo de Philae, construido en honor de la diosa Isis y considerado la joya del Nilo. Finalizada la visita, daremos un paseo en faluca o motora por el Nilo. (En caso de que por falta de tiempo no pueda realizarse en Aswan, el paseo se realizará en El Cairo o en Luxor).Navegación hacia Kom Ombo. Llegada y salida para realizar la visita del único templo en Egipto dedicado simultáneamente a dos dioses, el dios Sobek con cabeza de cocodrilo y el dios Haroeris con cabeza de halcón. Regreso a la motonave, navegación y noche a bordo.	6
+1275643e-5925-44f5-b32e-3cdb169cc067	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 5 – EDFU - ESNA - LUXOR (Pensión Completa).	7
+d1fbf171-83b7-48d9-93b9-8906f24607ca	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 9 – HURGADA – EL CAIRO (Pensión Completa).	19
+aa4ca961-9649-4f47-bc58-d31b175a0fc9	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Desayuno. Salida para regresar al Cairo traslado por autobús con el aire acondicionado hasta el Cairo. Paseo nocturno por la ciudad del Cairo conocer la ciudad antigua y el centro del Cairo y cena (plato de KUSHARI típico egipcio y probar FALAFEL) Traslado al hotel y alojamiento.	20
+51d094d2-c785-4f20-b594-d322b7557fb1	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Comidas: Desayuno, Almuerzo y Cena	21
+7f757240-9296-4750-9c71-4bfe15b7930e	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 10 – EL CAIRO (Desayuno).	22
+a9aae092-5918-4846-a115-501cf83c8f5f	88be8f27-1395-44ba-9f5b-58ac9ea9f387	03 noches Hurgada.	29
+42ad1c77-b924-4251-a4bc-8cdaff7a1e41	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Alojamiento y alimentos (sin bebidas) como indicado en el itinerario	1
+3f1ace03-896e-479a-9e1c-a7797c2ba812	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Traslados, visitas y excursiones con guía de habla hispana	2
+c6d5880a-252f-427f-a0bc-51e0d12458d8	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Entradas a los sitios de interés durante las visitas y excursiones	3
+3d78a2a2-c107-4d4c-9c08-f2881fac810b	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	Impuestos habitaciones, VAT y manejo de equipaje	4
+d71c6fc7-ed91-459e-af73-7f8b22028510	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Traslado de regreso al hotel, resto de la tarde libre a su disposición.	1
+179a723a-ed7e-488f-b296-f4cf3fe8c58e	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Día 7 – CHIANG MAI – SALIDA (Desayuno).	2
+8e7541a0-daf2-4df1-9300-b801c67257b1	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Desayuno en el hotel.	3
+732ad3ea-b0b6-4b95-bf14-28e0c4a8325b	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Desayuno. A la hora convenida traslado al aeropuerto y según plan de vuelos, con destino España. Llegada. Fin del viaje y de nuestros servicios.	23
+ac661160-24f8-4d55-a436-582971bc34ac	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Chocolates de bienvenida.	24
+4e45f3ac-38a8-41b6-ba14-83b703c67780	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	A la hora indicada, traslado al aeropuerto para tomar su vuelo hacia su siguiente destino.	4
+4db5acb1-c884-4a71-9a4f-4597d265c6e2	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Standard	5
+d56ac165-009e-492d-af99-f7b5eaaa937c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Superior	6
+0e3415a9-29c8-4cd1-b6b7-aa3429d2cea3	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Deluxe	7
+9439743f-09b8-4cf2-b73d-a5abeac109c2	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Gold Deluxe	8
+047e8c4c-c918-4d1d-8879-c209a16c0fcd	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Bangkok	9
+9fbe2dca-1c51-4bea-ae2a-fc0541ff449d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	MANDARIN HOTEL BY CENTRE POINT	10
+bb303f50-4af9-4afa-9517-58e0afd002d4	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe o similar	11
+a2345d6f-5249-4375-93ed-eeec47e243e4	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	BEST WESTERN CLICK SATHORN 11	12
+b4831356-bb77-4ad4-9f59-6d9f5e478486	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior o similar	13
+46dc52ac-7703-45b2-bfec-89405d68b319	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	HILTON GARDEN INN BANGKOK SILOM	14
+286c4af0-98ab-4e30-ae80-1913550b309d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similarHab. Guest room	15
+79aa972f-4459-491a-89cb-cab541cd6538	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	JC KEVIN SATHORN BANGKOK HOTEL	16
+cc606e83-fa10-4b1f-8b8b-534314d2b682	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similar	17
+49296b7b-36d5-4496-82d0-1745415360d3	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. One Bedroom Suite	18
+ad395a27-649d-4dd2-a7bb-938acc7b14a9	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	MONTIEN SURAWONG o similar	19
+21eb8396-1d21-400f-8cd0-fae278588deb	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe	20
+95c81d26-5c4e-4cc1-af3a-3675f1122960	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	PULLMAN BANGKOK HOTEL G	21
+a09f0ea0-b61e-4ae9-bcde-88a93b5a0630	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Premium Deluxe room o similar	22
+96d0f220-722c-4140-b558-b8aedd9afcb4	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SO BANGKOK o similar	23
+ca2e0d12-d9a3-4626-b4db-c97670030d52	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. So Cozy	24
+71e24497-5ee6-49af-9fc4-59605b371faa	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Sukhothai	25
+afcfa7fc-099d-4fa6-8a3c-01dd9cf6f78f	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SUKHOTHAI TREASURE RESORT & SPA o similar	26
+388ad61d-0394-4b8f-9326-6a42b5aa6c43	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	27
+f7bd862c-2ff4-456a-acca-c065f73eb55c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SRIWILAI SUKHOTHAI o similar	28
+6a16b3eb-e924-40f3-b5de-36fe97550418	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	29
+50117136-8965-4a88-b84a-ccefcd2aa58f	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Chiang Rai	30
+e2dd3aaa-919a-43e5-93f7-d1c8a56e9ae3	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	LALUNA HOTEL & RESORT	31
+cc3376f5-0e00-49f8-844c-d5cfb3283fe2	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Garden Bungalow	32
+224d6d3a-42db-4e14-a0d0-8606fee0ad9a	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	WIANG INN HOTEL	33
+db591160-9398-4097-ab7c-884a6df6d215	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similar	34
+d6140fd6-aaac-4b89-99ac-ef39d276e001	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	35
+6b479694-9932-4784-828f-79f55609221b	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	LEGEND o similar	36
+742100bd-a329-4e99-b1e3-79dad21f12ee	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	37
+ebeeab9d-060d-4d44-a926-4a29b8006cd2	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	THE RIVERIE BY KATATHANI o similar	38
+c2013245-30d9-4386-9755-d22545c45004	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe Garden	39
+41183d48-ef1f-4653-972b-eafd9c0d0150	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	LE MERIDIEN o similar	40
+6d404c5b-067c-4ef1-b313-58ed56a5d8e7	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe Garden	41
+bab95f42-edf3-4f96-a82a-bb367962254a	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Chiang Mai	42
+718f91c4-b542-41fd-86da-89afb4a2f411	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	IBIS CHIANG NIMMAN JOURNEYHUB	43
+7bb7874c-1621-4118-9c1e-4204b9430f3d	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	o similarHab. Standard	44
+b394bf50-98d3-4fa5-89be-35da9e3400ad	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	NOVOTEL NIMMAN	45
+d1c82086-23b8-4e66-8294-1515562842d6	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior Balcony	46
+017c6f15-4d69-4923-9397-f4b8c84d99af	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	TRAVELODGE NIMMAN o similar	47
+b06fa21c-078e-4754-a186-18aa0a691ff0	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Superior	48
+40686e32-ec9f-470c-8af7-d92bcbf88719	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	MELIA CHIANG MAI	49
+cacc332a-0c85-4cea-8e7e-fec94b6a56f5	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Melia room o similar	50
+18bda452-9830-4776-8e14-194ee9713512	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	AKYRA MANOR CHIANG MAI	51
+3ee889ce-ccee-4eca-9fa1-69c8dc9cc08e	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe o similar	52
+efb6dd1a-376d-4862-a735-e587bcbd6d3a	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	SHANGRI-LA CHIANG MAI  o similar	53
+a6c96bc2-f02c-45da-869b-6944eda2609c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	Hab. Deluxe	54
+2f0cb72d-1625-4423-b901-161eeafc01e5	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	La solicitud de cambio de la habitación está sujeta a disponibilidad y puede acarrear costes extras.	55
+4778e4d4-2b6c-49b0-b45a-39bb9b9f60b0	828163d2-cfd7-46f5-9d41-92e538bae766	Alojamiento y alimentos (sin bebidas) como indicado en el itinerario	1
+db293d63-d20a-4064-a8da-c0a4eb49682a	828163d2-cfd7-46f5-9d41-92e538bae766	Traslados, visitas y excursiones con guía de habla hispana	2
+46635584-c592-4b12-bba5-fe1c678a6380	828163d2-cfd7-46f5-9d41-92e538bae766	Entradas a los sitios de interés durante las visitas y excursiones	3
+c7ed0d8c-2e7c-4a33-b9ed-3deb79bd2808	828163d2-cfd7-46f5-9d41-92e538bae766	Impuestos habitaciones, VAT y manejo de equipaje	4
+92f2dae1-10f6-420e-bfb1-355b6d501d67	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Almuerzo en restaurante local.	1
+10a7cc9e-8b84-45ea-a825-91bff38faf6a	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Después del almuerzo, tendremos una experiencia con las flores y su tradicional forma de adornarlas. Visita a una floristería artesanal para ver cómo se realizan los ramos, cómo se transmite y conserva este hermoso y tradicional arte espiritual de Vietnam que ha llegado a nuestros días generación tras generación. Los invitados aprenderán a reconocer flores exóticas a la vez que disfrutan preparando una ofrenda floral espiritual. Posteriormente llegamos al lago Hoan Kiem, el corazón de Hanói, donde daremos un paseo alrededor del lago con una vista panorámica al templo Ngoc Son, situado en medio del lago, junto con el puente rojo The Huc.Por último, realizaremos un paseo panorámico en ciclo pousse por el Barrio Antiguo de Hanói, también conocido como el barrio de las 36 calles ya que en su tiempo fue conocido por el oficio de los artesanos que las habitaban y por los talleres que allí había.	2
+6c509cac-f5d3-4ddc-bd56-3719b2fc8b3a	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Regreso al hotel y alojamiento en Hanói.	3
+a067b480-54a6-41ba-a4b4-79ce682926a4	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Régimen de comidas: Desayuno y almuerzo	4
+04f28601-e473-48a5-8dbe-4ad528eacca1	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Recomendaciones: Reservar un masaje tradicional o participar en el curso de cocina vietnamita. Asistencia al espectáculo Marionetas sobre el agua.	5
+8499f1d8-fbc0-4180-b3d9-6867576e00d8	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Día 3 – HANÓI - BAHÍA DE HALONG (Desayuno,  almuerzo y cena).	6
+ef7f730e-311d-4762-896b-ae54f547ad5b	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Después del desayuno, encuentro con nuestro guía en el hall del hotel.	7
+a8cd23a2-710d-467d-8534-8930dd7cdd8d	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Salida por carretera hacia la Bahía de Halong que significa “el dragón que desciende del mar” en vietnamita, y según la leyenda, fue un dragón quien formó las islas de la bahía. Embarque en un maravilloso crucero con el que visitarán la bahía. Almuerzo a bordo.	8
+d4f87f32-fa21-4602-853f-39ee99d210f6	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Acabado el almuerzo, continuaremos navegando y descubriendo miles de islas e islotes de abundante vegetación que emergen en la bahía con sus insólitas formas y diferentes tamaños. Las aguas color esmeralda de este legendario tesoro nos llevan a explorar islas sublimes como la de la Tortuga, la del Perro, la Cabeza de Hombre, etc. Debido a su singular belleza, peculiaridad geológica, riqueza biológica, importancia cultural e histórica, la Bahía de Halong fue declarada Patrimonio de la Humanidad por la UNESCO en 1994 e incluida en la lista de las Siete Maravillas Naturales del Mundo desde 2011.	9
+95d9182b-1bfa-464c-bfb6-7ce3b794dba3	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Más allá de la contemplación del magnífico paisaje, disfrutamos de tiempo libre o de algunas de las actividades opcionales tales como nadar, practicar kayak o participar en una demostración de cocina vietnamita en la terraza del barco.	10
+ea07d793-5cf7-4306-a708-86de8166f57a	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	Cena y alojamiento a bordo.	11
+7a0dbd27-0206-423c-a4e7-e8a92fac5d9e	8a709aed-8b86-413a-bfcb-575185e69d53	Almuerzo en restaurante local.	1
+1b4a835b-b305-421c-8544-4aab227943aa	8a709aed-8b86-413a-bfcb-575185e69d53	Después del almuerzo, tendremos una experiencia con las flores y su tradicional forma de adornarlas. Visita a una floristería artesanal para ver cómo se realizan los ramos, cómo se transmite y conserva este hermoso y tradicional arte espiritual de Vietnam que ha llegado a nuestros días generación tras generación. Los invitados aprenderán a reconocer flores exóticas a la vez que disfrutan preparando una ofrenda floral espiritual. Posteriormente llegamos al lago Hoan Kiem, el corazón de Hanói, donde daremos un paseo alrededor del lago con una vista panorámica al templo Ngoc Son, situado en medio del lago, junto con el puente rojo The Huc.Por último, realizaremos un paseo panorámico en ciclo pousse por el Barrio Antiguo de Hanói, también conocido como el barrio de las 36 calles ya que en su tiempo fue conocido por el oficio de los artesanos que las habitaban y por los talleres que allí había.	2
+5b43b5d0-c33f-4f5b-a2bd-838e9736d0e0	8a709aed-8b86-413a-bfcb-575185e69d53	Regreso al hotel y alojamiento en Hanói.	3
+3b6186ca-87db-4016-9e80-748555c67932	8a709aed-8b86-413a-bfcb-575185e69d53	Régimen de comidas: Desayuno y almuerzo	4
+0109d4f7-88b1-4acb-a0d7-312582668f86	8a709aed-8b86-413a-bfcb-575185e69d53	Recomendaciones: Reservar un masaje tradicional o participar en el curso de cocina vietnamita. Asistencia al espectáculo Marionetas sobre el agua.	5
+aacba610-2eda-4c5c-989d-2ff4937d67f2	8a709aed-8b86-413a-bfcb-575185e69d53	Día 3 – HANÓI - BAHÍA DE HALONG (Desayuno,  almuerzo y cena).	6
+3187982c-c245-4190-bcb5-d912f0891a0d	8a709aed-8b86-413a-bfcb-575185e69d53	Después del desayuno, encuentro con nuestro guía en el hall del hotel.	7
+4c7d8295-0558-4e30-b971-874483d10d8b	8a709aed-8b86-413a-bfcb-575185e69d53	Salida por carretera hacia la Bahía de Halong que significa “el dragón que desciende del mar” en vietnamita, y según la leyenda, fue un dragón quien formó las islas de la bahía. Embarque en un maravilloso crucero con el que visitarán la bahía. Almuerzo a bordo.	8
+acc08d88-7105-4d00-93df-b656abf6eea1	8a709aed-8b86-413a-bfcb-575185e69d53	Acabado el almuerzo, continuaremos navegando y descubriendo miles de islas e islotes de abundante vegetación que emergen en la bahía con sus insólitas formas y diferentes tamaños. Las aguas color esmeralda de este legendario tesoro nos llevan a explorar islas sublimes como la de la Tortuga, la del Perro, la Cabeza de Hombre, etc. Debido a su singular belleza, peculiaridad geológica, riqueza biológica, importancia cultural e histórica, la Bahía de Halong fue declarada Patrimonio de la Humanidad por la UNESCO en 1994 e incluida en la lista de las Siete Maravillas Naturales del Mundo desde 2011.	9
+10698bf8-a174-461a-b4fa-f41148be19d5	de9eb689-7a5f-4095-a254-57e4d4276338	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+6e418c09-bb88-490a-9131-82d442f8a102	de9eb689-7a5f-4095-a254-57e4d4276338	3 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+d14dd8e4-312d-4416-b76a-99fc3abfe6ae	de9eb689-7a5f-4095-a254-57e4d4276338	Todos los desayunos ofrecidos por los hoteles (Box Breakfast para Machu Picchu)	3
+4ea28d66-bad2-4a96-bd6c-5abea543cfb2	de9eb689-7a5f-4095-a254-57e4d4276338	City tour Arqueológico - Cusco	4
+81d11ade-96cd-4c31-a3d1-19e707e423b2	de9eb689-7a5f-4095-a254-57e4d4276338	Tour a Salineras de Maras, Moray, Valle Sagrado (incluye almuerzo)	5
+72c92a7a-6afe-40c9-b32d-620377781683	de9eb689-7a5f-4095-a254-57e4d4276338	Tour a Machu Picchu	6
+bb5bc7f5-7332-4fc4-a7c2-19cdd1d5f4ff	de9eb689-7a5f-4095-a254-57e4d4276338	Ticket de TREN VOYAGER ó EXPEDITION	7
+0d619943-a44e-4364-8eb2-42d6661d78f8	de9eb689-7a5f-4095-a254-57e4d4276338	BTG (Boleto turístico general)	8
+f8b9ddb4-d522-43e1-99bc-d386c07638fc	de9eb689-7a5f-4095-a254-57e4d4276338	Ticket Ingreso a Machu Picchu	9
+74a627f1-2d2d-4264-b94e-7a126517cc19	de9eb689-7a5f-4095-a254-57e4d4276338	Boleto de bus de subida y bajada Aguas Calientes/Machupicchu/Aguas Calientes	10
+5d4801dc-3cb9-4504-bfa5-1f99eafccdd8	de9eb689-7a5f-4095-a254-57e4d4276338	Guía profesional bilingüe para todo el recorrido	11
+689a4cde-b9e4-4b8a-b985-87ab7ca64ff5	de9eb689-7a5f-4095-a254-57e4d4276338	Bus turístico	12
+0387649f-3c66-42ae-865b-507eb00adda7	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Traslados aeropuerto - hotel - aeropuerto en Cusco	1
+9af75adb-9869-443a-a316-34755ae6cdce	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	2 noches de alojamiento en Cusco	2
+9f047db4-3a60-476e-8998-f25f4d6ddb56	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	2 desayunos	3
+e3b57ab7-8069-4538-9dff-ea42524e08df	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	City Tour en Cusco con entradas incluidas	4
+896058ec-8e18-4b87-9f07-5fd9b6286383	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Tour a Machu Picchu (tren + bus + entrada + guía)	5
+43b6ec8d-b277-4949-b0dc-2126cabc1db0	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	Guía profesional en español	6
+9f849860-8061-4159-afd6-77c2f74d96a9	6997b7ff-f839-45be-b81e-0282087fe1dd	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+af07f312-654b-49ac-9f0f-6a25494e9f68	6997b7ff-f839-45be-b81e-0282087fe1dd	5 días / 4 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+d36ead2e-1e3f-4d58-ae4d-1f6ab0c31dfd	6997b7ff-f839-45be-b81e-0282087fe1dd	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+23f2c105-e63f-4b6c-9ce5-d08c115bbdaf	6997b7ff-f839-45be-b81e-0282087fe1dd	Machu Picchu).	4
+1a411df3-763f-4f3d-84c3-e63ee1a64597	6997b7ff-f839-45be-b81e-0282087fe1dd	City tour Arqueológico - Cusco	5
+91146084-0db3-4c4c-9f7c-fb22678d6b94	6997b7ff-f839-45be-b81e-0282087fe1dd	Tour a Machu Picchu	6
+2b0661e8-3260-4a09-a94d-3d5219c33e47	6997b7ff-f839-45be-b81e-0282087fe1dd	Tour a laguna Humantay (incluye Desayuno y almuerzo)	7
+3f813866-2f48-41e1-af74-0fa0dff11f8c	6997b7ff-f839-45be-b81e-0282087fe1dd	Tour a Vinicunca (la Montaña de 7 colores - incluye Desayuno y almuerzo)	8
+e36159a1-5f34-4605-b962-ccafae02d0d9	6997b7ff-f839-45be-b81e-0282087fe1dd	Ticket de TREN VOYAGER ó EXPEDITION	9
+711ffc98-81cb-42d2-95c8-8e3bd8dbb3b3	6997b7ff-f839-45be-b81e-0282087fe1dd	BTG (Boleto turístico general)	10
+11edb4d4-a91b-4277-9384-28c4655b12ef	6997b7ff-f839-45be-b81e-0282087fe1dd	Ticket Ingreso a Machu Picchu	11
+0bf3f259-fcf7-4d72-9997-51e4bed013a0	6997b7ff-f839-45be-b81e-0282087fe1dd	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	12
+ffd321cf-cea8-4303-87b7-4ad953014022	6997b7ff-f839-45be-b81e-0282087fe1dd	Guía profesional bilingüe para todo el recorrido.	13
+209b7817-80c0-4cfb-9951-bf729c517cbf	6997b7ff-f839-45be-b81e-0282087fe1dd	Bus turístico	14
+16ab30ab-3e99-4c92-8f1a-92d6f8a87d3c	6997b7ff-f839-45be-b81e-0282087fe1dd	Bus turístico	15
+a1b785ad-5253-42b3-a4ce-5feac7ab84f9	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+45ee1549-4c9a-4b0a-8a54-28ea66f0fd1f	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	6 días / 5 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+281cf72a-ba75-4a64-9b8c-17d876fb6ea4	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+bc9f5313-d654-44ae-9f6d-abb1f2a85d4c	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Machu Picchu).	4
+755099e8-4125-4b85-9585-522b4f9b2215	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	City tour Arqueológico - Cusco	5
+37bbf1a8-989a-42ee-ab67-151fa88863a5	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Tour a Salineras de Maras, Moray, Valle Sagrado (incluye almuerzo)	6
+67219f1a-e806-433c-9998-4f39bf7d1a3c	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Tour a Machu Picchu	7
+8abcecf9-cb53-45de-acf5-8c38320dead5	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Tour a laguna Humantay (incluye Desayuno y almuerzo)	8
+307f8a10-9c04-46e3-b967-9d564c419944	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Tour a Vinicunca (la Montaña de 7 colores - incluye Desayuno y almuerzo)	9
+f1638754-162e-4518-8a4f-dffdf8b6c32c	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Ticket de TREN VOYAGER ó EXPEDITION	10
+9f0cca37-9d18-4bbe-ad7a-ef28b2b6caca	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	BTG (Boleto turístico general)	11
+e0ee2dc2-3cf6-44f1-b20b-466ab5033df1	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Ticket Ingreso a Machu Picchu	12
+287bfd63-37cb-42b7-abad-d9d68258f4dd	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	13
+c99dbde5-59c2-4721-84e9-9532d95faab1	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Guía profesional bilingüe para todo el recorrido.	14
+7805432d-f2a4-408b-b1cf-8233f5fe89d6	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Bus turístico	15
+a9e6ac50-8757-47f6-b881-f7300ba61239	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	Bus turístico	16
+cea9a6d0-1843-43a8-9062-1fa743f344ab	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+65bb46f9-10a5-4024-8657-044b54186bd7	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	3 días / 2 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+d6558509-52a7-44c1-97c8-747f0e29792c	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+24f73a14-9071-40e3-9b6a-55094c32d5c5	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Machu Picchu).	4
+580a1cdd-3583-42c6-ae4d-4806b40f1fd5	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	City tour Arqueológico - Cusco	5
+478f8ddc-6bb1-488b-95d6-ba6f3c78819c	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Tour a Machu Picchu	6
+283d0f8a-44c0-416a-94bd-e7215a24bc9c	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Ticket de TREN VOYAGER ó EXPEDITION	7
+3c801f19-7924-4223-8c28-82358dcf5c29	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	BTG (Boleto turístico general)	8
+13f597da-d24d-4d2d-aa9d-24957f49bc6b	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Ticket Ingreso a Machu Picchu	9
+a507e7b7-aee4-4d45-a94f-630d37a3ca3e	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	10
+bf581990-751e-472a-8ae3-72b2afc5a683	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Guía profesional bilingüe para todo el recorrido.	11
+d2549d43-c4f7-4c02-9a49-b585e15cde1e	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Bus turístico	12
+950cf54e-3a65-49ab-9950-dee480bba3e7	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Tour a Islas Ballestas (Paracas) – Huacachina (incluye paseo en Tubulares + Sandboard)	13
+a5248bbc-7276-4e2b-a71e-77fd8de8b92a	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	City Tour en Lima	14
+b73b76e4-ff97-4d99-a548-174b457166b1	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	Traslado de Aeropuerto/hotel/Aeropuerto – Lima	15
+accc04cc-82c9-4e40-8e0b-884b51c31452	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	2 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	16
+daec240a-4b98-47eb-9afa-2914c3597984	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	2 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	17
+85740b77-6c2f-4233-ac9f-77403dff9164	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+4d412787-c6be-4b22-967b-13f5060275e7	b3d7b805-e20b-4fec-97b4-ae33ce95a273	4 días / 53 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+371f5958-571e-4c21-a7bc-84f30b939677	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+2a00cafd-27d9-40c4-b191-9af9698b5a03	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Machu Picchu).	4
+48baf7d1-073e-4ecb-ae46-7668aeb91d24	b3d7b805-e20b-4fec-97b4-ae33ce95a273	City tour Arqueológico - Cusco	5
+fd43143f-848b-4dd6-8d2c-bb30e776632c	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Tour a Machu Picchu	6
+077901d0-d55f-4512-968c-3c0a0bfd5b3c	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Tour a Vinicunca (la Montaña de 7 colores - incluye Desayuno y almuerzo)	7
+bc8465fc-2079-4c1f-a5b6-2b5826e309df	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Ticket de TREN VOYAGER ó EXPEDITION	8
+84f896e5-f6a7-4090-86f0-5a2122d8d312	b3d7b805-e20b-4fec-97b4-ae33ce95a273	BTG (Boleto turístico general)	9
+4caa30d6-5d5c-4ca4-b32f-925218363d5d	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Ticket Ingreso a Machu Picchu	10
+7f241391-08d2-45f7-a052-6a0f2c290824	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	11
+ad9d2cc9-e746-4937-a5c5-8c179f294ba9	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Guía profesional bilingüe para todo el recorrido.	12
+a9eb9f46-4e8f-4e4f-8c3c-9b2603d03a8c	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Bus turístico	13
+1fb49293-5b7f-4f68-9d67-b392b12da562	b3d7b805-e20b-4fec-97b4-ae33ce95a273	Bus turístico	14
+7667e9c7-6b83-4419-9204-a067f794ee4c	f1388f85-c87c-4875-8ad2-7523977b1196	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+52853851-4bb3-4391-ac41-00153bfcb60d	f1388f85-c87c-4875-8ad2-7523977b1196	5 días / 4 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+a0bc389f-9ee8-42bc-9359-6a716450f0c2	f1388f85-c87c-4875-8ad2-7523977b1196	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+74e7da67-bc43-4a5f-86eb-f61ff0fda86b	f1388f85-c87c-4875-8ad2-7523977b1196	Machu Picchu).	4
+afe4b92d-7d65-4bfc-9a26-bdb2fb9191c1	f1388f85-c87c-4875-8ad2-7523977b1196	City tour Arqueológico - Cusco	5
+6fd4add8-7c7c-4b31-ab68-cb493d491aea	f1388f85-c87c-4875-8ad2-7523977b1196	Tour a Salineras de Maras, Moray, Valle Sagrado (incluye almuerzo)	6
+b3d38cdd-614e-4369-8023-c5a707663a38	f1388f85-c87c-4875-8ad2-7523977b1196	Tour a Machu Picchu	7
+f46ca74d-84f0-4dd6-8a1d-e9686c28f8fd	f1388f85-c87c-4875-8ad2-7523977b1196	Tour a Vinicunca (la Montaña de 7 colores - incluye Desayuno y almuerzo)	8
+9669f764-9b0b-4735-96af-d53fe8442b18	f1388f85-c87c-4875-8ad2-7523977b1196	Ticket de TREN VOYAGER ó EXPEDITION	9
+57814691-cbae-4bb2-a68e-1ad4c478a2a8	f1388f85-c87c-4875-8ad2-7523977b1196	BTG (Boleto turístico general)	10
+a8dd9990-2925-43e1-ad9f-2a89b5744316	f1388f85-c87c-4875-8ad2-7523977b1196	Ticket Ingreso a Machu Picchu	11
+58c80270-e898-4732-9fc8-c697ce582d40	f1388f85-c87c-4875-8ad2-7523977b1196	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	12
+e1f0610e-ae89-4b55-8ec3-d7b43e1a049a	f1388f85-c87c-4875-8ad2-7523977b1196	Guía profesional bilingüe para todo el recorrido.	13
+fc64639f-cd04-46f1-aa98-57eca09a333d	f1388f85-c87c-4875-8ad2-7523977b1196	Bus turístico	14
+95c1de6a-49a8-4157-89e4-9e5c51c44d58	f1388f85-c87c-4875-8ad2-7523977b1196	Bus turístico	15
+dc5185e7-5ea1-4c5c-b81a-1dda16bc68f8	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+c74935c9-b97f-4c2c-87eb-145ea4c63dac	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	4 días / 3 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+939718e4-98ce-4916-a784-b09f639daf19	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+72c86f53-a50a-4d5c-ba4a-3b8923f4207c	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Machu Picchu).	4
+11f11ee4-e016-40b0-a87e-9324163a7024	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	City tour Arqueológico - Cusco	5
+ee7bb4af-a657-47ba-95ef-02650a30c547	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Tour a Machu Picchu	6
+8e91be98-603b-4bbd-aa3b-4e5a89eb9bd6	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Tour a Vinicunca (la Montaña de 7 colores - incluye Desayuno y almuerzo)	7
+4efe0cc9-91b2-4c07-8fdd-1aa898577abd	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Ticket de TREN VOYAGER ó EXPEDITION	8
+64ce9781-4de5-4808-bfb4-7301d5de2cf4	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	BTG (Boleto turístico general)	9
+294c3eb9-da44-4166-8392-4314b317706e	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Ticket Ingreso a Machu Picchu	10
+a952fc3c-7123-4577-bf93-331e6a0e6688	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	11
+29bac3cb-42df-4de9-b9f7-07b7a036c342	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Guía profesional bilingüe para todo el recorrido.	12
+f20d73a3-4f23-4295-ab89-d50ab282c646	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Bus turístico	13
+b8396052-335a-4783-a2c8-42d1730343ef	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Tour a Islas Ballestas (Paracas) – Huacachina (incluye paseo en Tubulares + Sandboard)	14
+1e616997-37ec-44d7-b6d7-5199f3d61100	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	City Tour en Lima	15
+f68006ac-0abd-4a8d-960a-b1c9b52f38f7	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	Traslado de Aeropuerto/hotel/Aeropuerto – Lima	16
+866543ac-00cf-486b-bd3d-8bcaf7e11939	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	2 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	17
+e49637de-ce21-41b8-a87a-eced6014a734	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	2 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	18
+636633b7-a360-4e7d-8508-49108a4257af	68e078c2-74fb-4390-a039-b17d6d7c7a54	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+0dec4b47-fb6f-438c-bf69-d5e91da3ecf8	68e078c2-74fb-4390-a039-b17d6d7c7a54	4 días / 3 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+51f944e1-cc99-4870-93de-3e2bd57de733	68e078c2-74fb-4390-a039-b17d6d7c7a54	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+7abd433d-d8ff-46ee-b1b2-b64f95473ce5	68e078c2-74fb-4390-a039-b17d6d7c7a54	Machu Picchu).	4
+a9bd1b13-532c-4b67-9306-eccdcae7bf68	68e078c2-74fb-4390-a039-b17d6d7c7a54	City tour Arqueológico - Cusco	5
+ffd97119-d8d8-49f5-9cd6-771fde0dd52c	68e078c2-74fb-4390-a039-b17d6d7c7a54	Tour a Machu Picchu	6
+e094360d-54e1-49f2-ac56-b83a8450c79d	68e078c2-74fb-4390-a039-b17d6d7c7a54	Tour a Vinicunca (la Montaña de 7 colores - incluye Desayuno y almuerzo)	7
+8c8e2d81-3996-481d-95c0-3d378a80f32a	68e078c2-74fb-4390-a039-b17d6d7c7a54	Ticket de TREN VOYAGER ó EXPEDITION	8
+a84bb05c-2e55-4380-b6c8-d9a94ef75269	68e078c2-74fb-4390-a039-b17d6d7c7a54	BTG (Boleto turístico general)	9
+0e1a1677-78c7-42cc-b6ba-b3c5a66300bb	68e078c2-74fb-4390-a039-b17d6d7c7a54	Ticket Ingreso a Machu Picchu	10
+50fa430f-28be-4f22-b3bd-0d3ba45e638b	68e078c2-74fb-4390-a039-b17d6d7c7a54	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	11
+217a6c34-163c-4d00-aafe-dc5a3e43dbfb	68e078c2-74fb-4390-a039-b17d6d7c7a54	Guía profesional bilingüe para todo el recorrido.	12
+73276f49-f2e3-40ba-ac07-f7e1b5f1d4a2	68e078c2-74fb-4390-a039-b17d6d7c7a54	Bus turístico	13
+71b5f44a-e682-4984-8ffc-bfe5d6cdf5f8	68e078c2-74fb-4390-a039-b17d6d7c7a54	Tour a Islas Ballestas (Paracas) – Huacachina (incluye paseo en Tubulares + Sandboard)	14
+21bbc115-af19-4a83-b30d-1496356a57d4	68e078c2-74fb-4390-a039-b17d6d7c7a54	City Tour en Lima	15
+1009cc59-104c-46b1-b359-c4d019bd374d	68e078c2-74fb-4390-a039-b17d6d7c7a54	Traslado de Aeropuerto/hotel/Aeropuerto – Lima	16
+438cd539-0994-4e8b-ac52-af8ca932312a	68e078c2-74fb-4390-a039-b17d6d7c7a54	3 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	17
+63e5adfa-35bd-4f78-94ef-5b7d2c9f2b3f	68e078c2-74fb-4390-a039-b17d6d7c7a54	3 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	18
+6bafdebc-4aba-4487-b138-0b3c3d58f207	f2db34e2-0381-4efa-a25f-6af768737c7a	Traslado de Aeropuerto/hotel/Aeropuerto – Cusco	1
+d59f5834-8cc2-4a95-9688-7d31d948b002	88be8f27-1395-44ba-9f5b-58ac9ea9f387	02 botellas de agua para cada viaje.	25
+de448fa6-f48e-4552-8a1a-b5ea68eb116c	88be8f27-1395-44ba-9f5b-58ac9ea9f387	WiFi en el autobús	26
+ab351a4f-7609-49c6-9116-d520c5034a91	88be8f27-1395-44ba-9f5b-58ac9ea9f387	03 noches Crucero Nilo P/C de 5 estrellas.	27
+171f8778-7ff5-4bc6-9517-8a81f154b50a	88be8f27-1395-44ba-9f5b-58ac9ea9f387	03noches Cairo.	28
+74f75aa9-60b4-4361-9dc0-90c3b6ff3c61	f2db34e2-0381-4efa-a25f-6af768737c7a	6 días / 5 noches de hospedaje en Cusco – ILLA HOTEL (3 estrellas)	2
+2c2a5b4a-3669-489e-bcbe-2411c901daf3	f2db34e2-0381-4efa-a25f-6af768737c7a	Todos los desayunos ofrecidos por los hoteles reservados (Box Breakfast para el día del Tour a	3
+f70600f6-d738-42fa-b68b-94591e30ffd0	f2db34e2-0381-4efa-a25f-6af768737c7a	Machu Picchu).	4
+b7497bb7-7c1c-4049-a298-e9c8e0ed11d8	f2db34e2-0381-4efa-a25f-6af768737c7a	City tour Arqueológico - Cusco	5
+d8f042c8-a6f8-4363-85a0-abb74e9f5905	f2db34e2-0381-4efa-a25f-6af768737c7a	Tour a Salineras de Maras, Moray, Valle Sagrado (incluye almuerzo)	6
+4510a4df-9542-4c00-a26f-2cb34b9ce252	f2db34e2-0381-4efa-a25f-6af768737c7a	Tour a Machu Picchu	7
+e59c0472-84e5-415e-8def-fdee9779a8e3	f2db34e2-0381-4efa-a25f-6af768737c7a	Tour a laguna Humantay (incluye Desayuno y almuerzo)	8
+f1464d6d-8335-4583-8c9f-dc6128e41104	f2db34e2-0381-4efa-a25f-6af768737c7a	Tour a Vinicunca (la Montaña de 7 colores - incluye Desayuno y almuerzo)	9
+df0be440-3148-4d24-ad33-e1b2a09e842d	f2db34e2-0381-4efa-a25f-6af768737c7a	Ticket de TREN VOYAGER ó EXPEDITION	10
+b7df5343-e8cf-417d-8050-6ff333c8e7b9	f2db34e2-0381-4efa-a25f-6af768737c7a	BTG (Boleto turístico general)	11
+5df010d6-8145-41f6-8924-a41bbe50c281	f2db34e2-0381-4efa-a25f-6af768737c7a	Ticket Ingreso a Machu Picchu	12
+4f4278fb-9150-46a1-ba91-836086fef163	f2db34e2-0381-4efa-a25f-6af768737c7a	Boleto de bus de subida y bajada Aguas Calientes /Machupicchu/Aguas Calientes	13
+caecdbc7-c7e4-4ee1-ae84-a47b24258c5a	f2db34e2-0381-4efa-a25f-6af768737c7a	Guía profesional bilingüe para todo el recorrido.	14
+fbeda65d-ccd5-4e97-9abc-f5608379c569	f2db34e2-0381-4efa-a25f-6af768737c7a	Bus turístico	15
+f6a3295c-b827-45cb-981b-a32505fcdb7f	f2db34e2-0381-4efa-a25f-6af768737c7a	Tour a Islas Ballestas (Paracas) – Huacachina (incluye paseo en Tubulares + Sandboard)	16
+3e7eebdb-f062-4209-9587-ff996bdc5b1f	f2db34e2-0381-4efa-a25f-6af768737c7a	City Tour en Lima	17
+eeabe847-9bbc-415f-8f5b-95793133e6f3	f2db34e2-0381-4efa-a25f-6af768737c7a	Traslado de Aeropuerto/hotel/Aeropuerto – Lima	18
+3260a2f7-ecaa-4e8c-b4ed-ce4cce3d0ea5	f2db34e2-0381-4efa-a25f-6af768737c7a	3 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	19
+47433e28-a7d6-48e3-b5ad-c82c19c3da22	f2db34e2-0381-4efa-a25f-6af768737c7a	3 noches de hospedaje en Lima – HOTEL “EL TAMBO 1” (Miraflores)	20
+27f9c194-9075-4967-a22e-679b66d135ad	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Pensión completa. Desayuno. Salida para realizar la visita al Templo de Edfú, erigido en honor del dios Horus con cabeza de halcón. El templo, situado en la orilla occidental del río Nilo es uno de los más grandes de Egipto y el mejor conservado hasta el momento. Las inscripciones en sus paredes proporcionan información importante sobre el lenguaje, la mitología y la religión durante el periodo grecorromano. Regreso a la motonave y navegación hacia Luxor atravesando la esclusa de Esna. Llegada a Luxor y salida para realizar las visitas del Templo de Karnak erigido en honor al dios Amón y principal recinto de culto en Egipto desde las dinastías que conformaron el Imperio Nuevo y que cuenta, entre otros, con una magnífica sala hipóstila de 23 metros de altura que alberga en su recinto nada menos que 134 columnas y el Templo de Luxor, (por calesa con caballos) ,para ver panorámica del Templo de Luxor por la noche más pequeño que el de Karnak y comunicado con éste por una impresionante avenida de esfinges con cabeza de carnero, más conocida como la Avenida de las esfinges. Regreso a la motonave y noche a bordo.	8
+18a21dde-f0d9-4ed6-a34f-337cac22e638	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 6 – LUXOR - HURGHADA (Pensión Completa).	9
+efbaec19-3baf-4f89-854f-2303bf7c8c19	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Pensión completa. Desayuno.	10
+652d0e46-8461-420c-bf1d-affcb0f4651a	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Opcional: Posibilidad de realizar PASEO EN GLOBO AEROSTÁTICO Paseo en globo durante el amanecer en Luxor: una sensación indescriptible: Luxor desde el aire: experimente el amanecer con un paseo en globo aerostático. Los vuelos en globo aerostático son una experiencia increíble, y qué mejor destino para Antigüedades. Desembarque y salida para finalizar las visitas de Luxor: El Valle de los Reyes, declarado por la Unesco Patrimonio de la Humanidad y que alberga la mayoría de las tumbas de los faraones del Imperio Nuevo continuación hasta Los Colosos de Memnon, gigantescas estatuas que representan al faraón Amenhotep III y que permanecen en posición sedente desde hace más de3.500 años.Terminadas las visitas, traslado por autobús con el aire acondicionado hasta Hurghada. Llegada al hotel y alojamiento en régimen de todo Incluido.	11
+cdaaeb8c-dbfc-449a-9e8a-87babc08af73	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 7 – HURGADA (Desayuno).	12
+8151e7eb-cca7-465b-bbf7-c295f45bd9a3	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Desayuno. Disfrutando de la playa.	13
+66edf6ed-9ec7-476d-abc9-585008ab1326	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Opcional puede unirse a uno de los increíbles viajes visitar Orange Bay o Paradise Island. Viaje con barco.	14
+967c16bf-208e-4827-a588-4102b33fb258	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Día 8 – HURGADA (Pensión Completa).	15
+ff24c4a4-3152-4d7f-bdd6-2e7e836806aa	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Traslados regulares.	30
+5c9c46dd-1518-4b5d-bc91-b514599e7473	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Visitas según itinerario.	31
+8c62dda0-6688-4a2c-8cb5-4d3b6eda6a70	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Vuelos domésticos Cairo – Aswan.	32
+bca4fca6-e005-4cac-8fbf-6b5530773f1f	88be8f27-1395-44ba-9f5b-58ac9ea9f387	EN CAIRO	33
+99dd7978-1bc4-4441-a2f4-286e7f29eac3	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Las Pirámides y La gran Esfinge	34
+9e93e09e-6025-4fe0-8741-7857e5b6b8d2	88be8f27-1395-44ba-9f5b-58ac9ea9f387	El Museo de Arte Egipcio	35
+71bd57cf-a42e-4fff-93b6-85a82a9eef46	88be8f27-1395-44ba-9f5b-58ac9ea9f387	La Ciudadela de Salah El Al Din	36
+61dcc3cc-72f0-4951-ab3f-10babaf3e593	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Paseo nocturno por la ciudad del Cairo	37
+ba753c10-054f-44c5-ac25-d734d19b6a0e	88be8f27-1395-44ba-9f5b-58ac9ea9f387	En Aswan	38
+8f4dc0c4-9a12-45bb-8e2c-a9df228068f2	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Templo de Philae	39
+8f999710-e85c-4807-99f1-4a0a96d58c31	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Templo de Kom Ombo.	40
+1ee2b4db-78e0-43f9-be48-f3018c2182b7	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Templo de Edfú	41
+9de03940-a565-4bef-827d-73c4e6fb2f27	88be8f27-1395-44ba-9f5b-58ac9ea9f387	EN LUXOR	42
+93ccfda0-ca3b-481f-8e6e-46c02fd7d520	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Templo de Luxor,	43
+1223f85d-bfba-49bd-b21d-1fab533fd429	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Templo de Karnak	44
+467d0256-26f1-4639-bad4-fd200976ef44	88be8f27-1395-44ba-9f5b-58ac9ea9f387	El Valle de los Reyes,	45
+5695c5a8-12c5-4c67-bc63-05b80bcbde45	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Los Colosos de Memnon.	46
+f3eb4497-ed8d-4864-86f7-039e6f6d4baa	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Paseo nocturno por calesa por la ciudad de Luxor	47
+581d9873-a180-473d-902d-2484f8bd6c46	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Guía local de habla hispana durante las visitas.	48
+1e2d2f81-0284-43f5-9173-d3ed282f5a05	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Botellas de agua mineral durante las visitas.	49
+593d752e-d0b8-4e12-a12c-c5ce1c79af2d	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Bus con aire acondicionado y libre wifi.	50
+d42ab337-22e6-44d4-a584-4167a7cd2755	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Entradas de todos los sitios especificados según que han mencionados en itinerario.	51
+4342d7d6-086f-4d69-b150-9779879fadc1	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Traslados privados en autobús de lujo con aire acondicionado (Luxor – Hurgada y Hurgada – Cairo)	52
+0e6906ea-950d-417a-bc8a-86952fcab76f	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Billetes de vuelos domésticos Aswan – Cairo.	53
+bc400770-347a-430b-99a5-53efb3c926be	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Impuestos aplicables en todos los hoteles y cruceros por el Nilo incluidos en el precio.	54
+9ba32e9a-1194-4d8d-a034-66f63fe411c3	88be8f27-1395-44ba-9f5b-58ac9ea9f387	Paseo nocturno por la ciudad del Cairo conecer la ciudad antigua y el centro del Cairo y cena (plato de KUSHARI típico egipcio y probar FALAFEL)	55
+66ada39c-0748-4754-a1b5-de20473edf70	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Chocolates de Bienvenida.	1
+2e93c7c6-a0d9-4486-8e97-817c1f6fd63a	c8cb4562-e3f4-434d-b638-39494cfe9f3b	02 botellas de agua para cada viaje.	2
+b1810fe3-a9a9-4cf4-8952-9f219cd50886	c8cb4562-e3f4-434d-b638-39494cfe9f3b	WIFI gratito en el autobús.	3
+d39bf154-afce-461f-99cd-9ea5398daba2	c8cb4562-e3f4-434d-b638-39494cfe9f3b	03 noches Cairo	4
+b153dc35-8e20-42d2-ab52-90b2ff9fe421	c8cb4562-e3f4-434d-b638-39494cfe9f3b	04 noches en Crucero.	5
+7b85bde4-f532-4ce5-bb8f-28f84823e500	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Traslados regulares en coches A/C.	6
+859c8ec8-5144-4b6d-bef6-67c41d008e10	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Visitas según itinerario.	7
+caf5f858-d531-414a-b82d-7eb267ccea02	c8cb4562-e3f4-434d-b638-39494cfe9f3b	Guía local de habla hispana durante las visitas	8
+1b118db3-3718-4c7f-bdff-51c5bd93b26a	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Chocolates de Bienvenida.	1
+46f27e35-f981-4a0a-9509-0b135bf65cac	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Alojamiento en hotel en El Cairo por 3 noches con desayuno.	2
+154c9ed7-715b-46a1-9e28-ffb278e1c433	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Alojamiento en hotel en Sinaí por 1 noche con desayuno.	3
+1200ada5-1028-42fa-9b24-0bb2e4c2b082	e95e6dde-a4ad-462a-afa5-0e7d667a920d	02 almuerzos en un restaurante local en El Cairo.	4
+19601124-6010-4ac5-8ce5-7cb14d511785	e95e6dde-a4ad-462a-afa5-0e7d667a920d	01 almuerzos en un restaurante local en el Sinaí.	5
+43607665-b2ed-42a3-95da-b3a49c0631e4	e95e6dde-a4ad-462a-afa5-0e7d667a920d	02 botellas de agua por persona durante los tours.	6
+c90cb913-c80d-4780-bf3d-5d52ff935158	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Todos los traslados en autobús privado A\\C.	7
+1bb0d320-d4d6-46a9-a124-97982c4a1a57	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Guía oficial egipcio que habla hispana.	8
+098ce76d-1246-426f-9ced-342a820028fa	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Impuestos y servicios.	9
+5698a37b-7dbd-4a35-bd80-d381dbae798e	e95e6dde-a4ad-462a-afa5-0e7d667a920d	Transporte de El Cairo a Taba en autobús privado (8 horas).	10
+fc19a055-9c5e-4913-836b-be87006462a1	e95e6dde-a4ad-462a-afa5-0e7d667a920d	WIFI gratuito durante los tours.	11
+3b0d6138-2653-4b13-a405-97fc5c0bccef	8a709aed-8b86-413a-bfcb-575185e69d53	Más allá de la contemplación del magnífico paisaje, disfrutamos de tiempo libre o de algunas de las actividades opcionales tales como nadar, practicar kayak o participar en una demostración de cocina vietnamita en la terraza del barco.	10
+c682211a-eef9-4544-9948-d1de69b68edf	8a709aed-8b86-413a-bfcb-575185e69d53	Cena y alojamiento a bordo.	11
+8a1cbaea-4234-48e0-8311-aec451feef42	c3e06106-518d-46da-b1db-4228b126be43	Almuerzo en restaurante local.	1
+8a8d4a76-3334-4ee8-99dc-285c4c996023	c3e06106-518d-46da-b1db-4228b126be43	Después del almuerzo, tendremos una experiencia con las flores y su tradicional forma de adornarlas. Visita a una floristería artesanal para ver cómo se realizan los ramos, cómo se transmite y conserva este hermoso y tradicional arte espiritual de Vietnam que ha llegado a nuestros días generación tras generación. Los invitados aprenderán a reconocer flores exóticas a la vez que disfrutan preparando una ofrenda floral espiritual. Posteriormente llegamos al lago Hoan Kiem, el corazón de Hanói, donde daremos un paseo alrededor del lago con una vista panorámica al templo Ngoc Son, situado en medio del lago, junto con el puente rojo The Huc.Por último, realizaremos un paseo panorámico en ciclo pousse por el Barrio Antiguo de Hanói, también conocido como el barrio de las 36 calles ya que en su tiempo fue conocido por el oficio de los artesanos que las habitaban y por los talleres que allí había.	2
+93181448-2051-442d-8faf-c73553e6de47	c3e06106-518d-46da-b1db-4228b126be43	Regreso al hotel y alojamiento en Hanói.	3
+a39cf85b-ed86-458a-a167-7f1b9177e8c9	c3e06106-518d-46da-b1db-4228b126be43	Régimen de comidas: Desayuno y almuerzo.	4
+5c647d9f-bbfb-4c1a-ab45-0b372d60b6e4	c3e06106-518d-46da-b1db-4228b126be43	Recomendaciones: Reservar un masaje tradicional o participar en el curso de cocina vietnamita. Asistencia al espectáculo Marionetas sobre el agua.	5
+1b34ca76-8ff2-4860-92a1-eaee94982d43	c3e06106-518d-46da-b1db-4228b126be43	Día 3 – HANÓI - BAHÍA DE HALONG (Desayuno, almuerzo y cena).	6
+6c317251-da46-4acf-8cab-f66985621f2a	c3e06106-518d-46da-b1db-4228b126be43	Después del desayuno, encuentro con nuestro guía en el hall del hotel.	7
+9af65882-b540-4af6-bc15-246127372410	c3e06106-518d-46da-b1db-4228b126be43	Salida por carretera hacia la Bahía de Halong que significa “el dragón que desciende del mar” en vietnamita, y según la leyenda, fue un dragón quien formó las islas de la bahía. Embarque en un maravilloso crucero con el que visitarán la bahía. Almuerzo a bordo.	8
+42e2fd24-6cd6-402a-bb22-8778045ca139	c3e06106-518d-46da-b1db-4228b126be43	Acabado el almuerzo, continuaremos navegando y descubriendo miles de islas e islotes de abundante vegetación que emergen en la bahía con sus insólitas formas y diferentes tamaños. Las aguas color esmeralda de este legendario tesoro nos llevan a explorar islas sublimes como la de la Tortuga, la del Perro, la Cabeza de Hombre, etc. Debido a su singular belleza, peculiaridad geológica, riqueza biológica, importancia cultural e histórica, la Bahía de Halong fue declarada Patrimonio de la Humanidad por la UNESCO en 1994 e incluida en la lista de las Siete Maravillas Naturales del Mundo desde 2011.	9
+f488d685-26af-491b-8cc6-36d5aa845a00	c3e06106-518d-46da-b1db-4228b126be43	Más allá de la contemplación del magnífico paisaje, disfrutamos de tiempo libre o de algunas de las actividades opcionales tales como nadar, practicar kayak o participar en una demostración de cocina vietnamita en la terraza del barco.	10
+384d12ef-4aab-4a3b-b26d-e26d7c95e748	c3e06106-518d-46da-b1db-4228b126be43	Cena y alojamiento a bordo.	11
+\.
+
+
+--
+-- Data for Name: itinerary_days; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.itinerary_days (id, destination_id, day_number, title, location, description, activities, meals, accommodation) FROM stdin;
+05158cc3-70fe-433f-b279-58afff75d814	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	1	Llegada a Estambul	\N	Llegada al aeropuerto. Traslado al hotel con asistente de habla hispana. Llegada al hotel. Alojamiento.	\N	\N	\N
+78d79135-93e6-4551-bf44-8ecf60ab5449	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	2	Estambul	\N	Tour panorámico pasando por las murallas, Canal de Bósforo y zona Eminonu. Opcional: Paseo por el Bósforo con vistas desde el Mirador Pierre Lotti, visita al Bazar Egipcio. Crucero por el Bósforo y recorrido por Beyoglu con posibilidad de visitar la Torre de Gálata (ingreso no incluido: 30-40 euros) + Almuerzo. (Quienes no tomen el tour opcional PASEO POR EL BOSFORO CON ALMUERZO, El guía los dejará en la zona de Eminonu para que tengan tarde libre y regresen por su cuenta al hotel).	\N	\N	\N
+5ec52055-fc71-4887-9361-48534df47b80	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	3	Estambul – Ankara – Capadocia	\N	Traslado a Ankara con visita panorámica y entrada al mausoleo de Ataturk. Continuación a Capadocia. Cena y alojamiento.	\N	\N	\N
+98a7d586-5fb4-40c2-b0d9-ccef2ff4d400	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	4	Capadocia	\N	Visitas: Ciudad subterránea de Ozkonak, Museo Abierto de Göreme, Avanos. Exposición de Alfombras o Visita a Joyería Típica. Cena y alojamiento. Opcional: Paseo en Globo - Disfruta de un maravilloso panorama en una de las regiones más bellas del mundo (sujeto a las condiciones climáticas). Noche turca.	\N	\N	\N
+29401abc-85fc-4f64-96d8-3a3edf51b57b	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	5	Capadocia	\N	Visitas: Avcilar, Guvercinlik (chimenea de las hadas), ciudad troglodita de Uchisar y taller de cerámica. Media tarde libre. Cena y alojamiento. Opcionales: Jeep Safari 4x4, Ski Monte Erciyes (Del 15 de diciembre al 15 de Marzo), Cappapark (Del 15 de abril al 15 de Octubre), Almuerzo o cena en SkyDinner.	\N	\N	\N
+ad331bfd-f3b7-41b9-b51b-a2b1ba6615d3	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	6	Capadocia - Estambul	\N	Desayuno en el hotel y salida de regreso a Estambul. Llegada al hotel y alojamiento. Tarde libre.	\N	\N	\N
+1c484178-f8cc-4fef-a7d2-6857eaea9e9c	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	1	Estambul.	\N	Llegada al aeropuerto. Traslado al hotel con asistente de habla hispana. Llegada al hotel. Alojamiento.	\N	\N	\N
+a29a74a7-3a27-45cd-99b1-f586c5e93def	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	2	Estambul	\N	Tour panorámico pasando por las murallas, Canal de Bósforo y zona Eminonu. Paseo por el Bósforo con vistas desde el Mirador Pierre Lotti, visita al Bazar Egipcio. Crucero por el Bósforo y recorrido por Beyoglu con posibilidad de visitar la Torre de Gálata (ingreso no incluido: 30-40 euros) + Almuerzo. (Quienes no tomen el tour opcional PASEO POR EL BOSFORO CON ALMUERZO, El guía los dejará en la zona de Eminonu para que tengan tarde libre y regresen por su cuenta al hotel).	\N	\N	\N
+e998c838-fc7f-4b05-8595-92d585203cda	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	7	Estambul	\N	Desayuno en el hotel. Día libre. Opcional Estambul Clásico con Almuerzo: Palacio Topkapi, Hagia Sophia, Mezquita Azul, Hipódromo Romano y Gran Bazar.	\N	\N	\N
+65f0c084-dcb6-46ce-b72f-9eaeb4fd56e2	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	8	Estambul - Salida	\N	Desayuno en el hotel. Traslado al aeropuerto. Fin de servicios.	\N	\N	\N
+19108f19-ea74-415c-8d34-fc02f0d4f252	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	3	Estambul – Ankara – Capadocia	\N	Suplemento de vuelo EST-CAP Traslado a Ankara con visita panorámica y entrada al mausoleo de Ataturk. Continuación a Capadocia. Cena y alojamiento.	\N	\N	\N
+4c79cda6-3a81-4187-920a-e655f7047d1c	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	4	Capadocia	\N	Visitas: Ciudad subterránea de Ozkonak, Museo Abierto de Göreme , Avanos Exposición de Alfombras o Visita a Joyería Típica. Cena y alojamiento. Paseo en Globo: Disfruta de un maravilloso panorama en una de las regiones más bellas del mundo. (Sujeto a las condiciones climáticas, si no se realiza el paseo en globo en Capadocia, este se llevará a cabo en Pamukkale). Noche turca.	\N	\N	\N
+a37eb9b5-b254-4157-b4e3-754caf069282	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	5	– Capadocia	\N	Visitas: Avcilar, Guvercinlik (chimenea de las hadas), ciudad troglodita de Uchisar y taller de cerámica. Media tarde libre. Cena y alojamiento. Opcionales: Jeep Safari. Ski Monte Erciyes (Del 15 de diciembre al 15 de Marzo) Cappapark (Del 15 de abril al 15 de Octubre). Almuerzo o cena en SkyDinner.	\N	\N	\N
+ae576092-41bb-47e1-aea6-30e41a2d3b2c	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	6	– Capadocia- Pamukkale	\N	Traslado a Pamukkale. Visita tienda Outlet. Visita:  Ciudad antigua de Hierápolis y el “Castillo de Algodón” termales. Llegada al hotel, Cena y alojamiento.	\N	\N	\N
+c394d1eb-3d04-44d0-83de-85c596a4764b	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	7	– Pamukkale – Éfeso – Esmirna	\N	Visitas: Ruinas de Éfeso, Casa de la Virgen María y visita a un outlet de pieles. Cena y alojamiento.	\N	\N	\N
+c9595b7e-0925-4700-9613-8b10eba3d66a	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	8	– Esmirna o Kuşadası – Bursa – Estambul	\N	Visitas: Mezquita y Mausoleo Verde, mercado de seda y tienda de delicias turcas. Regreso a Estambul. Alojamiento.	\N	\N	\N
+f6c58fb8-6606-4062-add0-76fb800e0029	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	9	– Estambul	\N	Alojamiento. Opcional Estambul Clásico con Almuerzo: Palacio Topkapi, Hagia Sophia, Mezquita Azul, Hipódromo Romano y Gran Bazar.	\N	\N	\N
+59fffc8b-8657-4bbf-a453-38a13923c9de	f958762f-f5cf-4c4e-82d8-69f90a29e1b1	10	–Estambul - Bogotá	\N	Desayuno en el hotel. Traslado al aeropuerto Fin de servicios.	\N	\N	\N
+e6c48542-82cb-490b-bb25-2c82e9ce8065	af281d14-a347-4f9c-8f2a-21308a321254	1	Estambul.	\N	Llegada al aeropuerto. Traslado al hotel con asistente de habla hispana. Llegada al hotel. Alojamiento.	\N	\N	\N
+3e55935e-b57d-49ef-934c-ca977a942d50	af281d14-a347-4f9c-8f2a-21308a321254	2	Estambul	\N	Tour panorámico pasando por las murallas, Canal de Bósforo y zona Eminonu. Paseo por el Bósforo con vistas desde el Mirador Pierre Lotti, visita al Bazar Egipcio. Crucero por el Bósforo y recorrido por Beyoglu con posibilidad de visitar la Torre de Gálata (ingreso no incluido: 30-40 euros) + Almuerzo. (Quienes no tomen el tour opcional PASEO POR EL BOSFORO CON ALMUERZO, El guía los dejará en la zona de Eminonu para que tengan tarde libre y regresen por su cuenta al hotel).	\N	\N	\N
+e224ce1f-7550-4b83-b355-581cf2d68196	af281d14-a347-4f9c-8f2a-21308a321254	3	Estambul – Ankara – Capadocia	\N	Suplemento de vuelo EST-CAP Traslado a Ankara con visita panorámica y entrada al mausoleo de Ata turk. Continuación a Capadocia. Cena y alojamiento.	\N	\N	\N
+06e5509c-cc3c-41c2-999e-ebaf6f1add5a	af281d14-a347-4f9c-8f2a-21308a321254	4	Capadocia	\N	Visitas: Ciudad subterránea de Ozkonak, Museo Abierto de Göreme , Avanos Exposición de Alfombras o Visita a Joyería Típica. Cena y alojamiento. Paseo en Globo: Disfruta de un maravilloso panorama en una de las regiones más bellas del mundo. (Sujeto a las condiciones climáticas, si no se realiza el paseo en globo en Capadocia, este se llevará a cabo en Pamukkale). Noche turca.	\N	\N	\N
+c7b08017-6772-40aa-bccc-f433a9b446b7	af281d14-a347-4f9c-8f2a-21308a321254	5	– Capadocia	\N	Visitas: Avcilar, Guvercinlik (chimenea de las hadas), ciudad troglodita de Uchisar y taller de cerámica. Media tarde libre. Cena y alojamiento. Opcionales: Jeep Safari. Ski Monte Erciyes (Del 15 de diciembre al 15 de Marzo) Cappapark (Del 15 de abril al 15 de Octubre). Almuerzo o cena en SkyDinner.	\N	\N	\N
+6167058a-d9ea-4b16-88c1-fee291a13ecd	af281d14-a347-4f9c-8f2a-21308a321254	6	– Capadocia- Pamukkale	\N	Traslado a Pamukkale. Visita tienda Outlet. Visita:  Ciudad antigua de Hierápolis y el “Castillo de Algodón” termales. Llegada al hotel, Cena y alojamiento.	\N	\N	\N
+35010989-49ff-41e0-a109-884bc1054b7a	af281d14-a347-4f9c-8f2a-21308a321254	7	– Pamukkale – Éfeso – Esmirna	\N	Visitas: Ruinas de Éfeso, Casa de la Virgen María y visita a un outlet de pieles. Cena y alojamiento.	\N	\N	\N
+0413f387-ec12-4d4f-9361-00e39a56b868	af281d14-a347-4f9c-8f2a-21308a321254	8	– Esmirna o Kuşadası – Bursa – Estambul	\N	Visitas: Mezquita y Mausoleo Verde, mercado de seda y tienda de delicias turcas. Regreso a Estambul. Alojamiento.	\N	\N	\N
+ff545a40-5d58-46de-b548-da3b977f8eac	af281d14-a347-4f9c-8f2a-21308a321254	9	– Estambul	\N	Alojamiento. Opcional Estambul Clásico con Almuerzo: Palacio Topkapi, Hagia Sophia, Mezquita Azul, Hipódromo Romano y Gran Bazar.	\N	\N	\N
+02dbd042-5934-4af0-8906-824bac2c8ea3	af281d14-a347-4f9c-8f2a-21308a321254	10	–Estambul * Bogotá	\N	Desayuno en el hotel. Traslado al aeropuerto Fin de servicios.	\N	\N	\N
+14b67203-a4ff-400a-8905-b03d6f0fff85	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	1	– DUBÁI.	\N	Llegada al aeropuerto de Dubai, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+3e91938f-27fb-4243-ba6b-809cf4c1bd10	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	2	DUBÁI) (Desayuno y cena).	\N	Desayuno en el hotel. Mañana libre. Alrededor de las 15:00 a 15:30 horas. los recogerán para realizar la excursión más popular Los Land- Cruisers (6 personas por vehículo) realizaremos un excitante trayecto por las fantásticas altas dunas donde podrán tomar fotografías únicas de la puesta de sol árabe. Una vez que se oculte el sol detrás de las dunas de arena dorada, nos dirigiremos a un campo en el Desierto. El olor a la fresca brocheta, el cordero a la parrilla, las hogueras, las tradicionales pipas de agua y los relajantes sonidos de la música árabe nos invitan a pasar una tarde inolvidable. Tras la suntuosa cena disfrutaremos del antiguo arte de la Danza del Vientre. (Se encuentran incluidos: pintarse con henna, agua, refrescos, te y café). Regreso al hotel. Alojamiento.	\N	\N	\N
+375fa8a1-ea31-4d3c-b6a8-922861042f45	c43a0ba6-b5e0-4726-85b7-a802b4d192b7	3	– DUBÁI (Desayuno).	\N	Desayuno en el hotel. A la hora prevista traslado al aeropuerto de Dubai. Fin de Servicios.	\N	\N	\N
+027b4d14-1bf6-48fd-afc6-a35f8f05d3b6	e5a2c7c1-1953-4d88-a677-7eb944fe8611	1	DUBAI	\N	Llegada al aeropuerto de Dubai, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+b089ef18-7b73-4186-aa25-e7a831e6d111	e5a2c7c1-1953-4d88-a677-7eb944fe8611	2	DUBAI (Desayuno).	\N	Desayuno. Visita por la ciudad Salida hacia Deira pasando por el Zoco de las especies, Zoco de Oro; atravesando el Canal por Abra (Taxi Acuático) llegada y visita al Museo de Dubai. Por la carretera de Jumeirah, vista de la Mezquita de Jumeirah; parada para fotos en el Burj al Arab único hotel en el mundo de 7 estrellas. Pasaremos por Burj Khalifa el edificio más alto del mundo situado en el Dubai Mall (el Mall más grande del mundo con 1000 tiendas. Regreso al hotel. Alojamiento. Tarde libre.	\N	\N	\N
+2ff38ee4-1899-4e54-8bfd-6e99000ed6a0	e95e6dde-a4ad-462a-afa5-0e7d667a920d	3	– EL CAIRO (Desayuno y almuerzo).	\N	Desayuno en el hotel. Tendremos una visita de día completo a la ciudad de El Cairo: El Museo de Arte Faraónico, la Ciudadela de Saladino con su Mezquita de Alabastro, el Mercado de Khan el Khalili y el Barrio Copto. Regreso al hotel en El Cairo.	\N	\N	\N
+ad84f301-ad11-4ff0-9fe9-7de840bfce0d	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	1	– ATENAS.	\N	Traslado aeropuerto / hotel con asistencia en español. Alojamiento con desayuno en Atenas.	\N	\N	\N
+04e707ce-c1e1-44cf-ab03-adac4ce79aaf	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	2	ATENAS (Desayuno).	\N	Visita de la ciudad con Acrópolis en privado con guía en español (incluyendo la entrada y auriculares) Alojamiento con desayuno en Atenas	\N	\N	\N
+67c61cc8-3d9b-4718-a6a6-9248d5b98057	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	3	– ATENAS – MYKONOS	\N	Traslado hotel / puerto del Pireo con asistencia en español Tiquete de barco ferry Atenas / Mykonos en clase economy Llegada a Mykonos y traslado al hotel con asistencia en español. Alojamiento con desayuno en Mykonos	\N	\N	\N
+c3b11c66-aa97-4037-a02a-a79993b726b3	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	4	– MYKONOS – SANTORINI	\N	Traslado hotel / puerto de Mykonos con asistencia en español. Tiquete de barco catamarán Mykonos / Santorini en clase economy Llegada a Santorini y traslado al hotel con asistencia en español. Alojamiento con desayuno en Santorini	\N	\N	\N
+bebfb155-0ce2-403c-ab19-df463382578f	9aeb1692-fe16-4a7a-8317-3b3155db5fbf	5	– SANTORINI.	\N	Tour de 5 horas en Santorini con guía en español. El tour incluye incluye Fira (la capital de Santorini), el pueblo tradicional de Pyrgos y visita del pueblo de Oia para admirar el famoso atardecer. Al finalizar el tour, traslado al aeropuerto con asistencia en español.	\N	\N	\N
+fb73876f-9318-4821-8801-ff3de3d967f1	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	1	LLEGADA A BANGKOK	\N	Llegada al aeropuerto de Bangkok donde los espera su guía de habla hispana y traslado al hotel. Tiempo libre hasta el check-in en el hotel según disponibilidad (normalmente las habitaciones están disponibles a partir de las 15.00h). Alojamiento en hotel Servicio Fast Track a la llegada Aeropuertos de Suvarnabhumi (BKK) Numero de personas Neto por persona, USD - Encuentro con el asistente en el puente aéreo, le acompañan al mostrador de inmigración. le llevarán la maleta y la acompañarán hasta encontrarse con el guía. - El proceso de tiempo se basa en un caso standard, cuando los pasajeros no requieren un control de salud o visado a la llegada. - NO incluye el visado, 2000 THB.-, por favor prepare el importe en efectivo.	\N	\N	\N
+67c29eeb-8611-4148-94a4-7efc860804e3	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	2	BANGKOK	\N	Después del desayuno, Visita a tres de los templos budistas más populares de la ciudad. Empezaremos por el Wat Traimit, situado en el extremo de Chinatown, en Yaowarat Road, cerca de la estación de tren Hualampong. Wat Traimit alberga el Buda de oro macizo más grande del mundo, midiendo casi cinco metros de altura con un peso de cinco toneladas y media. La excursión continuará hacia Wat Pho, el templo más grande de Bangkok. El templo del enorme Buda reclinado y los Chedis de los Reyes. Este se encuentra detrás del Templo del Buda. Es uno de los mayores templos de la ciudad y famoso por su gigantesco Buda reclinado que mide 46 metros de largo y está cubierto de oro. A continuación, visitarán el Palacio Real, que es sin duda, el monumento más famoso de la ciudad. Construido en 1782, por 150 años fue la casa del rey de Tailandia, la corte real y la sede administrativa del gobierno. El Gran Palacio de Bangkok es un edificio antiguo que continua impresionando a sus visitantes por su hermosa arquitectura y detalles. Dentro del complejo, se encuentra Wat Phra Kaew o el Templo del Buda Esmeralda (oficialmente conocido como Wat Phra Sri Rattana Satsadaram), considerado como el templo budista más importante de Tailandia, consagra el Buda más reverenciado tallado en un solo bloque de jade. Traslados incluidos. Alojamiento en hotel	\N	\N	\N
+a59733fa-8239-4d58-8bdd-8e2fe886ddba	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	3	BANGKOK – CHIANG RAI	\N	Después del desayuno traslado al aeropuerto para tomar el vuelo hacia Chiang Rai Llegada a Chiang Rai con el vuelo no más tarde que las 10.00 AM. Proceder a Chui Fong, una hermosa cultivadora de té. En un ambiente rodeado de plantaciones en las laderas de pequeñas colinas, podrán disfrutar de varias delicias como helado de té, torta de té (a gasto propio) y un almuerzo en el restaurante local cercano. Próximamente, pasaremos por un museo de opio antes de salir hacia el distrito de Mae Chan al norte de Chiang Rai. Luego continuaremos a pie, subiendo por las colinas a través de calles angostas para visitar una aldea de las minorías étnicas Akha y Yao. Nuestro último destino del día será una de las aldeas Karen, donde conoceremos a esta famosa tribu montañera – el grupo étnico minoritario más grande de Tailandia. Esta tribu originaria de Tíbet emigró a lo que hoy se conoce como Myanmar hace unos dos mil años. Durante el siglo XVIII, se estima que el conflicto político y la persecución fomentaron su migración masiva hacia el norte de Tailandia, donde todavía al día de hoy se encuentran sin un estado residencial oficial. La tribu es más reconocida por las mujeres Kayan – un subgrupo de los Po (Karen rojo) – cuyos cuellos están adornados en anillos de latón. A veces hasta empezando desde los cinco años, la presión constante empuja sus clavículas y costillas hacia abajo, dando la impresión de un cuello extendido; la razón detrás de su apodo ‘mujeres jirafa’ – una vista asombrosa. Al concluir, traslado de regreso al hotel. Cena y alojamiento en hotel.	\N	\N	\N
+c12fadfa-9ea7-43f2-a102-7c0f492b34a8	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	4	CHIANG RAI – CHIANG MAI	\N	Desayuno en el hotel. En la mañana nos trasladaremos al muelle y tomarnos un placentero paseo en bote tradicional por el río Kok visitando las tribus Karen que viven en cabañas de bambú en plena selva. Continuaremos con la visita al Templo Wat Rong Suea Tean, también conocido como el Templo Azul, otro templo budista moderno inusual que se distingue por su intenso color azul y sus estatuas elaboradas. Seguidamente visitaremos el famoso templo blanco de Wat Rong Khun. Después de la visita nos dirigiremos desde Chiang Rai a Chiang Mai por carretera (3 Hrs). Llegada a Chiang Mai y almuerzo en restaurante local. Visita al complejo de templos Wat Doi Suthep, el más conocido de Chiang Mai, situado en la cima de una pequeña colina a 15 Kms al noroeste de la ciudad. Cean y alojamiento en hotel	\N	\N	\N
+5dfe3776-7988-4dc5-80c0-b6947e17c159	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	5	CHIANG MAI	\N	Desayuno en el hotel. Por la mañana visitaremos algunas fábricas de artesanías locales .También se visita una fábrica de esculturas de madera donde es posible comprar antigüedades birmanas. Salida hacia el valle de Mae Sa visitando la granja de las orquídeas. Almuerzo en restaurante local. Después nos trasladaremos al santuario de elefantes para aprender sobre estos animales, y realizar diversas actividades incluso darles comida y tomar un baño, una experiencia inolvidable. Cena Kantoke. Regreso al hotel. Alojamiento en el hotel.	\N	\N	\N
+adea8b50-7a8b-4dd1-9489-2f25a4dbb222	a6d65452-944e-4cd6-bfb4-9086b9fc7b14	6	CHIANG MAI	\N	Desayuno en el hotel. Traslado al aeropuerto de Chiang Mai para conectar con el vuelo a su próximo destino. La solicitud de cambio de la habitación está sujeta a disponibilidad y puede acarrear costes extras.	\N	\N	\N
+213e002e-ed7b-409f-bade-5ce7c707a925	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	1	LLEGADA A BANGKOK	\N	Llegada al aeropuerto de Bangkok y encuentro con nuestro guía de habla hispana quien los estará esperando para asistirlos con el traslado a su hotel. Realizar el check-in según disponibilidad (Las habitaciones normalmente se habilitan a partir de las 15:00, pero a veces suelen facilitarse antes). Resto del día libre a su disposición. Alojamiento en el hotel seleccionado Servicio Fast Track a la llegada Aeropuertos de Suvarnabhumi (BKK) Número de personas Neto por persona, USD - Encuentro con el asistente en el puente aéreo, le acompañan al mostrador de inmigración. le llevarán la maleta y la acompañarán hasta encontrarse con el guía. - El proceso de tiempo se basa en un caso standard, cuando los pasajeros no requieren un control de salud o visado a la llegada. - NO incluye el visado, 2000 THB. -, por favor prepare el importe en efectivo (¡Visa a la llegada es solo para ciudadanos mexicanos!)	\N	\N	\N
+919dcb32-d663-4f44-a684-07b391b9edc4	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	2	BANGKOK	\N	Después del desayuno, Visita a dos de los templos budistas más inusuales de la ciudad. Empezaremos por Wat Traimit, situado en el extremo de Chinatown en la calle Yaowarat, cerca de la estación de tren Hualampong. Wat Traimit alberga el Buda de oro macizo más grande del mundo, midiendo casi cinco metros de altura con un peso de cinco toneladas y media. La excursión continuará hacia Wat Pho, el templo más grande de Bangkok, donde se encuentra el enorme Buda reclinado y los Chedis de los Reyes. Es uno de los mayores templos de la ciudad, famoso por su gigantesco Buda reclinado que mide 46 metros de largo y está cubierto de oro. Traslados incluidos. Alojamiento en el hotel. El Gran Palacio es uno de los monumentos más famoso de la ciudad. Construido en 1782, sirvió por 150 años como la casa del rey de Tailandia, la corte real y la sede administrativa del gobierno. El Gran Palacio de Bangkok es un edificio antiguo que continúa impresionando a sus visitantes con su hermosa arquitectura y detalles intricados. Dentro del complejo, se encuentra Wat Phra Kaew – ‘el Templo del Buda Esmeralda’ (oficialmente Wat Phra Sri Rattana Satsadaram) – considerado el templo budista más importante de Tailandia. Es aquí que se consagra la imagen de buda más reverenciada del país, meticulosamente tallada en un solo bloque de jade. Neto por persona, USD	\N	\N	\N
+138b3cf2-e3e8-4144-9d9a-cfa480d8ad53	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	3	BANGKOK – AYUTTHAYA – ANG THONG – SUKHOTHAI	\N	Después del desayuno, salida desde Bangkok hacia el norte. Haremos la primera parada en la ciudad de Ayutthaya – la antigua capital del reino de Siam y centro arqueológico del país – donde visitaremos sus templos y restos de sus fortificaciones más icónicas. Declarada como patrimonio de la humanidad por la UNESCO en 1991, Ayutthaya permanece un lugar mágico e imperdible para los amantes de la historia y civilizaciones antiguas. Próximamente, nos dirigiremos hacia la ciudad de Ang Thong donde podremos visitar el templo Wat Muang, famoso debido a que alberga la estatua de buda sentado más grande de Tailandia (novena mayor del mundo) con casi 100 metros de altura. Continuación hacia Sukhothai – Almuerzo, paisajes naturales Durante el trayecto seremos testigos del cambio en el paisaje, que va enverdeciendo y poniendose cada vez más frondoso; adelantando ya los paisajes selváticos que cubren la mayoría del norte del país. Llegaremos al alojamiento en Sukhothai por la tarde.	\N	\N	\N
+1d12da85-f2fa-4981-af9e-062ea4189a0c	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	4	SUKHOTHAI – CHIANG RAI	\N	Desayuno en el hotel. El punto más destacado del día de hoy es el Parque Arqueológico de Sukhothai, declarado como un Patrimonio de la Humanidad por UNESCO debido a su increíble belleza y exposición de varios siglos de prosperidad de la civilización tailandesa (demostrado a través de los gran monumentos y templos sofisticados erigidos en la zona). Una vez finalizada visita, nos dirigiremos a Chiang Rai vía Lampang mientras disfrutamos de las maravillosas vistas y el famoso lago Payao. Almuerzo por el camino. Llegada al alojamiento en Chiang Rai por la tarde.	\N	\N	\N
+ed8f76d1-fc94-4e55-a29b-f07449367f12	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	5	CHIANG RAI – CHIANG MAI	\N	Desayuno en el hotel. Visita al “Triángulo de Oro” del río Mekong, que abarca zonas de Tailandia, Laos y Birmania antiguamente dedicadas al tráfico del opio. Una vez allí, aprovecharemos para realizar una visita al museo Casa del Opio ubicado en la población de Chiang Rai. Luego nos dirigiremos al novedoso y llamativo Wat Rong Suea Ten (Templo azul), donde se pueden encontrar pinturas con un estilo similar al Templo Blanco, ya que fue allí donde se formó su arquitecto durante años. Parada en el espectacular y contemporáneo Wat Rong Khun, cuyo color blanco significa la pureza y el cristal representa la sabiduría de Buda como la "luz que brilla en el mundo y el universo". Retomando el viaje hacia Chiang Mai, almorzaremos por el camino. Llegada a Chiang Mai por la tarde; alojamiento.	\N	\N	\N
+bab41002-8727-40bd-ab90-81f6866cc55b	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	6	CHIANG MAI	\N	Desayuno en el hotel. Por la mañana partimos hacia el conocido Wat Phra That Doi Suthep; un templo magnífico ubicado a 1000 metros de elevación en las laderas de la montaña Doi Suthep. Requiriendo una subida de 306 escalones con barandillas de serpientes Naga, este templo sagrado ofrece una vista panorámica espectacular de la ciudad, así como una gran variedad de imágenes y frescos a aquellos que estén dispuestos a emprender la escalada. Almuerzo en restaurante local. Por la tarde, nos dirigiremos al Santuario de Elefantes para aprender sobre estos animales y realizar diversas actividades incluyendo dándoles de comer y bañándolos – una experiencia inolvidable. Traslado de regreso al hotel, resto de la tarde libre a su disposición.	\N	\N	\N
+436cdabf-471c-4f40-b8e4-ab55652088f0	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	7	CHIANG MAI – SALIDA	\N	Desayuno en el hotel. A la hora indicada, traslado al aeropuerto para tomar su vuelo hacia su siguiente destino.	\N	\N	\N
+812169cb-61c6-4f94-98d4-d7ef63f367ec	e95e6dde-a4ad-462a-afa5-0e7d667a920d	4	– EL CAIRO -SANTA CATALINA (Desayuno y cena).	\N	Desayuno. Salida hacia la península del Sinaí vía el túnel de Ahmed Hamdy por debajo del canal de Suez, pasando de África a Asia. Visitaremos Ayun Musa o las fuentes de Moisés (Mara) para luego seguir hacia la ciudad de Santa Catalina. Llegada al hotel. Cena y alojamiento en Santa Catalina.	\N	\N	\N
+298ff5d2-5571-44e7-9ad3-989aaafb7a7b	e95e6dde-a4ad-462a-afa5-0e7d667a920d	5	– SINAI (Desayuno y almuerzo).	\N	Por la mañana temprano, subir el Monte Sinaí, donde podemos ver a la hora de la madrugada un hermoso espectáculo. Descenso de la Montaña. Regreso al hotel, tomar el desayuno y descanso. Visita al monasterio de Santa Catalina. Traslado a la frontera de Taba con Israel y fin de nuestro servicio.	\N	\N	\N
+5c9d06d0-6cc3-4ab5-a700-bc35bbb44148	de9eb689-7a5f-4095-a254-57e4d4276338	1	Llegada a Cusco / City Tour Arqueológico	\N	Traslado a aeropuerto, vuelo a Cusco, llegada y traslado a hotel. Por la tarde, recojo de hotel para inicio del City Tour visitando Sacsayhuaman, Kenko, Puka Pukará y Tambo Machay. Fin del tour en Plaza San Francisco.	\N	\N	\N
+1e3fde7b-8cd1-4a8b-814b-6c2e0af1da29	de9eb689-7a5f-4095-a254-57e4d4276338	2	Tour Valle Sagrado – Maras - Moray	\N	Recojo en hotel e inicio de tour. Visitas a Chinchero (pueblo), Salineras de Maras, Moray. Almuerzo incluido. Visita a Ollantaytambo y Pisaq. Retorno a Cusco. Fin del tour en Plaza San Francisco.	\N	\N	\N
+22bf3bb5-b2ce-4a18-987d-a2b5d5dd8e75	de9eb689-7a5f-4095-a254-57e4d4276338	3	Tour Machu Picchu	\N	Recojo de hotel, salida en tren hacia Aguas Calientes desde Ollantaytambo. Llegada a Aguas Calientes y reunión de grupo. Inicio de Tour a Machu Picchu. Fin del tour y retorno a Aguas Calientes. Partida en tren hacia Ollantaytambo y luego traslado a Cusco. Fin del tour en Plaza San Francisco.	\N	\N	\N
+51aca756-3615-43a1-9b9b-cf3da8c8b1c3	de9eb689-7a5f-4095-a254-57e4d4276338	4	Vuelo de Retorno	\N	Partida hacia Aeropuerto. Llegada a Lima y vuelo de salida.	\N	\N	\N
+05523174-a870-4240-88d6-4d252138643e	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	1	Llegada a Cusco / City Tour	\N	Traslado al aeropuerto, vuelo a Cusco, llegada y traslado a hotel. Por la tarde, City Tour por Cusco visitando la Catedral, Qoricancha, Sacsayhuaman, Qenqo, Puca Pucara y Tambomachay. Retorno al hotel.	\N	\N	\N
+7d867db9-9500-4c16-9a8d-23934a048c7e	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	2	Tour Machu Picchu	\N	Salida muy temprano hacia estación de tren. Viaje en tren a Aguas Calientes. Ascenso a Machu Picchu en bus. Tour guiado por la ciudadela inca. Tiempo libre. Descenso a Aguas Calientes y retorno en tren a Cusco. Traslado al hotel.	\N	\N	\N
+ca5d6fdb-a854-4afe-a5fd-1d41b8ad7de2	f2a51612-5b67-4543-bc7d-8d5e2bab6bc1	3	Vuelo de Retorno	\N	Desayuno en el hotel. Traslado al aeropuerto de Cusco para vuelo de retorno.	\N	\N	\N
+9442d461-6205-4ec6-81dd-671bf662a241	6997b7ff-f839-45be-b81e-0282087fe1dd	1	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	6:45 AM – Traslado a aeropuerto 9:30 AM – Vuelo a Cusco 11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+df37f9a2-14e2-4b5d-adbc-a3289e01b5e7	6997b7ff-f839-45be-b81e-0282087fe1dd	2	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+4abab4b6-a0c5-4498-b52c-7a5f5d3189b8	6997b7ff-f839-45be-b81e-0282087fe1dd	3	TOUR LAGUNA HUMANTAY	\N	04:30 AM - Recojo en hotel y Partida a Mollepata (hora aproximada) 08:30 AM - Llegada a Mollepata e inicio del trekking a Laguna Humantay 11:00 AM - Llegada a Laguna Humantay (hora aproximada) 12:30 PM - Partida de retorno a Mollepata (hora aproximada) 03:00 PM - Retorno a Cusco 05:00 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+a46a589e-e5f5-410b-94e6-1260f866fd52	6997b7ff-f839-45be-b81e-0282087fe1dd	4	TOUR A VINICUNCA “LA MONTAÑA DE 7 COLORES”	\N	04:30 AM - Recojo de Hotel (hora aproximada) 09:30 AM – Inicio de caminata hacia Vinicunca 12:00 PM – Almuerzo 12:30 PM – Retorno a Cusco 05:30 PM – Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+428fa753-2182-4ca5-9e7a-330b394edd01	6997b7ff-f839-45be-b81e-0282087fe1dd	5	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+9d8bc21f-ff8b-47c0-a965-603f0b319ddb	6997b7ff-f839-45be-b81e-0282087fe1dd	5	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+de0b3f39-2fd3-4824-b990-69d9d4819d15	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	1	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+2d9bd730-f3c2-44df-a5d2-a747e242c848	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	2	TOUR VALLE SAGRADO – MARAS - MORAY	\N	06:40 AM - Recojo en hotel e inicio de tour (hora aproximada) 08:00 AM - Llegada a Chinchero (pueblo) 09:00 AM - Tour Salineras de Maras 11:30 AM - Tour a Moray 12:30 PM - Almuerzo (incluido) 03:00 PM - Visita Ollantaytambo y Pisaq 05:30 PM - Retorno a Cusco 07:00 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+1ec73b4c-db4a-4a68-a795-7a3933708f60	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	3	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+33ede853-fb93-4e57-8de5-b35c66264585	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	4	TOUR LAGUNA HUMANTAY	\N	04:30 AM - Recojo en hotel y Partida a Mollepata (hora aproximada) 08:30 AM - Llegada a Mollepata e inicio del trekking a Laguna Humantay 11:00 AM - Llegada a Laguna Humantay (hora aproximada) 12:30 PM - Partida de retorno a Mollepata (hora aproximada) 03:00 PM - Retorno a Cusco 05:00 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+07f7bf18-9f1e-4d51-a27a-a8d57ebdf85d	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	5	TOUR A VINICUNCA “LA MONTAÑA DE 7 COLORES”	\N	04:30 AM - Recojo de Hotel (hora aproximada) 09:30 AM – Inicio de caminata hacia Vinicunca 12:00 PM – Almuerzo 12:30 PM – Retorno a Cusco 05:30 PM – Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+70aeb31e-ccdd-4b81-b4d0-a65ad14c6d89	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	6	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+370e4466-412b-45dd-81aa-47b370781dbf	4bfcc3dd-eaf4-461a-ae9e-cdb6b6613855	6	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+cea3b291-e6a1-4b0c-90e6-8c97b5a50a04	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	1	LLEGADA A LIMA	\N	Llegada a Lima y traslado a hotel (según hora de llegada de su vuelo)	\N	\N	\N
+df91ecba-4204-4263-bfac-2016786c0747	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	2	TOUR ISLAS BALLESTAS + HUACACHINA + ICA	\N	05:00 AM – Recojo en Hotel (hora aproximada) 05:10 AM – Partida hacia Paracas 08:00 AM - Iniciaremos con el tour a Islas Ballestas (hora aproximada) 9:30 AM - Retorno de Islas Ballestas 10:30 AM - Llegada al viñedo “El Nieto” ó “El Catador” donde conoceremos el tradicional proceso 1:00 PM - Arribo a la ciudad de Ica y almuerzo (costo no incluido) 2:30 PM - Llegada al Oasis de Huacachina, aquí disfrutaremos de un paisaje impresionante donde 04:00 PM - Partida hacia Lima (hora aproximada) 10:00 PM – 10:30 PM - Llegada a LARCOMAR (hora aproximada) y fin del tour.	\N	\N	\N
+f0f06602-fc8f-41b8-8f84-27bfe5e86004	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	3	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	6:45 AM – Traslado a aeropuerto 9:30 AM – Vuelo a Cusco 11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+1893ad5d-03da-4cda-ac63-4fceda1b9b61	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	4	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+4455cb68-6453-4d02-ab56-aa5cbe52a447	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	5	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+53f11c29-578b-4a22-85f0-6d1d852cf50a	e7da6512-efe4-4e98-bbd1-ac96a3ebff47	5	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+9228d95e-e3d6-4c73-aa95-239e7946e699	b3d7b805-e20b-4fec-97b4-ae33ce95a273	1	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	6:45 AM – Traslado a aeropuerto 9:30 AM – Vuelo a Cusco 11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+d8f06cbb-6020-4413-8b3a-d88846c4eafd	b3d7b805-e20b-4fec-97b4-ae33ce95a273	2	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+80ec2f35-af7d-4dbd-9683-5ef46debd739	b3d7b805-e20b-4fec-97b4-ae33ce95a273	3	TOUR A VINICUNCA “LA MONTAÑA DE 7 COLORES”	\N	04:30 AM - Recojo de Hotel (hora aproximada) 09:30 AM – Inicio de caminata hacia Vinicunca 12:00 PM – Almuerzo 12:30 PM – Retorno a Cusco 05:30 PM – Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+8581caeb-24e5-4e8f-ba99-74bc962ea5f3	b3d7b805-e20b-4fec-97b4-ae33ce95a273	4	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+721dd932-bcc0-4279-b71a-2d66f578137c	b3d7b805-e20b-4fec-97b4-ae33ce95a273	4	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+016c4d5c-33ba-4ce6-bc69-5410aaed883b	f1388f85-c87c-4875-8ad2-7523977b1196	1	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	6:45 AM – Traslado a aeropuerto 9:30 AM – Vuelo a Cusco 11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+f86e92b2-85c6-4908-becd-961e457f7bec	f1388f85-c87c-4875-8ad2-7523977b1196	2	TOUR VALLE SAGRADO – MARAS - MORAY	\N	06:40 AM - Recojo en hotel e inicio de tour (hora aproximada) 08:00 AM - Llegada a Chinchero (pueblo) 09:00 AM - Tour Salineras de Maras 11:30 AM - Tour a Moray 12:30 PM - Almuerzo (incluido) 03:00 PM - Visita Ollantaytambo y Pisaq 05:30 PM - Retorno a Cusco 07:00 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+46696605-dd87-44fc-87bb-0d2272f9c5de	f1388f85-c87c-4875-8ad2-7523977b1196	3	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+f21d353c-a2f0-4fb3-bff6-505df29bd7a4	f1388f85-c87c-4875-8ad2-7523977b1196	4	TOUR A VINICUNCA “LA MONTAÑA DE 7 COLORES”	\N	04:30 AM - Recojo de Hotel (hora aproximada) 09:30 AM – Inicio de caminata hacia Vinicunca 12:00 PM – Almuerzo 12:30 PM – Retorno a Cusco 05:30 PM – Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+4e80d82f-6645-4f2e-9e7b-484153fbc7c9	f1388f85-c87c-4875-8ad2-7523977b1196	5	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+4217bd60-2cc8-43db-b125-05445e97e4cc	f1388f85-c87c-4875-8ad2-7523977b1196	5	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+349d980f-900b-4462-a67e-b38e35c2a2c2	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	1	LLEGADA A LIMA	\N	Llegada a Lima y traslado a hotel (según hora de llegada de su vuelo)	\N	\N	\N
+526d812b-cab7-41d2-8cd8-d09ea7922a25	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	2	TOUR ISLAS BALLESTAS + HUACACHINA + ICA	\N	05:00 AM – Recojo en Hotel (hora aproximada) 05:10 AM – Partida hacia Paracas 08:00 AM - Iniciaremos con el tour a Islas Ballestas (hora aproximada) 9:30 AM - Retorno de Islas Ballestas 10:30 AM - Llegada al viñedo “El Nieto” ó “El Catador” donde conoceremos el tradicional proceso 1:00 PM - Arribo a la ciudad de Ica y almuerzo (costo no incluido) 2:30 PM - Llegada al Oasis de Huacachina, aquí disfrutaremos de un paisaje impresionante donde 04:00 PM - Partida hacia Lima (hora aproximada) 10:00 PM – 10:30 PM - Llegada a LARCOMAR (hora aproximada) y fin del tour.	\N	\N	\N
+0901838a-da24-4d14-b436-13020fa3d70e	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	3	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	6:45 AM – Traslado a aeropuerto 9:30 AM – Vuelo a Cusco 11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+ccf6ffa3-671c-4f1e-a847-c87f3dd7e0c2	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	4	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+2a6b0165-7c37-42b8-8419-d58097568126	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	5	TOUR A VINICUNCA “LA MONTAÑA DE 7 COLORES”	\N	04:30 AM - Recojo de Hotel (hora aproximada) 09:30 AM – Inicio de caminata hacia Vinicunca 12:00 PM – Almuerzo 12:30 PM – Retorno a Cusco 05:30 PM – Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+0103e238-c204-40fa-973d-0ea4d02b9fad	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	6	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+2d5a8327-2678-41d6-b250-c7e696c1ba56	493a2646-dfc6-4eb3-84f7-5b6d10c747f5	6	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+e2b6fe90-769a-4700-b3a9-feca6e3c9308	68e078c2-74fb-4390-a039-b17d6d7c7a54	1	LLEGADA A LIMA	\N	Llegada a Lima y traslado a hotel (según hora de llegada de su vuelo)	\N	\N	\N
+292d7624-520c-48b6-8d5a-cb084b25b0bb	68e078c2-74fb-4390-a039-b17d6d7c7a54	2	CITY TOUR LIMA	\N	08:50 AM - 09:30 AM – Recojo en hotel e inicio de City tour (hora aproximada) 01:30 PM - fin del tour (hora aproximada)	\N	\N	\N
+b43ef4a4-5f05-4369-90d3-b2d278bbcc00	68e078c2-74fb-4390-a039-b17d6d7c7a54	3	TOUR ISLAS BALLESTAS + HUACACHINA + ICA	\N	05:00 AM – Recojo en Hotel (hora aproximada) 05:10 AM – Partida hacia Paracas 08:00 AM - Iniciaremos con el tour a Islas Ballestas (hora aproximada) 9:30 AM - Retorno de Islas Ballestas 10:30 AM - Llegada al viñedo “El Nieto” ó “El Catador” donde conoceremos el tradicional proceso 1:00 PM - Arribo a la ciudad de Ica y almuerzo (costo no incluido) 2:30 PM - Llegada al Oasis de Huacachina, aquí disfrutaremos de un paisaje impresionante donde 04:00 PM - Partida hacia Lima (hora aproximada) 10:00 PM – 10:30 PM - Llegada a LARCOMAR (hora aproximada) y fin del tour.	\N	\N	\N
+2863bb0c-a47a-4e29-92a7-2d6c7cef798c	68e078c2-74fb-4390-a039-b17d6d7c7a54	4	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	6:45 AM – Traslado a aeropuerto 9:30 AM – Vuelo a Cusco 11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+76d0761f-70d2-4788-8193-6e031088677c	68e078c2-74fb-4390-a039-b17d6d7c7a54	5	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+1b67185c-503f-40de-a3b6-c15d008a2d81	68e078c2-74fb-4390-a039-b17d6d7c7a54	6	TOUR A VINICUNCA “LA MONTAÑA DE 7 COLORES”	\N	04:30 AM - Recojo de Hotel (hora aproximada) 09:30 AM – Inicio de caminata hacia Vinicunca 12:00 PM – Almuerzo 12:30 PM – Retorno a Cusco 05:30 PM – Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+cf8787c5-86f7-4e9b-bf67-a13653a0cb00	68e078c2-74fb-4390-a039-b17d6d7c7a54	7	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+ec0fc324-47f3-473c-9da2-fd27700c48f1	68e078c2-74fb-4390-a039-b17d6d7c7a54	7	VUELO DE RETORNO	\N	10:00 AM - Partida hacia Aeropuerto (hora recomendada) 01:00 PM - Llegada a Lima 05:00 PM - Vuelo	\N	\N	\N
+6f4cbd77-b8b2-40d2-9be6-58451b170f48	f2db34e2-0381-4efa-a25f-6af768737c7a	1	LLEGADA A LIMA	\N	Llegada a Lima y traslado a hotel (según hora de llegada de su vuelo)	\N	\N	\N
+2e4423e8-e3f6-4ce1-ab3f-9c39532909d7	f2db34e2-0381-4efa-a25f-6af768737c7a	2	CITY TOUR LIMA	\N	08:50 AM - 09:30 AM – Recojo en hotel e inicio de City tour (hora aproximada) 01:30 PM - fin del tour (hora aproximada)	\N	\N	\N
+1c8ebb06-5f6f-421a-a6ec-c850ab817754	f2db34e2-0381-4efa-a25f-6af768737c7a	3	TOUR ISLAS BALLESTAS + HUACACHINA + ICA	\N	05:00 AM – Recojo en Hotel (hora aproximada) 05:10 AM – Partida hacia Paracas 08:00 AM - Iniciaremos con el tour a Islas Ballestas (hora aproximada) 9:30 AM - Retorno de Islas Ballestas 10:30 AM - Llegada al viñedo “El Nieto” ó “El Catador” donde conoceremos el tradicional proceso 1:00 PM - Arribo a la ciudad de Ica y almuerzo (costo no incluido) 2:30 PM - Llegada al Oasis de Huacachina, aquí disfrutaremos de un paisaje impresionante donde 04:00 PM - Partida hacia Lima (hora aproximada) 10:00 PM – 10:30 PM - Llegada a LARCOMAR (hora aproximada) y fin del tour.	\N	\N	\N
+68fb07c6-c056-49ec-992f-b228df0e5770	f2db34e2-0381-4efa-a25f-6af768737c7a	4	LLEGADA A CUSCO / CITY TOUR ARQUEOLÓGICO	\N	6:45 AM – Traslado a aeropuerto 9:30 AM – Vuelo a Cusco 11:00 AM - Llegada a Cusco y traslado a hotel. (hora Recomendada) 2:00 PM - Recojo de hotel para inicio del City Tour (hora aproximada) - (Sacsayhuaman, Kenko, Puka 6:30 PM – Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+2394fa9d-b1e2-456f-bba4-3abeeb5e4503	f2db34e2-0381-4efa-a25f-6af768737c7a	5	TOUR VALLE SAGRADO – MARAS - MORAY	\N	06:40 AM - Recojo en hotel e inicio de tour (hora aproximada) 08:00 AM - Llegada a Chinchero (pueblo) 09:00 AM - Tour Salineras de Maras 11:30 AM - Tour a Moray 12:30 PM - Almuerzo (incluido) 03:00 PM - Visita Ollantaytambo y Pisaq 05:30 PM - Retorno a Cusco 07:00 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+fe02953b-d988-4a1f-a341-058e839ed429	f2db34e2-0381-4efa-a25f-6af768737c7a	6	TOUR MACHU PICCHU	\N	03:30 AM - Recojo de Hotel (hora aproximada) 06:10 AM - Salida en tren hacia Aguas calientes desde Ollantaytambo 07:40 AM – Llegada a Aguas Calientes y reunión de grupo. 09:30 AM – Inicio de Tour a Machu Picchu (hora aproximada) 01:00 PM – Fin del tour y retorno a Aguas calientes (hora aproximada) 04:40 PM - Partida en tren hacia Ollantaytambo y luego traslado a Cusco (hora aproximada) 07:30 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+9f20be8d-db73-47d1-aac3-e3beb495c599	f2db34e2-0381-4efa-a25f-6af768737c7a	7	TOUR LAGUNA HUMANTAY	\N	04:30 AM - Recojo en hotel y Partida a Mollepata (hora aproximada) 08:30 AM - Llegada a Mollepata e inicio del trekking a Laguna Humantay 11:00 AM - Llegada a Laguna Humantay (hora aproximada) 12:30 PM - Partida de retorno a Mollepata (hora aproximada) 03:00 PM - Retorno a Cusco 05:00 PM - Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+e089632f-2c94-4264-82be-6ae1a59db13d	f2db34e2-0381-4efa-a25f-6af768737c7a	8	TOUR A VINICUNCA “LA MONTAÑA DE 7 COLORES”	\N	04:30 AM - Recojo de Hotel (hora aproximada) 09:30 AM – Inicio de caminata hacia Vinicunca 12:00 PM – Almuerzo 12:30 PM – Retorno a Cusco 05:30 PM – Llegada a Cusco y Fin del tour en Plaza San Francisco, cerca a la Plaza de Armas.	\N	\N	\N
+177b863f-9dbe-49f3-8afd-8f5377220196	828163d2-cfd7-46f5-9d41-92e538bae766	1	LLEGADA A BANGKOK	\N	Llegada al aeropuerto de Bangkok y encuentro con nuestro guía de habla hispana quien los estará esperando para asistirlos con el traslado a su hotel. Realizar el check-in según disponibilidad (Las habitaciones normalmente se habilitan a partir de las 15:00, pero a veces suelen facilitarse antes). Resto del día libre a su disposición. Alojamiento en el hotel seleccionado Servicio Fast Track a la llegada Aeropuertos de Suvarnabhumi (BKK) Numero de personas Neto por persona, USD - Encuentro con el asistente en el puente aéreo, le acompañan al mostrador de inmigración. le llevarán la maleta y la acompañarán hasta encontrarse con el guía. - El proceso de tiempo se basa en un caso standard, cuando los pasajeros no requieren un control de salud o visado a la llegada. - NO incluye el visado, 2000 THB.-, por favor prepare el importe en efectivo	\N	\N	\N
+e6393d30-07d4-41b4-aeac-fdf088bd3afb	828163d2-cfd7-46f5-9d41-92e538bae766	2	BANGKOK	\N	Después del desayuno, Visita a tres de los templos budistas más populares de la ciudad. Empezaremos por el Wat Traimit, situado en el extremo de Chinatown, en Yaowarat Road, cerca de la estación de tren Hualampong. Wat Traimit alberga el Buda de oro macizo más grande del mundo, midiendo casi cinco metros de altura con un peso de cinco toneladas y media. La excursión continuará hacia Wat Pho, el templo más grande de Bangkok. El templo del enorme Buda reclinado y los Chedis de los Reyes. Este se encuentra detrás del Templo del Buda. Es uno de los mayores templos de la ciudad y famoso por su gigantesco Buda reclinado que mide 46 metros de largo y está cubierto de oro. A continuación, visitarán el Palacio Real, que es sin duda, el monumento más famoso de la ciudad. Construido en 1782, por 150 años fue la casa del rey de Tailandia, la corte real y la sede administrativa del gobierno. El Gran Palacio de Bangkok es un edificio antiguo que continúa impresionando a sus visitantes por su hermosa arquitectura y detalles. Dentro del complejo, se encuentra Wat Phra Kaew o el Templo del Buda Esmeralda (oficialmente conocido como Wat Phra Sri Rattana Satsadaram), considerado como el templo budista más importante de Tailandia, consagra el Buda más reverenciado tallado en un solo bloque de jade. Traslados incluidos. Alojamiento en hotel	\N	\N	\N
+f5126e27-8851-44af-b3e3-ff2173711ff2	828163d2-cfd7-46f5-9d41-92e538bae766	3	BANGKOK – AYUTTHAYA – ANG THONG – SUKHOTHAI	\N	Desayuno en el hotel. Salida desde Bangkok hacia Ayuthaya, antigua capital del país, para visitar sus maravillosos templos entre los cuales Wat Chaiwathanaram y Wat Mahathat. Almuerzo en restaurante local. Por la tarde salida hacia Lopburi, visita al Templo de los Monos, Prang Sam Yod (la Pagoda Sagrada) Continuación hasta Sukhothai. Cena y alojamiento en hotel.	\N	\N	\N
+d8dd5b92-728d-42d2-a309-84c5409fa28c	828163d2-cfd7-46f5-9d41-92e538bae766	4	SUKHOTHAI – CHIANG RAI	\N	Desayuno en el hotel. Salida desde el hotel y visita Parque Histórico de Sukhothai, declarado Patrimonio Cultural de la Humanidad por la UNESCO. Allí se realiza un paseo en bicicleta por los jardines entre sus ruinas y lagunas. Desde aquí se contempla uno de los íconos más importantes, el gran Buda Blanco de Wat Sri Chum. Almuerzo en restaurante local. Continuación hacia Chiang Rai, en el camino se realiza una parada en el Lago Payao. Cena y alojamiento en hotel.	\N	\N	\N
+60442636-d08d-4df3-b40b-5a2d297c22c6	828163d2-cfd7-46f5-9d41-92e538bae766	5	CHIANG RAI	\N	Desayuno en el hotel. Tras el desayuno, visita a Mae Chan, antiguamente centro de trabajos de plata, posteriormente convertido en un centro de transacciones comerciales entre las tribus Yao y Akha donde es posible ver a miembros de las diferentes etnias. Visita al poblado de las famosas Mujeres Jirafas.  Almuerzo. A media mañana paseo por el río Mekkong en lancha tradicional tailandesa. Este río sirve de frontera natural entre Myanmar (ex Birmania), Laos y Tailandia. Visita a la Casa del Opio. Alojamiento en hotel.	\N	\N	\N
+ff41c6af-53d9-4721-9268-c9bc761961e7	828163d2-cfd7-46f5-9d41-92e538bae766	6	CHIANG RAI - CHIANG MAI	\N	Desayuno en el hotel. Salida desde el hotel al muelle y en barco tradicional visita a los pueblos de las minorías étnicas Karen, Lahu (Muser) a lo largo del río Kok. Visita al Wat Rong Khun, el famoso templo blanco.Salida desde Chiang Rai a Chiang Mai por carretera (3 hrs). Almuerzo en ruta en un restaurante local. Llegada en Chiang Mai, por la tarde, visita al templo más conocido de la ciudad, Wat Doi Suthep, situado en la cima de una pequeña colina a 15 Kms al noroeste.  Traslado y check in en el hotel. Cena Kantoke, con comida y danzas típicas del Norte de Tailandia Alojamiento en hotel.	\N	\N	\N
+3d74e7e0-c2a6-4a8f-bffe-fbe308c3d196	828163d2-cfd7-46f5-9d41-92e538bae766	7	CHIANG MAI	\N	Desayuno en el hotel. Por la mañana visitaremos algunas fábricas de artesanías, donde veremos el proceso de trabajo local. Seguidamente, salida hacia el valle de Mae Sa visitando la granja de las orquídeas. Almuerzo en restaurante local. Después nos trasladaremos al santuario de elefantes para aprender sobre estos animales, y realizar diversas actividades incluso darles comida y tomar un baño, una experiencia inolvidable. Cena y alojamiento en hotel.	\N	\N	\N
+f469502c-fe68-4768-8212-c5771574fcdd	828163d2-cfd7-46f5-9d41-92e538bae766	8	CHIANG MAI – SALIDA	\N	Desayuno en el hotel. Traslado al aeropuerto de Chiang Mai para conectar con el vuelo a su próximo destino.	\N	\N	\N
+9063fb89-05c7-4eab-9f01-3f6d0c261130	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	1	HANÓI	\N	Llegada al aeropuerto de Hanói donde les estará esperando nuestro guía de habla hispana. Traslado a la ciudad (1hr.), mientras tanto, podrán ir obteniendo una primera impresión de Hanói y su asombrosa fusión entre el bullicio y la serenidad. Tiempo libre hasta check-in en el hotel (normalmente las habitaciones están disponibles a partir de las 14.00h, aunque si hay disponibilidad, suelen facilitarlas antes). Alojamiento en Hanói.	\N	\N	\N
+59397b0e-5bd5-4eba-8992-fe71e29f286b	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	2	HANÓI	\N	Tras el desayuno, empezamos las visitas a Hanói, la capital de Vietnam. Es considerada también como una de las pocas ciudades asiáticas con avenidas arboladas, arquitectura colonial francesa, lagos apacibles y templos orientales.  El tour incluye la visita al Templo de la Literatura, la primera universidad de Vietnam, fundado en 1070 en honor a Confucio y considerado como el símbolo de Hanói. Seguimos con la ruta al Mausoleo de Ho Chi Minh, visitando la parte exterior del mismo desde la plaza Ba Dinh. Continuaremos hacia la Pagoda del Pilar Único, construida en 1049 sobre un solo pilar de piedra por el Emperador Ly Thai Tong, quien reinó desde 1028 hasta 1054. La pagoda está diseñada a semejanza de una hoja de flor de loto en honor a Buda. Almuerzo en restaurante local. Después del almuerzo, tendremos una experiencia con las flores y su tradicional forma de adornarlas. Visita a una floristería artesanal para ver cómo se realizan los ramos, cómo se transmite y conserva este hermoso y tradicional arte espiritual de Vietnam que ha llegado a nuestros días generación tras generación. Los invitados aprenderán a reconocer flores exóticas a la vez que disfrutan preparando una ofrenda floral espiritual. Posteriormente llegamos al lago Hoan Kiem, el corazón de Hanói, donde daremos un paseo alrededor del lago con una vista panorámica al templo Ngoc Son, situado en medio del lago, junto con el puente rojo The Huc.Por último, realizaremos un paseo panorámico en ciclo pousse por el Barrio Antiguo de Hanói, también conocido como el barrio de las 36 calles ya que en su tiempo fue conocido por el oficio de los artesanos que las habitaban y por los talleres que allí había. Regreso al hotel y alojamiento en Hanói.	\N	\N	\N
+b5ff4566-9280-4532-9f8f-a6c8f94369ac	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	3	HANÓI - BAHÍA DE HALONG	\N	Después del desayuno, encuentro con nuestro guía en el hall del hotel. Salida por carretera hacia la Bahía de Halong que significa “el dragón que desciende del mar” en vietnamita, y según la leyenda, fue un dragón quien formó las islas de la bahía. Embarque en un maravilloso crucero con el que visitarán la bahía. Almuerzo a bordo. Acabado el almuerzo, continuaremos navegando y descubriendo miles de islas e islotes de abundante vegetación que emergen en la bahía con sus insólitas formas y diferentes tamaños. Las aguas color esmeralda de este legendario tesoro nos llevan a explorar islas sublimes como la de la Tortuga, la del Perro, la Cabeza de Hombre, etc. Debido a su singular belleza, peculiaridad geológica, riqueza biológica, importancia cultural e histórica, la Bahía de Halong fue declarada Patrimonio de la Humanidad por la UNESCO en 1994 e incluida en la lista de las Siete Maravillas Naturales del Mundo desde 2011. Más allá de la contemplación del magnífico paisaje, disfrutamos de tiempo libre o de algunas de las actividades opcionales tales como nadar, practicar kayak o participar en una demostración de cocina vietnamita en la terraza del barco. Cena y alojamiento a bordo. Notas: El itinerario del crucero está sujeto a cambios sin previo aviso por motivos meteorológicos.	\N	\N	\N
+6b1ef6bc-8430-4c8d-add1-e3c37eb0a0d7	424f228a-7fc6-4ad1-9bc6-67e2d00533ca	4	BAHÍA DE HALONG	\N	A la salida del sol y para aquellos que estén interesados hay una clase de Tai chi en la terraza solárium. Continuamos navegando por la bahía de casi 2000 islas de roca calcárea y disfrutando de sus paisajes únicos. Aprovechar este increíble momento para sacar las mejores fotos de esas maravillas. Tendremos un buen brunch para recargar baterías y emprender el retorno a tierra. Desembarcamos en el muelle de Halong, desde donde nos trasladamos a Hanói por carretera hasta el aeropuerto para tomar el vuelo de salida.	\N	\N	\N
+56a53300-92e8-4d3f-9e2c-c969da155047	8a709aed-8b86-413a-bfcb-575185e69d53	1	HANÓI	\N	Llegada al aeropuerto de Hanói donde les estará esperando nuestro guía de habla hispana. Traslado a la ciudad (1hr.), mientras tanto, podrán ir obteniendo una primera impresión de Hanói y su asombrosa fusión entre el bullicio y la serenidad. Tiempo libre hasta check-in en el hotel (normalmente las habitaciones están disponibles a partir de las 14.00h, aunque si hay disponibilidad, suelen facilitarlas antes). Alojamiento en Hanói.	\N	\N	\N
+39806aa4-f483-4d1b-9acb-448eb685437b	8a709aed-8b86-413a-bfcb-575185e69d53	2	HANÓI	\N	Tras el desayuno, empezamos las visitas a Hanói, la capital de Vietnam. Es considerada también como una de las pocas ciudades asiáticas con avenidas arboladas, arquitectura colonial francesa, lagos apacibles y templos orientales.  El tour incluye la visita al Templo de la Literatura, la primera universidad de Vietnam, fundado en 1070 en honor a Confucio y considerado como el símbolo de Hanói. Seguimos con la ruta al Mausoleo de Ho Chi Minh, visitando la parte exterior del mismo desde la plaza Ba Dinh. Continuaremos hacia la Pagoda del Pilar Único, construida en 1049 sobre un solo pilar de piedra por el Emperador Ly Thai Tong, quien reinó desde 1028 hasta 1054. La pagoda está diseñada a semejanza de una hoja de flor de loto en honor a Buda. Almuerzo en restaurante local. Después del almuerzo, tendremos una experiencia con las flores y su tradicional forma de adornarlas. Visita a una floristería artesanal para ver cómo se realizan los ramos, cómo se transmite y conserva este hermoso y tradicional arte espiritual de Vietnam que ha llegado a nuestros días generación tras generación. Los invitados aprenderán a reconocer flores exóticas a la vez que disfrutan preparando una ofrenda floral espiritual. Posteriormente llegamos al lago Hoan Kiem, el corazón de Hanói, donde daremos un paseo alrededor del lago con una vista panorámica al templo Ngoc Son, situado en medio del lago, junto con el puente rojo The Huc.Por último, realizaremos un paseo panorámico en ciclo pousse por el Barrio Antiguo de Hanói, también conocido como el barrio de las 36 calles ya que en su tiempo fue conocido por el oficio de los artesanos que las habitaban y por los talleres que allí había. Regreso al hotel y alojamiento en Hanói.	\N	\N	\N
+ecbf8431-e741-48e6-aeb9-fb60706dc107	8a709aed-8b86-413a-bfcb-575185e69d53	3	HANÓI - BAHÍA DE HALONG	\N	Después del desayuno, encuentro con nuestro guía en el hall del hotel. Salida por carretera hacia la Bahía de Halong que significa “el dragón que desciende del mar” en vietnamita, y según la leyenda, fue un dragón quien formó las islas de la bahía. Embarque en un maravilloso crucero con el que visitarán la bahía. Almuerzo a bordo. Acabado el almuerzo, continuaremos navegando y descubriendo miles de islas e islotes de abundante vegetación que emergen en la bahía con sus insólitas formas y diferentes tamaños. Las aguas color esmeralda de este legendario tesoro nos llevan a explorar islas sublimes como la de la Tortuga, la del Perro, la Cabeza de Hombre, etc. Debido a su singular belleza, peculiaridad geológica, riqueza biológica, importancia cultural e histórica, la Bahía de Halong fue declarada Patrimonio de la Humanidad por la UNESCO en 1994 e incluida en la lista de las Siete Maravillas Naturales del Mundo desde 2011. Más allá de la contemplación del magnífico paisaje, disfrutamos de tiempo libre o de algunas de las actividades opcionales tales como nadar, practicar kayak o participar en una demostración de cocina vietnamita en la terraza del barco. Cena y alojamiento a bordo. Notas: El itinerario del crucero está sujeto a cambios sin previo aviso por motivos meteorológicos.	\N	\N	\N
+091d12c2-9251-4e38-bcdb-e2bf166c25af	8a709aed-8b86-413a-bfcb-575185e69d53	4	BAHÍA DE HALONG	\N	A la salida del sol y para aquellos que estén interesados hay una clase de Tai chi en la terraza solárium. Continuamos navegando por la bahía de casi 2000 islas de roca calcárea y disfrutando de sus paisajes únicos. Aprovechar este increíble momento para sacar las mejores fotos de esas maravillas. Tendremos un buen brunch para recargar baterías y emprender el retorno a tierra. Desembarcamos en el muelle de Halong, desde donde nos trasladamos a Hanói por carretera hasta el aeropuerto para tomar el vuelo de salida.	\N	\N	\N
+996828f1-5611-4a45-88a7-30318cc2ae82	8a709aed-8b86-413a-bfcb-575185e69d53	5	BAHÍA DE HALONG	\N	Desayuno y traslado al aeropuerto para tomar el vuelo hacia su próximo destino.	\N	\N	\N
+cdbbafa3-3f8a-4502-9fb5-f63aa418b295	c3e06106-518d-46da-b1db-4228b126be43	1	HANÓI	\N	Llegada al aeropuerto de Hanói donde les estará esperando nuestro guía de habla hispana. Traslado a la ciudad (1hr.), mientras tanto, podrán ir obteniendo una primera impresión de Hanói y su asombrosa fusión entre el bullicio y la serenidad. Tiempo libre hasta check-in en el hotel (normalmente las habitaciones están disponibles a partir de las 14.00h, aunque si hay disponibilidad, suelen facilitarlas antes). Alojamiento en Hanói.	\N	\N	\N
+b0e02a5e-4c98-4617-a8b2-f6e01e79cf5d	c3e06106-518d-46da-b1db-4228b126be43	2	HANÓI	\N	Tras el desayuno, empezamos las visitas a Hanói, la capital de Vietnam. Es considerada también como una de las pocas ciudades asiáticas con avenidas arboladas, arquitectura colonial francesa, lagos apacibles y templos orientales.  El tour incluye la visita al Templo de la Literatura, la primera universidad de Vietnam, fundado en 1070 en honor a Confucio y considerado como el símbolo de Hanói. Seguimos con la ruta al Mausoleo de Ho Chi Minh, visitando la parte exterior del mismo desde la plaza Ba Dinh. Continuaremos hacia la Pagoda del Pilar Único, construida en 1049 sobre un solo pilar de piedra por el Emperador Ly Thai Tong, quien reinó desde 1028 hasta 1054. La pagoda está diseñada a semejanza de una hoja de flor de loto en honor a Buda. Almuerzo en restaurante local. Después del almuerzo, tendremos una experiencia con las flores y su tradicional forma de adornarlas. Visita a una floristería artesanal para ver cómo se realizan los ramos, cómo se transmite y conserva este hermoso y tradicional arte espiritual de Vietnam que ha llegado a nuestros días generación tras generación. Los invitados aprenderán a reconocer flores exóticas a la vez que disfrutan preparando una ofrenda floral espiritual. Posteriormente llegamos al lago Hoan Kiem, el corazón de Hanói, donde daremos un paseo alrededor del lago con una vista panorámica al templo Ngoc Son, situado en medio del lago, junto con el puente rojo The Huc.Por último, realizaremos un paseo panorámico en ciclo pousse por el Barrio Antiguo de Hanói, también conocido como el barrio de las 36 calles ya que en su tiempo fue conocido por el oficio de los artesanos que las habitaban y por los talleres que allí había. Regreso al hotel y alojamiento en Hanói.	\N	\N	\N
+dd94afc9-65a9-490d-8f25-c5523031e9d4	c3e06106-518d-46da-b1db-4228b126be43	3	HANÓI - BAHÍA DE HALONG	\N	Después del desayuno, encuentro con nuestro guía en el hall del hotel. Salida por carretera hacia la Bahía de Halong que significa “el dragón que desciende del mar” en vietnamita, y según la leyenda, fue un dragón quien formó las islas de la bahía. Embarque en un maravilloso crucero con el que visitarán la bahía. Almuerzo a bordo. Acabado el almuerzo, continuaremos navegando y descubriendo miles de islas e islotes de abundante vegetación que emergen en la bahía con sus insólitas formas y diferentes tamaños. Las aguas color esmeralda de este legendario tesoro nos llevan a explorar islas sublimes como la de la Tortuga, la del Perro, la Cabeza de Hombre, etc. Debido a su singular belleza, peculiaridad geológica, riqueza biológica, importancia cultural e histórica, la Bahía de Halong fue declarada Patrimonio de la Humanidad por la UNESCO en 1994 e incluida en la lista de las Siete Maravillas Naturales del Mundo desde 2011. Más allá de la contemplación del magnífico paisaje, disfrutamos de tiempo libre o de algunas de las actividades opcionales tales como nadar, practicar kayak o participar en una demostración de cocina vietnamita en la terraza del barco. Cena y alojamiento a bordo. Notas: El itinerario del crucero está sujeto a cambios sin previo aviso por motivos meteorológicos.	\N	\N	\N
+5a6728a9-42c7-40a4-aed6-04d185101663	c3e06106-518d-46da-b1db-4228b126be43	4	VIE: BAHÍA DE HALONG - VUELO A DA NANG - HOI AN	\N	A la salida del sol y para aquellos que estén interesados hay una clase de Tai chi en la terraza solárium. Continuamos navegando por la bahía de casi 2000 islas de roca calcárea y disfrutando de sus paisajes únicos. Aprovechar este increíble momento para sacar las mejores fotos de esas maravillas. Tendremos un buen brunch para recargar baterías y emprender el retorno a tierra. Desembarcamos en el muelle de Halong, desde donde nos trasladamos a Hanói por carretera hasta el aeropuerto para tomar el vuelo a Da Nang. A su llegada, tenemos el traslado directo hasta Hoi An (aprox. 30 min) Al anochecer, traslado al río Hoai, por donde navegaremos Este río tiene un significado muy especial para los habitantes de Hoi An, ya que ha sido testigo de los acontecimientos acaecidos en Vietnam a través de los años. Cuando cae la noche, las calles se iluminan con farolillos y luces de colores, también se lanzan linternas al agua para pedir buenos augurios. La ciudad luce un nuevo aspecto brillante y misterioso. Desembarcar y tiempo libre para pasear por la calle y volver al hotel por su cuenta. Alojamiento en Hoi An. Notas: Duración del vuelo a Danang, 1h 10min aprox.	\N	\N	\N
+a87d217a-35b3-436e-9c47-94e080574796	e5a2c7c1-1953-4d88-a677-7eb944fe8611	3	–DUBAI	\N	Desayuno en el hotel. Mañana libre. Alrededor de las 15:00 a 15:30 hrs. los recogerán para realizar la excursión más popular Los Land Cruisers (6 personas por vehículo) realizaremos un excitante trayecto por las fantásticas altas dunas donde podrán tomar fotografías únicas de la puesta de sol árabe. Una vez que se oculte el sol detrás de las dunas de arena dorada, nos dirigiremos a un campo en el Desierto. El olor a la fresca brocheta, el cordero a la parrilla, las hogueras, las tradicionales pipas de agua y los relajantes sonidos de la música árabe nos invitan a pasar una tarde inolvidable. Tras la suntuosa cena disfrutaremos del antiguo arte de la Danza del Vientre. (Se encuentran incluidos: Ski por la arena, pintarse con henna, agua, refrescos, te y café). Regreso al hotel. Alojamiento.	\N	\N	\N
+2eff4df9-ea09-46f0-8109-d8212a626fef	e5a2c7c1-1953-4d88-a677-7eb944fe8611	4	– DUBÁI (Desayuno).	\N	Desayuno en el hotel. A la hora prevista traslado al aeropuerto de Dubai. Fin de Servicios.	\N	\N	\N
+4847fdc3-7f96-4bcc-87d1-2d0b0bfc7d49	c3e06106-518d-46da-b1db-4228b126be43	5	SAB: HOI AN – VISITAS	\N	Después del desayuno, empezamos la visita de la ciudad de Hoi An, un importante puerto comercial de Asia en los siglos XVII y XVIII, cuya arquitectura y relajado estilo de vida han cambiado poco en los últimos años. Llegada al Barrio Antiguo, desde donde empezaremos el paseo a pie por el centro de la ciudad antigua para visitar Phung Hung (Antigua casa de los mercaderes), el puente japonés cubierto con más de 400 años de antigüedad, la sala de Phuc Kien, la antigua Casa Tan Ky con su arquitectura tradicional y el museo. Almuerzo en restaurante. Tarde libre para disfrutar de la playa, pasear por el colorido mercado del centro o realizar compras. Alojamiento en Hoi An.	\N	\N	\N
+1e530481-0d2a-4a4e-a898-64350b5119b2	c3e06106-518d-46da-b1db-4228b126be43	6	HOI AN - DA NANG - VUELO DE SALIDA	\N	Desayuno y traslado al aeropuerto para tomar el vuelo hacia su próximo destino. ******Fin de nuestros servicios*****	\N	\N	\N
+6ba0b9b2-064b-491b-b94f-cbacbfeebef2	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	1	DUBAI	\N	Llegada al aeropuerto de Dubái, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+7bee8545-eb2f-44fa-961f-53617270901d	5099c499-78ed-453c-9fd7-d0cae36d5e6d	1	Estambul	\N	Llegada al aeropuerto y traslado al hotel con asistente de habla hispana. Alojamiento en el Pullman Istanbul Airport and Convention Center Hotel o similar.	\N	\N	\N
+f764c844-39c8-4bf4-b238-3760a3463794	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2	Estambul	\N	Desayuno. Día libre. Excursión opcional: Paseo Bósforo + Gálata (con almuerzo). Visita al Bazar Egipcio. Crucero por el Bósforo, que separa Asia de Europa. Vistas de Ortakoy, la Mezquita Mecidiye y los puentes colgantes. Uso del Túnel. Visita a la Torre de Gálata. Subida al Morro do Café de Pierre Loti.	\N	\N	\N
+ed7d5276-5c31-4ac4-a8e8-5da50c52e49a	5099c499-78ed-453c-9fd7-d0cae36d5e6d	3	Estambul - Ankara - Capadocia	\N	Desayuno y salida hacia Ankara. Recorrido panorámico con parada en el mausoleo de Ataturk. Almuerzo. Continuación hacia Capadocia. Cena y alojamiento en el Ramada by Wyndham Cappadocia o similar. Suplemento de vuelo Estambul - Capadocia disponible.	\N	\N	\N
+a9f11838-c405-4051-841c-655e996b5107	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	2	DUBAI (Desayuno y cena).	\N	Desayuno. Visita por la ciudad Salida hacia Deira pasando por el Zoco de las especies, Zoco de Oro; atravesando el Canal por Abra (Taxi Acuático) llegada y visita al Museo de Dubái. Por la carretera de Jumeirah, vista de la Mezquita de Jumeirah; parada para fotos en el Burj al Arab único hotel en el mundo de 7 estrellas. Pasaremos por Burj Khalifa el edificio más alto del mundo situado en el Dubái Mall (el Mall más grande del mundo con 1000 tiendas). Regreso al hotel. Por la noche salida a las 19:30 hrs. Para disfrutar de las vistas y los sonidos de la cala de Dubái navegando 2 horas abordo en un Dhow tradicional. El viaje se realiza desde la desembocadura del arroyo, a lo largo del mismo hasta el iluminado Dubái Creek Golf Club que asemeja a una vela de barco. Cena incluida. Regreso al hotel. Alojamiento.	\N	\N	\N
+a4171748-157f-47b1-ae6d-a5fad985f7ff	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	3	–DUBAI (Desayuno y cena).	\N	Desayuno en el hotel. Mañana libre. Alrededor de las 15:00 a 15:30 hrs. los recogerán para realizar la excursión más popular Los Land Cruisers (6 personas por vehículo) realizaremos un excitante trayecto por las fantásticas altas dunas donde podrán tomar fotografías únicas de la puesta de sol árabe. Una vez que se oculte el sol detrás de las dunas de arena dorada, nos dirigiremos a un campo en el Desierto. El olor a la fresca brocheta, el cordero a la parrilla, las hogueras, las tradicionales pipas de agua y los relajantes sonidos de la música árabe nos invitan a pasar una tarde inolvidable. Tras la suntuosa cena disfrutaremos del antiguo arte de la Danza del Vientre. (Se encuentran incluidos: Ski por la arena, pintarse con henna, agua, refrescos, te y café). Regreso al hotel. Alojamiento.	\N	\N	\N
+6312d54c-f106-4ee1-9b31-57a358498e7e	e95e6dde-a4ad-462a-afa5-0e7d667a920d	2	EL CAIRO – (Desayuno y almuerzo).	\N	Desayuno. Salida para realizar la visita incluida a las tres Pirámides de Giza, la eterna Esfinge y el Templo del Valle (no incluye entrada al interior de las Pirámides). Por la tarde Realizaremos una visita a la necrópolis de Sakkara y la ciudad de Menfis, capital del imperio antiguo. Opcional:- Por la noche podemos ir a disfrutar de un Espectáculo de Luz y Sonido de las Pirámides. Regreso al hotel en El Cairo.	\N	\N	\N
+1514e24a-69b5-4f81-b929-705f6d858f13	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	4	– DUBAI / VISITA ABU DHABI / DUBAI (Desayuno y almuerzo).	\N	Desayuno. Visita a Abu Dhabi. Recorrido de Dubái pasando por Puerto Jebel Ali, el puerto más grande del mundo realizado por los hombres hasta la capital de UAE. (2 horas aproximadas). Admiraremos la Mezquita del Jeque Zayed la tercera más grande del mundo; así como la tumba del mismo, antiguo presidente de UAE y padre de la nación. Continuación hasta el puente de Al Maqta pasando por una de las áreas más ricas de Abu Dhabi, el área de los ministros. Llegada a la calle Corniche que es comparada con Manhattan. Parada para fotos en el hotel Emirates Palace. Este hotel tiene su propio helipuerto y puerto. Continuamos a Al Batee Área, donde se encuentran los palacios de la familia Real. Almuerzo en restaurante local, visita panorámica al parque de Ferrari (breve tiempo para sacar fotos y ver tiendas). Regreso a Dubái. Alojamiento.	\N	\N	\N
+3095a31c-941c-495a-81ed-41f3d5fa2f87	4c5a7fae-1432-48fe-9b16-0b318e4aaa33	5	– DUBÁI (Desayuno).	\N	Desayuno en el hotel. A la hora prevista traslado al aeropuerto de Dubái. Fin de Servicios.	\N	\N	\N
+98ad195d-e037-4af8-a25f-7fec9d614719	4d6107a7-853c-48c9-ac68-75581775e8cd	1	– DUBAI.	\N	Llegada al aeropuerto de Dubái, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+cd047227-27ea-4d93-aed9-fd5999cde835	4d6107a7-853c-48c9-ac68-75581775e8cd	2	DUBAI (Desayuno).	\N	Desayuno en el hotel. City Tour Clásico de Dubái de medio día que cubre los lugares más representativos e históricos de la ciudad, como la Mezquita Jumeirah, la región de los Palacios de los jeques y el Dubái Creek - que es el canal de agua salada que atraviesa la ciudad. En la histórica fortaleza de Al Fahidi, que fue convertida en museo, se puede entender la evolución del país y profundizar en la cultura local. El tour también incluye un pintoresco paseo en la ABRA-taxi de agua, utilizado para cruzar el arroyo para conectarse a bazares típicos: el zoco de Especias y del oro. (Las entradas para el paseo en el ABRA & en el Museo están incluidas en el programa). Tour en Dubái moderno, donde visitaremos el más grande Mall del mundo, tiempo para comprar suvenires. Alojamiento.	\N	\N	\N
+e95fa449-1952-4079-89c0-f0c5ef27a3b1	4d6107a7-853c-48c9-ac68-75581775e8cd	3	– DUBAI / VISITA ABU DHABI / DUBAI (Desayuno y almuerzo).	\N	Desayuno en el hotel. Vamos a descubrir el impresionante paisaje de Abu Dhabi, capital de los Emiratos Árabes Unidos, también conocida como la joya de Arabia. Sheikh Zayed Grand Mosque: Esta hermosa casa de culto es uno de los lugares más espectaculares de la ciudad, es la tercera mezquita más grande del mundo; con capacidad para 40 mil personas. Toda construida en mármol de Carrara, fue inaugurada en el otoño de 2007. Su impresionante arquitectura complementa el paisaje urbano de Abu Dhabi. La visita es una oportunidad única para conocer detalles interesantes sobre la arquitectura de esta estructura y aprender más acerca de la religión y la cultura de la gente de Abu Dhabi. Continuación hasta el puente de Al Maqta pasando por una de las áreas más ricas de Abu Dhabi, el área de los ministros. Llegada a la calle Corniche que es comparada con Manhattan. Parada para fotos en el hotel Emirates Palace. Este hotel tiene su propio helipuerto y puerto. Continuamos a Al Batee Area, donde se encuentran los palacios de la familia Real. Visita, panorámica al parque de Ferrari (breve tiempo para sacar fotos y ver tiendas). Regreso a Dubái. Alojamiento.	\N	\N	\N
+7e43b25c-3aa5-44c5-a998-ae3bad4cb3eb	4d6107a7-853c-48c9-ac68-75581775e8cd	4	– DUBAI/SAFARI (Desayuno y cena).	\N	Desayuno en el hotel. Mañana libre para descubrir los encantos de esta ciudad. Por la tarde salida al “safari del desierto”. Esta encantadora aventura comienza en el momento que entra en el vehículo 4x4. Las dunas y el clima desértico los llevan a otro mundo. En el medio del Tour encontramos un oasis natural y una granja de camellos, un paisaje espectacular para sacar preciosas fotos. Después de la aventura en las dunas del desierto, hay una parada para admirar la puesta de sol árabe disfrutando de la serenidad y la belleza del desierto. En el campamento beduino, el turista tendrá la oportunidad de montar en camello, fumar narguile y hacer el famoso tatuaje de henna, o simplemente disfrutar de la noche con una deliciosa barbacoa de la moda de los árabes. (Paseo en camello & barbacoa árabe están incluidas en el programa). Alojamiento	\N	\N	\N
+a0874b63-24dc-4173-9256-6b1b4b247e27	4d6107a7-853c-48c9-ac68-75581775e8cd	5	– DUBAI/CRUCERO DHOW.	\N	Desayuno en el hotel. Mañana libre para descubrir los encantos de esta ciudad. Por la noche cena a bordo Del Dhow cruise (embarcación tradicional árabe, es ideal para un entorno verdaderamente romántico por la noche, todo iluminado y decorado, desliza a lo largo de la famosa cala de Dubái. Es difícil elegir entre la deliciosa variedad de comida que se sirve en el buffet a bordo. El rescate de la memoria nostálgica del espíritu aventurero árabe, el Dhow crucero Dubái se remonta a los días confinados a una tribu cuya economía estaba basada en la explotación y el comercio de perlas. Disfrute de una vista encantadora de la vibrante noche de Dubái y la frescura de la brisa del mar (Cena buffet incluida en el programa). Alojamiento.	\N	\N	\N
+d0aca4fe-06c3-4070-9054-cbdd410ddce2	4d6107a7-853c-48c9-ac68-75581775e8cd	6	– DUBÁI (Desayuno).	\N	Desayuno en el hotel. A la hora indicada traslado al aeropuerto de DXB para tomar vuelo de salida internacional.	\N	\N	\N
+652a6b74-b30e-4f4d-a8c0-b8b5826e0568	a3a1fa45-57de-4905-92ad-7fe67f091c9d	1	– DUBAI.	\N	Llegada al aeropuerto de Dubái, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+fe917a70-9c79-43d0-af7e-34f5b18b6f15	a3a1fa45-57de-4905-92ad-7fe67f091c9d	2	DUBAI (Desayuno).	\N	Desayuno. Visita por la ciudad Salida hacia Deira pasando por el Zoco de las especies, Zoco de Oro; atravesando el Canal por Abra (Taxi Acuático) llegada y visita al Museo de Dubai. Por la carretera de Jumeirah, vista de la Mezquita de Jumeirah; parada para fotos en el Burj al Arab único hotel en el mundo de 7 estrellas. Parada torre más alta del mundo Burj Khalifa el edificio más alto del mundo situado en el Dubai Mall (el Mall más grande del mundo con 1000 tiendas). Regreso al hotel. Alojamiento.	\N	\N	\N
+d039b389-5352-44fa-9431-8ee49a12311f	a3a1fa45-57de-4905-92ad-7fe67f091c9d	3	– DUBAI (Desayuno y cena).	\N	Desayuno. Mañana libre. Por la noche salida a las 19:30 hrs. Para disfrutar de las vistas y los sonidos de la cala de Dubai navegando 2 horas abordo en un Dhow tradicional. El viaje se realiza desde la desembocadura del arroyo, a lo largo del mismo hasta el iluminado Dubai Creek Golf Club que asemeja a una vela de barco. Cena incluida. Regreso al hotel. Alojamiento.	\N	\N	\N
+b4edd443-fed2-4dbc-a1f6-10c20aba3faf	c8cb4562-e3f4-434d-b638-39494cfe9f3b	3	– EL CAIRO – SINAI (Desayuno, almuerzo y cena).	\N	Desayuno. Salida desde El Cairo a desierto del Sinaí y el Canal de Suez. Dejando el continente africano para entrar en Asia, pasando por Oyun Musa almuerzo y Wadi Feiran. Llegada al hotel en Santa Catarina. Cena y alojamiento en el hotel.	\N	\N	\N
+eaf64810-dd1c-41d2-8929-4dfda530f130	a3a1fa45-57de-4905-92ad-7fe67f091c9d	4	– DUBAI (Desayuno y cena).	\N	Desayuno. Mañana libre. Alrededor de las 15:00 a 15:30 hrs. los recogerán para realizar la excursión más popular Los Land Cruisers realizaremos un excitante trayecto por las fantásticas altas dunas donde podrán tomar fotografías únicas de la puesta de sol árabe. Una vez que se oculte el sol detrás de las dunas de arena dorada, nos dirigiremos a un campo en el Desierto. El olor a la fresca brocheta, el cordero a la parrilla, las hogueras, las tradicionales pipas de agua y los relajantes sonidos de la música árabe nos invitan a pasar una tarde inolvidable. Tras la suntuosa cena disfrutaremos del antiguo arte de la Danza del Vientre. (Se encuentran incluidos: Ski por la arena, pintarse con henna, agua, refrescos, te y café). Regreso al hotel. Alojamiento.	\N	\N	\N
+280a673e-b1e1-4444-8e32-e324d6cb91ac	a3a1fa45-57de-4905-92ad-7fe67f091c9d	5	– DUBAI / VISITA ABU DHABI / DUBAI (Desayuno y almuerzo).	\N	Desayuno. Visita a Abu Dhabi. Recorrido de Dubái pasando por Puerto Jebel Ali, el puerto más grande del mundo realizado por los hombres hasta la capital de UAE. (2 horas aproximadas). Admiraremos la Mezquita del Jeque Zayed la tercera más grande del mundo; así como la tumba del mismo, antiguo presidente de UAE y padre de la nación. Continuación hasta el puente de Al Maqta pasando por una de las áreas más ricas de Abu Dhabi, el área de los Ministros. Llegada a la calle Corniche que es comparada con Manhattan. Parada para fotos en el hotel Emirates Palace. Este hotel tiene su propio helipuerto y puerto. Continuamos a Al Batee Area, donde se encuentran los palacios de la familia Real. Almuerzo en restaurante típico. Visita panorámica al parque de Ferrari (breve tiempo para sacar fotos y ver tiendas). Regreso a Dubái. Alojamiento.	\N	\N	\N
+ca3a39fc-d2ab-4ab9-826a-331d6ed85f8d	a3a1fa45-57de-4905-92ad-7fe67f091c9d	6	– DUBAI/ VISITASHARJAH / VISITA FUJEIRAH / DUBAI (Desayuno y almuerzo).	\N	Desayuno. Visita al emirato de Sharjah donde visitaremos El Zoco Azul, conocido por la venta de artesanías, pasaremos por la mezquita Faisal que ha sido regalo del difunto Rey Faisal al emirato de Sharjah, seguimos hacia la Costa Este Fujairah la excursión comienza con un paseo por el paisaje del desierto a través del Oasis Al Daid a Masafi. Justo antes de llegar a Masafi, nos detendremos en el mercado local Mercado de los viernes, que ha sido creado por los comerciantes desde antaño. Se puede encontrar de todo, desde frutas, plantas de interior, juguetes, cerámicas, tapices y todo tipo de regalos. Continuación a través de las montañas de Hajar hasta bajar a las aguas azules del Golfo de Oman, y divisar la bella Dibba. Almuerzo en hotel 4* de playa, día, de regreso visita a la Mezquita Bidiyah, la mezquita más antigua de UAE. Nuestra ruta sigue a lo largo de la costa de Khorr Fakkan. En camino se pasará por Fujairah, el único emirato en la costa este, regreso al hotel y alojamiento.	\N	\N	\N
+29f0f97c-9002-4682-a8e0-9ba8c0f27b23	a3a1fa45-57de-4905-92ad-7fe67f091c9d	7	– DUBAI (Desayuno).	\N	Desayuno. Día libre. Regreso al hotel y alojamiento.	\N	\N	\N
+da0a6ae2-2d51-4c92-bfda-60ec6092e198	a3a1fa45-57de-4905-92ad-7fe67f091c9d	8	– DUBAI (Desayuno).	\N	Desayuno en el hotel. A la hora prevista traslado al aeropuerto de Dubai. Fin de Servicios.	\N	\N	\N
+9e79d839-8482-4d10-b065-4a94684b36eb	4a457002-eba2-4864-96a1-0a7039b379d5	1	– EL CAIRO.	\N	Llegada al aeropuerto, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+9667a877-937d-43ee-a9ee-87d16c92f6b7	4a457002-eba2-4864-96a1-0a7039b379d5	2	EL CAIRO –LAS PIRÁMIDES Y LA GRAN ESFINGE (Desayuno).	\N	Desayuno y luego comienza el día visitando a las encantadoras pirámides de Keops, Kefren y Micerinos en Giza. Visita a la Gran Esfinge, la cabeza de un faraón con cuerpo de león, que se remonta a la época de Kefren. El tour también incluye una visita al Templo del Valle que pertenece a la Pirámide de Kefren. en El Cairo. y traslado al hotel y Alojamiento. Opcional visitando la pirámide escalonada en Sakkara, diseñada por el arquitecto Imhotep para el rey Zoser. Almuerzo en un restaurante local de buena calidad.	\N	\N	\N
+b144061c-1d85-425f-9a02-14a3544ffafd	4a457002-eba2-4864-96a1-0a7039b379d5	3	– EL CAIRO	\N	Desayuno. Día libre Opcionalmente Salida para visitar el Barrio Copto donde se encuentra la Iglesia de Santa María la Virgen, más conocida como la Iglesia Colgante, la Iglesia de San Jorge y la Iglesia de San Sergio. Continuación en el Museo de Arte Egipcio, que alberga numerosas estatuas, pinturas, relieves, elementos funerarios y otros muchos objetos de la época de los Faraones; la Mezquita de Mohamed Ali Pasha, más conocida como la Mezquita de Alabastro, la Ciudadela de Salah El aDin (Saladino, quien fuera Sultán de Egipto), declarada Patrimonio de la Humanidad y el Gran Bazar de Khan el Khalili donde podremos callejear para realizar compras o tomar un té en un café de la zona. Traslado al hotel y alojamiento..	\N	\N	\N
+17263809-91ea-4475-a664-2fac2339c90b	4a457002-eba2-4864-96a1-0a7039b379d5	4	– EL CAIRO - SHAM EL SHEIHK	\N	Desayuno, traslado al Aeropuerto Internacional de El Cairo y continúe. Tomará un vuelo desde El Cairo hasta el encantador destino de Sharm El Sheikh. A su llegada al aeropuerto de Sharm El Sheikh, Luego lo acompañará a su hotel para realizar el check-in sin inconvenientes. Tendrá tiempo libre por la tarde y la noche para relajarse y disfrutar de la serenidad de este paraíso costero. Pase una cómoda noche en su hotel en Sharm El Sheikh, donde le esperan la relajación y la belleza.	\N	\N	\N
+fde2a7dd-f999-4290-8fc6-46b1d7966d24	4a457002-eba2-4864-96a1-0a7039b379d5	5	– QUAD BIKE EN SHAM EL SHEIHK (Desayuno).	\N	Desayuno, día libre Opcionalmente ¡Prepárate para una emocionante aventura! horas, tu guía turístico privado te recibirá en tu hotel. Desde allí, te dirigirás al Quad Bike Centre, que se encuentra a unos 15 minutos de viaje. Después de una breve pero importante orientación sobre seguridad e instrucciones de conducción, comenzará tu aventura en quad en Sharm. Tomarás el control de tu quad y partirás a través del fascinante desierto del Sinaí, donde podrás disfrutar de impresionantes vistas del paisaje. 20 Después de aproximadamente una hora de emocionante conducción, llegarás al punto más alto de tu viaje. Aquí, tendrás la oportunidad de tomar un merecido descanso y saborear un té de hierbas beduino tradicional, sumergiéndote en la auténtica cultura de la región. Una vez que hayas recargado energías,. Desde allí, serás trasladado de regreso a tu hotel en la comodidad de un vehículo con aire acondicionado. La noche es para que la disfrutes a tu aire. Disfruta de una tranquila noche en tu hotel de Sharm, donde podrás reflexionar sobre la emocionante aventura del día.	\N	\N	\N
+9b9c0887-a9a4-4e63-b30f-e4204b54ccae	c8cb4562-e3f4-434d-b638-39494cfe9f3b	4	– SINAI (Desayuno).	\N	Por la mañana temprano, subir el Monte Sinaí, donde podemos ver a la hora de la madrugada un hermoso espectáculo. Descenso de la Montaña. Regreso al hotel, tomar el desayuno y descanso. Visita al monasterio de Santa Catalina. Traslado a la frontera de Taba con Israel y fin de nuestro servicio.	\N	\N	\N
+bf5b156d-cf51-48a0-912e-8ec4621402f2	4a457002-eba2-4864-96a1-0a7039b379d5	6	– QUAD BIKE EN SHAM EL SHEIHK (Desayuno).	\N	Desayuno, día libre Opcionalmente, salida de su hotel. Lo llevarán al muelle marítimo, donde se embarcará en un barco con destino al Parque Nacional Ras Mohamed. Este extraordinario santuario marino es un paraíso para los entusiastas de las actividades submarinas, con más de 130 especies de arrecifes de coral y la asombrosa cantidad de 1000 variedades de peces vibrantes y coloridos. Durante su viaje, el barco hará tres paradas, lo que le brindará la oportunidad de participar en aventuras de natación y esnórquel en las aguas cristalinas del Mar Rojo. Se servirá un delicioso almuerzo a bordo mientras disfruta de la belleza de este mundo submarino. Al final del día, el barco regresará a la actividad de esnórquel en el Mar Rojo y lo transportarán de regreso a su hotel. Disfrute de otra cómoda estadía de una noche en su hotel de Sharm El Sheikh..	\N	\N	\N
+7e021e67-43a5-4513-9700-84870c2ef971	4a457002-eba2-4864-96a1-0a7039b379d5	7	–EL CAIRO (Desayuno).	\N	Desayuno en el hotel y prepárese para el check-out y trasladado al aeropuerto para tomar el vuelo de regreso al Aeropuerto Internacional de El Cairo. Después  último destino para tomar su último vuelo de regreso a casa. Fin del viaje y de nuestros servicios.	\N	\N	\N
+9a1efbcc-89ff-45df-a99d-6b58e51fbf70	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	1	– EL CAIRO.	\N	Llegada al aeropuerto, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+8fbffce3-6bb4-47b7-aeb1-7803b281dab4	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	2	EL CAIRO –Las Pirámides y La gran Esfinge (Desayuno y almuerzo).	\N	Desayuno y luego comienza el día visitando a las encantadoras pirámides de Keops, Kefren y Micerinos en Giza. Visita a la Gran Esfinge, la cabeza de un faraón con cuerpo de león, que se remonta a la época de Kefren. El tour también incluye una visita al Templo del Valle que pertenece a la Pirámide de Kefren. en El Cairo. y traslado al hotel y Alojamiento. Opcional visitando la pirámide escalonada en Sakkara, diseñada por el arquitecto Imhotep para el rey Zoser. Almuerzo en un restaurante local de buena calidad.	\N	\N	\N
+5e7bcf27-bddf-4f3c-8f21-f6b4bfa97911	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	3	– EL CAIRO –LUXOR - El Templo de Karnak - Templo de Luxor  (Pensión Completa).	\N	Desayuno. Salida según plan de vuelos. Tomar el vuelo con destino al Luxor. Llegada a Luxor Traslado en vehículo privado con aire acondicionado al Crucero por el Nilo. Donde te recibirán y trasladarán para embarcar en un crucero de lujo de 5 estrellas por el Nilo. Pensión completa. Salida para visitar El Templo de Karnak erigido en honor al dios Amón y principal recinto de culto en Egipto desde las dinastías que conformaron el Imperio Nuevo y que cuenta, entre otros, con una magnífica sala hipóstila de 23 metros de altura que alberga en su recinto nada menos que 134 columnas y el Templo de Luxor, más pequeño que el de Karnak y comunicado con éste por una impresionante avenida de esfinges con cabeza de carnero, más conocida como la Avenida de las esfinges. Regreso a la motonave, y noche a bordo.	\N	\N	\N
+a5685b31-c736-402d-814f-dc8e2035d4f1	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	4	– LUXOR - ESNA - EDFU (Pensión Completa).	\N	Pensión completa. Desayuno. Salida para Visitar: el Valle de los Reyes, declarado por la Unesco Patrimonio de la Humanidad y que alberga la mayoría de las tumbas de los faraones del Imperio Nuevo. El Templo de la Reina Hatshepsut, que fue la primera mujer en ocupar la posición de faraón; el templo, situado en Deir El Bahari, es uno de los pocos templos construidos directamente en la roca y consta de varias terrazas que ejercían como vestíbulos para albergar a multitud de personas durante las festividades religiosas. Los Colosos de Memnon, gigantescas estatuas que representan al faraón Amenhotep III y que permanecen en posición sedente desde hace más de 3.500 años. Regreso a la motonave, navegación hacia Edfú y noche a bordo.	\N	\N	\N
+afe52bc2-2eb8-43b0-911f-b1f406462ba7	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	5	– EDFU - KOM OMBO – ASWAN (Pensión Completa).	\N	Pensión completa. Desayuno. Salida para realizar la visita al Templo de Edfú, erigido en honor del dios Horus con cabeza de halcón. El templo, situado en la orilla occidental del río Nilo es uno de los más grandes de Egipto y el mejor conservado hasta el momento. Las inscripciones en sus paredes proporcionan información importante sobre el lenguaje, la mitología y la religión durante el periodo grecorromano. Regreso a la motonave y navegación. Llegada a Kom Ombo y salida para realizar la visita del único templo en Egipto dedicado simultáneamente a dos dioses, el dios Sobek con cabeza de cocodrilo y el dios Haroeris con cabeza de halcón. Regreso a la motonave, navegación y noche a bordo.	\N	\N	\N
+20401073-8f89-479a-93dd-63ef0e4d9143	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	6	– ASWAN (Pensión Completa).	\N	Pensión completa. Desayuno.Salida para realizar la visita del Templo de Philae, construido en honor de la diosa Isis y considerado la joya del Nilo. Por la tarde, realizaremos un paseo en faluca o motora por el Nilo. (En caso de que por falta de tiempo no pueda realizarse en Aswan, el paseo se realizará en El Cairo o en Luxor). Regreso a la motonave y noche a bordo. Opcional: Posibilidad de realizar por carretera la visita opcional a los majestuosos Templos de Abu Simbel. El templo de Abu Simbel, junto con el templo de Nefertari forma el complejo de Abu Simbel, y fue mandado erigir por el Faraón Ramsés II, uno en su propio honor y otro en el de su esposa. Son uno de los seis templos edificados en roca en la zona nubia y tuvieron que ser trasladados de su emplazamiento original tras la construcción de la gran presa de Aswan.	\N	\N	\N
+46375486-ff07-483e-8bb3-70e9bef5f62d	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	7	– ASWAN - EL CAIRO (Desayuno).	\N	Desayuno y día libre. A la hora prevista desembarque y traslado al aeropuerto para volar con destino a El Cairo. Recepción y traslado al hotel y alojamiento. Opcional: Salida para visitar el Barrio Copto donde se encuentra la Iglesia de Santa María la Virgen, más conocida como la Iglesia Colgante, la Iglesia de San Jorge y la Iglesia de San Sergio. Continuación en el Museo de Arte Egipcio, que alberga numerosas estatuas, pinturas, relieves, elementos funerarios y otros muchos objetos de la época de los Faraones; la Mezquita de Mohamed Ali Pasha, más conocida como la Mezquita de Alabastro, la Ciudadela de Salah El aDin (Saladino, quien fuera Sultán de Egipto), declarada Patrimonio de la Humanidad y el Gran Bazar de Khan el Khalili donde podremos callejear para realizar compras o tomar un té en un café de la zona. Traslado al hotel y alojamiento.	\N	\N	\N
+408dca5c-e0f7-4a43-b126-5cd44c67b40a	04b9e2be-dd06-42bb-9e36-a1f9698b3e39	8	– EL CAIRO (Desayuno).	\N	Desayuno. A la hora convenida traslado al aeropuerto  y según plan de vuelos, con destino España. Llegada. Fin del viaje y de nuestros servicios.	\N	\N	\N
+6c1ffe3a-c805-4ff2-b531-9266aa5af4d0	88be8f27-1395-44ba-9f5b-58ac9ea9f387	1	– EL CAIRO.	\N	Llegada al aeropuerto, asistencia de habla hispana fuera del aeropuerto por parte de nuestro representante. Traslado al hotel y alojamiento.	\N	\N	\N
+4eb29c8a-72fa-4d85-ae03-0358a6f9322a	88be8f27-1395-44ba-9f5b-58ac9ea9f387	2	EL CAIRO – EL CAIRO –LAS PIRÁMIDES Y LA GRAN ESFINGE (Desayuno y almuerzo).	\N	Desayuno y luego comienza el día visitando a las encantadoras pirámides de Keops, Kefren y Micerinos en Giza. Visita a la Gran Esfinge, la cabeza de un faraón con cuerpo de león, que se remonta a la época de Kefren.El tour también incluye una visita al Templo del Valle que pertenece a la Pirámide de Kefren. en El Cairo. Traslado al hotel y alojamiento (Almuerzo en un restaurante local.) Opcional: Continuación en de Arte Egipcio, Entre los preciados objetos de la colección del El Museo Egipcio se pueden ver estatuas, pinturas, relieves y elementos funerarios entre otros numerosos objetos, aunque si hay dos áreas que destacan sobre el resto de las exposiciones se trata de las salas de Tutankamón, donde se exponen los tesoros que se encontraron en su tumba, y la sala de las momias, donde reposan los restos momificados de importantes faraones. Después La Ciudadela de Salah El Al Din (Saladino, quien fuera Sultán de Egipto), a Ciudadela de Saladino en El Cairo En árabe es Qalaat Salaḥ ad-Din. Es una fortaleza grande en el Cairo. Construido entre los años 1176 y 1183 para proteger la ciudad.Fue una fortificación medieval islámico en El Cairo, Egipto. En Mokattam colina cerca del centro de El Cairo, fue famoso por su brisa fresca y grande vistas de la ciudad. Ahora es un sitio históricoconservado, con mezquitas y museos en su interior y traslado al hotel y Alojamiento. Comidas: Desayuno, Almuerzo.	\N	\N	\N
+2039e13c-eb15-4e71-84e2-43fe8b88db0b	88be8f27-1395-44ba-9f5b-58ac9ea9f387	3	EL CAIRO – ASWAN  (Pensión Completa).	\N	Desayuno. Traslado Aeropuerto para tomar el vuelo hacia Aswan donde te recibirán y trasladarán para embarcar en un crucero por el Nilo. Cena y noche abordo.	\N	\N	\N
+b2c3183b-0c59-4d92-bc42-8a32fe483052	88be8f27-1395-44ba-9f5b-58ac9ea9f387	4	– ASUÁN - KOM OMBO – EDFU (Pensión Completa).	\N	Pensión completa. Desayuno. Opcional: Posibilidad de realizar por carretera la visita opcional a los majestuosos Templos de Abu Simbel. El templo de Abu Simbel, junto con el templo de Nefertari forma el complejo de Abu Simbel, y fue mandado erigir por el Faraón Ramsés II, uno en su propio honor y otro en el de su esposa. Son uno de los seis templos edificados en roca en la zona nubia y tuvieron que ser trasladados de su emplazamiento original tras la construcción de la gran presa de Aswan. Salida para realizar la visita del Templo de Philae, construido en honor de la diosa Isis y considerado la joya del Nilo. Finalizada la visita, daremos un paseo en faluca o motora por el Nilo. (En caso de que por falta de tiempo no pueda realizarse en Aswan, el paseo se realizará en El Cairo o en Luxor).Navegación hacia Kom Ombo. Llegada y salida para realizar la visita del único templo en Egipto dedicado simultáneamente a dos dioses, el dios Sobek con cabeza de cocodrilo y el dios Haroeris con cabeza de halcón. Regreso a la motonave, navegación y noche a bordo.	\N	\N	\N
+a2f85b1f-eed0-4868-94dd-b3e391c5a722	88be8f27-1395-44ba-9f5b-58ac9ea9f387	5	– EDFU - ESNA - LUXOR (Pensión Completa).	\N	Pensión completa. Desayuno. Salida para realizar la visita al Templo de Edfú, erigido en honor del dios Horus con cabeza de halcón. El templo, situado en la orilla occidental del río Nilo es uno de los más grandes de Egipto y el mejor conservado hasta el momento. Las inscripciones en sus paredes proporcionan información importante sobre el lenguaje, la mitología y la religión durante el periodo grecorromano. Regreso a la motonave y navegación hacia Luxor atravesando la esclusa de Esna. Llegada a Luxor y salida para realizar las visitas del Templo de Karnak erigido en honor al dios Amón y principal recinto de culto en Egipto desde las dinastías que conformaron el Imperio Nuevo y que cuenta, entre otros, con una magnífica sala hipóstila de 23 metros de altura que alberga en su recinto nada menos que 134 columnas y el Templo de Luxor, (por calesa con caballos) ,para ver panorámica del Templo de Luxor por la noche más pequeño que el de Karnak y comunicado con éste por una impresionante avenida de esfinges con cabeza de carnero, más conocida como la Avenida de las esfinges. Regreso a la motonave y noche a bordo.	\N	\N	\N
+ed4ce056-474c-44f0-9ed2-0a305c3f9756	88be8f27-1395-44ba-9f5b-58ac9ea9f387	6	– LUXOR - HURGHADA (Pensión Completa).	\N	Pensión completa. Desayuno. Opcional: Posibilidad de realizar PASEO EN GLOBO AEROSTÁTICO Paseo en globo durante el amanecer en Luxor: una sensación indescriptible: Luxor desde el aire: experimente el amanecer con un paseo en globo aerostático. Los vuelos en globo aerostático son una experiencia increíble, y qué mejor destino para Antigüedades. Desembarque y salida para finalizar las visitas de Luxor: El Valle de los Reyes, declarado por la Unesco Patrimonio de la Humanidad y que alberga la mayoría de las tumbas de los faraones del Imperio Nuevo continuación hasta Los Colosos de Memnon, gigantescas estatuas que representan al faraón Amenhotep III y que permanecen en posición sedente desde hace más de3.500 años.Terminadas las visitas, traslado por autobús con el aire acondicionado hasta Hurghada. Llegada al hotel y alojamiento en régimen de todo Incluido.	\N	\N	\N
+376d58c1-e92f-44f1-8247-c9cf05480876	88be8f27-1395-44ba-9f5b-58ac9ea9f387	7	– HURGADA (Desayuno).	\N	Desayuno. Disfrutando de la playa. Opcional puede unirse a uno de los increíbles viajes visitar Orange Bay o Paradise Island. Viaje con barco.	\N	\N	\N
+9e4450e1-cd05-4b2b-b94c-204b19549cc9	88be8f27-1395-44ba-9f5b-58ac9ea9f387	8	– HURGADA (Pensión Completa).	\N	Desayuno. Disfrutando de la playa. Opcional por la tarde Safari beduino atardecer disfrutando con el espectáculo beduino y danza folclórica. Comidas: Desayuno, Almuerzo y Cena	\N	\N	\N
+317906cd-3c1d-4b64-af2b-fc7221e0680d	88be8f27-1395-44ba-9f5b-58ac9ea9f387	9	– HURGADA – EL CAIRO (Pensión Completa).	\N	Desayuno. Salida para regresar al Cairo traslado por autobús con el aire acondicionado hasta el Cairo. Paseo nocturno por la ciudad del Cairo conocer la ciudad antigua y el centro del Cairo y cena (plato de KUSHARI típico egipcio y probar FALAFEL) Traslado al hotel y alojamiento. Comidas: Desayuno, Almuerzo y Cena	\N	\N	\N
+9a992eff-36bb-4aa9-9373-29cd22c5bb69	88be8f27-1395-44ba-9f5b-58ac9ea9f387	10	– EL CAIRO (Desayuno).	\N	Desayuno. A la hora convenida traslado al aeropuerto y según plan de vuelos, con destino España. Llegada. Fin del viaje y de nuestros servicios.	\N	\N	\N
+4b4b6f87-4af5-4416-bf0c-6456531a3d8c	c8cb4562-e3f4-434d-b638-39494cfe9f3b	1	– EL CAIRO.	\N	Llegada al Aeropuerto Internacional de El Cairo. Visa, de inmigración y aduanas con asistencia de nuestro representante. Traslado al hotel. Cena y alojamiento.	\N	\N	\N
+999cf235-f828-4751-bbf9-1957e2deb35a	c8cb4562-e3f4-434d-b638-39494cfe9f3b	2	EL CAIRO – (Desayuno, almuerzo y cena).	\N	Desayuno. Por la mañana, visita a las Pirámides de Giza (Keops, Kefren y Micerinos), la Esfinge y el templo del valle de Kefren almuerzo. Por la tarde, visitar El Museo Egipcio para ver las obras maestras de la época faraónica y los tesoros del Rey Tut. Regreso al hotel. Cena y alojamiento.	\N	\N	\N
+7454d684-0e5f-4a4c-b5b6-5363ba4df79d	e95e6dde-a4ad-462a-afa5-0e7d667a920d	1	– EL CAIRO.	\N	Llegada al Aeropuerto de El Cairo, nuestro representante lo recibirá y lo asistirá antes de que el control de pasaportes en el aeropuerto. Luego será trasladado por un coche privado A / C a su hotel. Alojamiento en El Cairo.	\N	\N	\N
+3c08b3c7-d7c5-4a1e-ae1b-afd193701f97	5099c499-78ed-453c-9fd7-d0cae36d5e6d	4	Capadocia	\N	Desayuno. Visita a la ciudad subterránea de Ozkonak. Por la tarde, visita al Museo abierto de Góreme (capillas y frescos del siglo X). Visita a Avanos (alfombras artesanales). Visita a una joyería y tiendas de piedras típicas. Cena y alojamiento. Excursiones opcionales: Noche Turca (danza del vientre y folclórica) y Paseo en Globo.	\N	\N	\N
+caead6d7-9930-4757-81ae-137b66d49783	5099c499-78ed-453c-9fd7-d0cae36d5e6d	5	Capadocia	\N	Desayuno. Visita a Avcilar y Guvercinlik (paisaje de "Fairy Chimney"). Visita a la ciudad troglodita de Uchisar. Por la tarde, visita a una cooperativa de cerámica. Cena y alojamiento. Excursión Opcional Cappa Park (a partir de Abr 15): Monster Safari, Zipline, Jet Boat. Excursión Opcional de Invierno (Dic 15 a Mar 31): Erciyes Ski. Excursión opcional: Almuerzo o cena en SkyDinner (a 50 metros de altitud).	\N	\N	\N
+20a2ddbf-dd96-47be-b8f3-f435f6524a03	5099c499-78ed-453c-9fd7-d0cae36d5e6d	6	Capadocia - Pamukkale	\N	Desayuno y salida hacia Pamukkale. Visita a una tienda Outlet. Visita a Hierapolis y el "Castelo de Algodão" (formaciones de piedra caliza con piscinas naturales blancas). Cena y alojamiento en el Richmond Pamukkale Thermal o similar.	\N	\N	\N
+f92b1d04-0536-44bd-92b5-fc831e1e21e7	5099c499-78ed-453c-9fd7-d0cae36d5e6d	7	Pamukkale - Éfeso - Izmir	\N	Desayuno. Salida para visitar las ruinas de Éfeso (Biblioteca de Celso, Calle de Mármol, Teatro). Visita a La Casa Virgen María. Visita a un outlet de pieles. Cena y alojamiento en el Hampton by Hilton Izmir Aliaga o similar.	\N	\N	\N
+e24ba6a0-58c8-443f-b73b-fdb8e6059535	5099c499-78ed-453c-9fd7-d0cae36d5e6d	8	Esmirna - Bursa - Estambul	\N	Desayuno. Salida hacia Bursa. Parada para visitar una tienda de delicias turcas ("Turkish Delight"). Visitas panorámicas de la ciudad. Visita a la Mezquita Verde y el Mausoleo Verde. Paseo por el mercado de la seda. Regreso a Estambul. Alojamiento.	\N	\N	\N
+c3f0aa91-e1e7-45ac-bc47-8c746139d3ce	5099c499-78ed-453c-9fd7-d0cae36d5e6d	9	Estambul	\N	Desayuno. Día libre. Alojamiento. Excursión opcional - Estambul Clásico con almuerzo: Palacio de Topkapi, Hagia Sophia (mezquita), Mezquita Azul, Gran Bazar.	\N	\N	\N
+6c1043ff-a1ca-4cca-a15a-fe830c4d633c	5099c499-78ed-453c-9fd7-d0cae36d5e6d	10	Estambul	\N	Desayuno y traslado al aeropuerto para tomar el vuelo de regreso. Fin de nuestros servicios.	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: quote_destinations; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.quote_destinations (id, quote_id, destination_id, start_date, passengers, price) FROM stdin;
+027277ab-b409-47f8-9b16-dc70744c73ea	c7c40f35-125c-4290-aa87-9e48b3681e4a	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	\N
+823f7dd6-e102-4f93-b982-c6d3232d7ffc	e9def6ad-e39c-47b2-b195-e39ca716366e	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	\N
+637d8119-6dee-4c93-a35c-4495bce8679f	a4afaa73-24d1-4351-939a-aff7776b7cb6	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2026-01-13 00:00:00	3	1800.00
+1aea27fd-5778-4684-baa1-dad60206f5d0	a4afaa73-24d1-4351-939a-aff7776b7cb6	9ed8e3da-1381-476e-9fa9-b9bc9906daf6	2026-01-13 00:00:00	3	1400.00
+7c453cb4-b199-4172-a8de-c0d161f78d1b	f9f89aec-730a-4672-af96-71fadf0147dd	a3a1fa45-57de-4905-92ad-7fe67f091c9d	2025-10-31 00:00:00	4	2200.00
+30e9d2ae-b708-471c-b014-7d96665bf0d9	f9f89aec-730a-4672-af96-71fadf0147dd	4a457002-eba2-4864-96a1-0a7039b379d5	2025-10-31 00:00:00	4	1500.00
+65e22beb-8516-4569-a6ca-38a1e5b0e829	09f10fc5-e9af-4733-9c38-413f14cf4f2b	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	1800.00
+a60b9863-6919-420f-bc39-61405dbdfeea	16e3d312-6f2d-4a12-8b4f-3201dbf97ae5	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	1800.00
+2370f0c6-d392-41c0-9168-cc2d8940dd85	16e3d312-6f2d-4a12-8b4f-3201dbf97ae5	e5a2c7c1-1953-4d88-a677-7eb944fe8611	2025-11-04 00:00:00	2	2200.00
+31165827-716c-4fd4-9b8c-1c720a8bb165	e9585b36-b1fc-4ef5-bf15-51b6e2b6f293	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	1800.00
+5ca5e4c8-b656-41b2-87ca-2f7b01ae0ac0	e9585b36-b1fc-4ef5-bf15-51b6e2b6f293	c8cb4562-e3f4-434d-b638-39494cfe9f3b	2025-11-04 00:00:00	2	1500.00
+dd7f25a0-580e-49d0-a817-0484125562ea	67640023-2118-42c4-a715-51843fc793cf	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	1800.00
+df9c22fb-a91c-4f93-8df2-893dcdccfce3	67640023-2118-42c4-a715-51843fc793cf	e5a2c7c1-1953-4d88-a677-7eb944fe8611	2025-11-04 00:00:00	2	2200.00
+d96584fd-c741-4a73-b7fb-ea9c1f73a758	31938b87-d066-4090-b915-2f528b8efdb2	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	1800.00
+3388da6f-7bda-4524-bb8b-48f85565630e	31938b87-d066-4090-b915-2f528b8efdb2	e5a2c7c1-1953-4d88-a677-7eb944fe8611	2025-11-04 00:00:00	2	2200.00
+e3b16a4d-f98b-4ec1-af13-ce1db8931161	87d00be3-90f7-47e9-a1c4-bc4d75e005f8	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2025-11-04 00:00:00	2	1800.00
+c7cf907f-cee9-4e7d-bed5-793425685019	87d00be3-90f7-47e9-a1c4-bc4d75e005f8	e5a2c7c1-1953-4d88-a677-7eb944fe8611	2025-11-04 00:00:00	2	2200.00
+592b2a9d-6927-492c-b000-d1d1b5936e18	14e6f7ec-b5c3-41e6-b9d7-ff088cb52799	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	2025-11-13 00:00:00	2	1200.00
+c70d5266-b5ea-4e1a-84a8-77caaa0d5177	eaf6a414-b24b-47e2-8912-3dd943021795	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	2025-11-04 00:00:00	2	1200.00
+22eb01ef-4bfe-479c-be38-3e6d7cff750a	d8913c27-9e63-4df8-a106-a92d4b8e5028	a66650c4-b2a6-4d50-9400-389b7e3cfd4e	2025-11-04 00:00:00	2	1200.00
+5fb91ca0-ef09-411c-b9dc-ffe7a2d05926	5b330c67-1e7d-4d85-a7ad-e9f0738bd8ea	5099c499-78ed-453c-9fd7-d0cae36d5e6d	2026-08-25 00:00:00	2	670.00
+\.
+
+
+--
+-- Data for Name: quotes; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.quotes (id, client_id, user_id, total_price, status, created_at, updated_at, origin_city, flights_and_extras, outbound_flight_images, return_flight_images, include_flights, outbound_cabin_baggage, outbound_hold_baggage, return_cabin_baggage, return_hold_baggage) FROM stdin;
+c7c40f35-125c-4290-aa87-9e48b3681e4a	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	81298668-b07b-47ca-afa0-3a2e70c060d1	6244.00	draft	2025-10-30 05:37:04.524306	2025-10-30 05:37:04.524306	\N	\N	\N	\N	f	f	f	f	f
+e9def6ad-e39c-47b2-b195-e39ca716366e	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	81298668-b07b-47ca-afa0-3a2e70c060d1	4143.00	draft	2025-10-30 06:00:10.086968	2025-10-30 06:00:10.086968	\N	\N	\N	\N	f	f	f	f	f
+a4afaa73-24d1-4351-939a-aff7776b7cb6	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	5500.00	draft	2025-10-30 15:19:45.485446	2025-10-30 15:19:45.485446	BOGOTA	2300.00	{}	{}	f	f	f	f	f
+f9f89aec-730a-4672-af96-71fadf0147dd	1bc8b253-dca7-4367-89b2-8e342b7e3694	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	5000.00	draft	2025-10-30 17:26:01.867693	2025-10-30 17:26:01.867693	MEDELLIN	1300.00	{}	{}	f	f	f	f	f
+09f10fc5-e9af-4733-9c38-413f14cf4f2b	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	1800.00	draft	2025-11-01 20:25:52.593742	2025-11-01 20:25:52.593742	\N	\N	{/uploads/e03e267f42d3cc62914ba42a666daaf9.png}	{/uploads/1c34201c298de02fe0b6b4e7d99498b2.png}	f	f	f	f	f
+16e3d312-6f2d-4a12-8b4f-3201dbf97ae5	1bc8b253-dca7-4367-89b2-8e342b7e3694	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	4000.00	draft	2025-11-01 20:35:55.336855	2025-11-01 20:35:55.336855	\N	\N	{/uploads/bb1734879bd986734feb50193339fabe.png}	{/uploads/fce057f274052d055d8c53f3f715d93a.png}	f	f	f	f	f
+e9585b36-b1fc-4ef5-bf15-51b6e2b6f293	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	3300.00	draft	2025-11-01 20:44:38.124836	2025-11-01 20:44:38.124836	\N	\N	{/uploads/9fa6805c608cfd08df60f8c92ab9fc76.png}	{/uploads/e185466491a34b2a654e19a25eac40d9.png}	f	f	f	f	f
+67640023-2118-42c4-a715-51843fc793cf	24659541-abc7-432e-a39f-b33460130ac2	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	4000.00	draft	2025-11-01 20:53:38.778997	2025-11-01 20:53:38.778997	\N	\N	{/uploads/822ead01115cf08c12c6cabaef133505.png}	{/uploads/e448cdd18a71ad1a7080eaac2077efb9.png}	f	f	f	f	f
+31938b87-d066-4090-b915-2f528b8efdb2	1bc8b253-dca7-4367-89b2-8e342b7e3694	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	5200.00	draft	2025-11-01 23:24:33.002202	2025-11-01 23:24:33.002202	MEDELLIN	1200.00	{/uploads/3b7abf4f0a638fc8a7accf0b29a83137.png}	{/uploads/09d410b76541dcd8228343491803b3ef.png}	f	f	f	f	f
+87d00be3-90f7-47e9-a1c4-bc4d75e005f8	24659541-abc7-432e-a39f-b33460130ac2	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	4500.00	draft	2025-11-02 01:16:16.648729	2025-11-02 01:16:16.648729	\N	500.00	{/uploads/56638da2772cf03b1b15d2bdf3fa098a.png}	{/uploads/a1943b10e2576332a8fa941e9663ea8c.png}	f	f	f	f	f
+14e6f7ec-b5c3-41e6-b9d7-ff088cb52799	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	81298668-b07b-47ca-afa0-3a2e70c060d1	1700.00	draft	2025-10-30 15:29:55.30413	2025-11-02 01:58:31.18	BOGOTÁ-RBGO05	2850.00	\N	\N	f	f	f	f	f
+eaf6a414-b24b-47e2-8912-3dd943021795	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	81298668-b07b-47ca-afa0-3a2e70c060d1	1202.00	draft	2025-11-02 02:03:29.565992	2025-11-02 02:07:00.393	\N	2.00	\N	\N	f	f	f	f	f
+d8913c27-9e63-4df8-a106-a92d4b8e5028	2c9b1dbd-5a02-49a1-b85f-daf53e56e193	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	1200.00	draft	2025-11-02 02:29:07.965578	2025-11-02 02:29:07.965578	MEDELLIN	\N	{/api/images/f46d19d42b57311d289f4a52b870b007.png,/api/images/4bf3b28bd0e1ec775258ce1ee220b41e.png}	{/api/images/98ba6c3c7cc5e17f41b8c9390d5e598e.png,/api/images/4e3d74cd780191254eb1633a719d580a.png}	f	f	f	f	f
+5b330c67-1e7d-4d85-a7ad-e9f0738bd8ea	1bc8b253-dca7-4367-89b2-8e342b7e3694	9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	4883.00	draft	2025-11-05 20:48:42.847993	2025-11-05 20:48:42.847993	PEREIRA	3543.00	{/api/images/750f0785-a283-44e5-b61d-8edff54a20a2.png}	{/api/images/ad7f78f5-8a9d-4439-a834-bc29e44649c2.png}	f	f	f	f	f
+\.
+
+
+--
+-- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.sessions (sid, sess, expire) FROM stdin;
+qXAZnWmL86QZC_9NL-yzKYCjHPJgz6j2	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T07:02:49.215Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"aceb549e-27df-4619-898f-fd9bac85cb2e"}}	2025-11-06 07:06:10
+cQvnPbWnb20BkxYHQzh7c07WpBpAwybp	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T04:27:47.938Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-06 04:30:24
+nIEZY5cGG8RBMoP9fLaqiROxCviQOg4i	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-09T02:00:54.621Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-09 02:07:03
+9nP9IU7HM45SRtihh5lMr6fyy-eMz5Y6	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T15:23:47.018Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-06 15:30:42
+w4FVROA7viTaxcwSy2jIdzfFLvaiMeDr	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-09T00:02:25.583Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f"}}	2025-11-09 01:05:01
+v262Hn0n5CL1x0sb7-DWAW7buTnEkAj4	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-09T02:10:21.909Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-09 02:10:33
+hi5bQMl_Cwh3Ndw2ueC-4wPRRLQfTVyx	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T05:58:20.710Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"d704cec1-9e4a-43a0-bffe-39035a5410d6"}}	2025-11-06 05:58:22
+00tmHeeY_bBLLp8CTApcTMkn3OVfYlvu	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-08T22:09:11.483Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-08 22:10:46
+uzlny2gkL6R0WkU5yDmVuNLxKA44xtVR	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T05:03:42.144Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-06 05:09:28
+XEHueb7NQdjvk7uwTrs6EhNEUSzzqUG6	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-08T22:13:29.393Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-08 22:14:40
+AbJVLgd5j550AYEPJCMqYVSfRPPnwusS	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T04:34:03.714Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-06 04:36:07
+_0Cu8KMHl5rjqp91ZlIKx5PPiOOwpoFL	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T04:55:53.403Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-06 05:02:10
+nxjNrQwNGEm-GweVLynd9g29yCJZh4MS	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T05:30:59.807Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-06 05:38:03
+tCOIuyLnbSOPEIgN-AHUz-O_i_VeqU2P	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-09T01:55:38.838Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-09 01:58:32
+RzMU8aiNEV7tPcvefoLD2GKPQ8FCBuML	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-08T23:26:06.899Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f"}}	2025-11-12 22:32:01
+5fhcHdIf7Dwb32_FFAoGtcOp_cw26PkC	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T15:17:21.241Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"81298668-b07b-47ca-afa0-3a2e70c060d1"}}	2025-11-06 15:21:53
+6EzBUIpCSnVm9FQxn5AV5pKRDfA32w1i	{"cookie":{"originalMaxAge":604800000,"expires":"2025-11-06T07:13:46.568Z","secure":false,"httpOnly":true,"path":"/"},"passport":{"user":"aceb549e-27df-4619-898f-fd9bac85cb2e"}}	2025-11-06 07:15:58
+\.
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.users (id, username, password_hash, role, created_at, name, email) FROM stdin;
+aceb549e-27df-4619-898f-fd9bac85cb2e	admin	$2b$10$iIFxVJLGhxELZMdyueLmH.cjTnlqE8.85k6Rs4I9HV5qJKAZGua4a	super_admin	2025-10-30 04:09:37.221325	\N	\N
+81298668-b07b-47ca-afa0-3a2e70c060d1	advisor1	$2b$10$Z6m/eCkUQkOwbuDStdpHf.kgGiFV4l4PzwZN4fmJoRsC96lzAe9fe	advisor	2025-10-30 04:25:17.083517	\N	\N
+d704cec1-9e4a-43a0-bffe-39035a5410d6	Zk7N1YpX@test.com	$2b$10$.CTFyzn9aQ.opoLfoF47GeDHZmiWq6eZrrLhfu6uw2RIHkvjjWdvC	advisor	2025-10-30 05:57:55.571233	Test User	Zk7N1YpX@test.com
+9dd1eabb-6ddb-4b13-accd-d3f9ee744e5f	pipedf92@gmail.com	$2b$10$OPJ/.aMHbkHoslyuV2ID8u/SI2ugj9a144a37YfxTzV8M85PS9uR2	advisor	2025-10-30 06:02:46.041754	Felipe Reinven	pipdf92@gmail.com
+test-advisor-001	advisor_test	$2b$10$dummyhash	advisor	2025-11-02 01:53:18.246323	Test Advisor	advisor@test.com
+\.
+
+
+--
+-- Name: clients clients_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.clients
+    ADD CONSTRAINT clients_email_key UNIQUE (email);
+
+
+--
+-- Name: clients clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.clients
+    ADD CONSTRAINT clients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: destinations destinations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.destinations
+    ADD CONSTRAINT destinations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: exclusions exclusions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.exclusions
+    ADD CONSTRAINT exclusions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hotels hotels_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hotels
+    ADD CONSTRAINT hotels_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: inclusions inclusions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.inclusions
+    ADD CONSTRAINT inclusions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: itinerary_days itinerary_days_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.itinerary_days
+    ADD CONSTRAINT itinerary_days_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: quote_destinations quote_destinations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quote_destinations
+    ADD CONSTRAINT quote_destinations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: quotes quotes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quotes
+    ADD CONSTRAINT quotes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sessions session_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT session_pkey PRIMARY KEY (sid);
+
+
+--
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
+-- Name: IDX_session_expire; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_session_expire" ON public.sessions USING btree (expire);
+
+
+--
+-- Name: destinations_name_country_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX destinations_name_country_unique ON public.destinations USING btree (name, country);
+
+
+--
+-- Name: exclusions exclusions_destination_id_destinations_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.exclusions
+    ADD CONSTRAINT exclusions_destination_id_destinations_id_fk FOREIGN KEY (destination_id) REFERENCES public.destinations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: hotels hotels_destination_id_destinations_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hotels
+    ADD CONSTRAINT hotels_destination_id_destinations_id_fk FOREIGN KEY (destination_id) REFERENCES public.destinations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: inclusions inclusions_destination_id_destinations_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.inclusions
+    ADD CONSTRAINT inclusions_destination_id_destinations_id_fk FOREIGN KEY (destination_id) REFERENCES public.destinations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: itinerary_days itinerary_days_destination_id_destinations_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.itinerary_days
+    ADD CONSTRAINT itinerary_days_destination_id_destinations_id_fk FOREIGN KEY (destination_id) REFERENCES public.destinations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: quote_destinations quote_destinations_destination_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quote_destinations
+    ADD CONSTRAINT quote_destinations_destination_id_fkey FOREIGN KEY (destination_id) REFERENCES public.destinations(id);
+
+
+--
+-- Name: quote_destinations quote_destinations_quote_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quote_destinations
+    ADD CONSTRAINT quote_destinations_quote_id_fkey FOREIGN KEY (quote_id) REFERENCES public.quotes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: quotes quotes_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quotes
+    ADD CONSTRAINT quotes_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id);
+
+
+--
+-- Name: quotes quotes_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quotes
+    ADD CONSTRAINT quotes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
