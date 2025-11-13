@@ -94,29 +94,21 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   const imagePaths = getDestinationImages(data.destinations);
 
   // Add Special Offer banner on first page only (top-right corner)
+  // The image is already designed diagonally, so no rotation needed
   const specialOfferPath = path.join(process.cwd(), "server", "assets", "special-offer-banner.png");
-  console.log("[PDF Generator] Special offer banner path:", specialOfferPath);
-  console.log("[PDF Generator] Special offer banner exists:", fs.existsSync(specialOfferPath));
   
   if (fs.existsSync(specialOfferPath)) {
     try {
-      doc.save();
-      // Position banner in top-right corner with diagonal orientation
-      // The banner needs to be positioned so it's visible in the corner
-      const bannerWidth = 220;
-      const bannerX = pageWidth - 100;
-      const bannerY = -10;
+      // Position the pre-designed diagonal banner in the top-right corner
+      const bannerWidth = 200;
+      const bannerX = pageWidth - bannerWidth;
+      const bannerY = 0;
       
-      doc.translate(bannerX, bannerY);
-      doc.rotate(45);
-      doc.image(specialOfferPath, 0, 0, { width: bannerWidth });
-      doc.restore();
+      doc.image(specialOfferPath, bannerX, bannerY, { width: bannerWidth });
       console.log("[PDF Generator] Special offer banner added successfully");
     } catch (error) {
       console.error("[PDF Generator] Error loading special offer banner:", error);
     }
-  } else {
-    console.warn("[PDF Generator] Special offer banner file not found at:", specialOfferPath);
   }
 
   // Move RNT to upper left
