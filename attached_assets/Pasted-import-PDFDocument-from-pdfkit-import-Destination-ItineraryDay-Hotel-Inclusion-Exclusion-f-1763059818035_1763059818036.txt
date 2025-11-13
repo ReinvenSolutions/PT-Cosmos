@@ -65,9 +65,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   const backgroundColor = "#88bbcd";
   const primaryColor = "#1e40af";
   const accentColor = "#f97316";
-  const priceBoxBackground = "#1e3a5f";
-  const priceBoxBorder = "#2c5282";
-  const priceTextColor = "#ffffff";
+  const priceBoxBackground = "#1e3a5f"; // Azul marino oscuro para el recuadro del precio
+  const priceBoxBorder = "#2c5282"; // Azul más claro para el borde
+  const priceTextColor = "#ffffff"; // Blanco para el texto del precio
   const textColor = "#1f2937";
   const lightGray = "#6b7280";
   const veryLightGray = "#9ca3af";
@@ -79,11 +79,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   const rightMargin = 60;
   const contentWidth = pageWidth - leftMargin - rightMargin;
 
+  // Helper function to add background color to the current page
   const addPageBackground = () => {
     doc.save();
     doc.rect(0, 0, pageWidth, pageHeight).fill(backgroundColor);
     doc.restore();
   };
+
+  // Add background to first page
+  addPageBackground();
 
   const destinationNames = data.destinations.map(d => d.name).join(" + ");
   const totalDuration = data.destinations.reduce((sum, d) => sum + d.duration, 0);
@@ -91,7 +95,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const imagePaths = getDestinationImages(data.destinations);
 
-  doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
+  doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
   doc.text("RNT No.240799", pageWidth - rightMargin - 100, 30, { align: "right" });
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(lightGray);
@@ -121,7 +125,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, durationY);
 
   const currentDate = formatDate(new Date());
-  doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
+  doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
   doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, durationY + 5, { align: "right" });
 
   const mainImageY = 165;
@@ -150,10 +154,10 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   
   doc.font("Helvetica").fontSize(9).fillColor(textColor);
   const startDateFormatted = data.startDate 
-    ? formatDate(new Date(data.startDate))
+    ? formatDateWithMonthName(new Date(data.startDate))
     : "Por definir";
   const endDateFormatted = data.endDate 
-    ? formatDate(new Date(data.endDate))
+    ? formatDateWithMonthName(new Date(data.endDate))
     : "Por definir";
   
   doc.text(`Salida de ${startDateFormatted}`, leftMargin, budgetY + 20);
@@ -172,9 +176,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text("D E S D E :", priceBoxX, priceBoxY);
   
   doc.roundedRect(priceBoxX, priceBoxY + 18, priceBoxWidth, priceBoxHeight - 18, 5)
-     .fillAndStroke("#fef3c7", "#fbbf24");
+     .fillAndStroke(priceBoxBackground, priceBoxBorder);
   
-  doc.font("Helvetica-Bold").fontSize(26).fillColor(accentColor);
+  doc.font("Helvetica-Bold").fontSize(26).fillColor(priceTextColor);
   doc.text(
     `$ ${formatUSD(data.grandTotal)}`,
     priceBoxX + 5,
@@ -182,7 +186,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     { width: priceBoxWidth - 10, align: "center" }
   );
   
-  doc.font("Helvetica").fontSize(9).fillColor(textColor);
+  doc.font("Helvetica").fontSize(9).fillColor("#ffffff");
   doc.text(
     getPassengerText(passengers),
     priceBoxX + 5,
@@ -241,6 +245,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   });
 
   doc.addPage();
+  addPageBackground();
+  addPageBackground();
 
   doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor);
   doc.text("Itinerario", leftMargin, 60);
@@ -307,6 +313,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   cityStops.forEach((stop) => {
     if (currentY > 650) {
       doc.addPage();
+  addPageBackground();
       currentY = 60;
     }
     
@@ -358,6 +365,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (data.includeFlights && data.outboundFlightImages && data.outboundFlightImages.length > 0) {
     console.log('[PDF Generator] Outbound flight images:', data.outboundFlightImages);
     doc.addPage();
+  addPageBackground();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
     
@@ -390,6 +398,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageHeight = 200;
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
+  addPageBackground();
                 flightImageY = 80;
               }
               
@@ -414,6 +423,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   }
 
   doc.addPage();
+  addPageBackground();
 
   doc.font("Helvetica-Bold").fontSize(14).fillColor(primaryColor);
   doc.text("Itinerario Detallado", leftMargin, 60);
@@ -424,6 +434,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
     if (doc.y > 700) {
       doc.addPage();
+  addPageBackground();
     }
 
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
@@ -461,6 +472,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     dest.itinerary.forEach((day) => {
       if (doc.y > 720) {
         doc.addPage();
+  addPageBackground();
       }
 
       doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
@@ -485,6 +497,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (allHotels.length > 0) {
     if (doc.y > 680) {
       doc.addPage();
+  addPageBackground();
     }
 
     doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
@@ -512,6 +525,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   if (doc.y > 600) {
     doc.addPage();
+  addPageBackground();
   }
 
   const allInclusions: Inclusion[] = [];
@@ -538,6 +552,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     uniqueInclusions.forEach(item => {
       if (doc.y > 750) {
         doc.addPage();
+  addPageBackground();
       }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
@@ -571,6 +586,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     uniqueExclusions.forEach(item => {
       if (doc.y > 750) {
         doc.addPage();
+  addPageBackground();
       }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
@@ -593,19 +609,20 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   if (doc.y > 680) {
     doc.addPage();
+  addPageBackground();
   }
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
   doc.text("Términos Generales y Condiciones", leftMargin, doc.y);
   doc.moveDown(0.5);
   
-  doc.font("Helvetica").fontSize(7.5).fillColor(lightGray);
+  doc.font("Helvetica").fontSize(7.5).fillColor("#374151");
   const terms = `Servicios: Cambios en el itinerario posibles según condiciones y disponibilidad del guía. Hotelería: Alojamiento en hoteles de primera entre 4 y 5 estrellas similares a los planificados. Excursiones: No reembolsos por inasistencias. Traslados: Recogida y salida sin acceso al aeropuerto. Espera máxima de 2 horas tras aterrizaje. Documentación: Colombianos exentos de visado. Pasaporte con mínimo 6 meses de validez. Consultar requerimientos para otras nacionalidades.`;
   doc.text(terms, leftMargin, doc.y, { width: contentWidth, align: "justify" });
   
   doc.moveDown(2);
 
-  doc.fontSize(7).fillColor(veryLightGray);
+  doc.fontSize(7).fillColor("#1f2937");
   doc.text(
     "Esta cotización es válida por 7 días. Los precios están sujetos a disponibilidad.",
     leftMargin,
@@ -624,6 +641,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (data.includeFlights && data.returnFlightImages && data.returnFlightImages.length > 0) {
     console.log('[PDF Generator] Return flight images:', data.returnFlightImages);
     doc.addPage();
+  addPageBackground();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
     
@@ -656,6 +674,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageHeight = 200;
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
+  addPageBackground();
                 flightImageY = 80;
               }
               
@@ -697,6 +716,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   // PÁGINA DE ASISTENCIA MÉDICA - Siempre incluida al final
   doc.addPage();
+  addPageBackground();
   
   const topMargin = 80;
   const bottomMargin = 50;
@@ -749,6 +769,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     if (remainingSpace < requiredSpace) {
       // No hay espacio, crear nueva página
       doc.addPage();
+  addPageBackground();
       doc.y = topMargin;
     } else {
       // Hay espacio, agregar separación
