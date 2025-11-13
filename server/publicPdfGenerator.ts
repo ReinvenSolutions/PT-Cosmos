@@ -96,7 +96,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
   doc.text("RNT No.240799", pageWidth - rightMargin - 100, 30, { align: "right" });
 
-  doc.font("Helvetica-Bold").fontSize(11).fillColor(lightGray);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text("S U   V I A J E   A :", leftMargin, 70);
 
   const titleY = 95;
