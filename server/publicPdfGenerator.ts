@@ -143,7 +143,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const currentDate = formatDate(new Date());
   doc.font("Helvetica").fontSize(9).fillColor(textColor);
-  doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, durationY + 5, { align: "right" });
+  doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 200, durationY + 5, { align: "right" });
 
   const mainImageY = 165;
   const mainImageHeight = 250;
@@ -177,8 +177,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     ? formatDateWithMonthName(new Date(data.endDate))
     : "Por definir";
   
-  doc.text(`Salida de ${startDateFormatted}`, leftMargin, budgetY + 20);
-  doc.text(`Regreso ${endDateFormatted}`, leftMargin, budgetY + 35);
+  doc.text(`Salida: ${startDateFormatted}`, leftMargin, budgetY + 20);
+  doc.text(`Regreso: ${endDateFormatted}`, leftMargin, budgetY + 35);
   
   const minPayment = Math.round(data.grandTotal * 0.6);
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
@@ -189,7 +189,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   const priceBoxWidth = 150;
   const priceBoxHeight = 70;
   
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(lightGray);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
   doc.text("D E S D E :", priceBoxX, priceBoxY);
   
   doc.roundedRect(priceBoxX, priceBoxY + 18, priceBoxWidth, priceBoxHeight - 18, 5)
