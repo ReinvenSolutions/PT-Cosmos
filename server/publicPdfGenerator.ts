@@ -93,8 +93,24 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const imagePaths = getDestinationImages(data.destinations);
 
+  // Add Special Offer banner on first page only (top-right corner)
+  const specialOfferPath = path.join(process.cwd(), "server", "assets", "special-offer-banner.png");
+  if (fs.existsSync(specialOfferPath)) {
+    try {
+      doc.save();
+      // Position banner in top-right corner with diagonal orientation
+      doc.translate(pageWidth - 20, 0);
+      doc.rotate(45);
+      doc.image(specialOfferPath, 0, -90, { width: 200 });
+      doc.restore();
+    } catch (error) {
+      console.error("Error loading special offer banner:", error);
+    }
+  }
+
+  // Move RNT to upper left
   doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
-  doc.text("RNT No.240799", pageWidth - rightMargin - 100, 30, { align: "right" });
+  doc.text("RNT No.240799", leftMargin, 30);
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text("S U   V I A J E   A :", leftMargin, 70);
