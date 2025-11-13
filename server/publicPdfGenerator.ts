@@ -143,7 +143,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const currentDate = formatDate(new Date());
   doc.font("Helvetica").fontSize(9).fillColor(textColor);
-  doc.text(`creado ${currentDate}`, leftMargin, durationY + 5, { width: contentWidth - 220, align: "right" });
+  // Position text to end just before the banner (banner starts at x=395, so text ends at ~385)
+  doc.text(`creado ${currentDate}`, 0, durationY + 5, { width: 385, align: "right" });
 
   const mainImageY = 165;
   const mainImageHeight = 250;
