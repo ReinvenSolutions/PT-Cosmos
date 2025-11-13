@@ -85,13 +85,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.restore();
   };
 
+  addPageBackground();
+
   const destinationNames = data.destinations.map(d => d.name).join(" + ");
   const totalDuration = data.destinations.reduce((sum, d) => sum + d.duration, 0);
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
   const imagePaths = getDestinationImages(data.destinations);
 
-  doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
+  doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
   doc.text("RNT No.240799", pageWidth - rightMargin - 100, 30, { align: "right" });
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(lightGray);
@@ -150,10 +152,10 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   
   doc.font("Helvetica").fontSize(9).fillColor(textColor);
   const startDateFormatted = data.startDate 
-    ? formatDate(new Date(data.startDate))
+    ? formatDateWithMonthName(new Date(data.startDate))
     : "Por definir";
   const endDateFormatted = data.endDate 
-    ? formatDate(new Date(data.endDate))
+    ? formatDateWithMonthName(new Date(data.endDate))
     : "Por definir";
   
   doc.text(`Salida de ${startDateFormatted}`, leftMargin, budgetY + 20);
@@ -172,9 +174,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text("D E S D E :", priceBoxX, priceBoxY);
   
   doc.roundedRect(priceBoxX, priceBoxY + 18, priceBoxWidth, priceBoxHeight - 18, 5)
-     .fillAndStroke("#fef3c7", "#fbbf24");
+     .fillAndStroke(priceBoxBackground, priceBoxBorder);
   
-  doc.font("Helvetica-Bold").fontSize(26).fillColor(accentColor);
+  doc.font("Helvetica-Bold").fontSize(26).fillColor(priceTextColor);
   doc.text(
     `$ ${formatUSD(data.grandTotal)}`,
     priceBoxX + 5,
@@ -182,7 +184,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     { width: priceBoxWidth - 10, align: "center" }
   );
   
-  doc.font("Helvetica").fontSize(9).fillColor(textColor);
+  doc.font("Helvetica").fontSize(9).fillColor("#ffffff");
   doc.text(
     getPassengerText(passengers),
     priceBoxX + 5,
