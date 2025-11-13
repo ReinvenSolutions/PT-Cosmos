@@ -243,6 +243,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   });
 
   doc.addPage();
+  addPageBackground();
 
   doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor);
   doc.text("Itinerario", leftMargin, 60);
@@ -309,6 +310,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   cityStops.forEach((stop) => {
     if (currentY > 650) {
       doc.addPage();
+      addPageBackground();
       currentY = 60;
     }
     
@@ -360,6 +362,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (data.includeFlights && data.outboundFlightImages && data.outboundFlightImages.length > 0) {
     console.log('[PDF Generator] Outbound flight images:', data.outboundFlightImages);
     doc.addPage();
+    addPageBackground();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
     
@@ -392,6 +395,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageHeight = 200;
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
+                addPageBackground();
                 flightImageY = 80;
               }
               
@@ -416,6 +420,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   }
 
   doc.addPage();
+  addPageBackground();
 
   doc.font("Helvetica-Bold").fontSize(14).fillColor(primaryColor);
   doc.text("Itinerario Detallado", leftMargin, 60);
@@ -426,6 +431,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
     if (doc.y > 700) {
       doc.addPage();
+      addPageBackground();
     }
 
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
@@ -463,6 +469,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     dest.itinerary.forEach((day) => {
       if (doc.y > 720) {
         doc.addPage();
+        addPageBackground();
       }
 
       doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
@@ -487,6 +494,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (allHotels.length > 0) {
     if (doc.y > 680) {
       doc.addPage();
+      addPageBackground();
     }
 
     doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
@@ -514,6 +522,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   if (doc.y > 600) {
     doc.addPage();
+    addPageBackground();
   }
 
   const allInclusions: Inclusion[] = [];
@@ -540,6 +549,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     uniqueInclusions.forEach(item => {
       if (doc.y > 750) {
         doc.addPage();
+        addPageBackground();
       }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
@@ -573,6 +583,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     uniqueExclusions.forEach(item => {
       if (doc.y > 750) {
         doc.addPage();
+        addPageBackground();
       }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
@@ -595,6 +606,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   if (doc.y > 680) {
     doc.addPage();
+    addPageBackground();
   }
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
@@ -626,6 +638,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (data.includeFlights && data.returnFlightImages && data.returnFlightImages.length > 0) {
     console.log('[PDF Generator] Return flight images:', data.returnFlightImages);
     doc.addPage();
+    addPageBackground();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
     
@@ -658,6 +671,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageHeight = 200;
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
+                addPageBackground();
                 flightImageY = 80;
               }
               
@@ -699,6 +713,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   // PÁGINA DE ASISTENCIA MÉDICA - Siempre incluida al final
   doc.addPage();
+  addPageBackground();
   
   const topMargin = 80;
   const bottomMargin = 50;
@@ -751,6 +766,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     if (remainingSpace < requiredSpace) {
       // No hay espacio, crear nueva página
       doc.addPage();
+      addPageBackground();
       doc.y = topMargin;
     } else {
       // Hay espacio, agregar separación
