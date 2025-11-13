@@ -253,7 +253,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text("C O M E N T A R I O S", leftMargin, commentsY);
   
   doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
-  const comments = `Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. Globo Turquía ¢330mil por persona / 5 salidas **Debe pagar 1 persona / Tarifa desde NO reembolsable, permite cambio con penalidades + diferencia de tarifa. NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 200USD EN HOTELES DE LA MISMA CATEGORIA.`;
+  const comments = `Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. Globo Turquía $450 USD por persona / 5 salidas **Debe pagar 1 persona / Tarifa desde NO reembolsable, permite cambio con penalidades + diferencia de tarifa. NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 200USD EN HOTELES DE LA MISMA CATEGORIA.`;
   
   doc.text(comments, leftMargin, commentsY + 15, { 
     width: contentWidth, 
