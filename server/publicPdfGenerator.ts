@@ -143,7 +143,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const currentDate = formatDate(new Date());
   doc.font("Helvetica").fontSize(9).fillColor(textColor);
-  doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 200, durationY + 5, { align: "right" });
+  doc.text(`creado ${currentDate}`, leftMargin, durationY + 5, { width: contentWidth - 220, align: "right" });
 
   const mainImageY = 165;
   const mainImageHeight = 250;
