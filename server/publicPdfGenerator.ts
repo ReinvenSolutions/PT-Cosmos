@@ -123,7 +123,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, durationY);
 
   const currentDate = formatDate(new Date());
-  doc.font("Helvetica").fontSize(9).fillColor(veryLightGray);
+  doc.font("Helvetica").fontSize(9).fillColor(textColor);
   doc.text(`creado ${currentDate}`, pageWidth - rightMargin - 100, durationY + 5, { align: "right" });
 
   const mainImageY = 165;
@@ -613,13 +613,13 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text("Términos Generales y Condiciones", leftMargin, doc.y);
   doc.moveDown(0.5);
   
-  doc.font("Helvetica").fontSize(7.5).fillColor(lightGray);
+  doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
   const terms = `Servicios: Cambios en el itinerario posibles según condiciones y disponibilidad del guía. Hotelería: Alojamiento en hoteles de primera entre 4 y 5 estrellas similares a los planificados. Excursiones: No reembolsos por inasistencias. Traslados: Recogida y salida sin acceso al aeropuerto. Espera máxima de 2 horas tras aterrizaje. Documentación: Colombianos exentos de visado. Pasaporte con mínimo 6 meses de validez. Consultar requerimientos para otras nacionalidades.`;
   doc.text(terms, leftMargin, doc.y, { width: contentWidth, align: "justify" });
   
   doc.moveDown(2);
 
-  doc.fontSize(7).fillColor(veryLightGray);
+  doc.fontSize(7).fillColor(textColor);
   doc.text(
     "Esta cotización es válida por 7 días. Los precios están sujetos a disponibilidad.",
     leftMargin,
