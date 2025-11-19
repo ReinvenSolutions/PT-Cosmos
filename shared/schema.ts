@@ -137,6 +137,7 @@ export const quotes = pgTable("quotes", {
   outboundHoldBaggage: boolean("outbound_hold_baggage").default(false),
   returnCabinBaggage: boolean("return_cabin_baggage").default(false),
   returnHoldBaggage: boolean("return_hold_baggage").default(false),
+  turkeyUpgrade: text("turkey_upgrade"),
   status: text("status").notNull().default("draft"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
