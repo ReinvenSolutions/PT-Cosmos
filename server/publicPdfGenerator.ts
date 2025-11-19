@@ -504,37 +504,21 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   // Add Turkey route map for Turkey destinations
   if (isTurkey) {
     console.log('[PDF Generator] Adding Turkey route map to itinerary page...');
-    console.log('[PDF Generator] Current working directory:', process.cwd());
     
-    // Try multiple possible locations for the Turkey route map
-    const possibleMapPaths = [
-      '/home/runner/workspace/attached_assets/Screenshot 2025-11-19 at 12.05.39 PM_1763576106301.png',
-      '/home/runner/workspace/attached_assets/Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png',
-      path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763576106301.png'),
-      path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png'),
-      path.join(process.cwd(), 'server', 'assets', 'turkey-route-map.png')
-    ];
+    // Use the new turkey map image
+    const turkeyMapPath = path.join(process.cwd(), 'attached_assets', 'mapa itinerario turquia_1763577662908.png');
     
-    let mapPath = null;
-    for (const possiblePath of possibleMapPaths) {
-      const exists = fs.existsSync(possiblePath);
-      console.log(`[PDF Generator] Checking ${possiblePath}: ${exists ? 'FOUND ✓' : 'NOT FOUND ✗'}`);
-      if (exists) {
-        mapPath = possiblePath;
-        console.log(`[PDF Generator] ✓ Using Turkey route map at: ${possiblePath}`);
-        break;
-      }
-    }
+    console.log(`[PDF Generator] Looking for Turkey map at: ${turkeyMapPath}`);
     
-    if (mapPath) {
+    if (fs.existsSync(turkeyMapPath)) {
       try {
-        const mapY = doc.y + 40;
+        const mapY = doc.y + 30;
         const mapWidth = contentWidth;
         const mapHeight = 280;
         
         console.log(`[PDF Generator] Adding map image at Y=${mapY}, width=${mapWidth}, height=${mapHeight}`);
         
-        doc.image(mapPath, leftMargin, mapY, {
+        doc.image(turkeyMapPath, leftMargin, mapY, {
           width: mapWidth,
           height: mapHeight,
           align: "center",
@@ -547,8 +531,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
         console.error("[PDF Generator] ✗ Error loading Turkey route map:", error);
       }
     } else {
-      console.warn("[PDF Generator] ✗ Turkey route map not found in any expected location");
-      console.warn("[PDF Generator] Tried paths:", possibleMapPaths);
+      console.warn(`[PDF Generator] ✗ Turkey route map not found at: ${turkeyMapPath}`);
     }
   }
 
@@ -1050,8 +1033,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
     // COMBO 1 - Sección separada con header azul
     const combo1HeaderY = doc.y;
-    // Dibujar header azul PRIMERO
-    doc.rect(leftMargin, combo1HeaderY, contentWidth, 20).fill("#1e40af");
+    // Dibujar header azul
+    doc.rect(leftMargin, combo1HeaderY, contentWidth, 20)
+       .fillAndStroke("#1e40af", "#1e40af");
     // Agregar título "Combo 1" en el header
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
     doc.text("Combo 1", leftMargin, combo1HeaderY + 6, { width: contentWidth, align: "center" });
@@ -1062,12 +1046,11 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     const combo1ContentHeight = 50;
     const combo1ContentY = doc.y;
     
-    // Dibujar rectángulo de fondo PRIMERO
-    doc.rect(leftMargin, combo1ContentY, contentWidth, combo1ContentHeight).fill(tableRowBg);
-    // Dibujar bordes
-    doc.rect(leftMargin, combo1ContentY, contentWidth, combo1ContentHeight).stroke("#3b82f6");
+    // Dibujar rectángulo de fondo con borde
+    doc.rect(leftMargin, combo1ContentY, contentWidth, combo1ContentHeight)
+       .fillAndStroke(tableRowBg, "#3b82f6");
     
-    // Texto del combo 1 DESPUÉS (encima del fondo)
+    // Texto del combo 1 (encima del fondo)
     const combo1TextX = leftMargin + 5;
     const combo1TextY = combo1ContentY + 3;
     doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
@@ -1080,7 +1063,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     // Precio del Combo 1 (rectángulo azul + texto blanco)
     const combo1PriceX = leftMargin + contentWidth - 100;
     const combo1PriceY = combo1TextY + 15;
-    doc.rect(combo1PriceX, combo1PriceY, 95, 25).fill("#1e40af");
+    doc.rect(combo1PriceX, combo1PriceY, 95, 25)
+       .fillAndStroke("#1e40af", "#1e40af");
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
     doc.text("1,020 USD", combo1PriceX, combo1PriceY + 5, { width: 95, align: "center" });
     
@@ -1088,8 +1072,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
     // COMBO 2 - Sección separada con header azul
     const combo2HeaderY = doc.y;
-    // Dibujar header azul PRIMERO
-    doc.rect(leftMargin, combo2HeaderY, contentWidth, 20).fill("#1e40af");
+    // Dibujar header azul
+    doc.rect(leftMargin, combo2HeaderY, contentWidth, 20)
+       .fillAndStroke("#1e40af", "#1e40af");
     // Agregar título "Combo 2" en el header
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
     doc.text("Combo 2", leftMargin, combo2HeaderY + 6, { width: contentWidth, align: "center" });
@@ -1100,12 +1085,11 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     const combo2ContentHeight = 30;
     const combo2ContentY = doc.y;
     
-    // Dibujar rectángulo de fondo PRIMERO
-    doc.rect(leftMargin, combo2ContentY, contentWidth, combo2ContentHeight).fill(tableRowBg);
-    // Dibujar bordes
-    doc.rect(leftMargin, combo2ContentY, contentWidth, combo2ContentHeight).stroke("#3b82f6");
+    // Dibujar rectángulo de fondo con borde
+    doc.rect(leftMargin, combo2ContentY, contentWidth, combo2ContentHeight)
+       .fillAndStroke(tableRowBg, "#3b82f6");
     
-    // Texto del combo 2 DESPUÉS (encima del fondo)
+    // Texto del combo 2 (encima del fondo)
     const combo2TextX = leftMargin + 5;
     const combo2TextY = combo2ContentY + 3;
     doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
@@ -1116,7 +1100,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     // Precio del Combo 2 (rectángulo azul + texto blanco)
     const combo2PriceX = leftMargin + contentWidth - 100;
     const combo2PriceY = combo2TextY + 5;
-    doc.rect(combo2PriceX, combo2PriceY, 95, 25).fill("#1e40af");
+    doc.rect(combo2PriceX, combo2PriceY, 95, 25)
+       .fillAndStroke("#1e40af", "#1e40af");
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
     doc.text("660 USD", combo2PriceX, combo2PriceY + 5, { width: 95, align: "center" });
     
