@@ -149,8 +149,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const titleY = 95;
   const passengers = data.passengers || 2;
-  const titleSuffix = passengers === 2 ? " 2X1" : "";
-  const titleText = destinationNames.toUpperCase() + titleSuffix;
+  const titleText = destinationNames.toUpperCase();
   
   let titleFontSize = 24;
   if (titleText.length > 50) {
