@@ -44,6 +44,13 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
   - **Conditional PDF Generation**: If no flight images are uploaded AND no baggage checkboxes are selected, the PDF generates as land-only (no flight pages). If any flight data exists (images OR baggage selections), flight pages are included in the PDF with dynamic baggage text
   - **Medical Assistance Page**: All PDFs automatically include a final page with title "ASISTENCIA MEDICA PARA TU VIAJE" and medical assistance coverage details (image stored in `server/assets/medical-assistance.png`)
   - **Turkey Optional Activities**: When a quotation includes Turkey/Turquía destinations, the medical assistance page also displays a section titled "ACTIVIDADES OPCIONALES" with pricing table for optional tours in Turkey (image stored in `attached_assets/Screenshot 2025-11-05 at 3.01.29 PM_1762373446353.png`). Detection is based on destination country or name containing "turqu" or "turkey" (case-insensitive)
+  - **PDF Branding Elements**: 
+    - **Special Offer Banner**: Diagonal golden "OFERTA ESPECIAL" banner positioned in the top-right corner of the first page only (image stored in `server/assets/special-offer-banner.png`)
+    - **Plane Logo**: Blue airplane icon with trail appears in two locations:
+      - First page: Positioned immediately after "SU VIAJE A:" text in the header (60px width)
+      - All other pages: Bottom-left corner of every page (80px width at coordinates leftMargin, pageHeight-70)
+      - Image stored in `server/assets/plane-logo.png`
+    - **RNT Number**: "RNT No.240799" displayed in upper-left corner of first page for regulatory compliance
 - **Role-Based Access**: Public routes are accessible without authentication, while advisor and super admin routes require specific roles, enforced by `requireAuth` and `requireRole` middleware.
 
 ### System Design Choices

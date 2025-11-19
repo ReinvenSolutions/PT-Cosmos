@@ -85,6 +85,23 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.restore();
   };
 
+  // Helper function to add plane logo in bottom-left corner (for all pages except first)
+  const planeLogoPath = path.join(process.cwd(), "server", "assets", "plane-logo.png");
+  const addPlaneLogoBottom = () => {
+    if (fs.existsSync(planeLogoPath)) {
+      try {
+        const logoWidth = 80;
+        const logoX = leftMargin;
+        const logoY = pageHeight - 70;
+        
+        doc.image(planeLogoPath, logoX, logoY, { width: logoWidth });
+        console.log("[PDF Generator] Plane logo added to bottom-left corner");
+      } catch (error) {
+        console.error("[PDF Generator] Error loading plane logo:", error);
+      }
+    }
+  };
+
   addPageBackground();
 
   const destinationNames = data.destinations.map(d => d.name).join(" + ");
@@ -117,6 +134,21 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text("S U   V I A J E   A :", leftMargin, 70);
+
+  // Add plane logo on first page after "SU VIAJE A:" text
+  if (fs.existsSync(planeLogoPath)) {
+    try {
+      const firstPageLogoWidth = 60;
+      const textWidth = doc.widthOfString("S U   V I A J E   A :");
+      const firstPageLogoX = leftMargin + textWidth + 15;
+      const firstPageLogoY = 68;
+      
+      doc.image(planeLogoPath, firstPageLogoX, firstPageLogoY, { width: firstPageLogoWidth });
+      console.log("[PDF Generator] Plane logo added to first page after title");
+    } catch (error) {
+      console.error("[PDF Generator] Error loading plane logo on first page:", error);
+    }
+  }
 
   const titleY = 95;
   const passengers = data.passengers || 2;
@@ -265,6 +297,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   doc.addPage();
   addPageBackground();
+  addPlaneLogoBottom();
 
   doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor);
   doc.text("Itinerario", leftMargin, 60);
@@ -332,6 +365,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     if (currentY > 650) {
       doc.addPage();
       addPageBackground();
+      addPlaneLogoBottom();
       currentY = 60;
     }
     
@@ -384,6 +418,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     console.log('[PDF Generator] Outbound flight images:', data.outboundFlightImages);
     doc.addPage();
     addPageBackground();
+    addPlaneLogoBottom();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
     
@@ -417,6 +452,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
                 addPageBackground();
+                addPlaneLogoBottom();
                 flightImageY = 80;
               }
               
@@ -442,6 +478,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   doc.addPage();
   addPageBackground();
+  addPlaneLogoBottom();
 
   doc.font("Helvetica-Bold").fontSize(14).fillColor(primaryColor);
   doc.text("Itinerario Detallado", leftMargin, 60);
@@ -453,6 +490,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     if (doc.y > 700) {
       doc.addPage();
       addPageBackground();
+      addPlaneLogoBottom();
     }
 
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
@@ -491,6 +529,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       if (doc.y > 720) {
         doc.addPage();
         addPageBackground();
+        addPlaneLogoBottom();
       }
 
       doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
@@ -516,6 +555,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     if (doc.y > 680) {
       doc.addPage();
       addPageBackground();
+      addPlaneLogoBottom();
     }
 
     doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
@@ -544,6 +584,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (doc.y > 600) {
     doc.addPage();
     addPageBackground();
+    addPlaneLogoBottom();
   }
 
   const allInclusions: Inclusion[] = [];
@@ -571,6 +612,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       if (doc.y > 750) {
         doc.addPage();
         addPageBackground();
+        addPlaneLogoBottom();
       }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
@@ -605,6 +647,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       if (doc.y > 750) {
         doc.addPage();
         addPageBackground();
+        addPlaneLogoBottom();
       }
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
@@ -628,6 +671,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   if (doc.y > 680) {
     doc.addPage();
     addPageBackground();
+    addPlaneLogoBottom();
   }
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
@@ -660,6 +704,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     console.log('[PDF Generator] Return flight images:', data.returnFlightImages);
     doc.addPage();
     addPageBackground();
+    addPlaneLogoBottom();
     
     doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
     
@@ -693,6 +738,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
                 addPageBackground();
+                addPlaneLogoBottom();
                 flightImageY = 80;
               }
               
@@ -735,6 +781,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   // PÁGINA DE ASISTENCIA MÉDICA - Siempre incluida al final
   doc.addPage();
   addPageBackground();
+  addPlaneLogoBottom();
   
   const topMargin = 80;
   const bottomMargin = 50;
@@ -788,6 +835,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       // No hay espacio, crear nueva página
       doc.addPage();
       addPageBackground();
+      addPlaneLogoBottom();
       doc.y = topMargin;
     } else {
       // Hay espacio, agregar separación
