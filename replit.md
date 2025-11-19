@@ -1,7 +1,7 @@
 # Tourist Package Quotation System
 
 ## Overview
-This is an authenticated travel booking system designed for travel advisors to create, save, and manage client quotations. It enables the generation of professional, detailed PDF itineraries. Super administrators oversee client management, destination creation, and monitor advisor performance through comprehensive statistics. The system features native authentication with robust role-based access control for "Super Admin" and "Advisor" roles. The business vision is to streamline the quotation process for travel agencies, enhance client engagement with professional documentation, and provide management with oversight into sales activities.
+This is an authenticated travel booking system designed for travel advisors to create, save, and manage client quotations, and generate professional, detailed PDF itineraries. Super administrators manage clients, create destinations, and monitor advisor performance. The system aims to streamline the quotation process for travel agencies, enhance client engagement with professional documentation, and provide management oversight into sales activities. It features native authentication with robust role-based access control for "Super Admin" and "Advisor" roles.
 
 ## User Preferences
 I prefer detailed explanations and iterative development. Ask before making major changes.
@@ -9,125 +9,42 @@ I prefer detailed explanations and iterative development. Ask before making majo
 ## System Architecture
 
 ### UI/UX Decisions
-The system features a modern, responsive interface built with React, Wouter for routing, Tailwind CSS, and shadcn/ui. It includes a dedicated login page and role-based dashboard redirection. Key UI elements include professional PDF generation with company branding, interactive destination cards that expand on hover, and modern icons for clarity. Specific logic is implemented for Turkey destinations, affecting UI validations and messaging. When a single destination is selected for a quote, the PDF cover page displays 3 different images of that destination instead of repeating the same image.
+The system features a modern, responsive interface built with React, Wouter for routing, Tailwind CSS, and shadcn/ui. It includes a dedicated login page, role-based dashboard redirection, and professional PDF generation with company branding. Interactive destination cards expand on hover, and modern icons enhance clarity. Specific logic is implemented for Turkey destinations, affecting UI validations and messaging. Single-destination quotes display three distinct images on the PDF cover page.
 
 ### Technical Implementations
-The frontend is built with React, Wouter, and TanStack Query, styled with Tailwind CSS and shadcn/ui. The backend uses Express.js with TypeScript. PostgreSQL, hosted on Neon, serves as the database, managed by Drizzle ORM. Authentication is handled by Passport.js with Local Strategy, bcrypt for password hashing, and express-session with `connect-pg-simple` for PostgreSQL session storage. PDF generation is powered by PDFKit. The system automatically calculates trip dates and durations, implements specific business rules for Turkey destinations, and uses Replit Object Storage for persistent flight attachment images. Quote updates utilize database transactions for consistency.
-
-**Image Storage Architecture**: Flight attachment images use persistent storage that automatically adapts to the environment:
-- **Production**: Stores images in Replit Object Storage using native `@replit/object-storage` package for permanent persistence
-  - Uses `ObjectStorageService` in `server/objectStorage.ts` with Replit's native Client
-  - Images are uploaded to `uploads/` directory with UUID-based filenames
-  - Automatically detects bucket via `DEFAULT_OBJECT_STORAGE_BUCKET_ID` environment variable
-- **Development**: Stores images in `/home/runner/workspace/uploads` for persistence during local development
-- The system automatically detects the environment and selects the appropriate storage location on startup
-- Images are served via authenticated endpoint `/api/images/:filename` which requires user authentication
-- The PDF generator accesses images using the async `getImagePathForPDF()` helper function:
-  - In production: Downloads images from Object Storage to `/tmp/pdf-images/` for PDF generation
-  - In development: Returns direct filesystem path to uploaded images
-- The upload flow uses `handleFileUpload()` in `server/upload.ts` which validates file types, sizes, and security
-- All monetary values are formatted with `formatUSD()` utility (thousands separators, no decimals)
-- All dates are formatted with `formatDate()` utility in DD/MM/AAAA format
-- This ensures images persist across server restarts in both development and production environments
+The frontend uses React, Wouter, and TanStack Query, styled with Tailwind CSS and shadcn/ui. The backend is built with Express.js and TypeScript. PostgreSQL, hosted on Neon, is the database, managed by Drizzle ORM. Authentication relies on Passport.js with Local Strategy, bcrypt for password hashing, and express-session with `connect-pg-simple` for PostgreSQL session storage. PDF generation is powered by PDFKit. The system calculates trip dates/durations, applies specific business rules for Turkey destinations (e.g., holiday validation, upgrade options), and uses Replit Object Storage (or local filesystem for development) for persistent flight attachment images. Quote updates use database transactions. Monetary values are formatted as USD without decimals, and dates are DD/MM/AAAA.
 
 ### Feature Specifications
-- **Super Admin**: Manages clients (global list), creates and manages destinations, views quote statistics across all advisors, and has full access to the system.
-- **Advisor**: Creates, views, and edits personal quotations, associates quotes with clients, uploads flight images, customizes baggage options, and generates detailed PDFs. The quotation flow mirrors the original public system but is now protected by authentication.
-- **Quotation System**: Allows browsing and selecting destinations, setting travel dates, viewing itineraries, and saving quotes associated with clients and the logged-in user.
-  - **Passenger Selection**: Users can select 1-10 passengers in `/cotizacion`. The system multiplies the land portion price by the number of passengers to calculate the total. Price display shows both per-person and total amounts.
-  - **Dynamic PDF Text**: PDF quotations display context-aware passenger text:
-    - 1 passenger: "por Persona"
-    - 2 passengers: "por Pareja" + adds "2X1" suffix to destination title
-    - 3+ passengers: "por Grupo de X" (where X is the passenger count)
-  - **Flight Sections**: Both public (`/cotizacion`) and advisor edit pages include flight upload sections with customizable baggage options
-  - **Baggage Customization**: Users can select "Equipaje de cabina 10kg" and "Equipaje de bodega 23kg" independently for outbound and return flights (Personal 8kg is always included)
-  - **Conditional PDF Generation**: If no flight images are uploaded AND no baggage checkboxes are selected, the PDF generates as land-only (no flight pages). If any flight data exists (images OR baggage selections), flight pages are included in the PDF with dynamic baggage text
-  - **Medical Assistance & Optional Tours Page**: All PDFs include a combined final page with title "ASISTENCIA MEDICA PARA TU VIAJE"
-    - **Page Structure**:
-      1. **Medical Assistance Image**: Displayed first (180px height for Turkey, 400px for others)
-      2. **Turkey Optional Tours Section** (when applicable, displayed below image):
-         - **Main Table**: Blue header "TOUR OPCIONALES" (#1e40af) with 14 individual tour options
-         - **Combo 1 Section**: Separate blue-header box listing included tours with **1,020 USD** price (bold, 18pt)
-         - **Combo 2 Section**: Separate blue-header box listing included tours with **660 USD** price (bold, 18pt)
-         - Banking fee notice in red text: "Fee bancario no incluido, 2.5% sobre el total"
-         - Compact styling with 11px row height, tour names 7pt font, prices bold 8pt font
-         - Light blue row backgrounds (#e0e7ff), blue borders (#3b82f6)
-    - Detection is based on destination country or name containing "turqu" or "turkey" (case-insensitive)
-  - **Turquía Esencial Policies & Holidays**: For "Turquía Esencial" packages specifically, a single consolidated page includes:
-    - **Policies & Conditions Section**: Comprehensive terms covering cancellations, tips, services, baggage, hotels, excursions, WiFi, balloon rides, and transfers
-    - **2026 Holidays Section**: Continues on same page (no page break) with table of Turkish national and religious holidays with impact on services and bazaar closures
-    - Only appears for "Turquía Esencial" plan, formatted with clear section headings and justified text for professional appearance
-  - **PDF Branding Elements**: 
-    - **Special Offer Banner**: Diagonal golden "OFERTA ESPECIAL" banner positioned in the top-right corner of the first page only (image stored in `server/assets/special-offer-banner.png`)
-    - **Plane Logo**: Blue airplane icon with trail appears in two locations:
-      - First page: Positioned immediately after "SU VIAJE A:" text in the header (60px width, Y=57)
-      - All other pages: Bottom-left corner of every page (80px width at coordinates X=20, Y=pageHeight-50) - positioned close to corner
-      - Image stored in `server/assets/plane-logo.png`
-    - **RNT Number**: "RNT No.240799" displayed in upper-left corner of first page for regulatory compliance
-- **Role-Based Access**: Public routes are accessible without authentication, while advisor and super admin routes require specific roles, enforced by `requireAuth` and `requireRole` middleware.
+- **Role-Based Access**: Public routes are accessible without authentication, while advisor and super admin routes require specific roles.
+- **Super Admin**: Manages clients, creates/manages destinations, and views global quote statistics.
+- **Advisor**: Creates, views, and edits personal quotations, associates quotes with clients, uploads flight images, customizes baggage options, and generates detailed PDFs.
+- **Quotation System**: Allows destination selection, date setting, itinerary viewing, and saving quotes linked to clients.
+    - **Passenger Selection**: Supports 1-10 passengers, dynamically calculating total land portion price and adjusting PDF text (e.g., "por Persona", "por Pareja", "por Grupo de X").
+    - **Flight Sections**: Includes flight upload and baggage customization for outbound/return flights. If no flight images or baggage are selected, PDFs generate as land-only; otherwise, flight pages are included with dynamic baggage text.
+    - **Conditional PDF Content**:
+        - All PDFs include a "ASISTENCIA MEDICA PARA TU VIAJE" page with medical assistance imagery.
+        - For Turkey destinations, this page also includes "TOUR OPCIONALES" tables, Combo packages, and a banking fee notice.
+        - "Turquía Esencial" plans specifically include a consolidated page with comprehensive policies/conditions and 2026 Turkish national/religious holidays, impacting booking availability (dates disabled in picker with toast notifications).
+        - "Turquía Esencial" offers three exclusive upgrade packages that adjust the total cost.
+    - **PDF Branding**: Includes a diagonal "OFERTA ESPECIAL" banner, a blue airplane logo (in header and page footers), and an "RNT No.240799" for regulatory compliance.
+    - **Destination Catalog**: Only `isActive=true` destinations are displayed. Currently active include 7 Colombian destinations and "Turquía Esencial" (10 days, 9 nights, $710 USD land portion). The "Turquía Esencial" plan has specific image sets, a detailed itinerary, inclusions/exclusions, hotel options, a route map, and a tooltip.
 
 ### System Design Choices
-The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clients are global entities managed by super admins. Advisors manage their own quotes, while super admins have full visibility. PostgreSQL session storage ensures production readiness. Database entities use `varchar` with `gen_random_uuid()` for IDs, and unique constraints prevent duplicate destinations. The database auto-seeds on deployment, populating with essential data if empty.
-
-### Destination Catalog Management
-**Active Destinations**: Only destinations with `isActive=true` are displayed in the public and advisor interfaces. Currently active:
-- **Colombia Plans**: 7 national destinations (Cartagena, Medellín, Eje Cafetero, San Andrés, Amazonas, La Guajira, Santander)
-- **International Plans**: "Turquía Esencial" (10 days, 9 nights, $710 USD land portion)
-
-**Turquía Esencial Plan Configuration**:
-- **Name**: "Turquía Esencial"
-- **Price**: $710 USD (land portion only)
-- **Duration**: 11 days, 9 nights
-- **Main Cover Image**: Illuminated mosque (`attached_assets/2_1763570259884.png`)
-- **PDF Image Set**: 6 custom images showcasing Turkey's iconic locations:
-  1. Illuminated mosque at night (`2_1763570259884.png`) - Used on front page (main image)
-  2. Hot air balloons in Capadocia (`3_1763570259885.png`) - Used on front page (secondary)
-  3. Pamukkale white pools (`4_1763570259885.png`) - Used on front page (secondary)
-  4. Turkish flags with Galata Tower (`1_1763570259884.png`) - Used on itinerary page
-  5. Ephesus ruins interior (`5_1763570259885.png`) - Used on itinerary page
-  6. Ephesus temple arch (`6_1763570259885.png`) - Used on itinerary page
-- **Itinerary**: Estambul (3+1 nights) → Capadocia (3 nights) → Pamukkale (1 night) → Esmirna (1 night) → Estambul (1 night)
-- **Image Configuration**: Images are stored in `attached_assets/` and configured in `server/destination-images.ts` and `client/src/lib/destination-images.ts`. The first 3 images are shown on the PDF front page, the last 3 on the detailed itinerary page.
-- **Tooltip**: "Salidas todos los Martes desde Colombia. Combinable con: Dubái, Egipto, Grecia, Tailandia, Vietnam, Perú (salidas diarias). Turquía siempre va primero en la ruta."
-- **Holiday Date Validation**: The quotation system prevents booking on Turkish national and religious holidays for Turquía Esencial:
-  - Dates are automatically disabled in the date picker: January 1, March 30-31, April 1, April 23, May 1, May 6, June 6, July 15, August 30 (2026)
-  - If a user attempts to select a holiday date, a toast notification displays: "No se puede seleccionar esta fecha porque es festivo en Turquía" with the specific holiday description
-  - Holiday list is configured in `client/src/lib/turkey-holidays.ts` with helper functions `isTurkeyHoliday()` and `getTurkeyHolidayDescription()`
-  - Validation applies only to "Turquía Esencial" plan; other destinations are unaffected
-- **Upgrade Options**: Turquía Esencial offers three exclusive upgrade packages to enhance the base experience:
-  - **Option 1 (+$500 USD)**: 8 almuerzos + 2 actividades Estambul
-  - **Option 2 (+$770 USD)**: Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul
-  - **Option 3 (+$1,100 USD)**: Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul
-  - Upgrade options are displayed conditionally in both QuoteSummary and QuoteEdit pages only when Turquía Esencial is selected
-  - Users can select only one upgrade option at a time (radio-style checkboxes)
-  - The selected upgrade cost is automatically added to the grand total calculation
-  - Stored in database field `turkeyUpgrade` with values: 'option1', 'option2', 'option3', or null
-- **PDF Formatting Changes**:
-  - Plane logo positioned at Y=57 (raised for better alignment with "SU VIAJE A:" text)
-  - RNT No.240799 and creation date positioned above main image
-  - Special Offer banner 140px width, positioned exactly at top-right corner (no margins)
-  - Dates formatted without slashes (e.g., "25 Noviembre 2025")
-  - Date values and payment amount displayed in bold at 12pt font
-  - Page 1 comments use mixed text formatting: normal text for general information, bold text for pricing details (Globo +415usd, 6 almuerzos +200usd, tarifa aérea policies)
-  - Page 2 itinerary displays custom stop numbers: Estambul (1, 3 noches), Capadocia (3, 3 noches), Pamukkale (4, 1 noche), Esmirna (5, 1 noche), Estambul (7, 1 noche)
-  - Page 2 includes Turkey route map below itinerary (searches for latest version in attached_assets, fallback to server/assets)
-  - **Tours Opcionales Table** (Medical Assistance page): 11 rows with individual tours plus separated Combo 1 (1,020 USD) and Combo 2 (660 USD), all prices displayed in bold 8pt font
-
-**Hidden Destinations**: 31 international plans are hidden (`isActive=false`) including previous Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, and Peru plans.
+The project utilizes a monorepo structure (`/client`, `/server`, `/shared`). Clients are global entities managed by super admins. Advisors manage their own quotes. PostgreSQL session storage ensures production readiness. Database entities use `varchar` with `gen_random_uuid()` for IDs and have unique constraints. The database auto-seeds on deployment.
 
 ## External Dependencies
-- **PostgreSQL (Neon)**: Main relational database.
-- **PDFKit**: JavaScript library for PDF generation.
-- **Wouter**: Client-side routing for React.
-- **TanStack Query**: Data fetching and caching for React.
+- **PostgreSQL (Neon)**: Relational database.
+- **PDFKit**: PDF generation library.
+- **Wouter**: Client-side routing.
+- **TanStack Query**: Data fetching and caching.
 - **Tailwind CSS**: Utility-first CSS framework.
-- **shadcn/ui**: Reusable UI components.
-- **Express.js**: Backend web application framework.
-- **TypeScript**: For type-safe backend development.
-- **Drizzle ORM**: TypeScript ORM for PostgreSQL.
+- **shadcn/ui**: UI components.
+- **Express.js**: Backend framework.
+- **TypeScript**: Backend language.
+- **Drizzle ORM**: PostgreSQL ORM.
 - **Passport.js**: Authentication middleware.
 - **bcrypt**: Password hashing.
-- **express-session**: Session management middleware.
+- **express-session**: Session management.
 - **connect-pg-simple**: PostgreSQL session store.
-- **multer**: Middleware for handling `multipart/form-data` (file uploads).
-- **Object Storage**: For storing flight attachment images.
+- **multer**: File upload handling.
+- **Object Storage**: Persistent storage for flight attachment images (Replit Object Storage in production).
