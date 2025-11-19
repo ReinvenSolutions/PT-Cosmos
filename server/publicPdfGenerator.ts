@@ -303,14 +303,28 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
   doc.text("C O M E N T A R I O S", 0, commentsY, { width: pageWidth, align: "center" });
   
+  // Comments with mixed formatting (normal and bold)
+  const commentsStartY = commentsY + 15;
   doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
-  const comments = `Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guia de habla hispana. Recuerda consultar los servicios no incluidos. Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa. NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.`;
   
-  doc.text(comments, leftMargin, commentsY + 15, { 
-    width: contentWidth, 
-    align: "justify",
-    lineGap: 2
-  });
+  doc.text(
+    "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. ",
+    leftMargin, 
+    commentsStartY, 
+    { width: contentWidth, align: "justify", lineGap: 2, continued: true }
+  );
+  
+  doc.font("Helvetica-Bold");
+  doc.text(
+    "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.",
+    { width: contentWidth, align: "justify", lineGap: 2, continued: true }
+  );
+  
+  doc.font("Helvetica");
+  doc.text(
+    " NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
+    { width: contentWidth, align: "justify", lineGap: 2 }
+  );
 
   doc.addPage();
   addPageBackground();
