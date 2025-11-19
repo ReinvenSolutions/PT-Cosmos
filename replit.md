@@ -32,7 +32,7 @@ The frontend uses React, Wouter, and TanStack Query, styled with Tailwind CSS an
         - **Estambul**: Ramada Plaza Tekstilkent 5*, Sundance Hotel Istanbul 5*, DoubleTree by Hilton Istanbul Topkapi 5*
         - **Capadocia**: Ramada Cappadocia 5*, Avrasya Hotel 5*, Crowne Plaza Nevsehir 5*
         - **Pamukkale**: Pamukale Kaya Thermal Hotel 5*, Pam Thermal Hotel 5*, Richmond Thermal 5*
-        - **Kusadasi/Esmirna**: Radisson Hotel İzmir Aliağa 5*, Hampton By Hilton Aliağa 4*, Faustina Hotel 4* (with upgrade option to Hotel Le Bleu subject to availability)
+        - **Kusadasi/Esmirna**: Radisson Hotel İzmir Aliaga 5*, Hampton By Hilton Aliaga 4*, Faustina Hotel 4* (with upgrade option to Hotel Le Bleu subject to availability)
 
 ### System Design Choices
 The project utilizes a monorepo structure (`/client`, `/server`, `/shared`). Clients are global entities managed by super admins. Advisors manage their own quotes. PostgreSQL session storage ensures production readiness. Database entities use `varchar` with `gen_random_uuid()` for IDs and have unique constraints. The database auto-seeds on deployment.
