@@ -107,7 +107,7 @@ The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clien
   - Date values and payment amount displayed in bold at 12pt font
   - Page 1 comments use mixed text formatting: normal text for general information, bold text for pricing details (Globo +415usd, 6 almuerzos +200usd, tarifa aérea policies)
   - Page 2 itinerary displays custom stop numbers: Estambul (1, 3 noches), Capadocia (3, 3 noches), Pamukkale (4, 1 noche), Esmirna (5, 1 noche), Estambul (7, 1 noche)
-  - Page 2 includes Turkey route map below itinerary (attached_assets/Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png)
+  - Page 2 includes Turkey route map below itinerary (searches for latest version in attached_assets, fallback to server/assets)
   - **Tours Opcionales Table** (Medical Assistance page): 11 rows with individual tours plus separated Combo 1 (1,020 USD) and Combo 2 (660 USD), all prices displayed in bold 8pt font
 
 **Hidden Destinations**: 31 international plans are hidden (`isActive=false`) including previous Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, and Peru plans.
