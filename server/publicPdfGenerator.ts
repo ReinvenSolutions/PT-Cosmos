@@ -974,35 +974,37 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   // Segundo: Agregar tabla de tours opcionales (solo para Turkey)
   if (hasTurkeyDestinations) {
 
-    // Título compacto
-    doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
-    doc.text("TOUR OPCIONALES", leftMargin, doc.y, { align: "center", width: contentWidth });
-    doc.moveDown(1);
+    // Header azul "TOUR OPCIONALES"
+    const headerHeight = 30;
+    const headerY = doc.y;
+    doc.rect(leftMargin, headerY, contentWidth, headerHeight).fill("#1e40af");
+    doc.font("Helvetica-Bold").fontSize(14).fillColor("#ffffff");
+    doc.text("TOUR OPCIONALES", leftMargin, headerY + 10, { align: "center", width: contentWidth });
+    doc.y = headerY + headerHeight + 5;
 
     // Configuración de tabla compacta
-    const tableHeaderBg = "#1e40af";
     const tableRowBg = "#e0e7ff";
     const tableTextColor = "#1f2937";
-    const priceColWidth = 80;
+    const priceColWidth = 90;
     const nameColWidth = contentWidth - priceColWidth;
     
     // Helper para agregar fila de tabla compacta
     const addTableRow = (name: string, price: string) => {
-      const rowHeight = 12;
+      const rowHeight = 11;
       const currentY = doc.y;
       
       doc.rect(leftMargin, currentY, contentWidth, rowHeight).fill(tableRowBg);
       
       // Nombre del tour en Helvetica normal
       doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
-      doc.text(name, leftMargin + 3, currentY + 3, { 
+      doc.text(name, leftMargin + 3, currentY + 2.5, { 
         width: nameColWidth - 6,
         continued: false
       });
       
-      // Precio en negrita y un poco más grande
+      // Precio en negrita
       doc.font("Helvetica-Bold").fontSize(8);
-      doc.text(price, leftMargin + nameColWidth, currentY + 3, { 
+      doc.text(price, leftMargin + nameColWidth, currentY + 2.5, { 
         width: priceColWidth - 3,
         align: "right",
         continued: false
@@ -1014,37 +1016,94 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       doc.y = currentY + rowHeight;
     };
 
-    // Tours individuales condensados
+    // Solo tours individuales (sin combos)
     const tours = [
-      { name: "Paseo en Globo (15/Mar-31/Oct 2026)", price: "415 USD" },
-      { name: "Paseo en Globo (01/Nov 2026-14/Mar 2027)", price: "384 USD" },
+      { name: "Paseo en Globo (de 15/Mar 2026 a 31/Oct 2026)", price: "415 USD" },
+      { name: "Paseo en Globo (de 01/Nov 2026 a 14/Mar 2027)", price: "384 USD" },
       { name: "Paseo Bósforo con almuerzo", price: "154 USD" },
       { name: "Paseo Clasico con almuerzo", price: "224 USD" },
-      { name: "Noche Turca Capadócia (solo show)", price: "116 USD" },
-      { name: "Noche Turca Capadócia (cena show)", price: "139 USD" },
-      { name: "Noche Turca İstambul (barco cena)", price: "154 USD" },
-      { name: "6 almuerzos (itinerario, no Estambul)", price: "185 USD" },
+      { name: "Noche Turca en Capadócia (solo show)", price: "116 USD" },
+      { name: "Noche Turca en Capadócia cena show", price: "139 USD" },
+      { name: "Noche Turca en   7F Ö ui (en barco con cena show)", price: "154 USD" },
+      { name: "Erciyes Ski", price: "200 USD" },
+      { name: "Cappa Park", price: "200 USD" },
+      { name: "SkyDinner", price: "324 USD" },
       { name: "Jeep Safari", price: "108 USD" },
-      { name: "Combo 1", price: "1,020 USD" },
-      { name: "Combo 2", price: "660 USD" }
+      { name: "6 almuerzos (en las ciudades del itinerario, menos en Estambul)", price: "185 USD" },
+      { name: "E-SIM (3GB)", price: "31 USD" },
+      { name: "Entrada al Palacio de Topkapi", price: "110 USD" }
     ];
 
     tours.forEach(tour => {
       addTableRow(tour.name, tour.price);
     });
 
-    doc.moveDown(0.5);
+    doc.moveDown(0.3);
 
     // Nota sobre fee bancario compacta
-    doc.fillColor("#dc2626").font("Helvetica-Bold").fontSize(8);
+    doc.fillColor("#dc2626").font("Helvetica-Bold").fontSize(9);
     doc.text("Fee bancario no incluido, 2.5% sobre el total", leftMargin, doc.y, { 
       align: "center", 
       width: contentWidth 
     });
 
-    doc.moveDown(1.5);
+    doc.moveDown(1);
 
-    console.log('[PDF Generator] Turkey optional tours table added successfully (compact version)');
+    // COMBO 1 - Sección separada con header azul
+    const combo1HeaderY = doc.y;
+    doc.rect(leftMargin, combo1HeaderY, contentWidth, 20).fill("#1e40af");
+    doc.y = combo1HeaderY + 20 + 3;
+
+    // Contenido del Combo 1
+    const combo1ContentHeight = 50;
+    doc.rect(leftMargin, doc.y, contentWidth, combo1ContentHeight).fill(tableRowBg);
+    
+    // Texto del combo 1
+    const combo1TextX = leftMargin + 5;
+    const combo1TextY = doc.y + 3;
+    doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
+    doc.text("PASEO EN GLOBO", combo1TextX, combo1TextY, { continued: false });
+    doc.text("BÓSFORO con almuerzo", combo1TextX, combo1TextY + 10, { continued: false });
+    doc.text("CLASICO con almuerzo", combo1TextX, combo1TextY + 20, { continued: false });
+    doc.text("NOCHE TURCA Capadocia sin cena", combo1TextX, combo1TextY + 30, { continued: false });
+    doc.text("JEEP SAFARI - Sujeto al clima", combo1TextX, combo1TextY + 40, { continued: false });
+    
+    // Precio del Combo 1
+    const combo1PriceX = leftMargin + contentWidth - 100;
+    const combo1PriceY = combo1TextY + 15;
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
+    doc.rect(combo1PriceX, combo1PriceY, 95, 25).fill("#1e40af");
+    doc.text("1,020 USD", combo1PriceX, combo1PriceY + 5, { width: 95, align: "center" });
+    
+    doc.y = doc.y + combo1ContentHeight + 5;
+
+    // COMBO 2 - Sección separada con header azul
+    const combo2HeaderY = doc.y;
+    doc.rect(leftMargin, combo2HeaderY, contentWidth, 20).fill("#1e40af");
+    doc.y = combo2HeaderY + 20 + 3;
+
+    // Contenido del Combo 2
+    const combo2ContentHeight = 30;
+    doc.rect(leftMargin, doc.y, contentWidth, combo2ContentHeight).fill(tableRowBg);
+    
+    // Texto del combo 2
+    const combo2TextX = leftMargin + 5;
+    const combo2TextY = doc.y + 3;
+    doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
+    doc.text("PASEO EN GLOBO", combo2TextX, combo2TextY, { continued: false });
+    doc.text("NOCHE TURCA Capadocia sin cena", combo2TextX, combo2TextY + 10, { continued: false });
+    doc.text("JEEP SAFARI - Sujeto al clima", combo2TextX, combo2TextY + 20, { continued: false });
+    
+    // Precio del Combo 2
+    const combo2PriceX = leftMargin + contentWidth - 100;
+    const combo2PriceY = combo2TextY + 5;
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
+    doc.rect(combo2PriceX, combo2PriceY, 95, 25).fill("#1e40af");
+    doc.text("660 USD", combo2PriceX, combo2PriceY + 5, { width: 95, align: "center" });
+    
+    doc.y = doc.y + combo2ContentHeight + 10;
+
+    console.log('[PDF Generator] Turkey optional tours table added successfully (compact version with combos)');
   }
 
   // PÁGINAS DE POLÍTICAS Y DÍAS FESTIVOS - Solo para Turquía Esencial

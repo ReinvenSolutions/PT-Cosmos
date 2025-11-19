@@ -45,13 +45,13 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
   - **Medical Assistance & Optional Tours Page**: All PDFs include a combined final page with title "ASISTENCIA MEDICA PARA TU VIAJE"
     - **Page Structure**:
       1. **Medical Assistance Image**: Displayed first (180px height for Turkey, 400px for others)
-      2. **Turkey Optional Tours Table** (when applicable, displayed below image):
-         - 9 individual tour options with prices (Balloon rides, Bosphorus, Turkish nights, lunches, jeep safari)
-         - Combo 1: 1,020 USD (separate row)
-         - Combo 2: 660 USD (separate row)
+      2. **Turkey Optional Tours Section** (when applicable, displayed below image):
+         - **Main Table**: Blue header "TOUR OPCIONALES" (#1e40af) with 14 individual tour options
+         - **Combo 1 Section**: Separate blue-header box listing included tours with **1,020 USD** price (bold, 18pt)
+         - **Combo 2 Section**: Separate blue-header box listing included tours with **660 USD** price (bold, 18pt)
          - Banking fee notice in red text: "Fee bancario no incluido, 2.5% sobre el total"
-         - Compact styling with 12px row height, tour names in 7pt font, prices in bold 8pt font
-         - Blue headers (#1e40af), light blue rows (#e0e7ff)
+         - Compact styling with 11px row height, tour names 7pt font, prices bold 8pt font
+         - Light blue row backgrounds (#e0e7ff), blue borders (#3b82f6)
     - Detection is based on destination country or name containing "turqu" or "turkey" (case-insensitive)
   - **Turquía Esencial Policies & Holidays**: For "Turquía Esencial" packages specifically, a single consolidated page includes:
     - **Policies & Conditions Section**: Comprehensive terms covering cancellations, tips, services, baggage, hotels, excursions, WiFi, balloon rides, and transfers
