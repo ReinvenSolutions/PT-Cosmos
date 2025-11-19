@@ -14,6 +14,7 @@ import { isTuesday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { isTurkeyHoliday, getTurkeyHolidayDescription } from "@/lib/turkey-holidays";
 
 interface DestinationDetail {
   destination: Destination;
@@ -68,6 +69,7 @@ export default function Home() {
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
   
   const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
+  const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   
   const turkeyDestinations = selectedDests.filter((d) => d.requiresTuesday);
   const otherDestinations = selectedDests.filter((d) => !d.requiresTuesday);
@@ -108,11 +110,39 @@ export default function Home() {
   const endDate = calculateEndDate();
 
   const disableDates = (date: Date) => {
-    if (hasTurkeyDestinations) {
-      return !isTuesday(date) || date < new Date(new Date().setHours(0, 0, 0, 0));
+    // Disable past dates
+    if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
+      return true;
     }
-    return date < new Date(new Date().setHours(0, 0, 0, 0));
+    
+    // For Turkey Esencial, disable holidays and non-Tuesday dates
+    if (hasTurkeyEsencial) {
+      if (isTurkeyHoliday(date)) {
+        return true;
+      }
+      return !isTuesday(date);
+    }
+    
+    // For other Turkey destinations, only disable non-Tuesday dates
+    if (hasTurkeyDestinations) {
+      return !isTuesday(date);
+    }
+    
+    return false;
   };
+
+  // Validate selected date against Turkey holidays
+  useEffect(() => {
+    if (hasTurkeyEsencial && startDate && isTurkeyHoliday(startDate)) {
+      const description = getTurkeyHolidayDescription(startDate);
+      toast({
+        title: "Fecha no disponible",
+        description: `No se puede seleccionar esta fecha porque es festivo en Turquía: ${description}`,
+        variant: "destructive",
+      });
+      setStartDate(undefined);
+    }
+  }, [startDate, hasTurkeyEsencial, toast]);
 
   const getHotelStars = (destId: string): number => {
     const details = destinationDetails[destId];
