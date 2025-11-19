@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Upload, X, Save } from "lucide-react";
+import { ArrowLeft, Upload, X, Save, Star } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +49,7 @@ interface Quote {
   outboundHoldBaggage: boolean | null;
   returnCabinBaggage: boolean | null;
   returnHoldBaggage: boolean | null;
+  turkeyUpgrade: string | null;
   status: string;
   client: Client;
   destinations: QuoteDestination[];
@@ -73,6 +74,7 @@ export default function QuoteEdit() {
   const [outboundHoldBaggage, setOutboundHoldBaggage] = useState(false);
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
+  const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
 
   const { data: quote, isLoading } = useQuery<Quote>({
     queryKey: ["/api/quotes", quoteId],
@@ -110,6 +112,7 @@ export default function QuoteEdit() {
       setOutboundHoldBaggage(quote.outboundHoldBaggage ?? false);
       setReturnCabinBaggage(quote.returnCabinBaggage ?? false);
       setReturnHoldBaggage(quote.returnHoldBaggage ?? false);
+      setTurkeyUpgrade(quote.turkeyUpgrade || "");
     }
   }, [quote]);
 
@@ -228,6 +231,16 @@ export default function QuoteEdit() {
     }
   };
 
+  const hasTurkeyEsencial = quote?.destinations.some(qd => qd.destination.name === "Turquía Esencial") || false;
+
+  const getTurkeyUpgradeCost = () => {
+    if (!turkeyUpgrade) return 0;
+    if (turkeyUpgrade === "option1") return 500;
+    if (turkeyUpgrade === "option2") return 770;
+    if (turkeyUpgrade === "option3") return 1100;
+    return 0;
+  };
+
   const handleSave = () => {
     if (!clientId || !totalPrice) {
       toast({
@@ -252,6 +265,7 @@ export default function QuoteEdit() {
       outboundHoldBaggage,
       returnCabinBaggage,
       returnHoldBaggage,
+      turkeyUpgrade: turkeyUpgrade || null,
       destinations: quote.destinations.map(qd => ({
         destinationId: qd.destinationId,
         startDate: qd.startDate.split("T")[0],
@@ -361,6 +375,75 @@ export default function QuoteEdit() {
                   />
                 </CardContent>
               </Card>
+
+              {hasTurkeyEsencial && (
+                <Card className="border-orange-200">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-orange-600">
+                      <Star className="w-5 h-5" />
+                      Mejora tu Plan Turquía Esencial
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Selecciona una opción para mejorar tu experiencia en Turquía:
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                        <Checkbox
+                          id="upgrade-option1"
+                          checked={turkeyUpgrade === "option1"}
+                          onCheckedChange={(checked) => setTurkeyUpgrade(checked ? "option1" : "")}
+                          data-testid="checkbox-upgrade-option1"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="upgrade-option1" className="font-semibold cursor-pointer">
+                            + 500 USD
+                          </label>
+                          <p className="text-sm text-gray-600">8 almuerzos + 2 actividades Estambul</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                        <Checkbox
+                          id="upgrade-option2"
+                          checked={turkeyUpgrade === "option2"}
+                          onCheckedChange={(checked) => setTurkeyUpgrade(checked ? "option2" : "")}
+                          data-testid="checkbox-upgrade-option2"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="upgrade-option2" className="font-semibold cursor-pointer">
+                            + 770 USD
+                          </label>
+                          <p className="text-sm text-gray-600">Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                        <Checkbox
+                          id="upgrade-option3"
+                          checked={turkeyUpgrade === "option3"}
+                          onCheckedChange={(checked) => setTurkeyUpgrade(checked ? "option3" : "")}
+                          data-testid="checkbox-upgrade-option3"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="upgrade-option3" className="font-semibold cursor-pointer">
+                            + 1,100 USD
+                          </label>
+                          <p className="text-sm text-gray-600">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul</p>
+                        </div>
+                      </div>
+                    </div>
+                    {turkeyUpgrade && (
+                      <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <p className="text-sm font-semibold text-orange-700">
+                          Mejora seleccionada: +US$ {formatUSD(getTurkeyUpgradeCost())}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardHeader>
