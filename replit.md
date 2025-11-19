@@ -51,6 +51,11 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
     - **Banking Fee Notice**: Prominently displays "Fee bancario no incluido, 2.5% sobre el total" in red text
     - Detection is based on destination country or name containing "turqu" or "turkey" (case-insensitive)
     - Tables use professional styling with blue headers (#1e40af), light blue rows (#e0e7ff), and proper alignment for readability
+  - **Turquía Esencial Policies & Holidays Pages**: For "Turquía Esencial" packages specifically, two additional pages are included after the optional tours:
+    - **Policies & Conditions Page**: Comprehensive terms and conditions covering cancellations, tips, services, baggage, hotels, excursions, WiFi, balloon rides, and transfers
+    - **2026 Holidays Page**: Table of Turkish national and religious holidays with impact on services and bazaar closures
+    - These pages only appear for the "Turquía Esencial" plan, not for other Turkey destinations
+    - Content is formatted with clear section headings and justified text for professional appearance
   - **PDF Branding Elements**: 
     - **Special Offer Banner**: Diagonal golden "OFERTA ESPECIAL" banner positioned in the top-right corner of the first page only (image stored in `server/assets/special-offer-banner.png`)
     - **Plane Logo**: Blue airplane icon with trail appears in two locations:

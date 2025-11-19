@@ -885,6 +885,12 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
            name.includes("turqu") || name.includes("turkey");
   });
 
+  // Detectar específicamente si incluye "Turquía Esencial"
+  const hasTurkeyEsencial = data.destinations.some((dest) => {
+    const name = normalizeText(dest.name || "");
+    return name.includes("turquia esencial") || name.includes("turkey esencial");
+  });
+
   // PÁGINA DE ASISTENCIA MÉDICA - Siempre incluida al final
   doc.addPage();
   addPageBackground();
@@ -1115,6 +1121,202 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.rect(leftMargin + contentWidth - 100, combo2PriceY, 100, 14 * combo2Items.length).stroke("#3b82f6");
 
     console.log('[PDF Generator] Turkey optional tours table added successfully');
+  }
+
+  // PÁGINAS DE POLÍTICAS Y DÍAS FESTIVOS - Solo para Turquía Esencial
+  if (hasTurkeyEsencial) {
+    // PÁGINA DE POLÍTICAS Y CONDICIONES
+    doc.addPage();
+    addPageBackground();
+    addPlaneLogoBottom();
+    doc.y = topMargin;
+
+    // Función auxiliar para agregar secciones de políticas
+    const addPolicySection = (title: string, content: string[]) => {
+      // Verificar si hay espacio para el título y al menos 2 líneas de contenido
+      if (doc.y > 680) {
+        doc.addPage();
+        addPageBackground();
+        addPlaneLogoBottom();
+        doc.y = topMargin;
+      }
+
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(primaryColor);
+      doc.text(title, leftMargin, doc.y);
+      doc.moveDown(0.3);
+
+      doc.font("Helvetica").fontSize(7).fillColor(textColor);
+      content.forEach(line => {
+        if (doc.y > 750) {
+          doc.addPage();
+          addPageBackground();
+          addPlaneLogoBottom();
+          doc.y = topMargin;
+        }
+        doc.text(line, leftMargin, doc.y, { width: contentWidth, align: "justify" });
+        doc.moveDown(0.4);
+      });
+      doc.moveDown(0.5);
+    };
+
+    // Políticas de cancelación
+    addPolicySection("CANCELACIONES DE SERVICIOS:", [
+      "Para particulares (Excepto vuelos ya emitidos que se cobrarán 100%)",
+      "• Hasta 30 días antes de la llegada, sin gastos de cancelación.",
+      "• Entre 29-11 días se cobra 50%. (Excepto vuelos ya emitidos que se cobrarán 100%)",
+      "• Entre 10 a 1 días antes de la llegada, se cobrará el 100% de gastos de cancelación.",
+      "Todas las políticas de cancelación se confirmarán junto con la confirmación del viaje. Grupos consultar."
+    ]);
+
+    // Propinas
+    addPolicySection("PROPINAS:", [
+      "En los restaurantes las propinas y bebidas no están incluidas (se sugiere un 10% en la factura consultar ya que en algunos casos el restaurante puede ya tenerlo incluido). Al finalizar los tours o circuitos se suele dar una propina al guía y al conductor. Se sugiere 5 USD por día por persona, que para ellos es obligatorio."
+    ]);
+
+    // Servicios
+    addPolicySection("SERVICIOS:", [
+      "El orden del itinerario, puede sufrir modificaciones sin previo aviso, según la disponibilidad del guía y sucesos que surjan por fuerza mayor en destino, para mejorar el rendimiento del circuito, como así también el orden de las excursiones y visitas también pueden ser modificadas por casos ajenos al guía y a Dorak."
+    ]);
+
+    // Equipaje
+    addPolicySection("EQUIPAJE:", [
+      "En el tour se permite una maleta de 23 kg y un equipaje de mano de 8 kg + bolsos de viaje. No hay disponibilidad para más equipaje. Lo mismo para los billetes aéreos internos/nacionales, que son estándar con maleta de 15 kg más equipaje de mano. Para aumentar los kilogramos de la maleta facturable consultar presupuesto."
+    ]);
+
+    // Hotelería
+    addPolicySection("HOTELERÍA:", [
+      "Pueden ser similares a los previstos, no sólo los mencionados en este circuito. Las categorías de hoteles que recomendamos corresponden a la clasificación oficial del Ministerio de Turismo de Turquía. En la mayoría de los hoteles las habitaciones triples suelen ser habitaciones dobles con cama supletoria (sofá cama o roll away)."
+    ]);
+
+    // Ubicación de hoteles
+    addPolicySection("UBICACIÓN DE HOTELES EN ESTAMBUL:", [
+      "Al escoger los hoteles para la estancia del pasajero deben tener en cuenta la ubicación de estos. En Estambul, los hoteles situados en la parte antigua tienen la ventaja de encontrarse más cerca a los museos y monumentos, pero por la noche, en esta zona tiene menos diversidad en cuanto a restaurantes y vida nocturna. Si el pasajero decide alojarse en la parte nueva (centro) (donde también se encuentran la mayoría de los hoteles de 5*), encontrará una gran variedad de tiendas modernas, restaurantes, bares y discotecas."
+    ]);
+
+    // Comidas
+    addPolicySection("COMIDAS EN LOS HOTELES:", [
+      "La media pensión en los hoteles suele consistir en un desayuno buffet y una cena servida en el restaurante principal del hotel. La media pensión es estándar durante el periodo del tour en Anatolia. En Estambul es sólo con desayuno (a menos que se solicite pagando un suplemento)."
+    ]);
+
+    // Excursiones
+    addPolicySection("EXCURSIONES O VISITAS:", [
+      "En caso de retraso por parte de algún pasajero y no puede hacer o perdió la excursión, no se devuelve el dinero ni se compensa por otra excursión. Solicitamos respetar el horario indicado por el guía en cada excursión cuando den minutos libres en alguna visita, caso contrario que el pasajero no se presente, el guía deberá seguir con el recorrido del circuito, de esta manera el pasajero deberá volver por sus propios medios. Las excursiones al aire libre, siempre estarán sujetas al clima."
+    ]);
+
+    // WiFi
+    addPolicySection("WIFI EN OMNIBUS:", [
+      "El wifi provisto en el autobús durante todo el viaje está restringido por antenas de carretera e inconsistente debido a la cantidad de pasajeros que usan la misma red, por lo que es mejor usarlo solo para mensajes de WhatsApp o contenido que no requiera altos datos de red."
+    ]);
+
+    // Globo
+    addPolicySection("GLOBO:", [
+      "En Capadocia el globo está sujeto a cambios y disponibilidad y cada grupo tiene su reserva el primer día después de llegar a la ciudad. En caso de cancelación por condiciones climáticas, las reservas para los días siguientes estarán sujetas a disponibilidad. Si el vuelo en globo no tiene lugar en Capadocia, existe una segunda oportunidad en la ciudad de Pamukkale. Paseo en Globo, solo se devuelve el dinero si no se realiza por cuestiones climáticas tanto en Capadoccia como en Pamukkale. Si el pasajero tiene la posibilidad de realizar el paseo en globo en Pamukkale y el mismo no desea, no se devolverá el dinero."
+    ]);
+
+    // Excursiones (segunda parte)
+    addPolicySection("EXCURSIONES:", [
+      "Las opciones de excursiones ofrecidas por Dorak Latin son exclusivas para compras con Dorak, no estando permitida la compra de las mismas opciones con otros proveedores. Una vez reservado el programa el cliente acepta las condiciones indicadas."
+    ]);
+
+    // Traslados
+    addPolicySection("TRASLADOS DE LLEGADA Y SALIDAS:", [
+      "No se permite el ingreso de guías y transportistas al aeropuerto. Te estaremos esperando en la salida de la puerta 8 con el cartel de Dorak Latin. Desde el aterrizaje del vuelo tendrás que esperar 2 horas. Recuerde que este es un servicio regular. Le pedimos que se dirija a la salida lo antes posible. El transferista dará las primeras informaciones sobre (dinero, cambio, posibilidad de excursiones, etc) aclarando todas las dudas turísticas que uno podrá tener.",
+      "Le solicitamos respetar el tiempo indicado por el guía en cada tour cuando permite tiempo libre en una visita, de lo contrario el pasajero no se presenta, el guía deberá continuar con la ruta del circuito, por lo que el pasajero deberá regresar por su cuenta. Le pedimos que guarde el número de teléfono de guardia antes de salir de su destino, en caso de que tenga algún inconveniente en el aeropuerto de Estambul y no pueda salir a tiempo.",
+      "En caso de cambios en los horarios de los vuelos, es estrictamente necesario notificar el cambio al menos 48 horas antes de la realización del servicio de traslado.",
+      "Dato de importancia - en el aeropuerto tienen una hora gratis de wifi, recomendamos no se conecten enseguida, sino esperar un poco más de una hora, para no quedarse sin conexión y puedan comunicarse con nuestro equipo, en caso de inconvenientes, como retraso de valija, detención en aduana, etc, solo emergencias.",
+      "Para el traslado de salida, dejaremos el día anterior el horario de Pick up. También solicitamos puntualidad, para no retrasar la recolección de pasajeros y llegar a tiempo para el embarque, evitemos pérdidas de vuelos.",
+      "Horarios del circuito, deben ser comunicado por el guía, en caso de no haber escuchado o que el guía no lo comentó, por favor consultarle antes de que el guía los deje en el hotel y se retire ese día, de esta manera evitaremos problemas en destino sobre los horarios de los servicios del día siguiente y evitamos la diferencia horaria entre países."
+    ]);
+
+    console.log('[PDF Generator] Turkey policies page added successfully');
+
+    // PÁGINA DE DÍAS FESTIVOS 2026
+    doc.addPage();
+    addPageBackground();
+    addPlaneLogoBottom();
+    doc.y = topMargin;
+
+    // Título de días festivos
+    doc.font("Helvetica-Bold").fontSize(14).fillColor(primaryColor);
+    doc.text("DÍAS FESTIVOS 2026 - TURQUÍA", leftMargin, doc.y, { align: "center", width: contentWidth });
+    doc.moveDown(2);
+
+    // Lista de días festivos
+    const holidays = [
+      {
+        date: "Enero",
+        description: "Feriado de año nuevo. Los bazares están cerrados."
+      },
+      {
+        date: "30 marzo",
+        description: "1º día del feriado religioso, no se harán visitas (bazares y algunos museos cerrados)."
+      },
+      {
+        date: "31 marzo - 01 abril",
+        description: "Feriado religioso, se realizan visitas pero el gran bazar y bazar de las especias se encuentran cerrados."
+      },
+      {
+        date: "23 de abril",
+        description: "Feriado nacional, puede haber cambios en el orden de las visitas. Los bazares están cerrados."
+      },
+      {
+        date: "01 de mayo",
+        description: "Feriado nacional. Los bazares están cerrados."
+      },
+      {
+        date: "06 de mayo",
+        description: "Feriado nacional, solo puede haber cambios en el orden de las visitas. Los bazares están cerrados."
+      },
+      {
+        date: "06 junio",
+        description: "1º día del feriado religioso, no se harán visitas (bazares y algunos museos cerrados)."
+      },
+      {
+        date: "15 julio",
+        description: "Feriado nacional, puede haber cambios en el orden de las visitas. Los bazares están cerrados."
+      },
+      {
+        date: "30 agosto",
+        description: "Feriado nacional, solo puede haber cambios en el orden de las visitas. Los bazares están cerrados."
+      }
+    ];
+
+    doc.font("Helvetica").fontSize(8).fillColor(textColor);
+    
+    holidays.forEach((holiday, index) => {
+      if (doc.y > 720) {
+        doc.addPage();
+        addPageBackground();
+        addPlaneLogoBottom();
+        doc.y = topMargin;
+      }
+
+      const rowY = doc.y;
+      const rowHeight = 25;
+
+      // Fondo alternado para filas
+      if (index % 2 === 0) {
+        doc.rect(leftMargin, rowY, contentWidth, rowHeight).fill("#e0e7ff");
+      }
+
+      // Fecha en negrita
+      doc.fillColor(primaryColor).font("Helvetica-Bold").fontSize(8);
+      doc.text(holiday.date, leftMargin + 5, rowY + 5, { width: 120 });
+
+      // Descripción
+      doc.fillColor(textColor).font("Helvetica").fontSize(7);
+      doc.text(holiday.description, leftMargin + 130, rowY + 5, { 
+        width: contentWidth - 135,
+        align: "left"
+      });
+
+      // Borde de la fila
+      doc.rect(leftMargin, rowY, contentWidth, rowHeight).stroke("#3b82f6");
+
+      doc.y = rowY + rowHeight;
+    });
+
+    console.log('[PDF Generator] Turkey holidays page added successfully');
   }
 
   return doc;
