@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Destination, formatUSD, formatDate } from "@shared/schema";
@@ -47,6 +47,8 @@ export default function QuoteSummary() {
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isPDFComplete, setIsPDFComplete] = useState(false);
+  const pdfCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -89,6 +91,15 @@ export default function QuoteSummary() {
       setLocation("/");
     }
   }, [setLocation]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pdfCompletionTimeoutRef.current) {
+        clearTimeout(pdfCompletionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
 
@@ -282,7 +293,17 @@ export default function QuoteSummary() {
   };
 
   const handleExportPDF = async () => {
+    // Prevent concurrent PDF generation
+    if (isGeneratingPDF) return;
+
+    // Clear any existing completion timeout
+    if (pdfCompletionTimeoutRef.current) {
+      clearTimeout(pdfCompletionTimeoutRef.current);
+      pdfCompletionTimeoutRef.current = null;
+    }
+
     setIsGeneratingPDF(true);
+    setIsPDFComplete(false);
     
     try {
       const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
@@ -335,6 +356,21 @@ export default function QuoteSummary() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
+      // Mark PDF as complete and show completion state
+      setIsPDFComplete(true);
+      
+      // Clear any existing timeout (defensive - should already be cleared)
+      if (pdfCompletionTimeoutRef.current) {
+        clearTimeout(pdfCompletionTimeoutRef.current);
+      }
+      
+      // Keep modal open for 1.5s to show completion state, then close
+      pdfCompletionTimeoutRef.current = setTimeout(() => {
+        setIsGeneratingPDF(false);
+        setIsPDFComplete(false);
+        pdfCompletionTimeoutRef.current = null;
+      }, 1500);
+      
       toast({
         title: "PDF generado",
         description: "Tu cotización ha sido descargada exitosamente",
@@ -345,11 +381,8 @@ export default function QuoteSummary() {
         description: "No se pudo generar el PDF. Intenta nuevamente.",
         variant: "destructive",
       });
-    } finally {
-      // Add a small delay to ensure user sees the completion animation
-      setTimeout(() => {
-        setIsGeneratingPDF(false);
-      }, 500);
+      setIsGeneratingPDF(false);
+      setIsPDFComplete(false);
     }
   };
 
@@ -845,10 +878,11 @@ export default function QuoteSummary() {
             variant="outline"
             className="w-full border-blue-600 text-blue-600 hover:bg-blue-50"
             onClick={handleExportPDF}
+            disabled={isGeneratingPDF}
             data-testid="button-export-pdf"
           >
             <FileText className="w-5 h-5 mr-2" />
-            Exportar PDF
+            {isGeneratingPDF ? "Generando..." : "Exportar PDF"}
           </Button>
           
           <Button
@@ -931,7 +965,7 @@ export default function QuoteSummary() {
         </Dialog>
 
         {/* PDF Loading Modal */}
-        <PDFLoadingModal isOpen={isGeneratingPDF} />
+        <PDFLoadingModal isOpen={isGeneratingPDF} isComplete={isPDFComplete} />
             </div>
           </main>
         </div>
