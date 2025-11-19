@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save } from "lucide-react";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +44,7 @@ export default function QuoteSummary() {
   const [outboundHoldBaggage, setOutboundHoldBaggage] = useState(false);
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
+  const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -90,6 +91,7 @@ export default function QuoteSummary() {
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
 
   const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
+  const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
 
   const calculateEndDate = (): string => {
     if (!startDate || selectedDests.length === 0) return "";
@@ -120,7 +122,17 @@ export default function QuoteSummary() {
   
   const landPortionTotal = landPortionPerPerson * passengers;
   const flightsAndExtrasValue = flightsAndExtras ? parseFloat(flightsAndExtras) : 0;
-  const grandTotal = landPortionTotal + flightsAndExtrasValue;
+  
+  const getTurkeyUpgradeCost = () => {
+    if (!turkeyUpgrade) return 0;
+    if (turkeyUpgrade === "option1") return 500;
+    if (turkeyUpgrade === "option2") return 770;
+    if (turkeyUpgrade === "option3") return 1100;
+    return 0;
+  };
+  
+  const turkeyUpgradeCost = getTurkeyUpgradeCost();
+  const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost;
 
   const handleOutboundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -255,6 +267,7 @@ export default function QuoteSummary() {
       outboundHoldBaggage,
       returnCabinBaggage,
       returnHoldBaggage,
+      turkeyUpgrade: turkeyUpgrade || null,
       destinations: selectedDests.map((dest) => ({
         destinationId: dest.id,
         startDate: new Date(startDate).toISOString().split("T")[0],
@@ -485,6 +498,75 @@ export default function QuoteSummary() {
             </div>
           </CardContent>
         </Card>
+
+        {hasTurkeyEsencial && (
+          <Card className="mb-6 border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-600">
+                <Star className="w-5 h-5" />
+                Mejora tu Plan Turquía Esencial
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Selecciona una opción para mejorar tu experiencia en Turquía:
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                  <Checkbox
+                    id="upgrade-option1"
+                    checked={turkeyUpgrade === "option1"}
+                    onCheckedChange={(checked) => setTurkeyUpgrade(checked ? "option1" : "")}
+                    data-testid="checkbox-upgrade-option1"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="upgrade-option1" className="font-semibold cursor-pointer">
+                      + 500 USD
+                    </label>
+                    <p className="text-sm text-gray-600">8 almuerzos + 2 actividades Estambul</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                  <Checkbox
+                    id="upgrade-option2"
+                    checked={turkeyUpgrade === "option2"}
+                    onCheckedChange={(checked) => setTurkeyUpgrade(checked ? "option2" : "")}
+                    data-testid="checkbox-upgrade-option2"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="upgrade-option2" className="font-semibold cursor-pointer">
+                      + 770 USD
+                    </label>
+                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                  <Checkbox
+                    id="upgrade-option3"
+                    checked={turkeyUpgrade === "option3"}
+                    onCheckedChange={(checked) => setTurkeyUpgrade(checked ? "option3" : "")}
+                    data-testid="checkbox-upgrade-option3"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="upgrade-option3" className="font-semibold cursor-pointer">
+                      + 1,100 USD
+                    </label>
+                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul</p>
+                  </div>
+                </div>
+              </div>
+              {turkeyUpgrade && (
+                <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                  <p className="text-sm font-semibold text-orange-700">
+                    Mejora seleccionada: +US$ {formatUSD(turkeyUpgradeCost)}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="mb-6">
           <CardHeader>
@@ -738,6 +820,9 @@ export default function QuoteSummary() {
               </div>
               <div className="text-right text-sm opacity-90">
                 <div>Porciones Terrestres: US$ {formatUSD(landPortionTotal)}</div>
+                {turkeyUpgradeCost > 0 && (
+                  <div>Mejora Turquía: US$ {formatUSD(turkeyUpgradeCost)}</div>
+                )}
                 <div>Vuelos y Extras: US$ {formatUSD(flightsAndExtrasValue)}</div>
               </div>
             </div>
