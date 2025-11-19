@@ -25,7 +25,7 @@ The frontend uses React, Wouter, and TanStack Query, styled with Tailwind CSS an
         - All PDFs include a "ASISTENCIA MEDICA PARA TU VIAJE" page with medical assistance imagery.
         - For Turkey destinations, this page also includes "TOUR OPCIONALES" tables, Combo packages, and a banking fee notice.
         - "Turquía Esencial" plans specifically include a consolidated page with comprehensive policies/conditions and 2026 Turkish national/religious holidays, impacting booking availability (dates disabled in picker with toast notifications).
-        - "Turquía Esencial" offers three exclusive upgrade packages that adjust the total cost.
+        - "Turquía Esencial" offers three exclusive upgrade packages ($500, $770, $1,100 USD) that adjust the total cost. The upgrade section displays immediately after the detailed itinerary in a blue highlighted box, showing either available upgrade options or the selected upgrade details.
     - **PDF Branding**: Includes a diagonal "OFERTA ESPECIAL" banner, a blue airplane logo (in header and page footers), and an "RNT No.240799" for regulatory compliance.
     - **Destination Catalog**: Only `isActive=true` destinations are displayed. Currently active include 7 Colombian destinations and "Turquía Esencial" (10 days, 9 nights, $710 USD land portion). The "Turquía Esencial" plan has specific image sets, a detailed itinerary, inclusions/exclusions, hotel options, a route map, and a tooltip.
     - **Turkey Hotel Options**: The Turquía Esencial plan features 12 premium hotels distributed across 4 locations:
