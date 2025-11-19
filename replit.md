@@ -42,20 +42,18 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
   - **Flight Sections**: Both public (`/cotizacion`) and advisor edit pages include flight upload sections with customizable baggage options
   - **Baggage Customization**: Users can select "Equipaje de cabina 10kg" and "Equipaje de bodega 23kg" independently for outbound and return flights (Personal 8kg is always included)
   - **Conditional PDF Generation**: If no flight images are uploaded AND no baggage checkboxes are selected, the PDF generates as land-only (no flight pages). If any flight data exists (images OR baggage selections), flight pages are included in the PDF with dynamic baggage text
-  - **Medical Assistance Page**: All PDFs automatically include a final page with title "ASISTENCIA MEDICA PARA TU VIAJE" and medical assistance coverage details (image stored in `server/assets/medical-assistance.png`)
-  - **Turkey Optional Activities**: When a quotation includes Turkey/Turquía destinations, a dedicated page with professionally formatted tables displays optional tour packages:
-    - **Individual Tours Table**: Lists 14 optional activities with prices (Balloon rides, Bosphorus tour, Turkish night shows, ski, jeep safari, lunch packages, e-SIM, museum entries)
-    - **Combo Packages**: Two pre-packaged deals with discounted pricing:
-      - Combo 1 (969 USD): Includes balloon ride, Bosphorus lunch tour, classic tour with lunch, Turkish night in Cappadocia, and jeep safari
-      - Combo 2 (606 USD): Includes balloon ride, Turkish night in Cappadocia, and jeep safari
-    - **Banking Fee Notice**: Prominently displays "Fee bancario no incluido, 2.5% sobre el total" in red text
+  - **Medical Assistance & Optional Tours Page**: All PDFs include a combined final page with title "ASISTENCIA MEDICA PARA TU VIAJE"
+    - **Turkey Optional Tours** (when applicable): Compact table displayed above medical assistance image showing:
+      - 10 condensed tour options with prices (Balloon rides, Bosphorus, Turkish nights, lunches, jeep safari)
+      - Combo packages displayed as single row: "Combos: Combo 1 / Combo 2" (969 / 606 USD)
+      - Banking fee notice in red text: "Fee bancario no incluido, 2.5% sobre el total"
+      - Compact styling with 12px row height, 7pt font size, blue headers (#1e40af), light blue rows (#e0e7ff)
+    - **Medical Assistance Image**: Displayed below tours (180px height when tours present, 400px when no tours)
     - Detection is based on destination country or name containing "turqu" or "turkey" (case-insensitive)
-    - Tables use professional styling with blue headers (#1e40af), light blue rows (#e0e7ff), and proper alignment for readability
-  - **Turquía Esencial Policies & Holidays Pages**: For "Turquía Esencial" packages specifically, two additional pages are included after the optional tours:
-    - **Policies & Conditions Page**: Comprehensive terms and conditions covering cancellations, tips, services, baggage, hotels, excursions, WiFi, balloon rides, and transfers
-    - **2026 Holidays Page**: Table of Turkish national and religious holidays with impact on services and bazaar closures
-    - These pages only appear for the "Turquía Esencial" plan, not for other Turkey destinations
-    - Content is formatted with clear section headings and justified text for professional appearance
+  - **Turquía Esencial Policies & Holidays**: For "Turquía Esencial" packages specifically, a single consolidated page includes:
+    - **Policies & Conditions Section**: Comprehensive terms covering cancellations, tips, services, baggage, hotels, excursions, WiFi, balloon rides, and transfers
+    - **2026 Holidays Section**: Continues on same page (no page break) with table of Turkish national and religious holidays with impact on services and bazaar closures
+    - Only appears for "Turquía Esencial" plan, formatted with clear section headings and justified text for professional appearance
   - **PDF Branding Elements**: 
     - **Special Offer Banner**: Diagonal golden "OFERTA ESPECIAL" banner positioned in the top-right corner of the first page only (image stored in `server/assets/special-offer-banner.png`)
     - **Plane Logo**: Blue airplane icon with trail appears in two locations:
