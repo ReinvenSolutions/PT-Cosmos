@@ -1,0 +1,48 @@
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[Upload] Using Replit Object Storage
+5:41:27 PM [express] serving on port 5000
+Browserslist: browsers data (caniuse-lite) is 13 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+5:41:32 PM [express] GET /api/auth/me 401 in 2ms :: {"message":"No autenticado"}
+5:41:34 PM [express] GET /api/auth/me 304 in 24ms :: {"user":{"id":"9dd1eabb-6ddb-4b13-accd-d3f9ee74…
+5:41:34 PM [express] GET /api/destinations 304 in 50ms :: [{"id":"c024eeaa-4d65-4307-8a97-048681a090…
+5:41:34 PM [express] GET /api/destinations/c024eeaa-4d65-4307-8a97-048681a090f2 304 in 140ms :: {"id…
+5:41:35 PM [express] GET /api/destinations/a0edb8c2-7e77-444e-8221-2501fe87f338 304 in 141ms :: {"id…
+5:41:35 PM [express] GET /api/destinations/ba24d18c-c63c-4b80-a5e0-6b47a6484313 304 in 139ms :: {"id…
+5:41:35 PM [express] GET /api/destinations/5df7975b-cdc3-4c7d-b6c4-09ea2a2bf2a7 304 in 140ms :: {"id…
+5:41:35 PM [express] GET /api/destinations/094a5ae7-416e-477a-85f7-6c3d02417bab 304 in 137ms :: {"id…
+5:41:36 PM [express] GET /api/destinations/9c80b7c9-5040-45db-8c83-c9476adb3052 304 in 145ms :: {"id…
+5:41:36 PM [express] GET /api/destinations/49b95345-1239-4687-83e2-fa735553ca5d 304 in 137ms :: {"id…
+5:41:36 PM [express] GET /api/destinations/f1f209b8-cbd7-4f3c-8e3d-143ef65b292c 304 in 137ms :: {"id…
+5:41:46 PM [express] POST /api/auth/login 401 in 24ms :: {"message":"Usuario o contraseña incorrecto…
+5:41:51 PM [express] GET /api/admin/clients 304 in 51ms :: [{"id":"2c9b1dbd-5a02-49a1-b85f-daf53e56e…
+[PDF Generator] Special offer banner added successfully
+[PDF Generator] Plane logo added to first page after title
+[PDF Generator] Plane logo added to bottom-left corner
+Error generating PDF: ReferenceError: __dirname is not defined
+    at generatePublicQuotePDF (/home/runner/workspace/server/publicPdfGenerator.ts:492:37)
+    at <anonymous> (/home/runner/workspace/server/routes.ts:149:28)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+5:41:58 PM [express] POST /api/public/quote-pdf 500 in 680ms :: {"message":"Failed to generate PDF"}
+[PDF Generator] Special offer banner added successfully
+[PDF Generator] Plane logo added to first page after title
+[PDF Generator] Plane logo added to bottom-left corner
+Error generating PDF: ReferenceError: __dirname is not defined
+    at generatePublicQuotePDF (/home/runner/workspace/server/publicPdfGenerator.ts:492:37)
+    at <anonymous> (/home/runner/workspace/server/routes.ts:149:28)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+5:42:07 PM [express] POST /api/public/quote-pdf 500 in 633ms :: {"message":"Failed to generate PDF"}
+5:42:13 PM [express] POST /api/auth/login 401 in 25ms :: {"message":"Usuario o contraseña incorrecto…
+[PDF Generator] Special offer banner added successfully
+[PDF Generator] Plane logo added to first page after title
+[PDF Generator] Plane logo added to bottom-left corner
+Error generating PDF: ReferenceError: __dirname is not defined
+    at generatePublicQuotePDF (/home/runner/workspace/server/publicPdfGenerator.ts:492:37)
+    at <anonymous> (/home/runner/workspace/server/routes.ts:149:28)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+5:42:29 PM [express] POST /api/public/quote-pdf 500 in 762ms :: {"message":"Failed to generate PDF"}

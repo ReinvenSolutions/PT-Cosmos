@@ -489,8 +489,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   // Add Turkey route map for Turkey destinations
   if (isTurkey) {
-    const turkeyMapPath = path.join(__dirname, 'assets', 'turkey-route-map.png');
-    const attachedMapPath = path.join(__dirname, '..', 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png');
+    const turkeyMapPath = path.join(process.cwd(), 'server', 'assets', 'turkey-route-map.png');
+    const attachedMapPath = path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png');
     
     // Try attached_assets first, then server/assets
     const mapPath = fs.existsSync(attachedMapPath) ? attachedMapPath : turkeyMapPath;
