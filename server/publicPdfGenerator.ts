@@ -110,16 +110,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const imagePaths = getDestinationImages(data.destinations);
 
-  // Add Special Offer banner on first page only (top-right corner)
-  // The image is already designed diagonally, so no rotation needed
+  // Add Special Offer banner on first page only (top-right corner) - smaller size
   const specialOfferPath = path.join(process.cwd(), "server", "assets", "special-offer-banner.png");
   
   if (fs.existsSync(specialOfferPath)) {
     try {
-      // Position the pre-designed diagonal banner in the top-right corner
-      const bannerWidth = 200;
-      const bannerX = pageWidth - bannerWidth;
-      const bannerY = 0;
+      // Smaller banner, better positioned in top-right corner
+      const bannerWidth = 140;
+      const bannerX = pageWidth - bannerWidth - 5;
+      const bannerY = 5;
       
       doc.image(specialOfferPath, bannerX, bannerY, { width: bannerWidth });
       console.log("[PDF Generator] Special offer banner added successfully");
@@ -128,20 +127,16 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     }
   }
 
-  // Move RNT to upper left
-  doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
-  doc.text("RNT No.240799", leftMargin, 30);
-
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text("S U   V I A J E   A :", leftMargin, 70);
 
-  // Add plane logo on first page after "SU VIAJE A:" text
+  // Add plane logo on first page after "SU VIAJE A:" text - better aligned vertically
   if (fs.existsSync(planeLogoPath)) {
     try {
       const firstPageLogoWidth = 60;
       const textWidth = doc.widthOfString("S U   V I A J E   A :");
       const firstPageLogoX = leftMargin + textWidth + 15;
-      const firstPageLogoY = 68;
+      const firstPageLogoY = 65; // Moved up to align better with text
       
       doc.image(planeLogoPath, firstPageLogoX, firstPageLogoY, { width: firstPageLogoWidth });
       console.log("[PDF Generator] Plane logo added to first page after title");
@@ -173,13 +168,14 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text(`PLAN ${totalDuration} DÍAS - ${totalNights} NOCHES`, leftMargin, durationY);
 
-  const currentDate = formatDate(new Date());
-  doc.font("Helvetica").fontSize(9).fillColor(textColor);
-  // Position text to end just before the banner (banner starts at x=395, so text ends at ~385)
-  doc.text(`creado ${currentDate}`, 0, durationY + 5, { width: 385, align: "right" });
-
   const mainImageY = 165;
   const mainImageHeight = 250;
+  
+  // Add RNT and creation date above the main image
+  const currentDate = formatDate(new Date());
+  doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
+  doc.text("RNT No.240799", leftMargin, mainImageY - 15);
+  doc.text(`creado ${currentDate}`, 0, mainImageY - 15, { width: pageWidth - rightMargin, align: "right" });
   
   if (imagePaths.length > 0 && fs.existsSync(imagePaths[0])) {
     try {
@@ -202,20 +198,41 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
   doc.text("P R E S U P U E S T O    P A R A    S U    V I A J E", leftMargin, budgetY);
   
-  doc.font("Helvetica").fontSize(9).fillColor(textColor);
+  // Format dates without slashes
   const startDateFormatted = data.startDate 
-    ? formatDateWithMonthName(new Date(data.startDate))
+    ? (() => {
+        const d = new Date(data.startDate);
+        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      })()
     : "Por definir";
   const endDateFormatted = data.endDate 
-    ? formatDateWithMonthName(new Date(data.endDate))
+    ? (() => {
+        const d = new Date(data.endDate);
+        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      })()
     : "Por definir";
   
-  doc.text(`Salida: ${startDateFormatted}`, leftMargin, budgetY + 20);
-  doc.text(`Regreso: ${endDateFormatted}`, leftMargin, budgetY + 35);
-  
   const minPayment = Math.round(data.grandTotal * 0.6);
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
-  doc.text(`Pago mínimo para separar: $${formatUSD(minPayment)}`, leftMargin, budgetY + 52);
+  
+  // Salida with larger font and bold date
+  doc.font("Helvetica").fontSize(11).fillColor(textColor);
+  doc.text("Salida: ", leftMargin, budgetY + 20, { continued: true });
+  doc.font("Helvetica-Bold").fontSize(12);
+  doc.text(startDateFormatted);
+  
+  // Regreso with larger font and bold date
+  doc.font("Helvetica").fontSize(11).fillColor(textColor);
+  doc.text("Regreso: ", leftMargin, budgetY + 38, { continued: true });
+  doc.font("Helvetica-Bold").fontSize(12);
+  doc.text(endDateFormatted);
+  
+  // Pago mínimo with larger font and bold amount
+  doc.font("Helvetica").fontSize(11).fillColor(textColor);
+  doc.text("Pago mínimo para separar: ", leftMargin, budgetY + 56, { continued: true });
+  doc.font("Helvetica-Bold").fontSize(12);
+  doc.text(`$${formatUSD(minPayment)}`);
 
   const priceBoxX = pageWidth - rightMargin - 150;
   const priceBoxY = budgetY;
@@ -504,7 +521,12 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       const imageHeight = 100;
       const currentY = doc.y;
 
-      destImages.slice(0, 3).forEach((imagePath, index) => {
+      // For itinerary page, use images 4-6 (indices 3-5) if available, otherwise use first 3
+      const imagesToShow = destImages.length >= 6 
+        ? destImages.slice(3, 6)  // Use last 3 images (banderas, éfeso interior, éfeso arco)
+        : destImages.slice(0, 3);  // Fallback to first 3 for other countries
+      
+      imagesToShow.forEach((imagePath, index) => {
         if (fs.existsSync(imagePath)) {
           try {
             const xPos = leftMargin + (index * (imageWidth + 10));

@@ -65,17 +65,23 @@ The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clien
 - **Name**: "Turquía Esencial"
 - **Price**: $710 USD (land portion only)
 - **Duration**: 11 days, 9 nights
-- **Main Cover Image**: Hot air balloons over Capadocia (`attached_assets/3_1763570259885.png`)
+- **Main Cover Image**: Illuminated mosque (`attached_assets/2_1763570259884.png`)
 - **PDF Image Set**: 6 custom images showcasing Turkey's iconic locations:
-  1. Turkish flags with Galata Tower (`1_1763570259884.png`)
-  2. Illuminated mosque at night (`2_1763570259884.png`)
-  3. Hot air balloons in Capadocia (`3_1763570259885.png`)
-  4. Pamukkale white pools (`4_1763570259885.png`)
-  5. Ephesus ruins interior (`5_1763570259885.png`)
-  6. Ephesus temple arch (`6_1763570259885.png`)
+  1. Illuminated mosque at night (`2_1763570259884.png`) - Used on front page (main image)
+  2. Hot air balloons in Capadocia (`3_1763570259885.png`) - Used on front page (secondary)
+  3. Pamukkale white pools (`4_1763570259885.png`) - Used on front page (secondary)
+  4. Turkish flags with Galata Tower (`1_1763570259884.png`) - Used on itinerary page
+  5. Ephesus ruins interior (`5_1763570259885.png`) - Used on itinerary page
+  6. Ephesus temple arch (`6_1763570259885.png`) - Used on itinerary page
 - **Itinerary**: Estambul (3+1 nights) → Capadocia (3 nights) → Pamukkale (1 night) → Esmirna (1 night) → Estambul (1 night)
-- **Image Configuration**: Images are stored in `attached_assets/` and configured in both `server/destination-images.ts` and `client/src/lib/destination-images.ts`
+- **Image Configuration**: Images are stored in `attached_assets/` and configured in `server/destination-images.ts` and `client/src/lib/destination-images.ts`. The first 3 images are shown on the PDF front page, the last 3 on the detailed itinerary page.
 - **Tooltip**: "Salidas todos los Martes desde Colombia. Combinable con: Dubái, Egipto, Grecia, Tailandia, Vietnam, Perú (salidas diarias). Turquía siempre va primero en la ruta."
+- **PDF Formatting Changes**:
+  - Plane logo positioned at Y=65 (better aligned with "SU VIAJE A:" text)
+  - RNT No.240799 and creation date positioned above main image
+  - Special Offer banner reduced to 140px width
+  - Dates formatted without slashes (e.g., "25 Noviembre 2025")
+  - Date values and payment amount displayed in bold at 12pt font
 
 **Hidden Destinations**: 31 international plans are hidden (`isActive=false`) including previous Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, and Peru plans.
 

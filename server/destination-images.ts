@@ -3,7 +3,7 @@ import path from "path";
 const ASSETS_PATH = path.join(process.cwd(), "attached_assets", "stock_images");
 
 export const countryImagePaths: Record<string, string> = {
-  'Turquía': path.join(process.cwd(), 'attached_assets', '3_1763570259885.png'),
+  'Turquía': path.join(process.cwd(), 'attached_assets', '2_1763570259884.png'),
   'Dubái': path.join(ASSETS_PATH, 'burj_khalifa_dubai_s_0a51b3ef.jpg'),
   'Egipto': path.join(ASSETS_PATH, 'pyramids_of_giza_egy_4d7d81d1.jpg'),
   'Grecia': path.join(ASSETS_PATH, 'santorini_greece_whi_25df22f7.jpg'),
@@ -15,12 +15,12 @@ export const countryImagePaths: Record<string, string> = {
 
 export const countryImageSets: Record<string, string[]> = {
   'Turquía': [
-    path.join(process.cwd(), 'attached_assets', '1_1763570259884.png'),
-    path.join(process.cwd(), 'attached_assets', '2_1763570259884.png'),
-    path.join(process.cwd(), 'attached_assets', '3_1763570259885.png'),
-    path.join(process.cwd(), 'attached_assets', '4_1763570259885.png'),
-    path.join(process.cwd(), 'attached_assets', '5_1763570259885.png'),
-    path.join(process.cwd(), 'attached_assets', '6_1763570259885.png')
+    path.join(process.cwd(), 'attached_assets', '2_1763570259884.png'), // Mezquita (foto principal)
+    path.join(process.cwd(), 'attached_assets', '3_1763570259885.png'), // Globos (secundaria 1)
+    path.join(process.cwd(), 'attached_assets', '4_1763570259885.png'), // Pamukkale (secundaria 2)
+    path.join(process.cwd(), 'attached_assets', '1_1763570259884.png'), // Banderas (itinerario)
+    path.join(process.cwd(), 'attached_assets', '5_1763570259885.png'), // Éfeso interior (itinerario)
+    path.join(process.cwd(), 'attached_assets', '6_1763570259885.png')  // Éfeso arco (itinerario)
   ],
   'Dubái': [
     path.join(ASSETS_PATH, 'burj_khalifa_dubai_s_0a51b3ef.jpg'),
