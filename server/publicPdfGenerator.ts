@@ -891,7 +891,29 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     });
 
     Object.entries(hotelGroups).forEach(([location, hotels]) => {
-      const hotelNames = hotels.map(h => `${h.name}${h.category ? ` ${h.category}` : ""}`).join(" - ");
+      // Sort hotels by category (5* first, then 4*, etc.) and then alphabetically
+      const sortedHotels = hotels.sort((a, b) => {
+        const categoryA = a.category || '';
+        const categoryB = b.category || '';
+        
+        // Extract star rating (5*, 4*, etc.)
+        const starsA = parseInt(categoryA.match(/\d+/)?.[0] || '0');
+        const starsB = parseInt(categoryB.match(/\d+/)?.[0] || '0');
+        
+        // Sort by stars descending (5* before 4*)
+        if (starsB !== starsA) {
+          return starsB - starsA;
+        }
+        
+        // If same stars, sort alphabetically by name
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      
+      // Build hotel names string and replace Turkish İ with regular I for PDF compatibility
+      const hotelNames = sortedHotels
+        .map(h => `${h.name}${h.category ? ` ${h.category}` : ""}`)
+        .join(" - ")
+        .replace(/İ/g, 'I'); // Replace Turkish İ with regular I
       
       doc.font("Helvetica-Bold").fontSize(8).fillColor(primaryColor);
       doc.text(`${location.toUpperCase()}:`, leftMargin, doc.y, { continued: true });
