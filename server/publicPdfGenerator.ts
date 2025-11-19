@@ -502,7 +502,10 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   });
 
   // Add Turkey route map for Turkey destinations
+  console.log(`[PDF Generator] isTurkey = ${isTurkey}, destinations:`, data.destinations.map(d => ({ name: d.name, country: d.country })));
+  
   if (isTurkey) {
+    console.log('[PDF Generator] Adding Turkey route map to itinerary page...');
     // Try multiple possible locations for the Turkey route map
     const possibleMapPaths = [
       path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763576106301.png'),
@@ -510,11 +513,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       path.join(process.cwd(), 'server', 'assets', 'turkey-route-map.png')
     ];
     
+    console.log('[PDF Generator] Checking for Turkey route map in paths:', possibleMapPaths);
+    
     let mapPath = null;
     for (const possiblePath of possibleMapPaths) {
-      if (fs.existsSync(possiblePath)) {
+      const exists = fs.existsSync(possiblePath);
+      console.log(`[PDF Generator] Checking ${possiblePath}: ${exists ? 'FOUND' : 'NOT FOUND'}`);
+      if (exists) {
         mapPath = possiblePath;
-        console.log(`[PDF Generator] Found Turkey route map at: ${possiblePath}`);
+        console.log(`[PDF Generator] Using Turkey route map at: ${possiblePath}`);
         break;
       }
     }
@@ -525,6 +532,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
         const mapWidth = contentWidth;
         const mapHeight = 280;
         
+        console.log(`[PDF Generator] Adding map image at Y=${mapY}, width=${mapWidth}, height=${mapHeight}`);
+        
         doc.image(mapPath, leftMargin, mapY, {
           width: mapWidth,
           height: mapHeight,
@@ -533,13 +542,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
         });
         
         doc.y = mapY + mapHeight + 20;
-        console.log("[PDF Generator] Turkey route map added successfully");
+        console.log("[PDF Generator] ✓ Turkey route map added successfully");
       } catch (error) {
-        console.error("[PDF Generator] Error loading Turkey route map:", error);
+        console.error("[PDF Generator] ✗ Error loading Turkey route map:", error);
       }
     } else {
-      console.warn("[PDF Generator] Turkey route map not found in any expected location");
+      console.warn("[PDF Generator] ✗ Turkey route map not found in any expected location");
     }
+  } else {
+    console.log('[PDF Generator] Skipping Turkey route map (not a Turkey destination)');
   }
 
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
@@ -932,9 +943,36 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   
   doc.moveDown(2);
 
+  // Primero: Agregar imagen de asistencia médica
+  const medicalAssistanceImagePath = path.join(process.cwd(), "server", "assets", "medical-assistance.png");
+  const medicalImageHeight = hasTurkeyDestinations ? 180 : 400;
+  
+  if (fs.existsSync(medicalAssistanceImagePath)) {
+    try {
+      const stats = fs.statSync(medicalAssistanceImagePath);
+      if (stats.size > 0) {
+        const imageY = topMargin + 60;
+        
+        doc.image(medicalAssistanceImagePath, leftMargin, imageY, {
+          fit: [contentWidth, medicalImageHeight],
+          align: "center"
+        });
+        
+        doc.y = imageY + medicalImageHeight + 30;
+        
+        console.log('[PDF Generator] Medical assistance image added successfully');
+      } else {
+        console.warn('[PDF Generator] Medical assistance image file is empty');
+      }
+    } catch (error) {
+      console.error('[PDF Generator] Error loading medical assistance image:', error);
+    }
+  } else {
+    console.warn(`[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`);
+  }
+
+  // Segundo: Agregar tabla de tours opcionales (solo para Turkey)
   if (hasTurkeyDestinations) {
-    // TOURS OPCIONALES - Mostrar en la misma página de asistencia médica
-    doc.y = topMargin + 50;
 
     // Título compacto
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
@@ -1007,36 +1045,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.moveDown(1.5);
 
     console.log('[PDF Generator] Turkey optional tours table added successfully (compact version)');
-  }
-
-  // Agregar imagen de asistencia médica después de los tours
-  const medicalAssistanceImagePath = path.join(process.cwd(), "server", "assets", "medical-assistance.png");
-  
-  // Calcular altura de imagen de asistencia médica basado en espacio disponible
-  const medicalImageHeight = hasTurkeyDestinations ? 180 : 400;
-  
-  if (fs.existsSync(medicalAssistanceImagePath)) {
-    try {
-      const stats = fs.statSync(medicalAssistanceImagePath);
-      if (stats.size > 0) {
-        const imageY = doc.y;
-        
-        doc.image(medicalAssistanceImagePath, leftMargin, imageY, {
-          fit: [contentWidth, medicalImageHeight],
-          align: "center"
-        });
-        
-        doc.y = imageY + medicalImageHeight + 20;
-        
-        console.log('[PDF Generator] Medical assistance page added successfully');
-      } else {
-        console.warn('[PDF Generator] Medical assistance image file is empty');
-      }
-    } catch (error) {
-      console.error('[PDF Generator] Error loading medical assistance image:', error);
-    }
-  } else {
-    console.warn(`[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`);
   }
 
   // PÁGINAS DE POLÍTICAS Y DÍAS FESTIVOS - Solo para Turquía Esencial
