@@ -82,6 +82,9 @@ The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clien
   - Special Offer banner reduced to 140px width
   - Dates formatted without slashes (e.g., "25 Noviembre 2025")
   - Date values and payment amount displayed in bold at 12pt font
+  - Page 1 comments updated with current pricing: Globo +415usd, 6 almuerzos +200usd, hotel adicional +250USD
+  - Page 2 itinerary displays custom stop numbers: Estambul (1, 3 noches), Capadocia (3, 3 noches), Pamukkale (4, 1 noche), Esmirna (5, 1 noche), Estambul (7, 1 noche)
+  - Page 2 includes Turkey route map below itinerary (attached_assets/Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png)
 
 **Hidden Destinations**: 31 international plans are hidden (`isActive=false`) including previous Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, and Peru plans.
 

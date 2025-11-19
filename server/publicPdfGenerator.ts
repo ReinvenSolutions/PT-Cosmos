@@ -487,6 +487,34 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     align: "right" 
   });
 
+  // Add Turkey route map for Turkey destinations
+  if (isTurkey) {
+    const turkeyMapPath = path.join(__dirname, 'assets', 'turkey-route-map.png');
+    const attachedMapPath = path.join(__dirname, '..', 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png');
+    
+    // Try attached_assets first, then server/assets
+    const mapPath = fs.existsSync(attachedMapPath) ? attachedMapPath : turkeyMapPath;
+    
+    if (fs.existsSync(mapPath)) {
+      try {
+        const mapY = doc.y + 40;
+        const mapWidth = contentWidth;
+        const mapHeight = 280;
+        
+        doc.image(mapPath, leftMargin, mapY, {
+          width: mapWidth,
+          height: mapHeight,
+          align: "center",
+          valign: "center"
+        });
+        
+        doc.y = mapY + mapHeight + 20;
+      } catch (error) {
+        console.error("[PDF Generator] Error loading Turkey route map:", error);
+      }
+    }
+  }
+
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
   if (data.includeFlights && data.outboundFlightImages && data.outboundFlightImages.length > 0) {
     console.log('[PDF Generator] Outbound flight images:', data.outboundFlightImages);
