@@ -4,6 +4,7 @@ import { getDestinationImages, getDestinationImageSet } from "./destination-imag
 import { getImagePathForPDF } from "./upload";
 import fs from "fs";
 import path from "path";
+import sizeOf from "image-size";
 
 interface PublicQuoteData {
   destinations: Array<{
@@ -554,7 +555,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
           
           if (fs.existsSync(fullPath)) {
             try {
-              const imageHeight = 200;
+              // Get actual image dimensions by reading file buffer
+              const imageBuffer = fs.readFileSync(fullPath);
+              const dimensions = sizeOf(imageBuffer);
+              const imageWidth = contentWidth;
+              const imageHeight = dimensions.height && dimensions.width 
+                ? (dimensions.height / dimensions.width) * imageWidth 
+                : contentWidth * 0.6; // Fallback estimate
+              
+              // Check if image fits on current page
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
                 addPageBackground();
@@ -562,12 +571,12 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
                 flightImageY = 80;
               }
               
+              // Insert image at full width
               doc.image(fullPath, leftMargin, flightImageY, {
-                fit: [contentWidth, imageHeight],
-                align: "center"
+                width: contentWidth
               });
               
-              console.log(`[PDF Generator] Successfully added outbound image ${index}`);
+              console.log(`[PDF Generator] Successfully added outbound image ${index} (${Math.round(imageHeight)}px)`);
               flightImageY += imageHeight + 20;
             } catch (error) {
               console.error(`[PDF Generator] Error loading outbound flight image ${index}:`, error);
@@ -850,7 +859,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
           
           if (fs.existsSync(fullPath)) {
             try {
-              const imageHeight = 200;
+              // Get actual image dimensions by reading file buffer
+              const imageBuffer = fs.readFileSync(fullPath);
+              const dimensions = sizeOf(imageBuffer);
+              const imageWidth = contentWidth;
+              const imageHeight = dimensions.height && dimensions.width 
+                ? (dimensions.height / dimensions.width) * imageWidth 
+                : contentWidth * 0.6; // Fallback estimate
+              
+              // Check if image fits on current page
               if (flightImageY + imageHeight > 750) {
                 doc.addPage();
                 addPageBackground();
@@ -858,12 +875,12 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
                 flightImageY = 80;
               }
               
+              // Insert image at full width
               doc.image(fullPath, leftMargin, flightImageY, {
-                fit: [contentWidth, imageHeight],
-                align: "center"
+                width: contentWidth
               });
               
-              console.log(`[PDF Generator] Successfully added return image ${index}`);
+              console.log(`[PDF Generator] Successfully added return image ${index} (${Math.round(imageHeight)}px)`);
               flightImageY += imageHeight + 20;
             } catch (error) {
               console.error(`[PDF Generator] Error loading return flight image ${index}:`, error);
