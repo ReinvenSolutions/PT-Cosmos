@@ -589,6 +589,63 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
         }
       }
     }
+    
+    // Add flight terms and conditions after images
+    if (flightImageY > 80) {
+      flightImageY += 20; // Add some spacing
+      
+      // Check if we have enough space for terms section
+      if (flightImageY + 300 > 750) {
+        doc.addPage();
+        addPageBackground();
+        addPlaneLogoBottom();
+        flightImageY = 80;
+      }
+      
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+      doc.text("Términos y condiciones", leftMargin, flightImageY, { width: contentWidth });
+      doc.moveDown(0.5);
+      
+      doc.font("Helvetica").fontSize(9).fillColor(textColor);
+      
+      const termsText = [
+        "Los boletos de avión no son reembolsables.",
+        "",
+        "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
+        "",
+        "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
+        "",
+        "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo."
+      ];
+      
+      termsText.forEach(line => {
+        if (line === "") {
+          doc.moveDown(0.3);
+        } else {
+          doc.text(line, { width: contentWidth, align: "left" });
+          doc.moveDown(0.3);
+        }
+      });
+      
+      doc.moveDown(0.3);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
+      doc.text("Tarifa Light:", { width: contentWidth });
+      doc.moveDown(0.3);
+      
+      doc.font("Helvetica").fontSize(9).fillColor(textColor);
+      const tarifaItems = [
+        "Equipaje documentado : Desde $90 USD",
+        "Reembolso : No incluido antes de la partida / No incluido después de la partida",
+        "Equipaje de mano : 1 Pieza incluida (8 kg/115 cm lineales)",
+        "Cambios : Desde $210 USD antes de la partida, aplica términos y condiciones, validar con la aerolínea / Desde $210 USD después de la partida, aplica términos y condiciones, validar con la aerolínea",
+        "Artículo Personal : 1 pieza incluida"
+      ];
+      
+      tarifaItems.forEach(item => {
+        doc.text(item, { width: contentWidth, align: "left" });
+        doc.moveDown(0.3);
+      });
+    }
   }
 
   doc.addPage();
@@ -892,6 +949,63 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
           console.error(`[PDF Generator] Error getting image path for ${filename}:`, error);
         }
       }
+    }
+    
+    // Add flight terms and conditions after images
+    if (flightImageY > 80) {
+      flightImageY += 20; // Add some spacing
+      
+      // Check if we have enough space for terms section
+      if (flightImageY + 300 > 750) {
+        doc.addPage();
+        addPageBackground();
+        addPlaneLogoBottom();
+        flightImageY = 80;
+      }
+      
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+      doc.text("Términos y condiciones", leftMargin, flightImageY, { width: contentWidth });
+      doc.moveDown(0.5);
+      
+      doc.font("Helvetica").fontSize(9).fillColor(textColor);
+      
+      const termsText = [
+        "Los boletos de avión no son reembolsables.",
+        "",
+        "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
+        "",
+        "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
+        "",
+        "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo."
+      ];
+      
+      termsText.forEach(line => {
+        if (line === "") {
+          doc.moveDown(0.3);
+        } else {
+          doc.text(line, { width: contentWidth, align: "left" });
+          doc.moveDown(0.3);
+        }
+      });
+      
+      doc.moveDown(0.3);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
+      doc.text("Tarifa Light:", { width: contentWidth });
+      doc.moveDown(0.3);
+      
+      doc.font("Helvetica").fontSize(9).fillColor(textColor);
+      const tarifaItems = [
+        "Equipaje documentado : Desde $90 USD",
+        "Reembolso : No incluido antes de la partida / No incluido después de la partida",
+        "Equipaje de mano : 1 Pieza incluida (8 kg/115 cm lineales)",
+        "Cambios : Desde $210 USD antes de la partida, aplica términos y condiciones, validar con la aerolínea / Desde $210 USD después de la partida, aplica términos y condiciones, validar con la aerolínea",
+        "Artículo Personal : 1 pieza incluida"
+      ];
+      
+      tarifaItems.forEach(item => {
+        doc.text(item, { width: contentWidth, align: "left" });
+        doc.moveDown(0.3);
+      });
     }
   }
 
