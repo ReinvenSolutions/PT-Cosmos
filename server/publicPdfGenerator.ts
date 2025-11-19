@@ -520,7 +520,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     }
   }
 
-  // Helper function to calculate flight terms height more accurately
+  // Helper function to calculate flight terms height (WITHOUT Tarifa Light section)
   const calculateFlightTermsHeight = (): number => {
     // Calculate actual height by measuring all text elements
     let totalHeight = 0;
@@ -532,7 +532,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     });
     totalHeight += 10; // moveDown(0.5) spacing
     
-    // Terms text - 9pt
+    // Terms text - 9pt (ONLY the main terms, NO Tarifa Light)
     const termsText = [
       "Los boletos de avión no son reembolsables.",
       "",
@@ -553,29 +553,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
         });
         totalHeight += 4; // moveDown(0.3)
       }
-    });
-    
-    totalHeight += 4; // moveDown(0.3) before "Tarifa Light"
-    
-    // "Tarifa Light:" title
-    totalHeight += doc.heightOfString("Tarifa Light:", { width: contentWidth });
-    totalHeight += 4; // moveDown(0.3)
-    
-    // Tarifa items
-    const tarifaItems = [
-      "Equipaje documentado : Desde $90 USD",
-      "Reembolso : No incluido antes de la partida / No incluido después de la partida",
-      "Equipaje de mano : 1 Pieza incluida (8 kg/115 cm lineales)",
-      "Cambios : Desde $210 USD antes de la partida, aplica términos y condiciones, validar con la aerolínea / Desde $210 USD después de la partida, aplica términos y condiciones, validar con la aerolínea",
-      "Artículo Personal : 1 pieza incluida"
-    ];
-    
-    tarifaItems.forEach(item => {
-      totalHeight += doc.heightOfString(item, { 
-        width: contentWidth,
-        lineGap: 3
-      });
-      totalHeight += 4; // moveDown(0.3)
     });
     
     // Add some buffer for safety
@@ -604,7 +581,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
     const termsHeight = calculateFlightTermsHeight();
-    let flightImageY = 150;
+    let flightImageY = 140; // Start closer to baggage text
     
     for (let index = 0; index < data.outboundFlightImages.length; index++) {
       const imageUrl = data.outboundFlightImages[index];
@@ -623,34 +600,65 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageBuffer = fs.readFileSync(fullPath);
               const dimensions = sizeOf(imageBuffer);
               const imageWidth = contentWidth;
-              let imageHeight = dimensions.height && dimensions.width 
+              
+              // Calculate natural height based on aspect ratio
+              let naturalHeight = dimensions.height && dimensions.width 
                 ? (dimensions.height / dimensions.width) * imageWidth 
                 : contentWidth * 0.6; // Fallback estimate
               
-              // Check if image + terms fit on current page (reserve space for terms on last image)
+              // For the last image, maximize to fit available space with terms
               const isLastImage = index === data.outboundFlightImages.length - 1;
-              const spaceNeeded = isLastImage ? imageHeight + termsHeight + 40 : imageHeight + 20;
+              let imageHeight = naturalHeight;
               
-              if (flightImageY + spaceNeeded > 750) {
-                doc.addPage();
-                addPageBackground();
-                addPlaneLogoBottom();
-                flightImageY = 80;
+              if (isLastImage) {
+                // Recalculate available space based on CURRENT position (after previous images)
+                // Use pageHeight (842) - bottom margin (50) instead of fixed 750
+                let maxAvailableHeight = Math.max(0, pageHeight - 50 - flightImageY - termsHeight - 40);
                 
-                // After moving to new page, check if image + terms still fit
-                // If not, scale down the image to fit
-                if (isLastImage && flightImageY + imageHeight + termsHeight + 40 > 750) {
-                  const maxImageHeight = 750 - flightImageY - termsHeight - 40;
-                  imageHeight = maxImageHeight;
-                  console.log(`[PDF Generator] Scaled down outbound image ${index} to ${Math.round(imageHeight)}px to fit with terms`);
+                // If available space is too small (less than 200px), move to new page WITH section header
+                const minimumImageHeight = 200;
+                if (maxAvailableHeight < minimumImageHeight) {
+                  console.log(`[PDF Generator] Insufficient space for outbound image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`);
+                  doc.addPage();
+                  addPageBackground();
+                  addPlaneLogoBottom();
+                  
+                  // Re-render section title and baggage text on new page
+                  doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
+                  doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
+                  
+                  flightImageY = 140; // Start after header
+                  
+                  // Recalculate on new page with header
+                  maxAvailableHeight = pageHeight - 50 - flightImageY - termsHeight - 40;
+                }
+                
+                // Maximize image to use all available space
+                imageHeight = Math.min(naturalHeight, maxAvailableHeight);
+                console.log(`[PDF Generator] Maximizing outbound image ${index} to ${Math.round(imageHeight)}px (available: ${Math.round(maxAvailableHeight)}px, natural: ${Math.round(naturalHeight)}px, currentY: ${Math.round(flightImageY)})`);
+              } else {
+                // For non-last images, check if they fit
+                if (flightImageY + imageHeight + 20 > pageHeight - 50) {
+                  doc.addPage();
+                  addPageBackground();
+                  addPlaneLogoBottom();
+                  
+                  // Re-render section title and baggage text on new page
+                  doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO IDA", leftMargin, 80, { align: "center", width: contentWidth });
+                  doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
+                  
+                  flightImageY = 140; // Start after header
+                  
+                  // Recalculate max height to ensure image fits on new page
+                  const maxHeightOnNewPage = pageHeight - 50 - flightImageY - 40;
+                  imageHeight = Math.min(naturalHeight, maxHeightOnNewPage);
                 }
               }
               
-              // Insert image (scaled if necessary)
+              // Insert image (maximized to available space)
               doc.image(fullPath, leftMargin, flightImageY, {
-                width: contentWidth,
-                height: imageHeight,
-                fit: [contentWidth, imageHeight]
+                fit: [contentWidth, imageHeight],
+                align: 'center'
               });
               
               console.log(`[PDF Generator] Successfully added outbound image ${index} (${Math.round(imageHeight)}px)`);
@@ -667,7 +675,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       }
     }
     
-    // Add flight terms and conditions after images (always on same page as last image)
+    // Add flight terms and conditions after images (NO "Tarifa Light" section)
     if (flightImageY > 80) {
       flightImageY += 20; // Add some spacing
       
@@ -694,25 +702,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
           doc.text(line, { width: contentWidth, align: "left" });
           doc.moveDown(0.3);
         }
-      });
-      
-      doc.moveDown(0.3);
-      doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
-      doc.text("Tarifa Light:", { width: contentWidth });
-      doc.moveDown(0.3);
-      
-      doc.font("Helvetica").fontSize(9).fillColor(textColor);
-      const tarifaItems = [
-        "Equipaje documentado : Desde $90 USD",
-        "Reembolso : No incluido antes de la partida / No incluido después de la partida",
-        "Equipaje de mano : 1 Pieza incluida (8 kg/115 cm lineales)",
-        "Cambios : Desde $210 USD antes de la partida, aplica términos y condiciones, validar con la aerolínea / Desde $210 USD después de la partida, aplica términos y condiciones, validar con la aerolínea",
-        "Artículo Personal : 1 pieza incluida"
-      ];
-      
-      tarifaItems.forEach(item => {
-        doc.text(item, { width: contentWidth, align: "left" });
-        doc.moveDown(0.3);
       });
     }
   }
@@ -1127,7 +1116,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
     const termsHeight = calculateFlightTermsHeight();
-    let flightImageY = 150;
+    let flightImageY = 140; // Start closer to baggage text
     
     for (let index = 0; index < data.returnFlightImages.length; index++) {
       const imageUrl = data.returnFlightImages[index];
@@ -1146,34 +1135,65 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageBuffer = fs.readFileSync(fullPath);
               const dimensions = sizeOf(imageBuffer);
               const imageWidth = contentWidth;
-              let imageHeight = dimensions.height && dimensions.width 
+              
+              // Calculate natural height based on aspect ratio
+              let naturalHeight = dimensions.height && dimensions.width 
                 ? (dimensions.height / dimensions.width) * imageWidth 
                 : contentWidth * 0.6; // Fallback estimate
               
-              // Check if image + terms fit on current page (reserve space for terms on last image)
+              // For the last image, maximize to fit available space with terms
               const isLastImage = index === data.returnFlightImages.length - 1;
-              const spaceNeeded = isLastImage ? imageHeight + termsHeight + 40 : imageHeight + 20;
+              let imageHeight = naturalHeight;
               
-              if (flightImageY + spaceNeeded > 750) {
-                doc.addPage();
-                addPageBackground();
-                addPlaneLogoBottom();
-                flightImageY = 80;
+              if (isLastImage) {
+                // Recalculate available space based on CURRENT position (after previous images)
+                // Use pageHeight (842) - bottom margin (50) instead of fixed 750
+                let maxAvailableHeight = Math.max(0, pageHeight - 50 - flightImageY - termsHeight - 40);
                 
-                // After moving to new page, check if image + terms still fit
-                // If not, scale down the image to fit
-                if (isLastImage && flightImageY + imageHeight + termsHeight + 40 > 750) {
-                  const maxImageHeight = 750 - flightImageY - termsHeight - 40;
-                  imageHeight = maxImageHeight;
-                  console.log(`[PDF Generator] Scaled down return image ${index} to ${Math.round(imageHeight)}px to fit with terms`);
+                // If available space is too small (less than 200px), move to new page WITH section header
+                const minimumImageHeight = 200;
+                if (maxAvailableHeight < minimumImageHeight) {
+                  console.log(`[PDF Generator] Insufficient space for return image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`);
+                  doc.addPage();
+                  addPageBackground();
+                  addPlaneLogoBottom();
+                  
+                  // Re-render section title and baggage text on new page
+                  doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
+                  doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
+                  
+                  flightImageY = 140; // Start after header
+                  
+                  // Recalculate on new page with header
+                  maxAvailableHeight = pageHeight - 50 - flightImageY - termsHeight - 40;
+                }
+                
+                // Maximize image to use all available space
+                imageHeight = Math.min(naturalHeight, maxAvailableHeight);
+                console.log(`[PDF Generator] Maximizing return image ${index} to ${Math.round(imageHeight)}px (available: ${Math.round(maxAvailableHeight)}px, natural: ${Math.round(naturalHeight)}px, currentY: ${Math.round(flightImageY)})`);
+              } else {
+                // For non-last images, check if they fit
+                if (flightImageY + imageHeight + 20 > pageHeight - 50) {
+                  doc.addPage();
+                  addPageBackground();
+                  addPlaneLogoBottom();
+                  
+                  // Re-render section title and baggage text on new page
+                  doc.font("Helvetica-Bold").fontSize(18).fillColor(textColor).text("VUELO REGRESO", leftMargin, 80, { align: "center", width: contentWidth });
+                  doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
+                  
+                  flightImageY = 140; // Start after header
+                  
+                  // Recalculate max height to ensure image fits on new page
+                  const maxHeightOnNewPage = pageHeight - 50 - flightImageY - 40;
+                  imageHeight = Math.min(naturalHeight, maxHeightOnNewPage);
                 }
               }
               
-              // Insert image (scaled if necessary)
+              // Insert image (maximized to available space)
               doc.image(fullPath, leftMargin, flightImageY, {
-                width: contentWidth,
-                height: imageHeight,
-                fit: [contentWidth, imageHeight]
+                fit: [contentWidth, imageHeight],
+                align: 'center'
               });
               
               console.log(`[PDF Generator] Successfully added return image ${index} (${Math.round(imageHeight)}px)`);
@@ -1190,7 +1210,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       }
     }
     
-    // Add flight terms and conditions after images (always on same page as last image)
+    // Add flight terms and conditions after images (NO "Tarifa Light" section)
     if (flightImageY > 80) {
       flightImageY += 20; // Add some spacing
       
@@ -1217,25 +1237,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
           doc.text(line, { width: contentWidth, align: "left" });
           doc.moveDown(0.3);
         }
-      });
-      
-      doc.moveDown(0.3);
-      doc.font("Helvetica-Bold").fontSize(9).fillColor(textColor);
-      doc.text("Tarifa Light:", { width: contentWidth });
-      doc.moveDown(0.3);
-      
-      doc.font("Helvetica").fontSize(9).fillColor(textColor);
-      const tarifaItems = [
-        "Equipaje documentado : Desde $90 USD",
-        "Reembolso : No incluido antes de la partida / No incluido después de la partida",
-        "Equipaje de mano : 1 Pieza incluida (8 kg/115 cm lineales)",
-        "Cambios : Desde $210 USD antes de la partida, aplica términos y condiciones, validar con la aerolínea / Desde $210 USD después de la partida, aplica términos y condiciones, validar con la aerolínea",
-        "Artículo Personal : 1 pieza incluida"
-      ];
-      
-      tarifaItems.forEach(item => {
-        doc.text(item, { width: contentWidth, align: "left" });
-        doc.moveDown(0.3);
       });
     }
   }
