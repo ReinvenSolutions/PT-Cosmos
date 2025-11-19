@@ -402,6 +402,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
             nights: 1
           });
         }
+      } else if (location === 'Kusadasi/Esmirna') {
+        // Change "Kusadasi/Esmirna" to just "Esmirna"
+        const stopNumber = turkeyStopNumbers[location] || 2;
+        cityStops.push({
+          number: stopNumber,
+          name: 'Esmirna',
+          country: data.destinations[0].country || 'Turquía',
+          nights: nights
+        });
       } else {
         const stopNumber = turkeyStopNumbers[location] || 2;
         cityStops.push({
@@ -449,7 +458,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   
   let currentY = doc.y;
   
-  cityStops.forEach((stop) => {
+  // Draw top separator line before first stop
+  doc.moveTo(leftMargin, currentY)
+     .lineTo(pageWidth - rightMargin, currentY)
+     .lineWidth(0.5)
+     .stroke("#cccccc");
+  
+  currentY += 15;
+  
+  cityStops.forEach((stop, index) => {
     if (currentY > 650) {
       doc.addPage();
       addPageBackground();
@@ -488,7 +505,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       align: "right" 
     });
     
-    currentY += numberBoxSize + 20;
+    currentY += numberBoxSize + 15;
+    
+    // Draw separator line after each stop
+    doc.moveTo(leftMargin, currentY)
+       .lineTo(pageWidth - rightMargin, currentY)
+       .lineWidth(0.5)
+       .stroke("#cccccc");
+    
+    currentY += 15;
   });
   
   doc.y = currentY + 20;
