@@ -91,8 +91,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     if (fs.existsSync(planeLogoPath)) {
       try {
         const logoWidth = 80;
-        const logoX = leftMargin;
-        const logoY = pageHeight - 70;
+        const logoX = 20; // Closer to left edge
+        const logoY = pageHeight - 50; // Closer to bottom edge
         
         doc.image(planeLogoPath, logoX, logoY, { width: logoWidth });
         console.log("[PDF Generator] Plane logo added to bottom-left corner");

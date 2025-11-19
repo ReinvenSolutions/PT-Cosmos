@@ -57,8 +57,8 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
   - **PDF Branding Elements**: 
     - **Special Offer Banner**: Diagonal golden "OFERTA ESPECIAL" banner positioned in the top-right corner of the first page only (image stored in `server/assets/special-offer-banner.png`)
     - **Plane Logo**: Blue airplane icon with trail appears in two locations:
-      - First page: Positioned immediately after "SU VIAJE A:" text in the header (60px width)
-      - All other pages: Bottom-left corner of every page (80px width at coordinates leftMargin, pageHeight-70)
+      - First page: Positioned immediately after "SU VIAJE A:" text in the header (60px width, Y=57)
+      - All other pages: Bottom-left corner of every page (80px width at coordinates X=20, Y=pageHeight-50) - positioned close to corner
       - Image stored in `server/assets/plane-logo.png`
     - **RNT Number**: "RNT No.240799" displayed in upper-left corner of first page for regulatory compliance
 - **Role-Based Access**: Public routes are accessible without authentication, while advisor and super admin routes require specific roles, enforced by `requireAuth` and `requireRole` middleware.
