@@ -75,6 +75,7 @@ The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clien
   6. Ephesus temple arch (`6_1763570259885.png`)
 - **Itinerary**: Estambul (3+1 nights) → Capadocia (3 nights) → Pamukkale (1 night) → Esmirna (1 night) → Estambul (1 night)
 - **Image Configuration**: Images are stored in `attached_assets/` and configured in both `server/destination-images.ts` and `client/src/lib/destination-images.ts`
+- **Tooltip**: "Salidas todos los Martes desde Colombia. Combinable con: Dubái, Egipto, Grecia, Tailandia, Vietnam, Perú (salidas diarias). Turquía siempre va primero en la ruta."
 
 **Hidden Destinations**: 31 international plans are hidden (`isActive=false`) including previous Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, and Peru plans.
 

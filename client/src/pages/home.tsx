@@ -166,10 +166,10 @@ export default function Home() {
           .map(d => d.country)
       )).join(", ");
       
-      return `Salidas todos los miércoles. Combinable con: ${otherCountries || "otros destinos"} (salidas diarias). Turquía siempre va primero en la ruta.`;
+      return `Salidas todos los Martes desde Colombia. Combinable con: ${otherCountries || "otros destinos"} (salidas diarias). Turquía siempre va primero en la ruta.`;
     }
     
-    return `Salidas diarias. Combinable con todos los destinos. Si combinas con Turquía, ten en cuenta que Turquía tiene salidas los miércoles y será el primer destino en tu ruta.`;
+    return `Salidas diarias. Combinable con todos los destinos. Si combinas con Turquía, ten en cuenta que Turquía tiene salidas los Martes desde Colombia y será el primer destino en tu ruta.`;
   };
   
   const filteredDestinations = destinations.filter((dest) => {
