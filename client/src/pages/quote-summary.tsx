@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { PDFLoadingModal } from "@/components/pdf-loading-modal";
 
 interface Client {
   id: string;
@@ -45,6 +46,7 @@ export default function QuoteSummary() {
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -280,6 +282,8 @@ export default function QuoteSummary() {
   };
 
   const handleExportPDF = async () => {
+    setIsGeneratingPDF(true);
+    
     try {
       const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
                             outboundCabinBaggage || outboundHoldBaggage || 
@@ -313,6 +317,7 @@ export default function QuoteSummary() {
           returnCabinBaggage,
           returnHoldBaggage,
           passengers,
+          turkeyUpgrade: turkeyUpgrade || null,
         }),
       });
       
@@ -340,6 +345,11 @@ export default function QuoteSummary() {
         description: "No se pudo generar el PDF. Intenta nuevamente.",
         variant: "destructive",
       });
+    } finally {
+      // Add a small delay to ensure user sees the completion animation
+      setTimeout(() => {
+        setIsGeneratingPDF(false);
+      }, 500);
     }
   };
 
@@ -919,6 +929,9 @@ export default function QuoteSummary() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* PDF Loading Modal */}
+        <PDFLoadingModal isOpen={isGeneratingPDF} />
             </div>
           </main>
         </div>
