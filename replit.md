@@ -100,14 +100,15 @@ The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clien
   - The selected upgrade cost is automatically added to the grand total calculation
   - Stored in database field `turkeyUpgrade` with values: 'option1', 'option2', 'option3', or null
 - **PDF Formatting Changes**:
-  - Plane logo positioned at Y=65 (better aligned with "SU VIAJE A:" text)
+  - Plane logo positioned at Y=57 (raised for better alignment with "SU VIAJE A:" text)
   - RNT No.240799 and creation date positioned above main image
-  - Special Offer banner reduced to 140px width
+  - Special Offer banner 140px width, positioned exactly at top-right corner (no margins)
   - Dates formatted without slashes (e.g., "25 Noviembre 2025")
   - Date values and payment amount displayed in bold at 12pt font
   - Page 1 comments use mixed text formatting: normal text for general information, bold text for pricing details (Globo +415usd, 6 almuerzos +200usd, tarifa aérea policies)
   - Page 2 itinerary displays custom stop numbers: Estambul (1, 3 noches), Capadocia (3, 3 noches), Pamukkale (4, 1 noche), Esmirna (5, 1 noche), Estambul (7, 1 noche)
   - Page 2 includes Turkey route map below itinerary (attached_assets/Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png)
+  - **Tours Opcionales Table** (Medical Assistance page): 11 rows with individual tours plus separated Combo 1 (1,020 USD) and Combo 2 (660 USD), all prices displayed in bold 8pt font
 
 **Hidden Destinations**: 31 international plans are hidden (`isActive=false`) including previous Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, and Peru plans.
 
