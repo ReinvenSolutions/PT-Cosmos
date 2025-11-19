@@ -503,13 +503,23 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   // Add Turkey route map for Turkey destinations
   if (isTurkey) {
-    const turkeyMapPath = path.join(process.cwd(), 'server', 'assets', 'turkey-route-map.png');
-    const attachedMapPath = path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png');
+    // Try multiple possible locations for the Turkey route map
+    const possibleMapPaths = [
+      path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763576106301.png'),
+      path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png'),
+      path.join(process.cwd(), 'server', 'assets', 'turkey-route-map.png')
+    ];
     
-    // Try attached_assets first, then server/assets
-    const mapPath = fs.existsSync(attachedMapPath) ? attachedMapPath : turkeyMapPath;
+    let mapPath = null;
+    for (const possiblePath of possibleMapPaths) {
+      if (fs.existsSync(possiblePath)) {
+        mapPath = possiblePath;
+        console.log(`[PDF Generator] Found Turkey route map at: ${possiblePath}`);
+        break;
+      }
+    }
     
-    if (fs.existsSync(mapPath)) {
+    if (mapPath) {
       try {
         const mapY = doc.y + 40;
         const mapWidth = contentWidth;
@@ -523,9 +533,12 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
         });
         
         doc.y = mapY + mapHeight + 20;
+        console.log("[PDF Generator] Turkey route map added successfully");
       } catch (error) {
         console.error("[PDF Generator] Error loading Turkey route map:", error);
       }
+    } else {
+      console.warn("[PDF Generator] Turkey route map not found in any expected location");
     }
   }
 
