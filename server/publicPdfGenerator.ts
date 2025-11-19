@@ -362,68 +362,27 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   
   const cityStops: CityStop[] = [];
   
-  // For Turkey destinations, use hotels data with specific stop numbers
+  // Check if this is specifically the "Turquía Esencial" plan
+  const isTurkeyEsencial = data.destinations.some(d => 
+    d.name?.toLowerCase().includes('turquía esencial') || 
+    d.name?.toLowerCase().includes('turquia esencial')
+  );
+  
+  // For general Turkey check (for map and other features)
   const isTurkey = data.destinations.some(d => 
     d.country?.toLowerCase().includes('turqu') || 
     d.country?.toLowerCase().includes('turkey')
   );
   
-  if (isTurkey && data.destinations[0]?.hotels && data.destinations[0].hotels.length > 0) {
-    // Define specific order for Turkey with custom stop numbers
-    const turkeyStopNumbers: { [key: string]: number } = {
-      'Estambul': 1,
-      'Capadocia': 3,
-      'Pamukkale': 4,
-      'Kusadasi/Esmirna': 5
-    };
-    
-    let estambulNightsAdded = false;
-    
-    data.destinations[0].hotels.forEach(hotel => {
-      const location = hotel.location || "";
-      const nights = hotel.nights || 0;
-      
-      // For Estambul, combine the two entries into one if first time
-      if (location === 'Estambul') {
-        if (!estambulNightsAdded) {
-          cityStops.push({
-            number: 1,
-            name: 'Estambul',
-            country: data.destinations[0].country || 'Turquía',
-            nights: 3
-          });
-          estambulNightsAdded = true;
-        } else {
-          // Second Estambul entry with 1 night
-          cityStops.push({
-            number: 7,
-            name: 'Estambul',
-            country: data.destinations[0].country || 'Turquía',
-            nights: 1
-          });
-        }
-      } else if (location === 'Kusadasi/Esmirna') {
-        // Change "Kusadasi/Esmirna" to just "Esmirna"
-        const stopNumber = turkeyStopNumbers[location] || 2;
-        cityStops.push({
-          number: stopNumber,
-          name: 'Esmirna',
-          country: data.destinations[0].country || 'Turquía',
-          nights: nights
-        });
-      } else {
-        const stopNumber = turkeyStopNumbers[location] || 2;
-        cityStops.push({
-          number: stopNumber,
-          name: location,
-          country: data.destinations[0].country || 'Turquía',
-          nights: nights
-        });
-      }
-    });
-    
-    // Sort by stop number
-    cityStops.sort((a, b) => a.number - b.number);
+  if (isTurkeyEsencial) {
+    // Use exact hardcoded itinerary for Turkey Esencial only
+    cityStops.push(
+      { number: 1, name: 'Estambul', country: 'Turquía', nights: 3 },
+      { number: 3, name: 'Capadocia', country: 'Turquía', nights: 3 },
+      { number: 4, name: 'Pamukkale', country: 'Turquía', nights: 1 },
+      { number: 5, name: 'Esmirna', country: 'Turquía', nights: 1 },
+      { number: 7, name: 'Estambul', country: 'Turquía', nights: 1 }
+    );
   } else {
     // Original logic for non-Turkey destinations
     let stopNumber = 1;
