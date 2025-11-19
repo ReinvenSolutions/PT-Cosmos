@@ -1045,35 +1045,47 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
     doc.text("Combo 1", leftMargin, combo1HeaderY + 6, { width: contentWidth, align: "center" });
     
-    doc.y = combo1HeaderY + 20 + 3;
+    doc.y = combo1HeaderY + 20;
 
-    // Contenido del Combo 1
-    const combo1ContentHeight = 50;
-    const combo1ContentY = doc.y;
+    // Ítems del Combo 1 con cuadrículas individuales
+    const combo1Items = [
+      "PASEO EN GLOBO",
+      "BÓSFORO con almuerzo",
+      "CLASICO con almuerzo",
+      "NOCHE TURCA Capadocia sin cena",
+      "JEEP SAFARI - Sujeto al clima"
+    ];
     
-    // Dibujar rectángulo de fondo con borde
-    doc.rect(leftMargin, combo1ContentY, contentWidth, combo1ContentHeight)
-       .fillAndStroke(tableRowBg, "#3b82f6");
+    const rowHeight = 12;
+    const priceBoxWidth = 100;
+    const itemsWidth = contentWidth - priceBoxWidth - 5;
     
-    // Texto del combo 1 (encima del fondo)
-    const combo1TextX = leftMargin + 5;
-    const combo1TextY = combo1ContentY + 3;
-    doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
-    doc.text("PASEO EN GLOBO", combo1TextX, combo1TextY, { continued: false });
-    doc.text("BÓSFORO con almuerzo", combo1TextX, combo1TextY + 10, { continued: false });
-    doc.text("CLASICO con almuerzo", combo1TextX, combo1TextY + 20, { continued: false });
-    doc.text("NOCHE TURCA Capadocia sin cena", combo1TextX, combo1TextY + 30, { continued: false });
-    doc.text("JEEP SAFARI - Sujeto al clima", combo1TextX, combo1TextY + 40, { continued: false });
+    const combo1GridStartY = doc.y;
+    let currentY = combo1GridStartY;
     
-    // Precio del Combo 1 (rectángulo azul + texto blanco)
-    const combo1PriceX = leftMargin + contentWidth - 100;
-    const combo1PriceY = combo1TextY + 15;
-    doc.rect(combo1PriceX, combo1PriceY, 95, 25)
+    // Dibujar cada ítem en su propia celda
+    combo1Items.forEach((item, index) => {
+      doc.rect(leftMargin, currentY, itemsWidth, rowHeight)
+         .fillAndStroke(tableRowBg, "#3b82f6");
+      
+      doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
+      doc.text(item, leftMargin + 3, currentY + 3, { width: itemsWidth - 6, continued: false });
+      
+      currentY += rowHeight;
+    });
+    
+    // Precio del Combo 1 en la esquina derecha (abarca todas las filas)
+    const combo1TotalHeight = rowHeight * combo1Items.length;
+    const combo1PriceX = leftMargin + itemsWidth + 5;
+    
+    doc.rect(combo1PriceX, combo1GridStartY, priceBoxWidth, combo1TotalHeight)
        .fillAndStroke("#1e40af", "#1e40af");
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
-    doc.text("1,020 USD", combo1PriceX, combo1PriceY + 5, { width: 95, align: "center" });
     
-    doc.y = combo1ContentY + combo1ContentHeight + 5;
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
+    const priceTextY = combo1GridStartY + (combo1TotalHeight / 2) - 9;
+    doc.text("1,020 USD", combo1PriceX, priceTextY, { width: priceBoxWidth, align: "center" });
+    
+    doc.y = currentY + 5;
 
     // COMBO 2 - Sección separada con header azul
     const combo2HeaderY = doc.y;
@@ -1084,33 +1096,41 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
     doc.text("Combo 2", leftMargin, combo2HeaderY + 6, { width: contentWidth, align: "center" });
     
-    doc.y = combo2HeaderY + 20 + 3;
+    doc.y = combo2HeaderY + 20;
 
-    // Contenido del Combo 2
-    const combo2ContentHeight = 30;
-    const combo2ContentY = doc.y;
+    // Ítems del Combo 2 con cuadrículas individuales
+    const combo2Items = [
+      "PASEO EN GLOBO",
+      "NOCHE TURCA Capadocia sin cena",
+      "JEEP SAFARI - Sujeto al clima"
+    ];
     
-    // Dibujar rectángulo de fondo con borde
-    doc.rect(leftMargin, combo2ContentY, contentWidth, combo2ContentHeight)
-       .fillAndStroke(tableRowBg, "#3b82f6");
+    const combo2GridStartY = doc.y;
+    let currentY2 = combo2GridStartY;
     
-    // Texto del combo 2 (encima del fondo)
-    const combo2TextX = leftMargin + 5;
-    const combo2TextY = combo2ContentY + 3;
-    doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
-    doc.text("PASEO EN GLOBO", combo2TextX, combo2TextY, { continued: false });
-    doc.text("NOCHE TURCA Capadocia sin cena", combo2TextX, combo2TextY + 10, { continued: false });
-    doc.text("JEEP SAFARI - Sujeto al clima", combo2TextX, combo2TextY + 20, { continued: false });
+    // Dibujar cada ítem en su propia celda
+    combo2Items.forEach((item, index) => {
+      doc.rect(leftMargin, currentY2, itemsWidth, rowHeight)
+         .fillAndStroke(tableRowBg, "#3b82f6");
+      
+      doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
+      doc.text(item, leftMargin + 3, currentY2 + 3, { width: itemsWidth - 6, continued: false });
+      
+      currentY2 += rowHeight;
+    });
     
-    // Precio del Combo 2 (rectángulo azul + texto blanco)
-    const combo2PriceX = leftMargin + contentWidth - 100;
-    const combo2PriceY = combo2TextY + 5;
-    doc.rect(combo2PriceX, combo2PriceY, 95, 25)
+    // Precio del Combo 2 en la esquina derecha (abarca todas las filas)
+    const combo2TotalHeight = rowHeight * combo2Items.length;
+    const combo2PriceX = leftMargin + itemsWidth + 5;
+    
+    doc.rect(combo2PriceX, combo2GridStartY, priceBoxWidth, combo2TotalHeight)
        .fillAndStroke("#1e40af", "#1e40af");
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
-    doc.text("660 USD", combo2PriceX, combo2PriceY + 5, { width: 95, align: "center" });
     
-    doc.y = combo2ContentY + combo2ContentHeight + 10;
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
+    const priceText2Y = combo2GridStartY + (combo2TotalHeight / 2) - 9;
+    doc.text("660 USD", combo2PriceX, priceText2Y, { width: priceBoxWidth, align: "center" });
+    
+    doc.y = currentY2 + 10;
 
     console.log('[PDF Generator] Turkey optional tours table added successfully (compact version with combos)');
   }
