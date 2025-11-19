@@ -502,26 +502,26 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   });
 
   // Add Turkey route map for Turkey destinations
-  console.log(`[PDF Generator] isTurkey = ${isTurkey}, destinations:`, data.destinations.map(d => ({ name: d.name, country: d.country })));
-  
   if (isTurkey) {
     console.log('[PDF Generator] Adding Turkey route map to itinerary page...');
+    console.log('[PDF Generator] Current working directory:', process.cwd());
+    
     // Try multiple possible locations for the Turkey route map
     const possibleMapPaths = [
+      '/home/runner/workspace/attached_assets/Screenshot 2025-11-19 at 12.05.39 PM_1763576106301.png',
+      '/home/runner/workspace/attached_assets/Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png',
       path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763576106301.png'),
       path.join(process.cwd(), 'attached_assets', 'Screenshot 2025-11-19 at 12.05.39 PM_1763572049850.png'),
       path.join(process.cwd(), 'server', 'assets', 'turkey-route-map.png')
     ];
     
-    console.log('[PDF Generator] Checking for Turkey route map in paths:', possibleMapPaths);
-    
     let mapPath = null;
     for (const possiblePath of possibleMapPaths) {
       const exists = fs.existsSync(possiblePath);
-      console.log(`[PDF Generator] Checking ${possiblePath}: ${exists ? 'FOUND' : 'NOT FOUND'}`);
+      console.log(`[PDF Generator] Checking ${possiblePath}: ${exists ? 'FOUND ✓' : 'NOT FOUND ✗'}`);
       if (exists) {
         mapPath = possiblePath;
-        console.log(`[PDF Generator] Using Turkey route map at: ${possiblePath}`);
+        console.log(`[PDF Generator] ✓ Using Turkey route map at: ${possiblePath}`);
         break;
       }
     }
@@ -548,9 +548,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       }
     } else {
       console.warn("[PDF Generator] ✗ Turkey route map not found in any expected location");
+      console.warn("[PDF Generator] Tried paths:", possibleMapPaths);
     }
-  } else {
-    console.log('[PDF Generator] Skipping Turkey route map (not a Turkey destination)');
   }
 
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
@@ -1051,16 +1050,26 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
     // COMBO 1 - Sección separada con header azul
     const combo1HeaderY = doc.y;
+    // Dibujar header azul PRIMERO
     doc.rect(leftMargin, combo1HeaderY, contentWidth, 20).fill("#1e40af");
+    // Agregar título "Combo 1" en el header
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
+    doc.text("Combo 1", leftMargin, combo1HeaderY + 6, { width: contentWidth, align: "center" });
+    
     doc.y = combo1HeaderY + 20 + 3;
 
     // Contenido del Combo 1
     const combo1ContentHeight = 50;
-    doc.rect(leftMargin, doc.y, contentWidth, combo1ContentHeight).fill(tableRowBg);
+    const combo1ContentY = doc.y;
     
-    // Texto del combo 1
+    // Dibujar rectángulo de fondo PRIMERO
+    doc.rect(leftMargin, combo1ContentY, contentWidth, combo1ContentHeight).fill(tableRowBg);
+    // Dibujar bordes
+    doc.rect(leftMargin, combo1ContentY, contentWidth, combo1ContentHeight).stroke("#3b82f6");
+    
+    // Texto del combo 1 DESPUÉS (encima del fondo)
     const combo1TextX = leftMargin + 5;
-    const combo1TextY = doc.y + 3;
+    const combo1TextY = combo1ContentY + 3;
     doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
     doc.text("PASEO EN GLOBO", combo1TextX, combo1TextY, { continued: false });
     doc.text("BÓSFORO con almuerzo", combo1TextX, combo1TextY + 10, { continued: false });
@@ -1068,40 +1077,50 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     doc.text("NOCHE TURCA Capadocia sin cena", combo1TextX, combo1TextY + 30, { continued: false });
     doc.text("JEEP SAFARI - Sujeto al clima", combo1TextX, combo1TextY + 40, { continued: false });
     
-    // Precio del Combo 1
+    // Precio del Combo 1 (rectángulo azul + texto blanco)
     const combo1PriceX = leftMargin + contentWidth - 100;
     const combo1PriceY = combo1TextY + 15;
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
     doc.rect(combo1PriceX, combo1PriceY, 95, 25).fill("#1e40af");
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
     doc.text("1,020 USD", combo1PriceX, combo1PriceY + 5, { width: 95, align: "center" });
     
-    doc.y = doc.y + combo1ContentHeight + 5;
+    doc.y = combo1ContentY + combo1ContentHeight + 5;
 
     // COMBO 2 - Sección separada con header azul
     const combo2HeaderY = doc.y;
+    // Dibujar header azul PRIMERO
     doc.rect(leftMargin, combo2HeaderY, contentWidth, 20).fill("#1e40af");
+    // Agregar título "Combo 2" en el header
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
+    doc.text("Combo 2", leftMargin, combo2HeaderY + 6, { width: contentWidth, align: "center" });
+    
     doc.y = combo2HeaderY + 20 + 3;
 
     // Contenido del Combo 2
     const combo2ContentHeight = 30;
-    doc.rect(leftMargin, doc.y, contentWidth, combo2ContentHeight).fill(tableRowBg);
+    const combo2ContentY = doc.y;
     
-    // Texto del combo 2
+    // Dibujar rectángulo de fondo PRIMERO
+    doc.rect(leftMargin, combo2ContentY, contentWidth, combo2ContentHeight).fill(tableRowBg);
+    // Dibujar bordes
+    doc.rect(leftMargin, combo2ContentY, contentWidth, combo2ContentHeight).stroke("#3b82f6");
+    
+    // Texto del combo 2 DESPUÉS (encima del fondo)
     const combo2TextX = leftMargin + 5;
-    const combo2TextY = doc.y + 3;
+    const combo2TextY = combo2ContentY + 3;
     doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
     doc.text("PASEO EN GLOBO", combo2TextX, combo2TextY, { continued: false });
     doc.text("NOCHE TURCA Capadocia sin cena", combo2TextX, combo2TextY + 10, { continued: false });
     doc.text("JEEP SAFARI - Sujeto al clima", combo2TextX, combo2TextY + 20, { continued: false });
     
-    // Precio del Combo 2
+    // Precio del Combo 2 (rectángulo azul + texto blanco)
     const combo2PriceX = leftMargin + contentWidth - 100;
     const combo2PriceY = combo2TextY + 5;
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
     doc.rect(combo2PriceX, combo2PriceY, 95, 25).fill("#1e40af");
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
     doc.text("660 USD", combo2PriceX, combo2PriceY + 5, { width: 95, align: "center" });
     
-    doc.y = doc.y + combo2ContentHeight + 10;
+    doc.y = combo2ContentY + combo2ContentHeight + 10;
 
     console.log('[PDF Generator] Turkey optional tours table added successfully (compact version with combos)');
   }
