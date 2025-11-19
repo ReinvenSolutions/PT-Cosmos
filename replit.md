@@ -56,6 +56,28 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
 ### System Design Choices
 The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clients are global entities managed by super admins. Advisors manage their own quotes, while super admins have full visibility. PostgreSQL session storage ensures production readiness. Database entities use `varchar` with `gen_random_uuid()` for IDs, and unique constraints prevent duplicate destinations. The database auto-seeds on deployment, populating with essential data if empty.
 
+### Destination Catalog Management
+**Active Destinations**: Only destinations with `isActive=true` are displayed in the public and advisor interfaces. Currently active:
+- **Colombia Plans**: 7 national destinations (Cartagena, Medellín, Eje Cafetero, San Andrés, Amazonas, La Guajira, Santander)
+- **International Plans**: "Turquía Esencial" (10 days, 9 nights, $710 USD land portion)
+
+**Turquía Esencial Plan Configuration**:
+- **Name**: "Turquía Esencial"
+- **Price**: $710 USD (land portion only)
+- **Duration**: 11 days, 9 nights
+- **Main Cover Image**: Hot air balloons over Capadocia (`attached_assets/3_1763570259885.png`)
+- **PDF Image Set**: 6 custom images showcasing Turkey's iconic locations:
+  1. Turkish flags with Galata Tower (`1_1763570259884.png`)
+  2. Illuminated mosque at night (`2_1763570259884.png`)
+  3. Hot air balloons in Capadocia (`3_1763570259885.png`)
+  4. Pamukkale white pools (`4_1763570259885.png`)
+  5. Ephesus ruins interior (`5_1763570259885.png`)
+  6. Ephesus temple arch (`6_1763570259885.png`)
+- **Itinerary**: Estambul (3+1 nights) → Capadocia (3 nights) → Pamukkale (1 night) → Esmirna (1 night) → Estambul (1 night)
+- **Image Configuration**: Images are stored in `attached_assets/` and configured in both `server/destination-images.ts` and `client/src/lib/destination-images.ts`
+
+**Hidden Destinations**: 31 international plans are hidden (`isActive=false`) including previous Turkey, Dubai, Egypt, Greece, Thailand, Vietnam, and Peru plans.
+
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main relational database.
 - **PDFKit**: JavaScript library for PDF generation.
