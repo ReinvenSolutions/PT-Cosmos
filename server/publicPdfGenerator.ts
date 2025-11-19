@@ -497,19 +497,19 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     if (fs.existsSync(turkeyMapPath)) {
       try {
         const mapY = doc.y + 20;
-        const mapWidth = contentWidth;
-        const mapHeight = 240;
+        const maxMapWidth = contentWidth;
+        const maxMapHeight = 240;
         
-        console.log(`[PDF Generator] Adding map image at Y=${mapY}, width=${mapWidth}, height=${mapHeight}`);
+        console.log(`[PDF Generator] Adding map image at Y=${mapY}, maxWidth=${maxMapWidth}`);
         
+        // Use fit to maintain aspect ratio without stretching
         doc.image(turkeyMapPath, leftMargin, mapY, {
-          width: mapWidth,
-          height: mapHeight,
-          align: "center",
-          valign: "center"
+          fit: [maxMapWidth, maxMapHeight],
+          align: "center"
         });
         
-        doc.y = mapY + mapHeight + 20;
+        // Update Y position after image (estimate based on max height)
+        doc.y = mapY + maxMapHeight + 20;
         console.log("[PDF Generator] ✓ Turkey route map added successfully");
       } catch (error) {
         console.error("[PDF Generator] ✗ Error loading Turkey route map:", error);
