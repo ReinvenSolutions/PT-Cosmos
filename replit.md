@@ -43,12 +43,15 @@ The frontend is built with React, Wouter, and TanStack Query, styled with Tailwi
   - **Baggage Customization**: Users can select "Equipaje de cabina 10kg" and "Equipaje de bodega 23kg" independently for outbound and return flights (Personal 8kg is always included)
   - **Conditional PDF Generation**: If no flight images are uploaded AND no baggage checkboxes are selected, the PDF generates as land-only (no flight pages). If any flight data exists (images OR baggage selections), flight pages are included in the PDF with dynamic baggage text
   - **Medical Assistance & Optional Tours Page**: All PDFs include a combined final page with title "ASISTENCIA MEDICA PARA TU VIAJE"
-    - **Turkey Optional Tours** (when applicable): Compact table displayed above medical assistance image showing:
-      - 10 condensed tour options with prices (Balloon rides, Bosphorus, Turkish nights, lunches, jeep safari)
-      - Combo packages displayed as single row: "Combos: Combo 1 / Combo 2" (969 / 606 USD)
-      - Banking fee notice in red text: "Fee bancario no incluido, 2.5% sobre el total"
-      - Compact styling with 12px row height, 7pt font size, blue headers (#1e40af), light blue rows (#e0e7ff)
-    - **Medical Assistance Image**: Displayed below tours (180px height when tours present, 400px when no tours)
+    - **Page Structure**:
+      1. **Medical Assistance Image**: Displayed first (180px height for Turkey, 400px for others)
+      2. **Turkey Optional Tours Table** (when applicable, displayed below image):
+         - 9 individual tour options with prices (Balloon rides, Bosphorus, Turkish nights, lunches, jeep safari)
+         - Combo 1: 1,020 USD (separate row)
+         - Combo 2: 660 USD (separate row)
+         - Banking fee notice in red text: "Fee bancario no incluido, 2.5% sobre el total"
+         - Compact styling with 12px row height, tour names in 7pt font, prices in bold 8pt font
+         - Blue headers (#1e40af), light blue rows (#e0e7ff)
     - Detection is based on destination country or name containing "turqu" or "turkey" (case-insensitive)
   - **Turquía Esencial Policies & Holidays**: For "Turquía Esencial" packages specifically, a single consolidated page includes:
     - **Policies & Conditions Section**: Comprehensive terms covering cancellations, tips, services, baggage, hotels, excursions, WiFi, balloon rides, and transfers
