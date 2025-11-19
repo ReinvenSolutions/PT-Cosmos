@@ -459,7 +459,8 @@ export default function Home() {
                                       {(() => {
                                         const parts = [];
                                         if (mealsInfo.breakfasts > 0) parts.push(`${mealsInfo.breakfasts} desayuno${mealsInfo.breakfasts > 1 ? 's' : ''}`);
-                                        if (mealsInfo.lunches > 0) parts.push(`${mealsInfo.lunches} almuerzo${mealsInfo.lunches > 1 ? 's' : ''}`);
+                                        // Skip lunches for Turquía Esencial plan
+                                        if (mealsInfo.lunches > 0 && dest.name !== 'Turquía Esencial') parts.push(`${mealsInfo.lunches} almuerzo${mealsInfo.lunches > 1 ? 's' : ''}`);
                                         if (mealsInfo.dinners > 0) parts.push(`${mealsInfo.dinners} cena${mealsInfo.dinners > 1 ? 's' : ''}`);
                                         return parts.length > 0 ? parts.join(' + ') : `${mealsInfo.total} comida${mealsInfo.total > 1 ? 's' : ''}`;
                                       })()}
