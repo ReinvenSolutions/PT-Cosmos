@@ -520,14 +520,66 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     }
   }
 
-  // Helper function to calculate flight terms height
+  // Helper function to calculate flight terms height more accurately
   const calculateFlightTermsHeight = (): number => {
-    // Approximate calculation based on the terms content
-    // Title: 11pt bold + 0.5 line spacing = ~20px
-    // 7 lines of terms text with spacing = ~120px
-    // Tarifa Light section: title + 5 items = ~100px
-    // Margins and spacing = ~60px
-    return 300; // Total reserved space for terms
+    // Calculate actual height by measuring all text elements
+    let totalHeight = 0;
+    
+    // Title "Términos y condiciones" - 11pt bold + 0.5 line spacing
+    totalHeight += doc.heightOfString("Términos y condiciones", { 
+      width: contentWidth,
+      lineGap: 6
+    });
+    totalHeight += 10; // moveDown(0.5) spacing
+    
+    // Terms text - 9pt
+    const termsText = [
+      "Los boletos de avión no son reembolsables.",
+      "",
+      "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
+      "",
+      "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
+      "",
+      "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo."
+    ];
+    
+    termsText.forEach(line => {
+      if (line === "") {
+        totalHeight += 4; // moveDown(0.3)
+      } else {
+        totalHeight += doc.heightOfString(line, { 
+          width: contentWidth,
+          lineGap: 3
+        });
+        totalHeight += 4; // moveDown(0.3)
+      }
+    });
+    
+    totalHeight += 4; // moveDown(0.3) before "Tarifa Light"
+    
+    // "Tarifa Light:" title
+    totalHeight += doc.heightOfString("Tarifa Light:", { width: contentWidth });
+    totalHeight += 4; // moveDown(0.3)
+    
+    // Tarifa items
+    const tarifaItems = [
+      "Equipaje documentado : Desde $90 USD",
+      "Reembolso : No incluido antes de la partida / No incluido después de la partida",
+      "Equipaje de mano : 1 Pieza incluida (8 kg/115 cm lineales)",
+      "Cambios : Desde $210 USD antes de la partida, aplica términos y condiciones, validar con la aerolínea / Desde $210 USD después de la partida, aplica términos y condiciones, validar con la aerolínea",
+      "Artículo Personal : 1 pieza incluida"
+    ];
+    
+    tarifaItems.forEach(item => {
+      totalHeight += doc.heightOfString(item, { 
+        width: contentWidth,
+        lineGap: 3
+      });
+      totalHeight += 4; // moveDown(0.3)
+    });
+    
+    // Add some buffer for safety
+    return Math.ceil(totalHeight) + 20;
   };
 
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
@@ -571,7 +623,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageBuffer = fs.readFileSync(fullPath);
               const dimensions = sizeOf(imageBuffer);
               const imageWidth = contentWidth;
-              const imageHeight = dimensions.height && dimensions.width 
+              let imageHeight = dimensions.height && dimensions.width 
                 ? (dimensions.height / dimensions.width) * imageWidth 
                 : contentWidth * 0.6; // Fallback estimate
               
@@ -584,11 +636,21 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
                 addPageBackground();
                 addPlaneLogoBottom();
                 flightImageY = 80;
+                
+                // After moving to new page, check if image + terms still fit
+                // If not, scale down the image to fit
+                if (isLastImage && flightImageY + imageHeight + termsHeight + 40 > 750) {
+                  const maxImageHeight = 750 - flightImageY - termsHeight - 40;
+                  imageHeight = maxImageHeight;
+                  console.log(`[PDF Generator] Scaled down outbound image ${index} to ${Math.round(imageHeight)}px to fit with terms`);
+                }
               }
               
-              // Insert image at full width
+              // Insert image (scaled if necessary)
               doc.image(fullPath, leftMargin, flightImageY, {
-                width: contentWidth
+                width: contentWidth,
+                height: imageHeight,
+                fit: [contentWidth, imageHeight]
               });
               
               console.log(`[PDF Generator] Successfully added outbound image ${index} (${Math.round(imageHeight)}px)`);
@@ -1064,7 +1126,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     
     doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
+    const termsHeight = calculateFlightTermsHeight();
     let flightImageY = 150;
+    
     for (let index = 0; index < data.returnFlightImages.length; index++) {
       const imageUrl = data.returnFlightImages[index];
       console.log(`[PDF Generator] Processing return image ${index}:`, imageUrl);
@@ -1082,21 +1146,34 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
               const imageBuffer = fs.readFileSync(fullPath);
               const dimensions = sizeOf(imageBuffer);
               const imageWidth = contentWidth;
-              const imageHeight = dimensions.height && dimensions.width 
+              let imageHeight = dimensions.height && dimensions.width 
                 ? (dimensions.height / dimensions.width) * imageWidth 
                 : contentWidth * 0.6; // Fallback estimate
               
-              // Check if image fits on current page
-              if (flightImageY + imageHeight > 750) {
+              // Check if image + terms fit on current page (reserve space for terms on last image)
+              const isLastImage = index === data.returnFlightImages.length - 1;
+              const spaceNeeded = isLastImage ? imageHeight + termsHeight + 40 : imageHeight + 20;
+              
+              if (flightImageY + spaceNeeded > 750) {
                 doc.addPage();
                 addPageBackground();
                 addPlaneLogoBottom();
                 flightImageY = 80;
+                
+                // After moving to new page, check if image + terms still fit
+                // If not, scale down the image to fit
+                if (isLastImage && flightImageY + imageHeight + termsHeight + 40 > 750) {
+                  const maxImageHeight = 750 - flightImageY - termsHeight - 40;
+                  imageHeight = maxImageHeight;
+                  console.log(`[PDF Generator] Scaled down return image ${index} to ${Math.round(imageHeight)}px to fit with terms`);
+                }
               }
               
-              // Insert image at full width
+              // Insert image (scaled if necessary)
               doc.image(fullPath, leftMargin, flightImageY, {
-                width: contentWidth
+                width: contentWidth,
+                height: imageHeight,
+                fit: [contentWidth, imageHeight]
               });
               
               console.log(`[PDF Generator] Successfully added return image ${index} (${Math.round(imageHeight)}px)`);
@@ -1113,17 +1190,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       }
     }
     
-    // Add flight terms and conditions after images
+    // Add flight terms and conditions after images (always on same page as last image)
     if (flightImageY > 80) {
       flightImageY += 20; // Add some spacing
-      
-      // Check if we have enough space for terms section
-      if (flightImageY + 300 > 750) {
-        doc.addPage();
-        addPageBackground();
-        addPlaneLogoBottom();
-        flightImageY = 80;
-      }
       
       doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
       doc.text("Términos y condiciones", leftMargin, flightImageY, { width: contentWidth });
