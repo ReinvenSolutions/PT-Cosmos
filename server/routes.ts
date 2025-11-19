@@ -283,10 +283,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
-      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages } = req.body;
+      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages, turkeyUpgrade, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage } = req.body;
 
       if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate turkeyUpgrade - only allow if Turquía Esencial is in destinations
+      if (turkeyUpgrade) {
+        const destinationIds = destinations.map((d: any) => d.destinationId);
+        const allDestinations = await storage.getDestinations();
+        const hasTurkeyEsencial = allDestinations.some((dest: any) => 
+          destinationIds.includes(dest.id) && dest.name === "Turquía Esencial"
+        );
+        
+        if (!hasTurkeyEsencial) {
+          return res.status(400).json({ message: "Turkey upgrade can only be selected for Turquía Esencial destination" });
+        }
       }
 
       const quoteData = {
@@ -297,6 +310,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         flightsAndExtras: flightsAndExtras || null,
         outboundFlightImages: outboundFlightImages || null,
         returnFlightImages: returnFlightImages || null,
+        includeFlights: includeFlights ?? false,
+        outboundCabinBaggage: outboundCabinBaggage ?? false,
+        outboundHoldBaggage: outboundHoldBaggage ?? false,
+        returnCabinBaggage: returnCabinBaggage ?? false,
+        returnHoldBaggage: returnHoldBaggage ?? false,
+        turkeyUpgrade: turkeyUpgrade || null,
         status: "draft",
       };
 
@@ -311,10 +330,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
-      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage } = req.body;
+      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, turkeyUpgrade } = req.body;
 
       if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate turkeyUpgrade - only allow if Turquía Esencial is in destinations
+      if (turkeyUpgrade) {
+        const destinationIds = destinations.map((d: any) => d.destinationId);
+        const allDestinations = await storage.getDestinations();
+        const hasTurkeyEsencial = allDestinations.some((dest: any) => 
+          destinationIds.includes(dest.id) && dest.name === "Turquía Esencial"
+        );
+        
+        if (!hasTurkeyEsencial) {
+          return res.status(400).json({ message: "Turkey upgrade can only be selected for Turquía Esencial destination" });
+        }
       }
 
       const quoteData = {
@@ -329,6 +361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outboundHoldBaggage: outboundHoldBaggage ?? false,
         returnCabinBaggage: returnCabinBaggage ?? false,
         returnHoldBaggage: returnHoldBaggage ?? false,
+        turkeyUpgrade: turkeyUpgrade || null,
       };
 
       const quote = await storage.updateQuote(req.params.id, user.id, quoteData, destinations);

@@ -124,7 +124,7 @@ export default function QuoteSummary() {
   const flightsAndExtrasValue = flightsAndExtras ? parseFloat(flightsAndExtras) : 0;
   
   const getTurkeyUpgradeCost = () => {
-    if (!turkeyUpgrade) return 0;
+    if (!hasTurkeyEsencial || !turkeyUpgrade) return 0;
     if (turkeyUpgrade === "option1") return 500;
     if (turkeyUpgrade === "option2") return 770;
     if (turkeyUpgrade === "option3") return 1100;
