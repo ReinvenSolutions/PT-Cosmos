@@ -347,34 +347,91 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   }
   
   const cityStops: CityStop[] = [];
-  let stopNumber = 1;
   
-  data.destinations.forEach(dest => {
-    if (dest.itinerary && dest.itinerary.length > 0) {
-      const locationGroups: { [key: string]: number } = {};
+  // For Turkey destinations, use hotels data with specific stop numbers
+  const isTurkey = data.destinations.some(d => 
+    d.country?.toLowerCase().includes('turqu') || 
+    d.country?.toLowerCase().includes('turkey')
+  );
+  
+  if (isTurkey && data.destinations[0]?.hotels && data.destinations[0].hotels.length > 0) {
+    // Define specific order for Turkey with custom stop numbers
+    const turkeyStopNumbers: { [key: string]: number } = {
+      'Estambul': 1,
+      'Capadocia': 3,
+      'Pamukkale': 4,
+      'Kusadasi/Esmirna': 5
+    };
+    
+    let estambulNightsAdded = false;
+    
+    data.destinations[0].hotels.forEach(hotel => {
+      const location = hotel.location || "";
+      const nights = hotel.nights || 0;
       
-      dest.itinerary.forEach((day, index) => {
-        const titleParts = day.title.split(' - ');
-        const lastLocation = titleParts[titleParts.length - 1].trim();
-        
-        if (index < dest.itinerary!.length - 1) {
-          if (!locationGroups[lastLocation]) {
-            locationGroups[lastLocation] = 0;
-          }
-          locationGroups[lastLocation]++;
+      // For Estambul, combine the two entries into one if first time
+      if (location === 'Estambul') {
+        if (!estambulNightsAdded) {
+          cityStops.push({
+            number: 1,
+            name: 'Estambul',
+            country: data.destinations[0].country || 'Turquía',
+            nights: 3
+          });
+          estambulNightsAdded = true;
+        } else {
+          // Second Estambul entry with 1 night
+          cityStops.push({
+            number: 7,
+            name: 'Estambul',
+            country: data.destinations[0].country || 'Turquía',
+            nights: 1
+          });
         }
-      });
-      
-      Object.entries(locationGroups).forEach(([location, nightCount]) => {
+      } else {
+        const stopNumber = turkeyStopNumbers[location] || 2;
         cityStops.push({
-          number: stopNumber++,
+          number: stopNumber,
           name: location,
-          country: dest.country || "",
-          nights: nightCount
+          country: data.destinations[0].country || 'Turquía',
+          nights: nights
         });
-      });
-    }
-  });
+      }
+    });
+    
+    // Sort by stop number
+    cityStops.sort((a, b) => a.number - b.number);
+  } else {
+    // Original logic for non-Turkey destinations
+    let stopNumber = 1;
+    
+    data.destinations.forEach(dest => {
+      if (dest.itinerary && dest.itinerary.length > 0) {
+        const locationGroups: { [key: string]: number } = {};
+        
+        dest.itinerary.forEach((day, index) => {
+          const titleParts = day.title.split(' - ');
+          const lastLocation = titleParts[titleParts.length - 1].trim();
+          
+          if (index < dest.itinerary!.length - 1) {
+            if (!locationGroups[lastLocation]) {
+              locationGroups[lastLocation] = 0;
+            }
+            locationGroups[lastLocation]++;
+          }
+        });
+        
+        Object.entries(locationGroups).forEach(([location, nightCount]) => {
+          cityStops.push({
+            number: stopNumber++,
+            name: location,
+            country: dest.country || "",
+            nights: nightCount
+          });
+        });
+      }
+    });
+  }
   
   let currentY = doc.y;
   
