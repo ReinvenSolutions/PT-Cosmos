@@ -110,15 +110,15 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
   const imagePaths = getDestinationImages(data.destinations);
 
-  // Add Special Offer banner on first page only (top-right corner) - smaller size
+  // Add Special Offer banner on first page only (top-right corner) - 100% in corner
   const specialOfferPath = path.join(process.cwd(), "server", "assets", "special-offer-banner.png");
   
   if (fs.existsSync(specialOfferPath)) {
     try {
-      // Smaller banner, better positioned in top-right corner
+      // Banner positioned exactly at corner with no margins
       const bannerWidth = 140;
-      const bannerX = pageWidth - bannerWidth - 5;
-      const bannerY = 5;
+      const bannerX = pageWidth - bannerWidth;
+      const bannerY = 0;
       
       doc.image(specialOfferPath, bannerX, bannerY, { width: bannerWidth });
       console.log("[PDF Generator] Special offer banner added successfully");
@@ -130,13 +130,13 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text("S U   V I A J E   A :", leftMargin, 70);
 
-  // Add plane logo on first page after "SU VIAJE A:" text - better aligned vertically
+  // Add plane logo on first page after "SU VIAJE A:" text - aligned with text
   if (fs.existsSync(planeLogoPath)) {
     try {
       const firstPageLogoWidth = 60;
       const textWidth = doc.widthOfString("S U   V I A J E   A :");
       const firstPageLogoX = leftMargin + textWidth + 15;
-      const firstPageLogoY = 65; // Moved up to align better with text
+      const firstPageLogoY = 57; // Raised higher to align better with text
       
       doc.image(planeLogoPath, firstPageLogoX, firstPageLogoY, { width: firstPageLogoWidth });
       console.log("[PDF Generator] Plane logo added to first page after title");
