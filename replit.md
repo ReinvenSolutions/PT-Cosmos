@@ -86,6 +86,11 @@ The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clien
 - **Itinerary**: Estambul (3+1 nights) → Capadocia (3 nights) → Pamukkale (1 night) → Esmirna (1 night) → Estambul (1 night)
 - **Image Configuration**: Images are stored in `attached_assets/` and configured in `server/destination-images.ts` and `client/src/lib/destination-images.ts`. The first 3 images are shown on the PDF front page, the last 3 on the detailed itinerary page.
 - **Tooltip**: "Salidas todos los Martes desde Colombia. Combinable con: Dubái, Egipto, Grecia, Tailandia, Vietnam, Perú (salidas diarias). Turquía siempre va primero en la ruta."
+- **Holiday Date Validation**: The quotation system prevents booking on Turkish national and religious holidays for Turquía Esencial:
+  - Dates are automatically disabled in the date picker: January 1, March 30-31, April 1, April 23, May 1, May 6, June 6, July 15, August 30 (2026)
+  - If a user attempts to select a holiday date, a toast notification displays: "No se puede seleccionar esta fecha porque es festivo en Turquía" with the specific holiday description
+  - Holiday list is configured in `client/src/lib/turkey-holidays.ts` with helper functions `isTurkeyHoliday()` and `getTurkeyHolidayDescription()`
+  - Validation applies only to "Turquía Esencial" plan; other destinations are unaffected
 - **Upgrade Options**: Turquía Esencial offers three exclusive upgrade packages to enhance the base experience:
   - **Option 1 (+$500 USD)**: 8 almuerzos + 2 actividades Estambul
   - **Option 2 (+$770 USD)**: Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul
