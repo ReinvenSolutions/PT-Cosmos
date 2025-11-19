@@ -941,13 +941,16 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       const currentY = doc.y;
       
       doc.rect(leftMargin, currentY, contentWidth, rowHeight).fill(tableRowBg);
-      doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
       
+      // Nombre del tour en Helvetica normal
+      doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
       doc.text(name, leftMargin + 3, currentY + 3, { 
         width: nameColWidth - 6,
         continued: false
       });
       
+      // Precio en negrita y un poco más grande
+      doc.font("Helvetica-Bold").fontSize(8);
       doc.text(price, leftMargin + nameColWidth, currentY + 3, { 
         width: priceColWidth - 3,
         align: "right",
@@ -971,7 +974,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       { name: "Noche Turca İstambul (barco cena)", price: "154 USD" },
       { name: "6 almuerzos (itinerario, no Estambul)", price: "185 USD" },
       { name: "Jeep Safari", price: "108 USD" },
-      { name: "Combos: Combo 1 / Combo 2", price: "969 / 606 USD" }
+      { name: "Combo 1", price: "1,020 USD" },
+      { name: "Combo 2", price: "660 USD" }
     ];
 
     tours.forEach(tour => {
