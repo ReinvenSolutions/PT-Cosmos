@@ -685,8 +685,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       addPlaneLogoBottom();
     }
 
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
-    doc.text("Alojamientos Previstos", leftMargin, doc.y);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+    doc.text("HOTELES PREVISTOS O SIMILARES", leftMargin, doc.y);
     doc.moveDown(0.5);
 
     doc.font("Helvetica").fontSize(8).fillColor(textColor);
@@ -700,9 +700,14 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     });
 
     Object.entries(hotelGroups).forEach(([location, hotels]) => {
-      const hotelNames = hotels.map(h => `${h.name}${h.category ? ` ${h.category}` : ""}`).join(", ");
-      doc.text(`${location}: ${hotelNames}`, leftMargin, doc.y, { width: contentWidth });
-      doc.moveDown(0.3);
+      const hotelNames = hotels.map(h => `${h.name}${h.category ? ` ${h.category}` : ""}`).join(" - ");
+      
+      doc.font("Helvetica-Bold").fontSize(8).fillColor(primaryColor);
+      doc.text(`${location.toUpperCase()}:`, leftMargin, doc.y, { continued: true });
+      
+      doc.font("Helvetica").fontSize(8).fillColor(textColor);
+      doc.text(` ${hotelNames}`, { width: contentWidth });
+      doc.moveDown(0.5);
     });
 
     doc.moveDown(1);
