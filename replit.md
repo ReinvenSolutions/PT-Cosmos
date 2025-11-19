@@ -76,6 +76,14 @@ The project adopts a monorepo structure (`/client`, `/server`, `/shared`). Clien
 - **Itinerary**: Estambul (3+1 nights) → Capadocia (3 nights) → Pamukkale (1 night) → Esmirna (1 night) → Estambul (1 night)
 - **Image Configuration**: Images are stored in `attached_assets/` and configured in `server/destination-images.ts` and `client/src/lib/destination-images.ts`. The first 3 images are shown on the PDF front page, the last 3 on the detailed itinerary page.
 - **Tooltip**: "Salidas todos los Martes desde Colombia. Combinable con: Dubái, Egipto, Grecia, Tailandia, Vietnam, Perú (salidas diarias). Turquía siempre va primero en la ruta."
+- **Upgrade Options**: Turquía Esencial offers three exclusive upgrade packages to enhance the base experience:
+  - **Option 1 (+$500 USD)**: 8 almuerzos + 2 actividades Estambul
+  - **Option 2 (+$770 USD)**: Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul
+  - **Option 3 (+$1,100 USD)**: Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul
+  - Upgrade options are displayed conditionally in both QuoteSummary and QuoteEdit pages only when Turquía Esencial is selected
+  - Users can select only one upgrade option at a time (radio-style checkboxes)
+  - The selected upgrade cost is automatically added to the grand total calculation
+  - Stored in database field `turkeyUpgrade` with values: 'option1', 'option2', 'option3', or null
 - **PDF Formatting Changes**:
   - Plane logo positioned at Y=65 (better aligned with "SU VIAJE A:" text)
   - RNT No.240799 and creation date positioned above main image
