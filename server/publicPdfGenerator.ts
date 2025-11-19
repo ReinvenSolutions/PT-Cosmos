@@ -801,21 +801,21 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     } else {
       // Upgrade selected - show which upgrade was included
       const upgradeOptions: { [key: string]: { description: string; price: string } } = {
-        "500": {
+        "option1": {
           description: "8 almuerzos + 2 actividades Estambul",
           price: "500 USD"
         },
-        "770": {
+        "option2": {
           description: "Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul",
           price: "770 USD"
         },
-        "1100": {
+        "option3": {
           description: "Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul",
           price: "1,100 USD"
         }
       };
       
-      const selectedUpgrade = data.turkeyUpgrade ? upgradeOptions[String(data.turkeyUpgrade)] : undefined;
+      const selectedUpgrade = data.turkeyUpgrade ? upgradeOptions[data.turkeyUpgrade] : undefined;
       
       if (selectedUpgrade) {
         const boxHeight = 80;
