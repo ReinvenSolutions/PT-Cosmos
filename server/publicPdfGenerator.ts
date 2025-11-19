@@ -520,6 +520,16 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     }
   }
 
+  // Helper function to calculate flight terms height
+  const calculateFlightTermsHeight = (): number => {
+    // Approximate calculation based on the terms content
+    // Title: 11pt bold + 0.5 line spacing = ~20px
+    // 7 lines of terms text with spacing = ~120px
+    // Tarifa Light section: title + 5 items = ~100px
+    // Margins and spacing = ~60px
+    return 300; // Total reserved space for terms
+  };
+
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
   if (data.includeFlights && data.outboundFlightImages && data.outboundFlightImages.length > 0) {
     console.log('[PDF Generator] Outbound flight images:', data.outboundFlightImages);
@@ -541,7 +551,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     
     doc.font("Helvetica-Bold").fontSize(12).fillColor(textColor).text(baggageText, leftMargin, 110, { align: "center", width: contentWidth });
     
+    const termsHeight = calculateFlightTermsHeight();
     let flightImageY = 150;
+    
     for (let index = 0; index < data.outboundFlightImages.length; index++) {
       const imageUrl = data.outboundFlightImages[index];
       console.log(`[PDF Generator] Processing outbound image ${index}:`, imageUrl);
@@ -563,8 +575,11 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
                 ? (dimensions.height / dimensions.width) * imageWidth 
                 : contentWidth * 0.6; // Fallback estimate
               
-              // Check if image fits on current page
-              if (flightImageY + imageHeight > 750) {
+              // Check if image + terms fit on current page (reserve space for terms on last image)
+              const isLastImage = index === data.outboundFlightImages.length - 1;
+              const spaceNeeded = isLastImage ? imageHeight + termsHeight + 40 : imageHeight + 20;
+              
+              if (flightImageY + spaceNeeded > 750) {
                 doc.addPage();
                 addPageBackground();
                 addPlaneLogoBottom();
@@ -590,17 +605,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       }
     }
     
-    // Add flight terms and conditions after images
+    // Add flight terms and conditions after images (always on same page as last image)
     if (flightImageY > 80) {
       flightImageY += 20; // Add some spacing
-      
-      // Check if we have enough space for terms section
-      if (flightImageY + 300 > 750) {
-        doc.addPage();
-        addPageBackground();
-        addPlaneLogoBottom();
-        flightImageY = 80;
-      }
       
       doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
       doc.text("Términos y condiciones", leftMargin, flightImageY, { width: contentWidth });
