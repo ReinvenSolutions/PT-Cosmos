@@ -905,7 +905,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     return name.includes("turquia esencial") || name.includes("turkey esencial");
   });
 
-  // PÁGINA DE ASISTENCIA MÉDICA - Siempre incluida al final
+  // PÁGINA DE ASISTENCIA MÉDICA Y TOURS OPCIONALES
   doc.addPage();
   addPageBackground();
   addPlaneLogoBottom();
@@ -918,12 +918,85 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   doc.text("ASISTENCIA MEDICA PARA TU VIAJE", leftMargin, topMargin, { align: "center", width: contentWidth });
   
   doc.moveDown(2);
-  
-  // Agregar imagen de asistencia médica
+
+  if (hasTurkeyDestinations) {
+    // TOURS OPCIONALES - Mostrar en la misma página de asistencia médica
+    doc.y = topMargin + 50;
+
+    // Título compacto
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
+    doc.text("TOUR OPCIONALES", leftMargin, doc.y, { align: "center", width: contentWidth });
+    doc.moveDown(1);
+
+    // Configuración de tabla compacta
+    const tableHeaderBg = "#1e40af";
+    const tableRowBg = "#e0e7ff";
+    const tableTextColor = "#1f2937";
+    const priceColWidth = 80;
+    const nameColWidth = contentWidth - priceColWidth;
+    
+    // Helper para agregar fila de tabla compacta
+    const addTableRow = (name: string, price: string) => {
+      const rowHeight = 12;
+      const currentY = doc.y;
+      
+      doc.rect(leftMargin, currentY, contentWidth, rowHeight).fill(tableRowBg);
+      doc.fillColor(tableTextColor).font("Helvetica").fontSize(7);
+      
+      doc.text(name, leftMargin + 3, currentY + 3, { 
+        width: nameColWidth - 6,
+        continued: false
+      });
+      
+      doc.text(price, leftMargin + nameColWidth, currentY + 3, { 
+        width: priceColWidth - 3,
+        align: "right",
+        continued: false
+      });
+      
+      doc.rect(leftMargin, currentY, nameColWidth, rowHeight).stroke("#3b82f6");
+      doc.rect(leftMargin + nameColWidth, currentY, priceColWidth, rowHeight).stroke("#3b82f6");
+      
+      doc.y = currentY + rowHeight;
+    };
+
+    // Tours individuales condensados
+    const tours = [
+      { name: "Paseo en Globo (15/Mar-31/Oct 2026)", price: "415 USD" },
+      { name: "Paseo en Globo (01/Nov 2026-14/Mar 2027)", price: "384 USD" },
+      { name: "Paseo Bósforo con almuerzo", price: "154 USD" },
+      { name: "Paseo Clasico con almuerzo", price: "224 USD" },
+      { name: "Noche Turca Capadócia (solo show)", price: "116 USD" },
+      { name: "Noche Turca Capadócia (cena show)", price: "139 USD" },
+      { name: "Noche Turca İstambul (barco cena)", price: "154 USD" },
+      { name: "6 almuerzos (itinerario, no Estambul)", price: "185 USD" },
+      { name: "Jeep Safari", price: "108 USD" },
+      { name: "Combos: Combo 1 / Combo 2", price: "969 / 606 USD" }
+    ];
+
+    tours.forEach(tour => {
+      addTableRow(tour.name, tour.price);
+    });
+
+    doc.moveDown(0.5);
+
+    // Nota sobre fee bancario compacta
+    doc.fillColor("#dc2626").font("Helvetica-Bold").fontSize(8);
+    doc.text("Fee bancario no incluido, 2.5% sobre el total", leftMargin, doc.y, { 
+      align: "center", 
+      width: contentWidth 
+    });
+
+    doc.moveDown(1.5);
+
+    console.log('[PDF Generator] Turkey optional tours table added successfully (compact version)');
+  }
+
+  // Agregar imagen de asistencia médica después de los tours
   const medicalAssistanceImagePath = path.join(process.cwd(), "server", "assets", "medical-assistance.png");
   
-  // Calcular altura de imagen de asistencia médica basado en si hay actividades opcionales
-  const medicalImageHeight = hasTurkeyDestinations ? 240 : 400;
+  // Calcular altura de imagen de asistencia médica basado en espacio disponible
+  const medicalImageHeight = hasTurkeyDestinations ? 180 : 400;
   
   if (fs.existsSync(medicalAssistanceImagePath)) {
     try {
@@ -947,194 +1020,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     }
   } else {
     console.warn(`[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`);
-  }
-
-  if (hasTurkeyDestinations) {
-    // Crear nueva página para tours opcionales
-    doc.addPage();
-    addPageBackground();
-    addPlaneLogoBottom();
-    doc.y = topMargin;
-
-    // Título principal
-    doc.font("Helvetica-Bold").fontSize(16).fillColor("#ffffff");
-    const titleBg = "#1e3a8a"; // Azul oscuro
-    doc.rect(leftMargin, doc.y, contentWidth, 30).fill(titleBg);
-    doc.fillColor("#ffffff").text("TOUR OPCIONALES", leftMargin, doc.y + 8, { align: "center", width: contentWidth });
-    doc.moveDown(2.5);
-
-    // Configuración de tabla
-    const tableHeaderBg = "#1e40af"; // Azul primary
-    const tableRowBg = "#e0e7ff"; // Azul muy claro
-    const tableTextColor = "#1f2937";
-    const priceColWidth = 100;
-    const nameColWidth = contentWidth - priceColWidth;
-    
-    // Helper para agregar fila de tabla
-    const addTableRow = (name: string, price: string, isHeader = false) => {
-      if (doc.y > 700) {
-        doc.addPage();
-        addPageBackground();
-        addPlaneLogoBottom();
-        doc.y = topMargin;
-      }
-      
-      const rowHeight = isHeader ? 20 : 16;
-      const currentY = doc.y;
-      
-      if (isHeader) {
-        doc.rect(leftMargin, currentY, contentWidth, rowHeight).fill(tableHeaderBg);
-        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9);
-      } else {
-        doc.rect(leftMargin, currentY, contentWidth, rowHeight).fill(tableRowBg);
-        doc.fillColor(tableTextColor).font("Helvetica").fontSize(8);
-      }
-      
-      // Nombre del tour
-      doc.text(name, leftMargin + 5, currentY + (isHeader ? 6 : 4), { 
-        width: nameColWidth - 10,
-        continued: false
-      });
-      
-      // Precio
-      doc.text(price, leftMargin + nameColWidth, currentY + (isHeader ? 6 : 4), { 
-        width: priceColWidth - 5,
-        align: "right",
-        continued: false
-      });
-      
-      // Borde de celdas
-      doc.rect(leftMargin, currentY, nameColWidth, rowHeight).stroke("#3b82f6");
-      doc.rect(leftMargin + nameColWidth, currentY, priceColWidth, rowHeight).stroke("#3b82f6");
-      
-      doc.y = currentY + rowHeight;
-    };
-
-    // Tours individuales
-    const tours = [
-      { name: "Paseo en Globo (de 15/Mar 2026 a 31/Oct 2026)", price: "415 USD" },
-      { name: "Paseo en Globo (de 01/Nov 2026 a 14/Mar 2027)", price: "384 USD" },
-      { name: "Paseo Bósforo con almuerzo", price: "154 USD" },
-      { name: "Paseo Clasico con almuerzo", price: "224 USD" },
-      { name: "Noche Turca en Capadócia (solo show)", price: "116 USD" },
-      { name: "Noche Turca en Capadócia cena show", price: "139 USD" },
-      { name: "Noche Turca en İstambul (en barco con cena show)", price: "154 USD" },
-      { name: "Erciyes Ski", price: "200 USD" },
-      { name: "Cappa Park", price: "200 USD" },
-      { name: "SkyDinner", price: "324 USD" },
-      { name: "Jeep Safari", price: "108 USD" },
-      { name: "6 almuerzos (en las ciudades del itinerario, menos en Estambul)", price: "185 USD" },
-      { name: "E-SIM (3GB)", price: "31 USD" },
-      { name: "Entrada al Palacio de Topkapi", price: "110 USD" }
-    ];
-
-    tours.forEach(tour => {
-      addTableRow(tour.name, tour.price, false);
-    });
-
-    doc.moveDown(1.5);
-
-    // Nota sobre fee bancario
-    doc.fillColor("#dc2626").font("Helvetica-Bold").fontSize(10);
-    doc.text("Fee bancario no incluido, 2.5% sobre el total", leftMargin, doc.y, { 
-      align: "center", 
-      width: contentWidth 
-    });
-
-    doc.moveDown(2);
-
-    // COMBOS
-    if (doc.y > 600) {
-      doc.addPage();
-      addPageBackground();
-      addPlaneLogoBottom();
-      doc.y = topMargin + 20;
-    }
-
-    // Combo 1
-    doc.font("Helvetica-Bold").fontSize(12).fillColor("#ffffff");
-    doc.rect(leftMargin, doc.y, contentWidth, 25).fill("#1e3a8a");
-    doc.text("COMBO 1", leftMargin, doc.y + 7, { align: "center", width: contentWidth });
-    doc.moveDown(2);
-
-    const combo1Items = [
-      "PASEO EN GLOBO",
-      "BÓSFORO con almuerzo",
-      "CLASICO con almuerzo",
-      "NOCHE TURCA Capadocia sin cena",
-      "JEEP SAFARI - Sujeto al clima"
-    ];
-
-    doc.fillColor(tableTextColor).font("Helvetica").fontSize(9);
-    combo1Items.forEach(item => {
-      if (doc.y > 720) {
-        doc.addPage();
-        addPageBackground();
-        addPlaneLogoBottom();
-        doc.y = topMargin;
-      }
-      const itemY = doc.y;
-      doc.rect(leftMargin, itemY, contentWidth - 100, 14).fill(tableRowBg).stroke("#3b82f6");
-      doc.fillColor(tableTextColor).text(item, leftMargin + 5, itemY + 3, { width: contentWidth - 110 });
-      doc.y = itemY + 14;
-    });
-
-    // Precio del combo 1
-    const combo1PriceY = doc.y - (14 * combo1Items.length);
-    doc.rect(leftMargin + contentWidth - 100, combo1PriceY, 100, 14 * combo1Items.length).fill("#1e40af");
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(14);
-    doc.text("969 USD", leftMargin + contentWidth - 95, combo1PriceY + (14 * combo1Items.length / 2) - 7, { 
-      width: 90,
-      align: "center"
-    });
-    doc.rect(leftMargin + contentWidth - 100, combo1PriceY, 100, 14 * combo1Items.length).stroke("#3b82f6");
-
-    doc.moveDown(2);
-
-    // Combo 2
-    if (doc.y > 650) {
-      doc.addPage();
-      addPageBackground();
-      addPlaneLogoBottom();
-      doc.y = topMargin + 20;
-    }
-
-    doc.font("Helvetica-Bold").fontSize(12).fillColor("#ffffff");
-    doc.rect(leftMargin, doc.y, contentWidth, 25).fill("#1e3a8a");
-    doc.text("COMBO 2", leftMargin, doc.y + 7, { align: "center", width: contentWidth });
-    doc.moveDown(2);
-
-    const combo2Items = [
-      "PASEO EN GLOBO",
-      "NOCHE TURCA Capadocia sin cena",
-      "JEEP SAFARI - Sujeto al clima"
-    ];
-
-    doc.fillColor(tableTextColor).font("Helvetica").fontSize(9);
-    combo2Items.forEach(item => {
-      if (doc.y > 720) {
-        doc.addPage();
-        addPageBackground();
-        addPlaneLogoBottom();
-        doc.y = topMargin;
-      }
-      const itemY = doc.y;
-      doc.rect(leftMargin, itemY, contentWidth - 100, 14).fill(tableRowBg).stroke("#3b82f6");
-      doc.fillColor(tableTextColor).text(item, leftMargin + 5, itemY + 3, { width: contentWidth - 110 });
-      doc.y = itemY + 14;
-    });
-
-    // Precio del combo 2
-    const combo2PriceY = doc.y - (14 * combo2Items.length);
-    doc.rect(leftMargin + contentWidth - 100, combo2PriceY, 100, 14 * combo2Items.length).fill("#1e40af");
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(14);
-    doc.text("606 USD", leftMargin + contentWidth - 95, combo2PriceY + (14 * combo2Items.length / 2) - 7, { 
-      width: 90,
-      align: "center"
-    });
-    doc.rect(leftMargin + contentWidth - 100, combo2PriceY, 100, 14 * combo2Items.length).stroke("#3b82f6");
-
-    console.log('[PDF Generator] Turkey optional tours table added successfully');
   }
 
   // PÁGINAS DE POLÍTICAS Y DÍAS FESTIVOS - Solo para Turquía Esencial
@@ -1244,11 +1129,8 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
 
     console.log('[PDF Generator] Turkey policies page added successfully');
 
-    // PÁGINA DE DÍAS FESTIVOS 2026
-    doc.addPage();
-    addPageBackground();
-    addPlaneLogoBottom();
-    doc.y = topMargin;
+    // DÍAS FESTIVOS 2026 - Continuar en la misma página
+    doc.moveDown(2);
 
     // Título de días festivos
     doc.font("Helvetica-Bold").fontSize(14).fillColor(primaryColor);
