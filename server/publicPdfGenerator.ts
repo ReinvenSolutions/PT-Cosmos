@@ -512,9 +512,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
     
     if (fs.existsSync(turkeyMapPath)) {
       try {
-        const mapY = doc.y + 30;
+        const mapY = doc.y + 20;
         const mapWidth = contentWidth;
-        const mapHeight = 280;
+        const mapHeight = 240;
         
         console.log(`[PDF Generator] Adding map image at Y=${mapY}, width=${mapWidth}, height=${mapHeight}`);
         
