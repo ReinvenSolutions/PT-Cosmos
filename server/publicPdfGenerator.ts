@@ -34,6 +34,7 @@ interface PublicQuoteData {
   returnCabinBaggage?: boolean;
   returnHoldBaggage?: boolean;
   passengers?: number;
+  turkeyUpgrade?: string | null;
 }
 
 function getPassengerText(passengers: number): string {
@@ -865,20 +866,141 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   
   doc.moveDown(2);
 
-  doc.fontSize(7).fillColor(textColor);
-  doc.text(
-    "Esta cotización es válida por 7 días. Los precios están sujetos a disponibilidad.",
-    leftMargin,
-    doc.y,
-    { width: contentWidth, align: "center" }
-  );
-  doc.moveDown(0.3);
-  doc.text(
-    "Para más información, contáctanos por WhatsApp: +57 314 657 6500",
-    leftMargin,
-    doc.y,
-    { width: contentWidth, align: "center" }
-  );
+  // For Turkey Esencial, show upgrade options or selected upgrade in blue box
+  if (isTurkeyEsencial) {
+    // Check if we need a new page for the upgrade section
+    if (doc.y > 650) {
+      doc.addPage();
+      addPageBackground();
+      addPlaneLogoBottom();
+      doc.y = 80;
+    }
+    
+    const boxY = doc.y;
+    const boxPadding = 15;
+    const boxColor = "#88bbcd"; // Light blue background
+    const boxTextColor = "#1f2937"; // Dark text
+    
+    if (!data.turkeyUpgrade) {
+      // No upgrade selected - show available upgrade options
+      const boxHeight = 140; // Estimated height for the upgrade options
+      
+      // Draw blue background box
+      doc.rect(leftMargin, boxY, contentWidth, boxHeight)
+         .fillAndStroke(boxColor, "#5a9fb8");
+      
+      // Title
+      doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
+      doc.text(
+        "MEJORA TU PLAN, GASTA MENOS EN DESTINO (VALOR POR PERSONA):",
+        leftMargin + boxPadding,
+        boxY + boxPadding,
+        { width: contentWidth - (boxPadding * 2) }
+      );
+      
+      let optionY = boxY + boxPadding + 25;
+      doc.font("Helvetica").fontSize(9).fillColor(boxTextColor);
+      
+      // Option 1
+      doc.font("Helvetica-Bold").fontSize(10).text(
+        "+ 500 USD:",
+        leftMargin + boxPadding,
+        optionY,
+        { continued: true }
+      );
+      doc.font("Helvetica").fontSize(9).text(
+        " 8 almuerzos + 2 actividades Estambul",
+        { width: contentWidth - (boxPadding * 2) }
+      );
+      optionY += 25;
+      
+      // Option 2
+      doc.font("Helvetica-Bold").fontSize(10).text(
+        "+ 770 USD:",
+        leftMargin + boxPadding,
+        optionY,
+        { continued: true }
+      );
+      doc.font("Helvetica").fontSize(9).text(
+        " Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul",
+        { width: contentWidth - (boxPadding * 2) }
+      );
+      optionY += 25;
+      
+      // Option 3
+      doc.font("Helvetica-Bold").fontSize(10).text(
+        "+1,100 USD:",
+        leftMargin + boxPadding,
+        optionY,
+        { continued: true }
+      );
+      doc.font("Helvetica").fontSize(9).text(
+        " Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul",
+        { width: contentWidth - (boxPadding * 2) }
+      );
+      
+      doc.y = boxY + boxHeight + 10;
+    } else {
+      // Upgrade selected - show which upgrade was included
+      const upgradeOptions: { [key: string]: { description: string; price: string } } = {
+        "500": {
+          description: "8 almuerzos + 2 actividades Estambul",
+          price: "500 USD"
+        },
+        "770": {
+          description: "Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul",
+          price: "770 USD"
+        },
+        "1100": {
+          description: "Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul",
+          price: "1,100 USD"
+        }
+      };
+      
+      const selectedUpgrade = data.turkeyUpgrade ? upgradeOptions[String(data.turkeyUpgrade)] : undefined;
+      
+      if (selectedUpgrade) {
+        const boxHeight = 80;
+        
+        // Draw blue background box
+        doc.rect(leftMargin, boxY, contentWidth, boxHeight)
+           .fillAndStroke(boxColor, "#5a9fb8");
+        
+        // Title
+        doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
+        doc.text(
+          "MEJORA INCLUIDA EN ESTA COTIZACIÓN:",
+          leftMargin + boxPadding,
+          boxY + boxPadding,
+          { width: contentWidth - (boxPadding * 2) }
+        );
+        
+        doc.moveDown(0.5);
+        
+        // Description
+        doc.font("Helvetica").fontSize(10).fillColor(boxTextColor);
+        doc.text(
+          `• ${selectedUpgrade.description}`,
+          leftMargin + boxPadding,
+          doc.y,
+          { width: contentWidth - (boxPadding * 2) }
+        );
+        
+        doc.moveDown(0.5);
+        
+        // Price
+        doc.font("Helvetica-Bold").fontSize(10).fillColor(boxTextColor);
+        doc.text(
+          `Valor adicional: ${selectedUpgrade.price} por persona`,
+          leftMargin + boxPadding,
+          doc.y,
+          { width: contentWidth - (boxPadding * 2) }
+        );
+        
+        doc.y = boxY + boxHeight + 10;
+      }
+    }
+  }
 
   // VUELOS DE REGRESO - última página del PDF
   if (data.includeFlights && data.returnFlightImages && data.returnFlightImages.length > 0) {
@@ -1024,11 +1146,6 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
            name.includes("turqu") || name.includes("turkey");
   });
 
-  // Detectar específicamente si incluye "Turquía Esencial"
-  const hasTurkeyEsencial = data.destinations.some((dest) => {
-    const name = normalizeText(dest.name || "");
-    return name.includes("turquia esencial") || name.includes("turkey esencial");
-  });
 
   // PÁGINA DE ASISTENCIA MÉDICA Y TOURS OPCIONALES
   doc.addPage();
@@ -1250,7 +1367,7 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   }
 
   // PÁGINAS DE POLÍTICAS Y DÍAS FESTIVOS - Solo para Turquía Esencial
-  if (hasTurkeyEsencial) {
+  if (isTurkeyEsencial) {
     // PÁGINA DE POLÍTICAS Y CONDICIONES
     doc.addPage();
     addPageBackground();
