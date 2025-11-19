@@ -757,6 +757,13 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
       
       doc.font("Helvetica").fontSize(8).fillColor(textColor);
       doc.text(` ${hotelNames}`, { width: contentWidth });
+      
+      // Add Le Bleu upgrade note for Kusadasi/Esmirna location
+      if (location === 'Kusadasi/Esmirna') {
+        doc.font("Helvetica-Oblique").fontSize(8).fillColor(textColor);
+        doc.text(" (Posible mejora en el Hotel Le Bleu sujeta a disponibilidad)", { width: contentWidth });
+      }
+      
       doc.moveDown(0.5);
     });
 
