@@ -172,10 +172,9 @@ export async function generatePublicQuotePDF(data: PublicQuoteData): Promise<Ins
   const mainImageY = 165;
   const mainImageHeight = 250;
   
-  // Add RNT and creation date above the main image
+  // Add creation date above the main image
   const currentDate = formatDate(new Date());
   doc.font("Helvetica").fontSize(9).fillColor("#1f2937");
-  doc.text("RNT No.240799", leftMargin, mainImageY - 15);
   doc.text(`creado ${currentDate}`, 0, mainImageY - 15, { width: pageWidth - rightMargin, align: "right" });
   
   if (imagePaths.length > 0 && fs.existsSync(imagePaths[0])) {
