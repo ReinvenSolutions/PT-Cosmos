@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { FileText, Check } from "lucide-react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 interface PDFLoadingModalProps {
   isOpen: boolean;
@@ -88,6 +89,11 @@ export function PDFLoadingModal({ isOpen, isComplete = false }: PDFLoadingModalP
         className="sm:max-w-md [&>button]:hidden"
         onInteractOutside={(e) => e.preventDefault()}
       >
+        <VisuallyHidden>
+          <DialogTitle>
+            {isCompleteState ? "Cotización Lista" : "Generando Cotización"}
+          </DialogTitle>
+        </VisuallyHidden>
         <div className="flex flex-col items-center justify-center py-8 px-4">
           {/* Icon with animation */}
           <div className="relative mb-6">

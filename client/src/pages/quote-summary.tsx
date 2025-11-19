@@ -310,6 +310,8 @@ export default function QuoteSummary() {
                             outboundCabinBaggage || outboundHoldBaggage || 
                             returnCabinBaggage || returnHoldBaggage;
 
+      console.log("Starting PDF generation request...");
+
       const response = await fetch("/api/public/quote-pdf", {
         method: "POST",
         headers: {
@@ -342,8 +344,12 @@ export default function QuoteSummary() {
         }),
       });
       
+      console.log("PDF response received:", response.status, response.ok);
+      
       if (!response.ok) {
-        throw new Error("Failed to generate PDF");
+        const errorText = await response.text();
+        console.error("PDF generation failed:", errorText);
+        throw new Error(`Failed to generate PDF: ${response.status} - ${errorText}`);
       }
       
       const blob = await response.blob();
