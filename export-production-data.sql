@@ -507,11 +507,10 @@ INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES (
 INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('4b3b0796-7b5d-440d-a8e3-7f25e4a48752', 'c3e06106-518d-46da-b1db-4228b126be43', 'Tasa de visado de Vietnam: 25 USD por persona, entrada simple', 6);
 INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('55e5acce-393f-4a6c-9d50-719849ca150b', 'c3e06106-518d-46da-b1db-4228b126be43', 'Todos los conceptos no mencionados en SERVICIOS INCLUIDOS', 7);
 INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('f57aada7-642e-470f-8ef3-5c7f8248ba94', '9aeb1692-fe16-4a7a-8317-3b3155db5fbf', 'Los precios están sujetos a cambio sin previo aviso antes de la confirmación de la reserva.', 1);
-INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('c581997b-ded4-48a7-b503-2d39243b3ac9', 'a0edb8c2-7e77-444e-8221-2501fe87f338', 'Excursiones opcionales (plan mejorado, incluye actividades en Estambul)', 0);
+INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('c581997b-ded4-48a7-b503-2d39243b3ac9', 'a0edb8c2-7e77-444e-8221-2501fe87f338', 'Excursiones opcionales. Excepto en: Plan Mejorado (incluye 8 almuerzos y actividades en Estambul)', 0);
 INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('e8ee11c8-7dc6-4c7d-a003-2e9ceb34ead6', 'a0edb8c2-7e77-444e-8221-2501fe87f338', 'Bebidas con las comidas', 0);
 INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('0091f88c-8a28-4497-8e9a-559df164156e', 'a0edb8c2-7e77-444e-8221-2501fe87f338', 'Gastos personales', 0);
 INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('5517c91c-c19f-406e-a801-3e32a2567f00', 'a0edb8c2-7e77-444e-8221-2501fe87f338', 'Equipaje adicional', 0);
-INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('8a4af870-6894-44d9-a7d2-d9c18673b2db', 'a0edb8c2-7e77-444e-8221-2501fe87f338', 'Fee bancario 2.5% sobre el total', 0);
 INSERT INTO public.exclusions (id, destination_id, item, display_order) VALUES ('b332b857-e3f5-48ef-918a-a5e6b2debd55', 'a0edb8c2-7e77-444e-8221-2501fe87f338', 'Propinas para el guía y el conductor (se sugieren 5 USD P.P. por día)', 0);
 
 
