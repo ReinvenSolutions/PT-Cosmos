@@ -39,7 +39,6 @@ async function syncData() {
   console.log('========================================');
   console.log(`Entorno: ${env}`);
   console.log(`Deployment: ${isDeployment ? 'SÍ' : 'NO'}`);
-  console.log(`Base de datos: ${process.env.DATABASE_URL?.substring(0, 30)}...`);
   console.log('========================================\n');
 
   // Validación de seguridad para producción
