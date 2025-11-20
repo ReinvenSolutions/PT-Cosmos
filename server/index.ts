@@ -6,6 +6,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import passport from "./auth";
 import { seedDatabaseIfEmpty } from "./seed";
+import { syncCanonicalData } from "./sync-canonical-data";
 
 const app = express();
 
@@ -85,9 +86,13 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // Seed automático de base de datos en producción si está vacía
-  if (process.env.NODE_ENV === "production") {
+  // En producción: primero poblar BD si está vacía, luego sincronizar datos canónicos
+  if (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1") {
+    // Paso 1: Seed inicial (solo si BD está vacía)
     await seedDatabaseIfEmpty();
+    
+    // Paso 2: Sincronizar datos canónicos (SIEMPRE en producción/deployment)
+    await syncCanonicalData();
   }
 
   // importantly only setup vite in development and after
