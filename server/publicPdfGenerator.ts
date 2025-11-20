@@ -14,8 +14,52 @@ import {
 } from "./destination-images";
 import { getImagePathForPDF } from "./upload";
 import fs from "fs";
+import { promises as fsPromises } from "fs";
 import path from "path";
 import sizeOf from "image-size";
+
+// Image cache to avoid re-reading files
+interface CachedImage {
+  path: string;
+  buffer: Buffer;
+  width: number;
+  height: number;
+}
+
+const imageCache = new Map<string, CachedImage>();
+
+// Preload all flight images in parallel for better performance
+async function preloadFlightImages(imageUrls: string[]): Promise<void> {
+  console.log(`[PDF Generator] Preloading ${imageUrls.length} flight images...`);
+  const startTime = Date.now();
+  
+  const loadPromises = imageUrls.map(async (imageUrl) => {
+    const filename = imageUrl.split("/").pop();
+    if (!filename || imageCache.has(filename)) return;
+    
+    try {
+      const fullPath = await getImagePathForPDF(filename);
+      if (fs.existsSync(fullPath)) {
+        const buffer = await fsPromises.readFile(fullPath);
+        const dimensions = sizeOf(buffer);
+        
+        imageCache.set(filename, {
+          path: fullPath,
+          buffer,
+          width: dimensions.width || 0,
+          height: dimensions.height || 0,
+        });
+        console.log(`[PDF Generator] Cached image: ${filename}`);
+      }
+    } catch (error) {
+      console.error(`[PDF Generator] Error preloading ${filename}:`, error);
+    }
+  });
+  
+  await Promise.all(loadPromises);
+  const elapsed = Date.now() - startTime;
+  console.log(`[PDF Generator] Preloaded ${imageCache.size} images in ${elapsed}ms`);
+}
 
 interface PublicQuoteData {
   destinations: Array<{
@@ -78,6 +122,18 @@ function formatDateWithMonthName(date: Date): string {
 export async function generatePublicQuotePDF(
   data: PublicQuoteData,
 ): Promise<InstanceType<typeof PDFDocument>> {
+  // Clear cache before each PDF generation to avoid stale data
+  imageCache.clear();
+  
+  // Preload all flight images in parallel for optimal performance
+  const allFlightImages = [
+    ...(data.outboundFlightImages || []),
+    ...(data.returnFlightImages || []),
+  ];
+  if (allFlightImages.length > 0) {
+    await preloadFlightImages(allFlightImages);
+  }
+
   const doc = new PDFDocument({
     size: "A4",
     margins: { top: 50, bottom: 50, left: 60, right: 60 },
@@ -735,26 +791,18 @@ export async function generatePublicQuotePDF(
       // Extract filename from URL (format: /api/images/filename.ext)
       const filename = imageUrl.split("/").pop();
       if (filename) {
-        try {
-          const fullPath = await getImagePathForPDF(filename);
-          console.log(
-            `[PDF Generator] Full path for image ${index}:`,
-            fullPath,
-          );
-          console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
+        // Use cached image data for faster processing
+        const cachedImage = imageCache.get(filename);
+        
+        if (cachedImage) {
+          try {
+            const imageWidth = contentWidth;
 
-          if (fs.existsSync(fullPath)) {
-            try {
-              // Get actual image dimensions by reading file buffer
-              const imageBuffer = fs.readFileSync(fullPath);
-              const dimensions = sizeOf(imageBuffer);
-              const imageWidth = contentWidth;
-
-              // Calculate natural height based on aspect ratio
-              let naturalHeight =
-                dimensions.height && dimensions.width
-                  ? (dimensions.height / dimensions.width) * imageWidth
-                  : contentWidth * 0.6; // Fallback estimate
+            // Calculate natural height based on aspect ratio from cached dimensions
+            let naturalHeight =
+              cachedImage.height && cachedImage.width
+                ? (cachedImage.height / cachedImage.width) * imageWidth
+                : contentWidth * 0.6; // Fallback estimate
 
               // For the last image, maximize to fit available space with terms
               const isLastImage =
@@ -843,31 +891,25 @@ export async function generatePublicQuotePDF(
                 }
               }
 
-              // Insert image (maximized to available space)
-              doc.image(fullPath, leftMargin, flightImageY, {
-                fit: [contentWidth, imageHeight],
-                align: "center",
-              });
+            // Insert image using cached path (faster than re-reading)
+            doc.image(cachedImage.path, leftMargin, flightImageY, {
+              fit: [contentWidth, imageHeight],
+              align: "center",
+            });
 
-              console.log(
-                `[PDF Generator] Successfully added outbound image ${index} (${Math.round(imageHeight)}px)`,
-              );
-              flightImageY += imageHeight + 20;
-            } catch (error) {
-              console.error(
-                `[PDF Generator] Error loading outbound flight image ${index}:`,
-                error,
-              );
-            }
-          } else {
+            console.log(
+              `[PDF Generator] Successfully added outbound image ${index} (${Math.round(imageHeight)}px) from cache`,
+            );
+            flightImageY += imageHeight + 20;
+          } catch (error) {
             console.error(
-              `[PDF Generator] Image file not found at ${fullPath}`,
+              `[PDF Generator] Error adding outbound flight image ${index}:`,
+              error,
             );
           }
-        } catch (error) {
+        } else {
           console.error(
-            `[PDF Generator] Error getting image path for ${filename}:`,
-            error,
+            `[PDF Generator] Image not found in cache: ${filename}`,
           );
         }
       }
@@ -1391,29 +1433,21 @@ export async function generatePublicQuotePDF(
       // Extract filename from URL (format: /api/images/filename.ext)
       const filename = imageUrl.split("/").pop();
       if (filename) {
-        try {
-          const fullPath = await getImagePathForPDF(filename);
-          console.log(
-            `[PDF Generator] Full path for image ${index}:`,
-            fullPath,
-          );
-          console.log(`[PDF Generator] File exists:`, fs.existsSync(fullPath));
+        // Use cached image data for faster processing
+        const cachedImage = imageCache.get(filename);
+        
+        if (cachedImage) {
+          try {
+            const imageWidth = contentWidth;
 
-          if (fs.existsSync(fullPath)) {
-            try {
-              // Get actual image dimensions by reading file buffer
-              const imageBuffer = fs.readFileSync(fullPath);
-              const dimensions = sizeOf(imageBuffer);
-              const imageWidth = contentWidth;
+            // Calculate natural height based on aspect ratio from cached dimensions
+            let naturalHeight =
+              cachedImage.height && cachedImage.width
+                ? (cachedImage.height / cachedImage.width) * imageWidth
+                : contentWidth * 0.6; // Fallback estimate
 
-              // Calculate natural height based on aspect ratio
-              let naturalHeight =
-                dimensions.height && dimensions.width
-                  ? (dimensions.height / dimensions.width) * imageWidth
-                  : contentWidth * 0.6; // Fallback estimate
-
-              // For the last image, maximize to fit available space with terms
-              const isLastImage = index === data.returnFlightImages.length - 1;
+            // For the last image, maximize to fit available space with terms
+            const isLastImage = index === data.returnFlightImages.length - 1;
               let imageHeight = naturalHeight;
 
               if (isLastImage) {
@@ -1498,31 +1532,25 @@ export async function generatePublicQuotePDF(
                 }
               }
 
-              // Insert image (maximized to available space)
-              doc.image(fullPath, leftMargin, flightImageY, {
-                fit: [contentWidth, imageHeight],
-                align: "center",
-              });
+            // Insert image using cached path (faster than re-reading)
+            doc.image(cachedImage.path, leftMargin, flightImageY, {
+              fit: [contentWidth, imageHeight],
+              align: "center",
+            });
 
-              console.log(
-                `[PDF Generator] Successfully added return image ${index} (${Math.round(imageHeight)}px)`,
-              );
-              flightImageY += imageHeight + 20;
-            } catch (error) {
-              console.error(
-                `[PDF Generator] Error loading return flight image ${index}:`,
-                error,
-              );
-            }
-          } else {
+            console.log(
+              `[PDF Generator] Successfully added return image ${index} (${Math.round(imageHeight)}px) from cache`,
+            );
+            flightImageY += imageHeight + 20;
+          } catch (error) {
             console.error(
-              `[PDF Generator] Image file not found at ${fullPath}`,
+              `[PDF Generator] Error adding return flight image ${index}:`,
+              error,
             );
           }
-        } catch (error) {
+        } else {
           console.error(
-            `[PDF Generator] Error getting image path for ${filename}:`,
-            error,
+            `[PDF Generator] Image not found in cache: ${filename}`,
           );
         }
       }
