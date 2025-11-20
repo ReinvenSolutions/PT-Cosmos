@@ -419,13 +419,13 @@ export async function generatePublicQuotePDF(
 
   doc.font("Helvetica-Bold");
   doc.text(
-    "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa. ",
+    "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
     { width: contentWidth, align: "justify", lineGap: 2, continued: true },
   );
 
   doc.font("Helvetica");
   doc.text(
-    " NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
+    "NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
     { width: contentWidth, align: "justify", lineGap: 2 },
   );
 
