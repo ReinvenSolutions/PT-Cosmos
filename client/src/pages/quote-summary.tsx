@@ -46,6 +46,7 @@ export default function QuoteSummary() {
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
+  const [trm, setTrm] = useState("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isPDFComplete, setIsPDFComplete] = useState(false);
   const pdfCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -146,6 +147,9 @@ export default function QuoteSummary() {
   
   const turkeyUpgradeCost = getTurkeyUpgradeCost();
   const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost;
+  
+  const trmValue = trm ? parseFloat(trm) : 0;
+  const grandTotalCOP = trmValue > 0 ? grandTotal * trmValue : 0;
 
   const handleOutboundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -281,6 +285,7 @@ export default function QuoteSummary() {
       returnCabinBaggage,
       returnHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
+      trm: trmValue > 0 ? trmValue : null,
       destinations: selectedDests.map((dest) => ({
         destinationId: dest.id,
         startDate: new Date(startDate).toISOString().split("T")[0],
@@ -341,6 +346,8 @@ export default function QuoteSummary() {
           returnHoldBaggage,
           passengers,
           turkeyUpgrade: turkeyUpgrade || null,
+          trm: trmValue > 0 ? trmValue : null,
+          grandTotalCOP: trmValue > 0 ? grandTotalCOP : null,
         }),
       });
       
@@ -818,6 +825,42 @@ export default function QuoteSummary() {
                 data-testid="input-flights-extras"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              TRM - Tasa Representativa del Mercado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-3">
+              Ingresa la TRM para convertir el total de USD a COP (Pesos Colombianos)
+            </p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg font-semibold text-gray-700">$</span>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={trm}
+                onChange={(e) => setTrm(e.target.value)}
+                className="text-lg font-semibold"
+                data-testid="input-trm"
+              />
+            </div>
+            {trmValue > 0 && (
+              <div className="p-3 bg-green-100 rounded-lg border border-green-300">
+                <p className="text-sm font-semibold text-green-800 mb-1">Total en Pesos Colombianos:</p>
+                <p className="text-2xl font-extrabold text-green-700">
+                  $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  (US$ {formatUSD(grandTotal)} × {trmValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
