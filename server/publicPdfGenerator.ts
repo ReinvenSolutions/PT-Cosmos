@@ -28,10 +28,77 @@ interface CachedImage {
 
 const imageCache = new Map<string, CachedImage>();
 
+// Preload static images (logos, banners, etc.) that are used in every PDF
+async function preloadStaticImages(): Promise<void> {
+  const staticImages = [
+    path.join(process.cwd(), "server", "assets", "special-offer-banner.png"),
+    path.join(process.cwd(), "server", "assets", "plane-logo.png"),
+    path.join(process.cwd(), "server", "assets", "medical-assistance.png"),
+    path.join(process.cwd(), "attached_assets", "mapa itinerario turquia_1763577662908.png"),
+  ];
+
+  const loadPromises = staticImages.map(async (imagePath) => {
+    const filename = path.basename(imagePath);
+    if (imageCache.has(filename)) return;
+
+    try {
+      if (fs.existsSync(imagePath)) {
+        const buffer = await fsPromises.readFile(imagePath);
+        const dimensions = sizeOf(buffer);
+
+        imageCache.set(filename, {
+          path: imagePath,
+          buffer,
+          width: dimensions.width || 0,
+          height: dimensions.height || 0,
+        });
+      }
+    } catch (error) {
+      console.error(`[PDF Generator] Error preloading static ${filename}:`, error);
+    }
+  });
+
+  await Promise.all(loadPromises);
+}
+
+// Preload destination images (Colombia/Turkey destination photos)
+async function preloadDestinationImages(): Promise<void> {
+  const destImages = [
+    "1_1763570259884.png",
+    "2_1763570259884.png",
+    "3_1763570259885.png",
+    "4_1763570259885.png",
+    "5_1763570259885.png",
+    "6_1763570259885.png",
+  ];
+
+  const loadPromises = destImages.map(async (filename) => {
+    if (imageCache.has(filename)) return;
+
+    try {
+      const imagePath = path.join(process.cwd(), "attached_assets", filename);
+      if (fs.existsSync(imagePath)) {
+        const buffer = await fsPromises.readFile(imagePath);
+        const dimensions = sizeOf(buffer);
+
+        imageCache.set(filename, {
+          path: imagePath,
+          buffer,
+          width: dimensions.width || 0,
+          height: dimensions.height || 0,
+        });
+      }
+    } catch (error) {
+      console.error(`[PDF Generator] Error preloading destination ${filename}:`, error);
+    }
+  });
+
+  await Promise.all(loadPromises);
+}
+
 // Preload all flight images in parallel for better performance
 async function preloadFlightImages(imageUrls: string[]): Promise<void> {
-  console.log(`[PDF Generator] Preloading ${imageUrls.length} flight images...`);
-  const startTime = Date.now();
+  if (imageUrls.length === 0) return;
   
   const loadPromises = imageUrls.map(async (imageUrl) => {
     const filename = imageUrl.split("/").pop();
@@ -49,16 +116,26 @@ async function preloadFlightImages(imageUrls: string[]): Promise<void> {
           width: dimensions.width || 0,
           height: dimensions.height || 0,
         });
-        console.log(`[PDF Generator] Cached image: ${filename}`);
       }
     } catch (error) {
-      console.error(`[PDF Generator] Error preloading ${filename}:`, error);
+      console.error(`[PDF Generator] Error preloading flight ${filename}:`, error);
     }
   });
   
   await Promise.all(loadPromises);
-  const elapsed = Date.now() - startTime;
-  console.log(`[PDF Generator] Preloaded ${imageCache.size} images in ${elapsed}ms`);
+}
+
+// Helper to get cached image or return path (for fallback)
+function getCachedImageOrPath(filePathOrName: string): { buffer: Buffer; width: number; height: number } | string {
+  const filename = path.basename(filePathOrName);
+  const cached = imageCache.get(filename);
+  
+  if (cached) {
+    return { buffer: cached.buffer, width: cached.width, height: cached.height };
+  }
+  
+  // Fallback to path if not cached
+  return filePathOrName;
 }
 
 interface PublicQuoteData {
@@ -122,17 +199,24 @@ function formatDateWithMonthName(date: Date): string {
 export async function generatePublicQuotePDF(
   data: PublicQuoteData,
 ): Promise<InstanceType<typeof PDFDocument>> {
+  const preloadStartTime = Date.now();
+  
   // Clear cache before each PDF generation to avoid stale data
   imageCache.clear();
   
-  // Preload all flight images in parallel for optimal performance
-  const allFlightImages = [
-    ...(data.outboundFlightImages || []),
-    ...(data.returnFlightImages || []),
-  ];
-  if (allFlightImages.length > 0) {
-    await preloadFlightImages(allFlightImages);
-  }
+  // Preload ALL images in parallel for maximum performance
+  await Promise.all([
+    preloadStaticImages(),
+    preloadDestinationImages(),
+    preloadFlightImages([
+      ...(data.outboundFlightImages || []),
+      ...(data.returnFlightImages || []),
+    ]),
+  ]);
+  
+  const preloadElapsed = Date.now() - preloadStartTime;
+  console.log(`[PDF Generator] ⚡ All images preloaded in ${preloadElapsed}ms (${imageCache.size} total)`);
+  
 
   const doc = new PDFDocument({
     size: "A4",
@@ -163,24 +247,18 @@ export async function generatePublicQuotePDF(
   };
 
   // Helper function to add plane logo in bottom-left corner (for all pages except first)
-  const planeLogoPath = path.join(
-    process.cwd(),
-    "server",
-    "assets",
-    "plane-logo.png",
-  );
   const addPlaneLogoBottom = () => {
-    if (fs.existsSync(planeLogoPath)) {
-      try {
-        const logoWidth = 80;
-        const logoX = 20; // Closer to left edge
-        const logoY = pageHeight - 50; // Closer to bottom edge
-
-        doc.image(planeLogoPath, logoX, logoY, { width: logoWidth });
-        console.log("[PDF Generator] Plane logo added to bottom-left corner");
-      } catch (error) {
-        console.error("[PDF Generator] Error loading plane logo:", error);
+    try {
+      const logoWidth = 80;
+      const logoX = 20; // Closer to left edge
+      const logoY = pageHeight - 50; // Closer to bottom edge
+      const cached = getCachedImageOrPath("plane-logo.png");
+      
+      if (typeof cached === 'object') {
+        doc.image(cached.buffer, logoX, logoY, { width: logoWidth });
       }
+    } catch (error) {
+      console.error("[PDF Generator] Error loading plane logo:", error);
     }
   };
 
@@ -196,51 +274,45 @@ export async function generatePublicQuotePDF(
   const imagePaths = getDestinationImages(data.destinations);
 
   // Add Special Offer banner on first page only (top-right corner) - 100% in corner
-  const specialOfferPath = path.join(
-    process.cwd(),
-    "server",
-    "assets",
-    "special-offer-banner.png",
-  );
-
-  if (fs.existsSync(specialOfferPath)) {
-    try {
-      // Banner positioned exactly at corner with no margins
-      const bannerWidth = 140;
-      const bannerX = pageWidth - bannerWidth;
-      const bannerY = 0;
-
-      doc.image(specialOfferPath, bannerX, bannerY, { width: bannerWidth });
+  try {
+    const bannerWidth = 140;
+    const bannerX = pageWidth - bannerWidth;
+    const bannerY = 0;
+    const cached = getCachedImageOrPath("special-offer-banner.png");
+    
+    if (typeof cached === 'object') {
+      doc.image(cached.buffer, bannerX, bannerY, { width: bannerWidth });
       console.log("[PDF Generator] Special offer banner added successfully");
-    } catch (error) {
-      console.error(
-        "[PDF Generator] Error loading special offer banner:",
-        error,
-      );
     }
+  } catch (error) {
+    console.error(
+      "[PDF Generator] Error loading special offer banner:",
+      error,
+    );
   }
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
   doc.text("S U   V I A J E   A :", leftMargin, 70);
 
   // Add plane logo on first page after "SU VIAJE A:" text - aligned with text
-  if (fs.existsSync(planeLogoPath)) {
-    try {
-      const firstPageLogoWidth = 60;
-      const textWidth = doc.widthOfString("S U   V I A J E   A :");
-      const firstPageLogoX = leftMargin + textWidth + 15;
-      const firstPageLogoY = 57; // Raised higher to align better with text
-
-      doc.image(planeLogoPath, firstPageLogoX, firstPageLogoY, {
+  try {
+    const firstPageLogoWidth = 60;
+    const textWidth = doc.widthOfString("S U   V I A J E   A :");
+    const firstPageLogoX = leftMargin + textWidth + 15;
+    const firstPageLogoY = 57; // Raised higher to align better with text
+    const cached = getCachedImageOrPath("plane-logo.png");
+    
+    if (typeof cached === 'object') {
+      doc.image(cached.buffer, firstPageLogoX, firstPageLogoY, {
         width: firstPageLogoWidth,
       });
       console.log("[PDF Generator] Plane logo added to first page after title");
-    } catch (error) {
-      console.error(
-        "[PDF Generator] Error loading plane logo on first page:",
-        error,
-      );
     }
+  } catch (error) {
+    console.error(
+      "[PDF Generator] Error loading plane logo on first page:",
+      error,
+    );
   }
 
   const titleY = 95;
@@ -285,9 +357,12 @@ export async function generatePublicQuotePDF(
     align: "right",
   });
 
-  if (imagePaths.length > 0 && fs.existsSync(imagePaths[0])) {
+  if (imagePaths.length > 0) {
     try {
-      doc.image(imagePaths[0], leftMargin, mainImageY, {
+      const cached = getCachedImageOrPath(imagePaths[0]);
+      const imageSource = typeof cached === 'object' ? cached.buffer : imagePaths[0];
+      
+      doc.image(imageSource, leftMargin, mainImageY, {
         width: contentWidth,
         height: mainImageHeight,
         align: "center",
@@ -409,9 +484,12 @@ export async function generatePublicQuotePDF(
   const smallImageWidth = (contentWidth - 20) / 2;
   const smallImageHeight = 150;
 
-  if (imagePaths.length > 1 && fs.existsSync(imagePaths[1])) {
+  if (imagePaths.length > 1) {
     try {
-      doc.image(imagePaths[1], leftMargin, smallImagesY, {
+      const cached = getCachedImageOrPath(imagePaths[1]);
+      const imageSource = typeof cached === 'object' ? cached.buffer : imagePaths[1];
+      
+      doc.image(imageSource, leftMargin, smallImagesY, {
         width: smallImageWidth,
         height: smallImageHeight,
         align: "center",
@@ -657,17 +735,10 @@ export async function generatePublicQuotePDF(
   if (isTurkey) {
     console.log("[PDF Generator] Adding Turkey route map to itinerary page...");
 
-    // Use the new turkey map image
-    const turkeyMapPath = path.join(
-      process.cwd(),
-      "attached_assets",
-      "mapa itinerario turquia_1763577662908.png",
-    );
-
-    console.log(`[PDF Generator] Looking for Turkey map at: ${turkeyMapPath}`);
-
-    if (fs.existsSync(turkeyMapPath)) {
-      try {
+    try {
+      const cached = getCachedImageOrPath("mapa itinerario turquia_1763577662908.png");
+      
+      if (typeof cached === 'object') {
         const mapY = doc.y + 20;
         const maxMapWidth = contentWidth;
         const maxMapHeight = 240;
@@ -677,7 +748,7 @@ export async function generatePublicQuotePDF(
         );
 
         // Use fit to maintain aspect ratio without stretching
-        doc.image(turkeyMapPath, leftMargin, mapY, {
+        doc.image(cached.buffer, leftMargin, mapY, {
           fit: [maxMapWidth, maxMapHeight],
           align: "center",
         });
@@ -685,15 +756,11 @@ export async function generatePublicQuotePDF(
         // Update Y position after image (estimate based on max height)
         doc.y = mapY + maxMapHeight + 20;
         console.log("[PDF Generator] ✓ Turkey route map added successfully");
-      } catch (error) {
-        console.error(
-          "[PDF Generator] ✗ Error loading Turkey route map:",
-          error,
-        );
       }
-    } else {
-      console.warn(
-        `[PDF Generator] ✗ Turkey route map not found at: ${turkeyMapPath}`,
+    } catch (error) {
+      console.error(
+        "[PDF Generator] ✗ Error loading Turkey route map:",
+        error,
       );
     }
   }
@@ -1616,42 +1683,29 @@ export async function generatePublicQuotePDF(
   doc.moveDown(2);
 
   // Primero: Agregar imagen de asistencia médica
-  const medicalAssistanceImagePath = path.join(
-    process.cwd(),
-    "server",
-    "assets",
-    "medical-assistance.png",
-  );
   const medicalImageHeight = hasTurkeyDestinations ? 180 : 400;
 
-  if (fs.existsSync(medicalAssistanceImagePath)) {
-    try {
-      const stats = fs.statSync(medicalAssistanceImagePath);
-      if (stats.size > 0) {
-        const imageY = topMargin + 60;
+  try {
+    const cached = getCachedImageOrPath("medical-assistance.png");
+    
+    if (typeof cached === 'object') {
+      const imageY = topMargin + 60;
 
-        doc.image(medicalAssistanceImagePath, leftMargin, imageY, {
-          fit: [contentWidth, medicalImageHeight],
-          align: "center",
-        });
+      doc.image(cached.buffer, leftMargin, imageY, {
+        fit: [contentWidth, medicalImageHeight],
+        align: "center",
+      });
 
-        doc.y = imageY + medicalImageHeight + 30;
+      doc.y = imageY + medicalImageHeight + 30;
 
-        console.log(
-          "[PDF Generator] Medical assistance image added successfully",
-        );
-      } else {
-        console.warn("[PDF Generator] Medical assistance image file is empty");
-      }
-    } catch (error) {
-      console.error(
-        "[PDF Generator] Error loading medical assistance image:",
-        error,
+      console.log(
+        "[PDF Generator] Medical assistance image added successfully",
       );
     }
-  } else {
-    console.warn(
-      `[PDF Generator] Medical assistance image not found at ${medicalAssistanceImagePath}`,
+  } catch (error) {
+    console.error(
+      "[PDF Generator] Error loading medical assistance image:",
+      error,
     );
   }
 

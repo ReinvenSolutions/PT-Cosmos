@@ -10,10 +10,10 @@ interface PDFLoadingModalProps {
 }
 
 const loadingSteps = [
-  { message: "Preparando datos de la cotización...", duration: 800 },
-  { message: "Generando páginas del documento...", duration: 1000 },
-  { message: "Procesando imágenes y contenido...", duration: 900 },
-  { message: "Aplicando formato profesional...", duration: 800 },
+  { message: "Preparando datos de la cotización...", duration: 600 },
+  { message: "Cargando imágenes del destino...", duration: 700 },
+  { message: "Renderizando documento en el servidor...", duration: 1200 },
+  { message: "Optimizando páginas e imágenes...", duration: 1000 },
   { message: "Finalizando tu cotización...", duration: 500 },
 ];
 
