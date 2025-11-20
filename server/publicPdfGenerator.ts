@@ -167,6 +167,8 @@ interface PublicQuoteData {
   returnHoldBaggage?: boolean;
   passengers?: number;
   turkeyUpgrade?: string | null;
+  trm?: number | null;
+  grandTotalCOP?: number | null;
 }
 
 function getPassengerText(passengers: number): string {
@@ -468,11 +470,28 @@ export async function generatePublicQuotePDF(
     )
     .fillAndStroke(priceBoxBackground, priceBoxBorder);
 
-  doc.font("Helvetica-Bold").fontSize(26).fillColor(priceTextColor);
-  doc.text(`$ ${formatUSD(data.grandTotal)}`, priceBoxX + 5, priceBoxY + 30, {
-    width: priceBoxWidth - 10,
-    align: "center",
-  });
+  // Show price in COP if TRM is provided and valid, otherwise show USD
+  if (data.trm != null && data.trm > 0 && data.grandTotalCOP != null) {
+    // COP version
+    doc.font("Helvetica-Bold").fontSize(22).fillColor(priceTextColor);
+    doc.text(`$ ${formatUSD(data.grandTotalCOP)}`, priceBoxX + 5, priceBoxY + 28, {
+      width: priceBoxWidth - 10,
+      align: "center",
+    });
+    
+    doc.font("Helvetica").fontSize(8).fillColor("#ffffff");
+    doc.text("COP", priceBoxX + 5, priceBoxY + 50, {
+      width: priceBoxWidth - 10,
+      align: "center",
+    });
+  } else {
+    // USD version
+    doc.font("Helvetica-Bold").fontSize(26).fillColor(priceTextColor);
+    doc.text(`$ ${formatUSD(data.grandTotal)}`, priceBoxX + 5, priceBoxY + 30, {
+      width: priceBoxWidth - 10,
+      align: "center",
+    });
+  }
 
   doc.font("Helvetica").fontSize(9).fillColor("#ffffff");
   doc.text(getPassengerText(passengers), priceBoxX + 5, priceBoxY + 60, {

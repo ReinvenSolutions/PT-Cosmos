@@ -121,7 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/public/quote-pdf", async (req, res) => {
     try {
-      const { destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, originCity, outboundFlightImages, returnFlightImages, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, turkeyUpgrade } = req.body;
+      const { destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, originCity, outboundFlightImages, returnFlightImages, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, turkeyUpgrade, trm, grandTotalCOP } = req.body;
       
       if (!destinations || !Array.isArray(destinations) || destinations.length === 0) {
         return res.status(400).json({ message: "Destinations are required" });
@@ -146,13 +146,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
+      // Calculate grandTotalCOP if TRM is provided but grandTotalCOP is not
+      const trmValue = Number(trm) || 0;
+      const grandTotalValue = Number(grandTotal) || 0;
+      let calculatedGrandTotalCOP = Number(grandTotalCOP) || null;
+      
+      if (trmValue > 0 && !calculatedGrandTotalCOP) {
+        calculatedGrandTotalCOP = grandTotalValue * trmValue;
+      }
+      
       const pdfDoc = await generatePublicQuotePDF({
         destinations: destinationDetails,
         startDate,
         endDate,
         flightsAndExtras: Number(flightsAndExtras) || 0,
         landPortionTotal: Number(landPortionTotal) || 0,
-        grandTotal: Number(grandTotal) || 0,
+        grandTotal: grandTotalValue,
         originCity: originCity || "",
         outboundFlightImages: outboundFlightImages || undefined,
         returnFlightImages: returnFlightImages || undefined,
@@ -162,6 +171,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         returnCabinBaggage: returnCabinBaggage ?? false,
         returnHoldBaggage: returnHoldBaggage ?? false,
         turkeyUpgrade: turkeyUpgrade || null,
+        trm: trmValue > 0 ? trmValue : null,
+        grandTotalCOP: calculatedGrandTotalCOP,
       });
       
       res.setHeader('Content-Type', 'application/pdf');
@@ -452,6 +463,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const landPortionTotal = destinationsWithDetails.reduce((sum, d) => sum + parseFloat(d.basePrice), 0);
       const flightsAndExtras = quote.flightsAndExtras ? parseFloat(quote.flightsAndExtras.toString()) : 0;
+      
+      // Calculate grandTotalCOP if TRM exists in the saved quote
+      const trmValue = quote.trm ? parseFloat(quote.trm.toString()) : 0;
+      const grandTotalValue = Number(quote.totalPrice);
+      const calculatedGrandTotalCOP = trmValue > 0 ? grandTotalValue * trmValue : null;
 
       const pdfDoc = await generatePublicQuotePDF({
         destinations: destinationsWithDetails,
@@ -459,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate,
         flightsAndExtras,
         landPortionTotal,
-        grandTotal: Number(quote.totalPrice),
+        grandTotal: grandTotalValue,
         originCity: quote.originCity || "",
         outboundFlightImages: quote.outboundFlightImages || undefined,
         returnFlightImages: quote.returnFlightImages || undefined,
@@ -468,6 +484,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outboundHoldBaggage: quote.outboundHoldBaggage ?? false,
         returnCabinBaggage: quote.returnCabinBaggage ?? false,
         returnHoldBaggage: quote.returnHoldBaggage ?? false,
+        turkeyUpgrade: quote.turkeyUpgrade || null,
+        trm: trmValue > 0 ? trmValue : null,
+        grandTotalCOP: calculatedGrandTotalCOP,
       });
       
       res.setHeader('Content-Type', 'application/pdf');
