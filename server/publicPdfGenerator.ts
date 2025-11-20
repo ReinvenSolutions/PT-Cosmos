@@ -1009,17 +1009,19 @@ export async function generatePublicQuotePDF(
 
     const boxY = doc.y;
     const boxPadding = 15;
-    const boxColor = "#88bbcd"; // Light blue background
-    const boxTextColor = "#1f2937"; // Dark text
+    const boxColor = "#d4edfc"; // Lighter blue background with higher contrast
+    const borderColor = "#0891b2"; // Vibrant cyan border
+    const boxTextColor = "#0c4a6e"; // Darker blue text for better readability
 
     if (!data.turkeyUpgrade) {
       // No upgrade selected - show available upgrade options
       const boxHeight = 140; // Estimated height for the upgrade options
 
-      // Draw blue background box
+      // Draw blue background box with thicker border
       doc
         .rect(leftMargin, boxY, contentWidth, boxHeight)
-        .fillAndStroke(boxColor, "#5a9fb8");
+        .lineWidth(3) // Thicker border for more prominence
+        .fillAndStroke(boxColor, borderColor);
 
       // Title
       doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
@@ -1108,10 +1110,11 @@ export async function generatePublicQuotePDF(
       if (selectedUpgrade) {
         const boxHeight = 80;
 
-        // Draw blue background box
+        // Draw blue background box with thicker border
         doc
           .rect(leftMargin, boxY, contentWidth, boxHeight)
-          .fillAndStroke(boxColor, "#5a9fb8");
+          .lineWidth(3) // Thicker border for more prominence
+          .fillAndStroke(boxColor, borderColor);
 
         // Title
         doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
