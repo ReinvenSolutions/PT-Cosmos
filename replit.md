@@ -37,7 +37,14 @@ The frontend uses React, Wouter, and TanStack Query, styled with Tailwind CSS an
         - **Kusadasi/Esmirna**: Radisson Hotel İzmir Aliaga 5*, Hampton By Hilton Aliaga 4*, Faustina Hotel 4* (with upgrade option to Hotel Le Bleu subject to availability)
 
 ### System Design Choices
-The project utilizes a monorepo structure (`/client`, `/server`, `/shared`). Clients are global entities managed by super admins. Advisors manage their own quotes. PostgreSQL session storage ensures production readiness. Database entities use `varchar` with `gen_random_uuid()` for IDs and have unique constraints. The database auto-seeds on deployment.
+The project utilizes a monorepo structure (`/client`, `/server`, `/shared`). Clients are global entities managed by super admins. Advisors manage their own quotes. PostgreSQL session storage ensures production readiness. Database entities use `varchar` with `gen_random_uuid()` for IDs and have unique constraints.
+
+**Automatic Deployment & Data Synchronization**: The system features a fully automated deployment pipeline that propagates ALL changes (code + database schema + canonical data) to production with a single click. Canonical data is defined in `shared/seed-data.ts` as the "source of truth" for destinations, itineraries, hotels, inclusions, and exclusions. During deployment, `server/sync-canonical-data.ts` automatically executes to:
+1. Deactivate all existing destinations
+2. Upsert the active "Turquía Esencial" destination
+3. Replace all related data (itineraries, hotels, inclusions, exclusions)
+
+This idempotent synchronization ensures production always reflects the latest data changes without manual SQL intervention. The system detects Replit deployments via `REPLIT_DEPLOYMENT=1` and production environments via `NODE_ENV=production`, automatically triggering synchronization in both cases. Manual synchronization requires explicit authorization via `ALLOW_PROD_DATA_SYNC=true` for safety. See `DEPLOYMENT.md` for complete documentation.
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Relational database.
