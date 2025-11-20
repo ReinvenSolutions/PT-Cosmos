@@ -158,9 +158,15 @@ export default function Home() {
   };
   
   const getMealsInfo = (destId: string): { breakfasts: number; lunches: number; dinners: number; total: number } => {
+    const dest = destinations.find(d => d.id === destId);
+    
+    // Para Turquía Esencial, usar valores específicos del plan
+    if (dest?.name === "Turquía Esencial") {
+      return { breakfasts: 9, lunches: 0, dinners: 5, total: 14 };
+    }
+    
     const details = destinationDetails[destId];
     if (!details || !details.itinerary || details.itinerary.length === 0) {
-      const dest = destinations.find(d => d.id === destId);
       const nights = dest?.nights || 0;
       return { breakfasts: nights, lunches: 0, dinners: 0, total: nights };
     }
@@ -180,7 +186,6 @@ export default function Home() {
       }
     });
     
-    const dest = destinations.find(d => d.id === destId);
     if (breakfasts === 0 && dest?.nights) {
       breakfasts = dest.nights;
     }
@@ -189,6 +194,11 @@ export default function Home() {
   };
   
   const getTooltipContent = (dest: Destination): string => {
+    // Tooltip específico para Turquía Esencial
+    if (dest.name === "Turquía Esencial") {
+      return "Salidas todos los miércoles del año. Sabados entre marzo a nov 2026. Si vendes con vuelo, debes cotizar salida los martes y viernes desde Colombia. Programa terrestre con acompañamiento de guía habla hispana en destino";
+    }
+    
     if (dest.requiresTuesday) {
       const otherCountries = Array.from(new Set(
         destinations
