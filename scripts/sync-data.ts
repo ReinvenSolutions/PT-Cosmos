@@ -31,21 +31,30 @@ import { eq } from 'drizzle-orm';
 
 const env = process.env.NODE_ENV || 'development';
 const allowProdSync = process.env.ALLOW_PROD_DATA_SYNC === 'true';
+const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
 
 async function syncData() {
   console.log('\n========================================');
   console.log('🔄 SINCRONIZACIÓN DE DATOS');
   console.log('========================================');
   console.log(`Entorno: ${env}`);
+  console.log(`Deployment: ${isDeployment ? 'SÍ' : 'NO'}`);
   console.log(`Base de datos: ${process.env.DATABASE_URL?.substring(0, 30)}...`);
   console.log('========================================\n');
 
   // Validación de seguridad para producción
-  if (env === 'production' && !allowProdSync) {
+  // Si está en deployment de Replit, permitir sincronización automáticamente
+  if (env === 'production' && !allowProdSync && !isDeployment) {
     console.error('❌ ERROR: Intento de sincronización en producción sin autorización');
-    console.error('Para sincronizar en producción, ejecuta:');
+    console.error('Para sincronizar en producción manualmente, ejecuta:');
     console.error('ALLOW_PROD_DATA_SYNC=true npm run db:seed');
+    console.error('');
+    console.error('Nota: En deployment automático de Replit, esto se ejecuta automáticamente.');
     process.exit(1);
+  }
+
+  if (isDeployment) {
+    console.log('🚀 Ejecutando en Replit Deployment - sincronización automática habilitada\n');
   }
 
   try {
