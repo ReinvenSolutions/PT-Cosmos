@@ -66,9 +66,11 @@ El sistema utiliza **datos canónicos** definidos en `shared/seed-data.ts` que s
 ┌─────────────────────────────────────────────────┐
 │  6. Sincroniza datos canónicos SIEMPRE          │
 │     (server/sync-canonical-data.ts)             │
+│     - Verifica y aplica cambios de esquema      │
 │     - Desactiva destinos antiguos               │
 │     - Actualiza "Turquía Esencial"              │
 │     - Sincroniza todos los datos relacionados   │
+│     - Limpia datos duplicados                   │
 └─────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────┐
@@ -93,7 +95,9 @@ export const seedExclusions = [...];    // 5 exclusiones
 Módulo que sincroniza los datos canónicos con la base de datos.
 - Solo se ejecuta en producción (`NODE_ENV=production`)
 - Detecta automáticamente deployment de Replit (`REPLIT_DEPLOYMENT=1`)
+- **Verifica y aplica cambios de esquema** (ej: campo TRM)
 - Operación idempotente y segura
+- Limpia datos duplicados automáticamente
 
 ### 3. `server/index.ts`
 Punto de entrada que orquesta el inicio de la aplicación.
@@ -152,6 +156,9 @@ Durante el deployment, verás en los logs:
 Entorno: production
 Deployment: SÍ
 ========================================
+
+0️⃣  Verificando esquema de base de datos...
+   ✅ Esquema verificado y actualizado
 
 1️⃣  Desactivando destinos antiguos...
    ✅ Destinos desactivados

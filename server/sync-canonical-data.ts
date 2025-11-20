@@ -45,6 +45,29 @@ export async function syncCanonicalData() {
     console.log(`Deployment: ${isDeployment ? 'SÍ' : 'NO'}`);
     console.log('========================================\n');
 
+    // Paso 0: Verificar y agregar campo TRM si no existe
+    console.log('0️⃣  Verificando esquema de base de datos...');
+    try {
+      await db.execute(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'quotes' AND column_name = 'trm'
+          ) THEN
+            ALTER TABLE quotes ADD COLUMN trm NUMERIC(10, 2);
+            RAISE NOTICE 'Campo TRM agregado a la tabla quotes';
+          ELSE
+            RAISE NOTICE 'Campo TRM ya existe en la tabla quotes';
+          END IF;
+        END $$;
+      `);
+      console.log('   ✅ Esquema verificado y actualizado\n');
+    } catch (schemaError) {
+      console.error('   ⚠️  Error verificando esquema:', schemaError);
+      console.log('   ℹ️  Continuando con la sincronización...\n');
+    }
+
     // Paso 1: Desactivar TODOS los destinos existentes
     console.log('1️⃣  Desactivando destinos antiguos...');
     await db
