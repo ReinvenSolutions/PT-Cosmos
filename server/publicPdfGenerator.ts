@@ -1178,17 +1178,6 @@ export async function generatePublicQuotePDF(
           { width: contentWidth - boxPadding * 2 },
         );
 
-        doc.moveDown(0.5);
-
-        // Price
-        doc.font("Helvetica-Bold").fontSize(10).fillColor(boxTextColor);
-        doc.text(
-          `Valor adicional: ${selectedUpgrade.price} por persona`,
-          leftMargin + boxPadding,
-          doc.y,
-          { width: contentWidth - boxPadding * 2 },
-        );
-
         doc.y = boxY + boxHeight + 10;
       }
     }
