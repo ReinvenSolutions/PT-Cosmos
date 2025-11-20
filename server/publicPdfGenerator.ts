@@ -430,7 +430,14 @@ export async function generatePublicQuotePDF(
       })()
     : "Por definir";
 
-  const minPayment = Math.round(data.grandTotal * 0.6);
+  // Calculate minimum payment based on TRM presence
+  const minPaymentValue = data.trm != null && data.trm > 0 && data.grandTotalCOP != null
+    ? Math.round(data.grandTotalCOP * 0.6)
+    : Math.round(data.grandTotal * 0.6);
+  
+  const minPaymentCurrency = data.trm != null && data.trm > 0 && data.grandTotalCOP != null
+    ? "COP"
+    : "USD";
 
   // Salida with larger font and bold date
   doc.font("Helvetica").fontSize(11).fillColor(textColor);
@@ -444,13 +451,13 @@ export async function generatePublicQuotePDF(
   doc.font("Helvetica-Bold").fontSize(12);
   doc.text(endDateFormatted);
 
-  // Pago mínimo with larger font and bold amount
+  // Pago mínimo with larger font and bold amount - show in COP if TRM exists
   doc.font("Helvetica").fontSize(11).fillColor(textColor);
   doc.text("Pago mínimo para separar: ", leftMargin, budgetY + 56, {
     continued: true,
   });
   doc.font("Helvetica-Bold").fontSize(12);
-  doc.text(`$${formatUSD(minPayment)}`);
+  doc.text(`$${formatUSD(minPaymentValue)} ${minPaymentCurrency}`);
 
   const priceBoxX = pageWidth - rightMargin - 150;
   const priceBoxY = budgetY;

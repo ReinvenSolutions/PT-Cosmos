@@ -22,6 +22,7 @@ The frontend uses React, Wouter, and TanStack Query, styled with Tailwind CSS an
 - **Advisor**: Creates, views, and edits personal quotations, associates quotes with clients, uploads flight images, customizes baggage options, and generates detailed PDFs.
 - **Quotation System**: Allows destination selection, date setting, itinerary viewing, and saving quotes linked to clients.
     - **Passenger Pricing**: System displays pricing for a single passenger only. The passenger selector has been removed from the quotation page, and all pricing calculations default to 1 passenger. PDF first page always displays "por Persona" pricing.
+    - **TRM (Exchange Rate) System**: Optional TRM field enables real-time USD to COP conversion. When TRM is provided, the quote summary displays both USD and COP totals, and generated PDFs show all pricing in COP including grand total and minimum payment (60% deposit). Backend calculates `grandTotalCOP = grandTotal × TRM` server-side for both ad-hoc and saved quote PDFs. Currency display logic: COP when `TRM > 0` and `grandTotalCOP` exists, USD otherwise. Minimum payment displays with explicit currency suffix (e.g., "$1,917,000 COP" or "$426 USD").
     - **Flight Sections**: Includes flight upload and baggage customization for outbound/return flights. If no flight images or baggage are selected, PDFs generate as land-only; otherwise, flight pages are included with dynamic baggage text.
     - **Conditional PDF Content**:
         - All PDFs include a "ASISTENCIA MEDICA PARA TU VIAJE" page with medical assistance imagery.
