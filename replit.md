@@ -21,7 +21,7 @@ The frontend uses React, Wouter, and TanStack Query, styled with Tailwind CSS an
 - **Super Admin**: Manages clients, creates/manages destinations, and views global quote statistics.
 - **Advisor**: Creates, views, and edits personal quotations, associates quotes with clients, uploads flight images, customizes baggage options, and generates detailed PDFs.
 - **Quotation System**: Allows destination selection, date setting, itinerary viewing, and saving quotes linked to clients.
-    - **Passenger Selection**: Supports 1-10 passengers, dynamically calculating total land portion price and adjusting PDF text (e.g., "por Persona", "por Pareja", "por Grupo de X").
+    - **Passenger Pricing**: System displays pricing for a single passenger only. The passenger selector has been removed from the quotation page, and all pricing calculations default to 1 passenger. PDF first page always displays "por Persona" pricing.
     - **Flight Sections**: Includes flight upload and baggage customization for outbound/return flights. If no flight images or baggage are selected, PDFs generate as land-only; otherwise, flight pages are included with dynamic baggage text.
     - **Conditional PDF Content**:
         - All PDFs include a "ASISTENCIA MEDICA PARA TU VIAJE" page with medical assistance imagery.

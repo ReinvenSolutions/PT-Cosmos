@@ -40,7 +40,7 @@ export default function QuoteSummary() {
   const [originCity, setOriginCity] = useState("");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
-  const [passengers, setPassengers] = useState(2);
+  const [passengers, setPassengers] = useState(1);
   const [outboundCabinBaggage, setOutboundCabinBaggage] = useState(false);
   const [outboundHoldBaggage, setOutboundHoldBaggage] = useState(false);
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
@@ -511,43 +511,6 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              Cantidad de Pasajeros
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
-              Selecciona la cantidad de personas que viajarán
-            </p>
-            <Select 
-              value={passengers.toString()} 
-              onValueChange={(value) => setPassengers(parseInt(value))}
-            >
-              <SelectTrigger className="w-full" data-testid="select-passengers">
-                <SelectValue placeholder="Selecciona cantidad" />
-              </SelectTrigger>
-              <SelectContent>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                  <SelectItem key={num} value={num.toString()}>
-                    {num} {num === 1 ? 'persona' : 'personas'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-gray-700">
-                <span className="font-semibold">Precio por persona:</span> US$ {formatUSD(landPortionPerPerson)}
-              </p>
-              <p className="text-lg font-bold text-blue-600 mt-1">
-                <span className="font-semibold">Total ({passengers} {passengers === 1 ? 'persona' : 'personas'}):</span> US$ {formatUSD(landPortionTotal)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
         {hasTurkeyEsencial && (
           <Card className="mb-6 border-orange-200">
             <CardHeader>
@@ -935,18 +898,6 @@ export default function QuoteSummary() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="passengers">Número de Pasajeros</Label>
-                <Input
-                  id="passengers"
-                  type="number"
-                  min="1"
-                  value={passengers}
-                  onChange={(e) => setPassengers(Number(e.target.value))}
-                  data-testid="input-passengers"
-                />
               </div>
 
               <div className="space-y-2">
