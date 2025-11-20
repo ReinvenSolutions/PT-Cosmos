@@ -924,9 +924,8 @@ export async function generatePublicQuotePDF(
     }
 
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
-    const countryText = dest.country ? dest.country.toUpperCase() : "";
     doc.text(
-      `${dest.name?.toUpperCase() || "DESTINO"} - ${countryText}`,
+      `${dest.name?.toUpperCase() || "DESTINO"}`,
       leftMargin,
       doc.y,
     );
