@@ -45,3 +45,7 @@ Thumbs.db
 .config/
 .local/
 replit.nix
+
+# Database backups
+*.sql
+!migrations/*.sql
