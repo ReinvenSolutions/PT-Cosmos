@@ -10,7 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,7 +43,11 @@ export default function QuoteSummary() {
   const [returnImages, setReturnImages] = useState<string[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
-  const [flightsAndExtras, setFlightsAndExtras] = useState("");
+  const [flightsCost, setFlightsCost] = useState("");
+  const [assistanceCost, setAssistanceCost] = useState("");
+  const [inputCurrencyFlights, setInputCurrencyFlights] = useState<"USD" | "COP">("USD");
+  const [inputCurrencyAssistance, setInputCurrencyAssistance] = useState<"USD" | "COP">("USD");
+  const [inputCurrencyFinal, setInputCurrencyFinal] = useState<"USD" | "COP">("USD");
   const [originCity, setOriginCity] = useState("");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -47,9 +58,18 @@ export default function QuoteSummary() {
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
   const [trm, setTrm] = useState("");
+  const [finalPrice, setFinalPrice] = useState("");
+  const [minPayment, setMinPayment] = useState("");
+  const [customFilename, setCustomFilename] = useState("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isPDFComplete, setIsPDFComplete] = useState(false);
   const pdfCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // New Client State
+  const [activeTab, setActiveTab] = useState("existing");
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
 
   const { data: destinations = [] } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
@@ -57,6 +77,27 @@ export default function QuoteSummary() {
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/admin/clients"],
+  });
+
+  const createClientMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/admin/clients", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/clients"] });
+      toast({
+        title: "Cliente creado",
+        description: "El cliente ha sido creado exitosamente",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error al crear cliente",
+        description: error.message || "Ha ocurrido un error",
+        variant: "destructive",
+      });
+    },
   });
 
   const saveQuoteMutation = useMutation({
@@ -135,7 +176,46 @@ export default function QuoteSummary() {
   }, 0);
   
   const landPortionTotal = landPortionPerPerson * passengers;
-  const flightsAndExtrasValue = flightsAndExtras ? parseFloat(flightsAndExtras) : 0;
+  
+  const trmValue = trm ? parseFloat(trm) : 0;
+  const effectiveTrm = trmValue > 0 ? trmValue + 30 : 0;
+
+  // Auto-switch to COP when TRM is entered
+  useEffect(() => {
+    if (trmValue > 0) {
+      setInputCurrencyFlights("COP");
+      setInputCurrencyAssistance("COP");
+      setInputCurrencyFinal("COP");
+    } else {
+      setInputCurrencyFlights("USD");
+      setInputCurrencyAssistance("USD");
+      setInputCurrencyFinal("USD");
+    }
+  }, [trmValue > 0]);
+
+  const formatNumber = (value: string) => {
+    const clean = value.replace(/[^\d.]/g, "");
+    if (!clean) return "";
+    const parts = clean.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  const parseNumber = (value: string) => {
+    return parseFloat(value.replace(/,/g, "")) || 0;
+  };
+
+  const getUSDValue = (value: string, currency: "USD" | "COP") => {
+    const num = parseNumber(value);
+    if (currency === "COP" && effectiveTrm > 0) {
+      return num / effectiveTrm;
+    }
+    return num;
+  };
+
+  const flightsCostUSD = getUSDValue(flightsCost, inputCurrencyFlights);
+  const assistanceCostUSD = getUSDValue(assistanceCost, inputCurrencyAssistance);
+  const flightsAndExtrasValue = flightsCostUSD + assistanceCostUSD;
   
   const getTurkeyUpgradeCost = () => {
     if (!hasTurkeyEsencial || !turkeyUpgrade) return 0;
@@ -148,8 +228,39 @@ export default function QuoteSummary() {
   const turkeyUpgradeCost = getTurkeyUpgradeCost();
   const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost;
   
-  const trmValue = trm ? parseFloat(trm) : 0;
-  const grandTotalCOP = trmValue > 0 ? grandTotal * trmValue : 0;
+  const grandTotalCOP = effectiveTrm > 0 ? grandTotal * effectiveTrm : 0;
+
+  const finalPriceValue = getUSDValue(finalPrice, inputCurrencyFinal);
+  const profit = finalPriceValue - grandTotal;
+  const finalPriceCOP = effectiveTrm > 0 ? finalPriceValue * effectiveTrm : 0;
+
+  // Calculate default minimum payment
+  // Formula: (Flights + Assistance) + (30% of (Land Portion + Upgrade)) + 200 USD
+  const calculateDefaultMinPayment = () => {
+    const landPortionWithUpgrade = landPortionTotal + turkeyUpgradeCost;
+    const thirtyPercentLand = landPortionWithUpgrade * 0.30;
+    const baseMinPaymentUSD = flightsAndExtrasValue + thirtyPercentLand + 200;
+    
+    return baseMinPaymentUSD;
+  };
+
+  const defaultMinPaymentUSD = calculateDefaultMinPayment();
+  const defaultMinPaymentCOP = effectiveTrm > 0 ? defaultMinPaymentUSD * effectiveTrm : 0;
+
+  const handlePercentageClick = (percentage: number) => {
+    if (!finalPrice) return;
+    
+    const rawFinalPrice = parseNumber(finalPrice);
+    const calculatedValue = rawFinalPrice * (percentage / 100);
+    
+    // Format the value back to string with commas
+    const formattedValue = calculatedValue.toLocaleString('en-US', { 
+      minimumFractionDigits: inputCurrencyFinal === "USD" ? 2 : 0, 
+      maximumFractionDigits: inputCurrencyFinal === "USD" ? 2 : 0 
+    });
+    
+    setMinPayment(formattedValue);
+  };
 
   const handleOutboundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -250,13 +361,37 @@ export default function QuoteSummary() {
   };
   
   const handleSaveQuote = async () => {
-    if (!selectedClientId) {
-      toast({
-        title: "Cliente requerido",
-        description: "Por favor, selecciona un cliente",
-        variant: "destructive",
-      });
-      return;
+    let clientIdToUse = selectedClientId;
+
+    if (activeTab === "new") {
+      if (!newClientName || !newClientEmail) {
+        toast({
+          title: "Datos incompletos",
+          description: "Por favor completa el nombre y correo del cliente",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const newClient = await createClientMutation.mutateAsync({
+          name: newClientName,
+          email: newClientEmail,
+          phone: newClientPhone || null,
+        });
+        clientIdToUse = newClient.id;
+      } catch (error) {
+        return; // Error handled in mutation
+      }
+    } else {
+      if (!clientIdToUse) {
+        toast({
+          title: "Cliente requerido",
+          description: "Por favor, selecciona un cliente",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     if (!startDate) {
@@ -272,8 +407,41 @@ export default function QuoteSummary() {
                           outboundCabinBaggage || outboundHoldBaggage || 
                           returnCabinBaggage || returnHoldBaggage;
 
+    // Calculate Min Payment Payload
+    let payloadMinPayment = null;
+    let payloadMinPaymentCOP = null;
+    
+    if (minPayment && minPayment.trim() !== "") {
+      const rawMinPayment = parseNumber(minPayment);
+      if (inputCurrencyFinal === "USD") {
+        payloadMinPayment = rawMinPayment;
+        payloadMinPaymentCOP = effectiveTrm > 0 ? rawMinPayment * effectiveTrm : null;
+      } else {
+        payloadMinPayment = effectiveTrm > 0 ? rawMinPayment / effectiveTrm : null;
+        payloadMinPaymentCOP = rawMinPayment;
+      }
+    } else {
+      payloadMinPayment = defaultMinPaymentUSD;
+      payloadMinPaymentCOP = effectiveTrm > 0 ? defaultMinPaymentCOP : null;
+    }
+
+    // Calculate Final Price Payload
+    const rawFinalPrice = parseNumber(finalPrice);
+    let payloadFinalPrice = null;
+    let payloadFinalPriceCOP = null;
+
+    if (finalPrice && finalPrice.trim() !== "") {
+      if (inputCurrencyFinal === "USD") {
+        payloadFinalPrice = rawFinalPrice;
+        payloadFinalPriceCOP = effectiveTrm > 0 ? rawFinalPrice * effectiveTrm : null;
+      } else {
+        payloadFinalPrice = effectiveTrm > 0 ? rawFinalPrice / effectiveTrm : null;
+        payloadFinalPriceCOP = rawFinalPrice;
+      }
+    }
+
     const quoteData = {
-      clientId: selectedClientId,
+      clientId: clientIdToUse,
       totalPrice: grandTotal,
       originCity: originCity || "",
       flightsAndExtras: flightsAndExtrasValue,
@@ -285,7 +453,13 @@ export default function QuoteSummary() {
       returnCabinBaggage,
       returnHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
-      trm: trmValue > 0 ? trmValue : null,
+      trm: effectiveTrm > 0 ? effectiveTrm : null,
+      customFilename: customFilename.trim() || null,
+      minPayment: payloadMinPayment,
+      minPaymentCOP: payloadMinPaymentCOP,
+      finalPrice: payloadFinalPrice,
+      finalPriceCOP: payloadFinalPriceCOP,
+      finalPriceCurrency: inputCurrencyFinal,
       destinations: selectedDests.map((dest) => ({
         destinationId: dest.id,
         startDate: new Date(startDate).toISOString().split("T")[0],
@@ -317,6 +491,58 @@ export default function QuoteSummary() {
 
       console.log("Starting PDF generation request...");
 
+      // Calculate final prices explicitly for the payload to ensure accuracy
+      const rawFinalPrice = parseNumber(finalPrice);
+      let payloadFinalPrice = null;
+      let payloadFinalPriceCOP = null;
+
+      // Check if user has entered a value (string is not empty)
+      if (finalPrice && finalPrice.trim() !== "") {
+        if (inputCurrencyFinal === "USD") {
+          payloadFinalPrice = rawFinalPrice;
+          // Calculate COP equivalent if TRM is available
+          payloadFinalPriceCOP = effectiveTrm > 0 ? rawFinalPrice * effectiveTrm : null;
+        } else {
+          // COP
+          // Calculate USD equivalent if TRM is available
+          payloadFinalPrice = effectiveTrm > 0 ? rawFinalPrice / effectiveTrm : null;
+          // The COP value is exactly what the user typed
+          payloadFinalPriceCOP = rawFinalPrice;
+        }
+      }
+
+      // Calculate Min Payment Payload
+      let payloadMinPayment = null;
+      let payloadMinPaymentCOP = null;
+      
+      if (minPayment && minPayment.trim() !== "") {
+        // User entered a manual value
+        const rawMinPayment = parseNumber(minPayment);
+        
+        // Assume the currency matches the Final Price currency input
+        if (inputCurrencyFinal === "USD") {
+          payloadMinPayment = rawMinPayment;
+          payloadMinPaymentCOP = effectiveTrm > 0 ? rawMinPayment * effectiveTrm : null;
+        } else {
+          payloadMinPayment = effectiveTrm > 0 ? rawMinPayment / effectiveTrm : null;
+          payloadMinPaymentCOP = rawMinPayment;
+        }
+      } else {
+        // Use default calculation
+        payloadMinPayment = defaultMinPaymentUSD;
+        payloadMinPaymentCOP = effectiveTrm > 0 ? defaultMinPaymentCOP : null;
+      }
+
+      console.log("PDF Payload Prices:", {
+        rawFinalPrice,
+        inputCurrencyFinal,
+        payloadFinalPrice,
+        payloadFinalPriceCOP,
+        effectiveTrm,
+        payloadMinPayment,
+        payloadMinPaymentCOP
+      });
+
       const response = await fetch("/api/public/quote-pdf", {
         method: "POST",
         headers: {
@@ -346,8 +572,14 @@ export default function QuoteSummary() {
           returnHoldBaggage,
           passengers,
           turkeyUpgrade: turkeyUpgrade || null,
-          trm: trmValue > 0 ? trmValue : null,
-          grandTotalCOP: trmValue > 0 ? grandTotalCOP : null,
+          trm: effectiveTrm > 0 ? effectiveTrm : null,
+          grandTotalCOP: effectiveTrm > 0 ? grandTotalCOP : null,
+          finalPrice: payloadFinalPrice,
+          finalPriceCOP: payloadFinalPriceCOP,
+          finalPriceCurrency: inputCurrencyFinal,
+          customFilename: customFilename.trim() || null,
+          minPayment: payloadMinPayment,
+          minPaymentCOP: payloadMinPaymentCOP,
         }),
       });
       
@@ -363,7 +595,17 @@ export default function QuoteSummary() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      // Use custom filename if provided, otherwise default
+      let downloadFilename = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
+      if (customFilename.trim()) {
+        downloadFilename = customFilename.trim();
+        if (!downloadFilename.toLowerCase().endsWith('.pdf')) {
+          downloadFilename += '.pdf';
+        }
+      }
+      
+      a.download = downloadFilename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -468,6 +710,11 @@ export default function QuoteSummary() {
                         <div className="text-2xl font-extrabold text-blue-600">
                           US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </div>
+                        {effectiveTrm > 0 && (
+                          <div className="text-sm font-bold text-green-600">
+                            $ {(basePrice * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                          </div>
+                        )}
                         <div className="text-xs text-gray-500">Porción terrestre</div>
                       </div>
                     </div>
@@ -478,9 +725,16 @@ export default function QuoteSummary() {
               <div className="border-t border-blue-200 pt-3 mt-3">
                 <div className="flex justify-between items-center text-lg font-semibold">
                   <span className="text-gray-700">Subtotal Porciones Terrestres:</span>
-                  <span className="text-blue-600">
-                    US$ {landPortionTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-blue-600 block">
+                      US$ {landPortionTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    {effectiveTrm > 0 && (
+                      <span className="text-green-600 text-sm block">
+                        $ {(landPortionTotal * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -803,64 +1057,130 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+        <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="w-5 h-5" />
-              Vuelos, Asistencia y Comisión
+              TRM - Tasa Representativa del Mercado + 30 COP
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-gray-600 mb-3">
-              Ingresa el valor total de: Vuelos + Asistencia al Viajero + Comisión
+              Ingresa la TRM para convertir el total de USD a COP (Pesos Colombianos) el sistema sumara 30 COP automaticamente.
             </p>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold text-gray-700">US$</span>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg font-semibold text-gray-700">$</span>
               <Input
-                type="number"
+                type="text"
                 placeholder="0.00"
-                value={flightsAndExtras}
-                onChange={(e) => setFlightsAndExtras(e.target.value)}
+                value={formatNumber(trm)}
+                onChange={(e) => setTrm(e.target.value.replace(/,/g, ""))}
                 className="text-lg font-semibold"
-                data-testid="input-flights-extras"
+                data-testid="input-trm"
               />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+        <Card className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              TRM - Tasa Representativa del Mercado
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Vuelos y Asistencia
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-gray-600 mb-3">
-              Ingresa la TRM para convertir el total de USD a COP (Pesos Colombianos)
+              Ingresa los valores. El sistema calculará el total.
             </p>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg font-semibold text-gray-700">$</span>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={trm}
-                onChange={(e) => setTrm(e.target.value)}
-                className="text-lg font-semibold"
-                data-testid="input-trm"
-              />
-            </div>
-            {trmValue > 0 && (
-              <div className="p-3 bg-green-100 rounded-lg border border-green-300">
-                <p className="text-sm font-semibold text-green-800 mb-1">Total en Pesos Colombianos:</p>
-                <p className="text-2xl font-extrabold text-green-700">
-                  $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  (US$ {formatUSD(grandTotal)} × {trmValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Vuelos</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  {trmValue > 0 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-gray-700 hover:bg-gray-100">
+                          {inputCurrencyFlights === "USD" ? "US$" : "COP$"}
+                          <ChevronDown className="w-4 h-4 ml-1 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setInputCurrencyFlights("USD")}>US$ - Dólares</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setInputCurrencyFlights("COP")}>COP$ - Pesos</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <span className="text-lg font-semibold text-gray-700 px-2">US$</span>
+                  )}
+                  <Input
+                    type="text"
+                    placeholder="0.00"
+                    value={formatNumber(flightsCost)}
+                    onChange={(e) => setFlightsCost(e.target.value.replace(/,/g, ""))}
+                    className="text-lg font-semibold"
+                  />
+                </div>
+                {effectiveTrm > 0 && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    {inputCurrencyFlights === "USD" 
+                      ? `$ ${(getUSDValue(flightsCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+                      : `US$ ${getUSDValue(flightsCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    }
+                  </div>
+                )}
               </div>
-            )}
+              <div>
+                <Label>Asistencia</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  {trmValue > 0 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-gray-700 hover:bg-gray-100">
+                          {inputCurrencyAssistance === "USD" ? "US$" : "COP$"}
+                          <ChevronDown className="w-4 h-4 ml-1 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setInputCurrencyAssistance("USD")}>US$ - Dólares</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setInputCurrencyAssistance("COP")}>COP$ - Pesos</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <span className="text-lg font-semibold text-gray-700 px-2">US$</span>
+                  )}
+                  <Input
+                    type="text"
+                    placeholder="0.00"
+                    value={formatNumber(assistanceCost)}
+                    onChange={(e) => setAssistanceCost(e.target.value.replace(/,/g, ""))}
+                    className="text-lg font-semibold"
+                  />
+                </div>
+                {effectiveTrm > 0 && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    {inputCurrencyAssistance === "USD" 
+                      ? `$ ${(getUSDValue(assistanceCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+                      : `US$ ${getUSDValue(assistanceCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    }
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-orange-200 flex justify-between items-center">
+               <span className="font-semibold text-gray-700">Total Vuelos y Asistencia:</span>
+               <div className="text-right">
+                 <span className="text-xl font-bold text-orange-700 block">US$ {formatUSD(flightsAndExtrasValue)}</span>
+                 {effectiveTrm > 0 && (
+                   <span className="text-sm font-semibold text-orange-600 block">
+                     $ {(flightsAndExtrasValue * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                   </span>
+                 )}
+               </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -868,19 +1188,212 @@ export default function QuoteSummary() {
           <CardContent className="p-6">
             <div className="flex justify-between items-center">
               <div>
-                <div className="text-sm opacity-90 mb-1">Precio Total de la Cotización</div>
-                <div className="text-4xl font-extrabold">
-                  US$ {formatUSD(grandTotal)}
-                </div>
+                <div className="text-sm opacity-90 mb-1">Subtotal o costo Neto</div>
+                {effectiveTrm > 0 ? (
+                  <>
+                    <div className="text-4xl font-extrabold text-green-100">
+                      $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                    </div>
+                    <div className="text-xl font-bold opacity-75 mt-1">
+                      US$ {formatUSD(grandTotal)}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-4xl font-extrabold">
+                    US$ {formatUSD(grandTotal)}
+                  </div>
+                )}
               </div>
               <div className="text-right text-sm opacity-90">
                 <div>Porciones Terrestres: US$ {formatUSD(landPortionTotal)}</div>
                 {turkeyUpgradeCost > 0 && (
                   <div>Mejora Turquía: US$ {formatUSD(turkeyUpgradeCost)}</div>
                 )}
-                <div>Vuelos y Extras: US$ {formatUSD(flightsAndExtrasValue)}</div>
+                <div>Vuelos y Asistencia: US$ {formatUSD(flightsAndExtrasValue)}</div>
+                {effectiveTrm > 0 && (
+                  <div className="text-xs mt-1 opacity-75">
+                    (TRM: $ {effectiveTrm.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                  </div>
+                )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Precio Final de Venta PVP
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-3">
+              Ingresa el precio final que verá el cliente en el PDF.
+            </p>
+            <div className="flex items-center gap-2 mb-4">
+              {trmValue > 0 ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-gray-700 hover:bg-gray-100">
+                      {inputCurrencyFinal === "USD" ? "US$" : "COP$"}
+                      <ChevronDown className="w-4 h-4 ml-1 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setInputCurrencyFinal("USD")}>US$ - Dólares</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setInputCurrencyFinal("COP")}>COP$ - Pesos</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <span className="text-lg font-semibold text-gray-700 px-2">US$</span>
+              )}
+              <Input
+                type="text"
+                placeholder="0.00"
+                value={formatNumber(finalPrice)}
+                onChange={(e) => setFinalPrice(e.target.value.replace(/,/g, ""))}
+                className="text-lg font-semibold"
+                data-testid="input-final-price"
+              />
+            </div>
+            {effectiveTrm > 0 && (
+              <div className="mb-4 text-lg font-bold text-purple-700">
+                {inputCurrencyFinal === "USD"
+                  ? `$ ${finalPriceCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+                  : `US$ ${finalPriceValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                }
+              </div>
+            )}
+            
+            {finalPriceValue > 0 && (
+                <div className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-gray-600">Costo Total (Neto):</span>
+                        <div className="text-right">
+                            <span className="font-semibold block">US$ {formatUSD(grandTotal)}</span>
+                            {effectiveTrm > 0 && (
+                                <span className="text-xs text-gray-500 block">
+                                    $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                        <span className="text-purple-700 font-bold">Ganancia Estimada:</span>
+                        <div className="text-right">
+                            <span className={`font-bold text-xl block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                US$ {formatUSD(profit)}
+                            </span>
+                            {effectiveTrm > 0 && (
+                                <span className={`text-sm font-semibold block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    $ {(profit * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+             )}
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Pago Mínimo para Separar
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-3">
+              Ingresa el valor mínimo para separar. Si se deja vacío, el sistema calculará automáticamente:
+              <br/>
+              <span className="text-xs italic">(Vuelos + Asistencia + 30% Porción Terrestre + 200 USD)</span>
+            </p>
+            
+            <div className="flex flex-wrap gap-2 mb-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handlePercentageClick(60)}
+                className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+              >
+                60% del PVP
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handlePercentageClick(70)}
+                className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+              >
+                70% del PVP
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handlePercentageClick(100)}
+                className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+              >
+                100% del PVP
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg font-semibold text-gray-700 px-2">
+                {inputCurrencyFinal === "USD" ? "US$" : "COP$"}
+              </span>
+              <Input
+                type="text"
+                placeholder={inputCurrencyFinal === "USD" 
+                  ? formatNumber(defaultMinPaymentUSD.toFixed(2)) 
+                  : formatNumber(defaultMinPaymentCOP.toFixed(0))
+                }
+                value={formatNumber(minPayment)}
+                onChange={(e) => setMinPayment(e.target.value.replace(/,/g, ""))}
+                className="text-lg font-semibold"
+                data-testid="input-min-payment"
+              />
+            </div>
+            
+            {effectiveTrm > 0 && (
+              <div className="text-sm text-indigo-700 font-medium">
+                {minPayment ? (
+                  // Show conversion of manual input
+                  inputCurrencyFinal === "USD"
+                    ? `$ ${(parseNumber(minPayment) * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+                    : `US$ ${(parseNumber(minPayment) / effectiveTrm).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                ) : (
+                  // Show conversion of default calculation
+                  inputCurrencyFinal === "USD"
+                    ? `$ ${defaultMinPaymentCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP (Calculado)`
+                    : `US$ ${defaultMinPaymentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Calculado)`
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Nombre del Archivo (Opcional)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-3">
+              Ingresa un nombre personalizado para el archivo PDF. Si se deja vacío, se usará el nombre por defecto.
+            </p>
+            <Input
+              type="text"
+              placeholder="Ej: Cotización Familia Perez - Turquía"
+              value={customFilename}
+              onChange={(e) => setCustomFilename(e.target.value)}
+              className="text-lg"
+              data-testid="input-custom-filename"
+            />
           </CardContent>
         </Card>
 
@@ -923,26 +1436,67 @@ export default function QuoteSummary() {
             <DialogHeader>
               <DialogTitle>Guardar Cotización</DialogTitle>
               <DialogDescription>
-                Selecciona un cliente para asociar esta cotización
+                Selecciona un cliente existente o crea uno nuevo
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="client">Cliente</Label>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger data-testid="select-client">
-                    <SelectValue placeholder="Selecciona un cliente" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[100]" position="popper" sideOffset={5}>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} - {client.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="existing">Cliente Existente</TabsTrigger>
+                <TabsTrigger value="new">Nuevo Cliente</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="existing" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="client">Cliente</Label>
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger data-testid="select-client">
+                      <SelectValue placeholder="Selecciona un cliente" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[100]" position="popper" sideOffset={5}>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name} - {client.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="new" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-name">Nombre Completo</Label>
+                  <Input 
+                    id="new-name" 
+                    placeholder="Ej: Juan Pérez" 
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-email">Correo Electrónico</Label>
+                  <Input 
+                    id="new-email" 
+                    type="email" 
+                    placeholder="juan@ejemplo.com" 
+                    value={newClientEmail}
+                    onChange={(e) => setNewClientEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-phone">Teléfono (Opcional)</Label>
+                  <Input 
+                    id="new-phone" 
+                    placeholder="+57 300 123 4567" 
+                    value={newClientPhone}
+                    onChange={(e) => setNewClientPhone(e.target.value)}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
 
+            <div className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label>Resumen</Label>
                 <div className="text-sm space-y-1 text-muted-foreground">
@@ -955,10 +1509,10 @@ export default function QuoteSummary() {
               <Button
                 className="w-full"
                 onClick={handleSaveQuote}
-                disabled={saveQuoteMutation.isPending}
+                disabled={saveQuoteMutation.isPending || createClientMutation.isPending}
                 data-testid="button-confirm-save"
               >
-                {saveQuoteMutation.isPending ? "Guardando..." : "Confirmar y Guardar"}
+                {saveQuoteMutation.isPending || createClientMutation.isPending ? "Procesando..." : "Confirmar y Guardar"}
               </Button>
             </div>
           </DialogContent>

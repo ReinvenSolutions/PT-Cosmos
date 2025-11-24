@@ -169,6 +169,11 @@ interface PublicQuoteData {
   turkeyUpgrade?: string | null;
   trm?: number | null;
   grandTotalCOP?: number | null;
+  finalPrice?: number | null;
+  finalPriceCOP?: number | null;
+  finalPriceCurrency?: "USD" | "COP";
+  minPayment?: number | null;
+  minPaymentCOP?: number | null;
 }
 
 function getPassengerText(passengers: number): string {
@@ -430,14 +435,54 @@ export async function generatePublicQuotePDF(
       })()
     : "Por definir";
 
-  // Calculate minimum payment based on TRM presence
-  const minPaymentValue = data.trm != null && data.trm > 0 && data.grandTotalCOP != null
-    ? Math.round(data.grandTotalCOP * 0.6)
-    : Math.round(data.grandTotal * 0.6);
+  // Determine currency and price to display
+  let showInCOP = false;
+  if (data.finalPriceCurrency) {
+    showInCOP = data.finalPriceCurrency === "COP";
+  } else {
+    // Fallback to old logic: show COP if TRM and grandTotalCOP are present
+    showInCOP = !!(data.trm != null && data.trm > 0 && data.grandTotalCOP != null);
+  }
   
-  const minPaymentCurrency = data.trm != null && data.trm > 0 && data.grandTotalCOP != null
-    ? "COP"
-    : "USD";
+  // Use finalPrice/finalPriceCOP if available, otherwise fallback to grandTotal/grandTotalCOP
+  let displayPrice = 0;
+  if (showInCOP) {
+    // Check specifically for null/undefined, allowing 0
+    if (data.finalPriceCOP !== null && data.finalPriceCOP !== undefined) {
+      displayPrice = data.finalPriceCOP;
+    } else {
+      displayPrice = data.grandTotalCOP || 0;
+    }
+  } else {
+    // Check specifically for null/undefined, allowing 0
+    if (data.finalPrice !== null && data.finalPrice !== undefined) {
+      displayPrice = data.finalPrice;
+    } else {
+      displayPrice = data.grandTotal;
+    }
+  }
+
+  console.log(`[PDF Generator] Display Price: ${displayPrice} (${showInCOP ? "COP" : "USD"})`);
+  console.log(`[PDF Generator] Inputs - FinalPrice: ${data.finalPrice}, FinalPriceCOP: ${data.finalPriceCOP}, GrandTotal: ${data.grandTotal}`);
+
+  // Calculate minimum payment
+  // If minPayment is provided in the data, use it. Otherwise fallback to 60% calculation (legacy behavior)
+  let minPaymentValue = 0;
+  let minPaymentCurrency = showInCOP ? "COP" : "USD";
+
+  if (showInCOP) {
+    if (data.minPaymentCOP !== null && data.minPaymentCOP !== undefined && data.minPaymentCOP > 0) {
+      minPaymentValue = data.minPaymentCOP;
+    } else {
+      minPaymentValue = Math.round(displayPrice * 0.6);
+    }
+  } else {
+    if (data.minPayment !== null && data.minPayment !== undefined && data.minPayment > 0) {
+      minPaymentValue = data.minPayment;
+    } else {
+      minPaymentValue = Math.round(displayPrice * 0.6);
+    }
+  }
 
   // Salida with larger font and bold date
   doc.font("Helvetica").fontSize(11).fillColor(textColor);
@@ -451,7 +496,7 @@ export async function generatePublicQuotePDF(
   doc.font("Helvetica-Bold").fontSize(12);
   doc.text(endDateFormatted);
 
-  // Pago mínimo with larger font and bold amount - show in COP if TRM exists
+  // Pago mínimo with larger font and bold amount
   doc.font("Helvetica").fontSize(11).fillColor(textColor);
   doc.text("Pago mínimo para separar: ", leftMargin, budgetY + 56, {
     continued: true,
@@ -477,11 +522,10 @@ export async function generatePublicQuotePDF(
     )
     .fillAndStroke(priceBoxBackground, priceBoxBorder);
 
-  // Show price in COP if TRM is provided and valid, otherwise show USD
-  if (data.trm != null && data.trm > 0 && data.grandTotalCOP != null) {
+  if (showInCOP) {
     // COP version
     doc.font("Helvetica-Bold").fontSize(22).fillColor(priceTextColor);
-    doc.text(`$ ${formatUSD(data.grandTotalCOP)}`, priceBoxX + 5, priceBoxY + 28, {
+    doc.text(`$ ${formatUSD(displayPrice)}`, priceBoxX + 5, priceBoxY + 28, {
       width: priceBoxWidth - 10,
       align: "center",
     });
@@ -494,7 +538,7 @@ export async function generatePublicQuotePDF(
   } else {
     // USD version
     doc.font("Helvetica-Bold").fontSize(26).fillColor(priceTextColor);
-    doc.text(`$ ${formatUSD(data.grandTotal)}`, priceBoxX + 5, priceBoxY + 30, {
+    doc.text(`$ ${formatUSD(displayPrice)}`, priceBoxX + 5, priceBoxY + 30, {
       width: priceBoxWidth - 10,
       align: "center",
     });

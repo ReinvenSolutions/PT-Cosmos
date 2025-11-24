@@ -121,7 +121,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/public/quote-pdf", async (req, res) => {
     try {
-      const { destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, originCity, outboundFlightImages, returnFlightImages, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, turkeyUpgrade, trm, grandTotalCOP } = req.body;
+      const { 
+        destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, 
+        originCity, outboundFlightImages, returnFlightImages, includeFlights, 
+        outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
+        turkeyUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
+        customFilename, minPayment, minPaymentCOP
+      } = req.body;
       
       if (!destinations || !Array.isArray(destinations) || destinations.length === 0) {
         return res.status(400).json({ message: "Destinations are required" });
@@ -154,6 +160,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (trmValue > 0 && !calculatedGrandTotalCOP) {
         calculatedGrandTotalCOP = grandTotalValue * trmValue;
       }
+
+      console.log("PDF Generation Request:", {
+        grandTotal: grandTotalValue,
+        grandTotalCOP: calculatedGrandTotalCOP,
+        finalPrice: finalPrice,
+        finalPriceCOP: finalPriceCOP,
+        finalPriceCurrency: finalPriceCurrency
+      });
       
       const pdfDoc = await generatePublicQuotePDF({
         destinations: destinationDetails,
@@ -173,10 +187,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         turkeyUpgrade: turkeyUpgrade || null,
         trm: trmValue > 0 ? trmValue : null,
         grandTotalCOP: calculatedGrandTotalCOP,
+        finalPrice: (finalPrice !== undefined && finalPrice !== null) ? Number(finalPrice) : null,
+        finalPriceCOP: (finalPriceCOP !== undefined && finalPriceCOP !== null) ? Number(finalPriceCOP) : null,
+        finalPriceCurrency: finalPriceCurrency || "USD",
+        minPayment: (minPayment !== undefined && minPayment !== null) ? Number(minPayment) : null,
+        minPaymentCOP: (minPaymentCOP !== undefined && minPaymentCOP !== null) ? Number(minPaymentCOP) : null,
       });
       
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=cotizacion-${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      let filename = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
+      if (customFilename && typeof customFilename === 'string' && customFilename.trim() !== '') {
+        filename = customFilename.trim();
+        if (!filename.toLowerCase().endsWith('.pdf')) {
+          filename += '.pdf';
+        }
+        // Sanitize filename to prevent header injection or invalid characters
+        filename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      }
+      
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
       
       pdfDoc.pipe(res);
       pdfDoc.end();
@@ -222,7 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/clients", requireRole("super_admin"), async (req, res) => {
+  app.post("/api/admin/clients", requireRoles(["super_admin", "advisor"]), async (req, res) => {
     try {
       const validatedData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(validatedData);
@@ -295,7 +325,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
-      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages, turkeyUpgrade, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage } = req.body;
+      const { 
+        clientId, totalPrice, destinations, originCity, flightsAndExtras, 
+        outboundFlightImages, returnFlightImages, turkeyUpgrade, includeFlights, 
+        outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage,
+        trm, customFilename, minPayment, minPaymentCOP, finalPrice, finalPriceCOP, finalPriceCurrency
+      } = req.body;
 
       if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -328,6 +363,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         returnCabinBaggage: returnCabinBaggage ?? false,
         returnHoldBaggage: returnHoldBaggage ?? false,
         turkeyUpgrade: turkeyUpgrade || null,
+        trm: trm || null,
+        customFilename: customFilename || null,
+        minPayment: minPayment || null,
+        minPaymentCOP: minPaymentCOP || null,
+        finalPrice: finalPrice || null,
+        finalPriceCOP: finalPriceCOP || null,
+        finalPriceCurrency: finalPriceCurrency || "USD",
         status: "draft",
       };
 
@@ -342,7 +384,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
     try {
       const user = req.user as User;
-      const { clientId, totalPrice, destinations, originCity, flightsAndExtras, outboundFlightImages, returnFlightImages, includeFlights, outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, turkeyUpgrade } = req.body;
+      const { 
+        clientId, totalPrice, destinations, originCity, flightsAndExtras, 
+        outboundFlightImages, returnFlightImages, includeFlights, 
+        outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
+        turkeyUpgrade, trm, customFilename, minPayment, minPaymentCOP, finalPrice, finalPriceCOP, finalPriceCurrency
+      } = req.body;
 
       if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -374,6 +421,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         returnCabinBaggage: returnCabinBaggage ?? false,
         returnHoldBaggage: returnHoldBaggage ?? false,
         turkeyUpgrade: turkeyUpgrade || null,
+        trm: trm || null,
+        customFilename: customFilename || null,
+        minPayment: minPayment || null,
+        minPaymentCOP: minPaymentCOP || null,
+        finalPrice: finalPrice || null,
+        finalPriceCOP: finalPriceCOP || null,
+        finalPriceCurrency: finalPriceCurrency || "USD",
       };
 
       const quote = await storage.updateQuote(req.params.id, user.id, quoteData, destinations);
@@ -487,10 +541,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         turkeyUpgrade: quote.turkeyUpgrade || null,
         trm: trmValue > 0 ? trmValue : null,
         grandTotalCOP: calculatedGrandTotalCOP,
+        minPayment: quote.minPayment ? Number(quote.minPayment) : undefined,
+        minPaymentCOP: quote.minPaymentCOP ? Number(quote.minPaymentCOP) : undefined,
+        finalPrice: quote.finalPrice ? Number(quote.finalPrice) : undefined,
+        finalPriceCOP: quote.finalPriceCOP ? Number(quote.finalPriceCOP) : undefined,
+        finalPriceCurrency: (quote.finalPriceCurrency as "USD" | "COP") || "USD",
       });
       
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=cotizacion-${quote.id}.pdf`);
+      const filename = quote.customFilename 
+        ? (quote.customFilename.endsWith('.pdf') ? quote.customFilename : `${quote.customFilename}.pdf`)
+        : `cotizacion-${quote.id}.pdf`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       
       pdfDoc.pipe(res);
       pdfDoc.end();

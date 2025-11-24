@@ -1,0 +1,199 @@
+# ViajeRapido - Sistema de Cotizaciones de Viajes
+
+Sistema integral para gestionar cotizaciones de paquetes turísticos con generación automática de PDFs profesionales.
+
+## 🚀 Características
+
+- ✅ Sistema de autenticación (Advisors y Super Admin)
+- ✅ Gestión de destinos turísticos con itinerarios detallados
+- ✅ Creación y edición de cotizaciones
+- ✅ Generación automática de PDFs con diseño profesional
+- ✅ Gestión de clientes
+- ✅ Soporte para múltiples monedas (USD/COP)
+- ✅ Cálculo automático de precios y pagos mínimos
+- ✅ Sincronización automática de datos canónicos
+
+## 📋 Requisitos Previos
+
+- Node.js 20 o superior
+- PostgreSQL 16 o superior
+- npm o yarn
+
+## 🔧 Instalación Local
+
+1. **Clonar el repositorio**
+   ```bash
+   git clone <tu-repositorio>
+   cd ViajeRapido
+   ```
+
+2. **Instalar dependencias**
+   ```bash
+   npm install
+   ```
+
+3. **Configurar variables de entorno**
+   
+   Crea un archivo `.env` en la raíz del proyecto:
+   ```env
+   DATABASE_URL=postgresql://usuario:password@localhost:5432/nombre_db
+   SESSION_SECRET=tu-secret-key-muy-segura-aqui
+   NODE_ENV=development
+   PORT=5001
+   ```
+
+4. **Aplicar migraciones de base de datos**
+   ```bash
+   npm run db:push
+   ```
+
+5. **Iniciar el servidor de desarrollo**
+   ```bash
+   npm run dev
+   ```
+
+   La aplicación estará disponible en `http://localhost:5001`
+
+## 🚀 Deploy en Railway
+
+### Paso 1: Preparar el Repositorio en GitHub
+
+1. **Inicializar Git (si aún no está inicializado)**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   ```
+
+2. **Crear repositorio en GitHub**
+   - Ve a [github.com](https://github.com) y crea un nuevo repositorio
+   - **NO** inicialices con README, .gitignore o licencia
+
+3. **Subir código a GitHub**
+   ```bash
+   git remote add origin https://github.com/tu-usuario/tu-repositorio.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+### Paso 2: Deploy en Railway
+
+1. **Crear cuenta en Railway**
+   - Ve a [railway.app](https://railway.app)
+   - Inicia sesión con GitHub
+
+2. **Crear nuevo proyecto**
+   - Click en "New Project"
+   - Selecciona "Deploy from GitHub repo"
+   - Autoriza Railway a acceder a tus repositorios
+   - Selecciona el repositorio `ViajeRapido`
+
+3. **Agregar PostgreSQL**
+   - En tu proyecto, click en "+ New"
+   - Selecciona "Database" → "Add PostgreSQL"
+   - Railway creará automáticamente la base de datos
+
+4. **Configurar Variables de Entorno**
+   
+   En el servicio web (no en la base de datos), ve a "Variables" y agrega:
+   
+   ```env
+   NODE_ENV=production
+   SESSION_SECRET=genera-una-clave-segura-aleatoria-aqui
+   ```
+   
+   **Nota:** `DATABASE_URL` se crea automáticamente al agregar PostgreSQL
+
+5. **Configurar Build y Start Commands** (opcional, ya están en package.json)
+   
+   Railway detecta automáticamente:
+   - **Build Command:** `npm run build`
+   - **Start Command:** `npm run start`
+
+6. **Deploy**
+   - Railway desplegará automáticamente
+   - Espera a que termine el build y deploy
+   - Railway te dará una URL pública (ej: `tu-app.up.railway.app`)
+
+### Paso 3: Verificar el Deploy
+
+1. Accede a tu URL de Railway
+2. El sistema automáticamente:
+   - ✅ Ejecutará las migraciones de base de datos
+   - ✅ Creará usuarios iniciales (admin y advisor1)
+   - ✅ Sincronizará datos canónicos (destinos, itinerarios, etc.)
+
+**Usuarios por defecto:**
+- **Super Admin:** usuario: `admin` / contraseña: `admin123`
+- **Advisor:** usuario: `advisor1` / contraseña: `advisor123`
+
+⚠️ **IMPORTANTE:** Cambia estas contraseñas después del primer login.
+
+## 🔄 Actualización Continua
+
+Cada vez que hagas `git push` a la rama `main`, Railway automáticamente:
+1. Detecta los cambios
+2. Ejecuta el build
+3. Aplica migraciones de base de datos
+4. Re-despliega la aplicación
+
+```bash
+# Workflow típico
+git add .
+git commit -m "Descripción de los cambios"
+git push origin main
+# Railway despliega automáticamente
+```
+
+## 📦 Scripts Disponibles
+
+```bash
+npm run dev          # Desarrollo local
+npm run build        # Build para producción
+npm run start        # Iniciar en producción
+npm run db:push      # Aplicar cambios de esquema
+npm run check        # Verificar tipos TypeScript
+```
+
+## 🗂️ Estructura del Proyecto
+
+```
+ViajeRapido/
+├── client/              # Frontend React
+│   └── src/
+│       ├── components/  # Componentes reutilizables
+│       ├── pages/       # Páginas de la aplicación
+│       └── contexts/    # Contextos de React
+├── server/              # Backend Express
+│   ├── routes.ts        # Rutas API
+│   ├── auth.ts          # Autenticación
+│   ├── pdfGenerator.ts  # Generación de PDFs
+│   └── seed.ts          # Datos iniciales
+├── shared/              # Código compartido
+│   ├── schema.ts        # Esquema de base de datos
+│   └── seed-data.ts     # Datos canónicos
+└── uploads/             # Archivos subidos (no en Git)
+```
+
+## 🔒 Seguridad
+
+- Las contraseñas se hashean con bcrypt
+- Las sesiones se almacenan en PostgreSQL
+- Cookies seguras en producción (HTTPS)
+- Variables sensibles en `.env` (no se suben a Git)
+
+## 📝 Notas Importantes
+
+- **No subas el archivo `.env`** - está en `.gitignore`
+- **La carpeta `uploads/`** no se sube a Git - Railway proporciona almacenamiento efímero
+- **Los datos canónicos** se sincronizan automáticamente en cada deploy
+
+## 🆘 Soporte
+
+Para problemas o preguntas, revisa:
+- `DEPLOYMENT.md` - Guía detallada de deployment
+- `INSTRUCCIONES_DEPLOYMENT.md` - Solución de problemas específicos
+
+## 📄 Licencia
+
+MIT

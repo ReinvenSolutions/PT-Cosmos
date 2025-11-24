@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Upload, X, Save, Star } from "lucide-react";
+import { ArrowLeft, Upload, X, Save, Star, Download } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +50,13 @@ interface Quote {
   returnCabinBaggage: boolean | null;
   returnHoldBaggage: boolean | null;
   turkeyUpgrade: string | null;
+  trm: string | null;
+  customFilename: string | null;
+  minPayment: string | null;
+  minPaymentCOP: string | null;
+  finalPrice: string | null;
+  finalPriceCOP: string | null;
+  finalPriceCurrency: string | null;
   status: string;
   client: Client;
   destinations: QuoteDestination[];
@@ -75,6 +82,15 @@ export default function QuoteEdit() {
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
+  
+  // New fields state
+  const [trm, setTrm] = useState("");
+  const [customFilename, setCustomFilename] = useState("");
+  const [minPayment, setMinPayment] = useState("");
+  const [minPaymentCOP, setMinPaymentCOP] = useState("");
+  const [finalPrice, setFinalPrice] = useState("");
+  const [finalPriceCOP, setFinalPriceCOP] = useState("");
+  const [finalPriceCurrency, setFinalPriceCurrency] = useState("USD");
 
   const { data: quote, isLoading } = useQuery<Quote>({
     queryKey: ["/api/quotes", quoteId],
@@ -113,6 +129,15 @@ export default function QuoteEdit() {
       setReturnCabinBaggage(quote.returnCabinBaggage ?? false);
       setReturnHoldBaggage(quote.returnHoldBaggage ?? false);
       setTurkeyUpgrade(quote.turkeyUpgrade || "");
+      
+      // Set new fields
+      setTrm(quote.trm || "");
+      setCustomFilename(quote.customFilename || "");
+      setMinPayment(quote.minPayment || "");
+      setMinPaymentCOP(quote.minPaymentCOP || "");
+      setFinalPrice(quote.finalPrice || "");
+      setFinalPriceCOP(quote.finalPriceCOP || "");
+      setFinalPriceCurrency(quote.finalPriceCurrency || "USD");
     }
   }, [quote]);
 
@@ -241,6 +266,43 @@ export default function QuoteEdit() {
     return 0;
   };
 
+  const handleDownloadPDF = async () => {
+    if (!quoteId) return;
+    
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}/pdf`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al descargar el PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      
+      const filename = customFilename 
+        ? (customFilename.endsWith('.pdf') ? customFilename : `${customFilename}.pdf`)
+        : `cotizacion-${quoteId}.pdf`;
+        
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Error downloading PDF:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSave = () => {
     if (!clientId || !totalPrice) {
       toast({
@@ -266,6 +328,13 @@ export default function QuoteEdit() {
       returnCabinBaggage,
       returnHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
+      trm: trm || null,
+      customFilename: customFilename || null,
+      minPayment: minPayment || null,
+      minPaymentCOP: minPaymentCOP || null,
+      finalPrice: finalPrice || null,
+      finalPriceCOP: finalPriceCOP || null,
+      finalPriceCurrency: finalPriceCurrency || "USD",
       destinations: quote.destinations.map(qd => ({
         destinationId: qd.destinationId,
         startDate: qd.startDate.split("T")[0],
@@ -320,6 +389,14 @@ export default function QuoteEdit() {
                 >
                   <Save className="w-4 h-4 mr-2" />
                   {updateQuoteMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadPDF}
+                  data-testid="button-download-pdf"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar PDF
                 </Button>
               </div>
 
@@ -460,6 +537,105 @@ export default function QuoteEdit() {
                       data-testid="input-flights-extras"
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>TRM (Tasa Representativa del Mercado)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-semibold">$</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={trm}
+                      onChange={(e) => setTrm(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Se sumarán 30 COP automáticamente al valor ingresado.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Precio Final de Venta PVP</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Moneda</Label>
+                      <Select value={finalPriceCurrency || "USD"} onValueChange={setFinalPriceCurrency}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD - Dólares</SelectItem>
+                          <SelectItem value="COP">COP - Pesos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Valor</Label>
+                      <Input
+                        type="text"
+                        value={finalPrice}
+                        onChange={(e) => setFinalPrice(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pago Mínimo para Separar</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Valor en USD</Label>
+                        <Input
+                          type="text"
+                          value={minPayment}
+                          onChange={(e) => setMinPayment(e.target.value)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <Label>Valor en COP</Label>
+                        <Input
+                          type="text"
+                          value={minPaymentCOP}
+                          onChange={(e) => setMinPaymentCOP(e.target.value)}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Si se deja vacío, se calculará automáticamente.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Nombre del Archivo (Opcional)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Input
+                    type="text"
+                    value={customFilename}
+                    onChange={(e) => setCustomFilename(e.target.value)}
+                    placeholder="Ej: Cotización Familia Perez"
+                  />
                 </CardContent>
               </Card>
 

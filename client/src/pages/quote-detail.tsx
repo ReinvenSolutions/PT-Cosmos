@@ -43,6 +43,7 @@ interface Quote {
   flightsAndExtras: string | null;
   outboundFlightImages: string[] | null;
   returnFlightImages: string[] | null;
+  customFilename: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -85,7 +86,12 @@ export default function QuoteDetail() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `cotizacion-${quoteId}.pdf`;
+      
+      const filename = quote?.customFilename 
+        ? (quote.customFilename.endsWith('.pdf') ? quote.customFilename : `${quote.customFilename}.pdf`)
+        : `cotizacion-${quoteId}.pdf`;
+        
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

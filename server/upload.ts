@@ -39,7 +39,7 @@ async function initializeStorage() {
 
   // Fallback to local filesystem for development
   useObjectStorage = false;
-  localUploadDir = '/home/runner/workspace/uploads';
+  localUploadDir = process.cwd() + '/uploads';
   if (!existsSync(localUploadDir)) {
     await mkdir(localUploadDir, { recursive: true });
   }

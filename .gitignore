@@ -4,3 +4,44 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Uploads (imágenes de usuarios)
+uploads/
+
+# Cache
+.cache
+.vite
+.turbo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+*~
+
+# Replit specific (no necesario para Railway)
+.replit
+.config/
+.local/
+replit.nix

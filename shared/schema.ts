@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, uniqueIndex, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -139,6 +139,12 @@ export const quotes = pgTable("quotes", {
   returnHoldBaggage: boolean("return_hold_baggage").default(false),
   turkeyUpgrade: text("turkey_upgrade"),
   trm: decimal("trm", { precision: 10, scale: 2 }),
+  customFilename: text("custom_filename"),
+  minPayment: decimal("min_payment", { precision: 10, scale: 2 }),
+  minPaymentCOP: decimal("min_payment_cop", { precision: 15, scale: 2 }),
+  finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
+  finalPriceCOP: decimal("final_price_cop", { precision: 15, scale: 2 }),
+  finalPriceCurrency: text("final_price_currency").default("USD"),
   status: text("status").notNull().default("draft"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -166,6 +172,12 @@ export const insertQuoteDestinationSchema = createInsertSchema(quoteDestinations
 });
 export type InsertQuoteDestination = z.infer<typeof insertQuoteDestinationSchema>;
 export type QuoteDestination = typeof quoteDestinations.$inferSelect;
+
+export const sessions = pgTable("sessions", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
 
 export function formatUSD(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
