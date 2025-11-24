@@ -23,7 +23,7 @@ Sistema integral para gestionar cotizaciones de paquetes turísticos con generac
 
 1. **Clonar el repositorio**
    ```bash
-   git clone <tu-repositorio>
+   git clone https://github.com/felipereinven/ViajeRapido.git
    cd ViajeRapido
    ```
 
@@ -34,20 +34,15 @@ Sistema integral para gestionar cotizaciones de paquetes turísticos con generac
 
 3. **Configurar variables de entorno**
    
-   Crea un archivo `.env` en la raíz del proyecto:
+   Crea un archivo `.env` en la raíz del proyecto basándote en `.env.example`:
    ```env
-   DATABASE_URL=postgresql://usuario:password@localhost:5432/nombre_db
-   SESSION_SECRET=tu-secret-key-muy-segura-aqui
+   DATABASE_URL="postgresql://neondb_owner:npg_mFCT5oPH6Ovr@ep-blue-credit-aekag6rz-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require"
    NODE_ENV=development
+   SESSION_SECRET=tu-secret-key-muy-segura-aqui
    PORT=5001
    ```
 
-4. **Aplicar migraciones de base de datos**
-   ```bash
-   npm run db:push
-   ```
-
-5. **Iniciar el servidor de desarrollo**
+4. **Iniciar el servidor de desarrollo**
    ```bash
    npm run dev
    ```
@@ -88,23 +83,19 @@ Sistema integral para gestionar cotizaciones de paquetes turísticos con generac
    - Autoriza Railway a acceder a tus repositorios
    - Selecciona el repositorio `ViajeRapido`
 
-3. **Agregar PostgreSQL**
-   - En tu proyecto, click en "+ New"
-   - Selecciona "Database" → "Add PostgreSQL"
-   - Railway creará automáticamente la base de datos
-
-4. **Configurar Variables de Entorno**
+3. **Configurar Variables de Entorno**
    
-   En el servicio web (no en la base de datos), ve a "Variables" y agrega:
+   En el servicio web, ve a "Variables" y agrega:
    
    ```env
+   DATABASE_URL=postgresql://neondb_owner:npg_mFCT5oPH6Ovr@ep-blue-credit-aekag6rz-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require
    NODE_ENV=production
    SESSION_SECRET=genera-una-clave-segura-aleatoria-aqui
    ```
    
-   **Nota:** `DATABASE_URL` se crea automáticamente al agregar PostgreSQL
+   **Nota:** La base de datos Neon ya está configurada y poblada con datos.
 
-5. **Configurar Build y Start Commands** (opcional, ya están en package.json)
+4. **Configurar Build y Start Commands** (opcional, ya están en package.json)
    
    Railway detecta automáticamente:
    - **Build Command:** `npm run build`
@@ -120,8 +111,8 @@ Sistema integral para gestionar cotizaciones de paquetes turísticos con generac
 1. Accede a tu URL de Railway
 2. El sistema automáticamente:
    - ✅ Ejecutará las migraciones de base de datos
-   - ✅ Creará usuarios iniciales (admin y advisor1)
    - ✅ Sincronizará datos canónicos (destinos, itinerarios, etc.)
+   - ✅ La base de datos Neon ya contiene todos los datos necesarios
 
 **Usuarios por defecto:**
 - **Super Admin:** usuario: `admin` / contraseña: `admin123`
