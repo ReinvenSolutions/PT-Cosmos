@@ -2,6 +2,8 @@
 
 Sistema integral para gestionar cotizaciones de paquetes turísticos con generación automática de PDFs profesionales.
 
+**Base de datos:** Neon PostgreSQL (cloud-native, serverless)
+
 ## 🚀 Características
 
 - ✅ Sistema de autenticación (Advisors y Super Admin)
