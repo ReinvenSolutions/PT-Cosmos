@@ -5,16 +5,51 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plane, UserPlus } from "lucide-react";
+import { Plane, UserPlus, Eye, EyeOff, Check, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);alse);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
+
+  // Password strength calculation
+  const getPasswordStrength = (pass: string) => {
+    let strength = 0;
+    if (pass.length >= 6) strength += 20;
+    if (pass.length >= 8) strength += 20;
+    if (/[a-z]/.test(pass) && /[A-Z]/.test(pass)) strength += 20;
+    if (/[0-9]/.test(pass)) strength += 20;
+    if (/[^a-zA-Z0-9]/.test(pass)) strength += 20;
+    return strength;
+  };
+
+  const passwordStrength = getPasswordStrength(password);
+  const getStrengthLabel = (strength: number) => {
+    if (strength === 0) return { text: "", color: "" };
+    if (strength <= 40) return { text: "Débil", color: "text-red-500" };
+    if (strength <= 60) return { text: "Media", color: "text-yellow-500" };
+    if (strength <= 80) return { text: "Buena", color: "text-blue-500" };
+    return { text: "Fuerte", color: "text-green-500" };
+  };
+
+  const strengthLabel = getStrengthLabel(passwordStrength);
+
+  // Password requirements
+  const requirements = [
+    { text: "Al menos 6 caracteres", met: password.length >= 6 },
+    { text: "Contiene mayúsculas y minúsculas", met: /[a-z]/.test(password) && /[A-Z]/.test(password) },
+    { text: "Contiene números", met: /[0-9]/.test(password) },
+    { text: "Contiene caracteres especiales", met: /[^a-zA-Z0-9]/.test(password) },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,31 +162,94 @@ export default function Register() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
-                <Input
-                  id="password"
-                  data-testid="input-password"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="h-11"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    data-testid="input-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mínimo 6 caracteres"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="h-11 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                {password && (
+                  <div className="space-y-2 mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Fuerza de la contraseña:</span>
+                      <span className={`font-medium ${strengthLabel.color}`}>{strengthLabel.text}</span>
+                    </div>
+                    <Progress value={passwordStrength} className="h-2" />
+                    <div className="space-y-1 mt-2">
+                      {requirements.map((req, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          {req.met ? (
+                            <Check className="w-3 h-3 text-green-500" />
+                          ) : (
+                            <X className="w-3 h-3 text-muted-foreground" />
+                          )}
+                          <span className={req.met ? "text-green-600" : "text-muted-foreground"}>
+                            {req.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-                <Input
-                  id="confirmPassword"
-                  data-testid="input-confirm-password"
-                  type="password"
-                  placeholder="Repite tu contraseña"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="h-11"
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    data-testid="input-confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Repite tu contraseña"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="h-11 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <X className="w-3 h-3" />
+                    Las contraseñas no coinciden
+                  </p>
+                )}
+                {confirmPassword && password === confirmPassword && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    Las contraseñas coinciden
+                  </p>
+                )}
               </div>
               <Button
                 type="submit"
