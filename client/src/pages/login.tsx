@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plane, Eye, EyeOff } from "lucide-react";
+import { Plane, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -24,8 +24,8 @@ export default function Login() {
     try {
       await login(username, password);
       toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido al sistema",
+        title: "¡Bienvenido de nuevo!",
+        description: "Has iniciado sesión correctamente.",
       });
       navigate("/");
     } catch (error: any) {
@@ -40,93 +40,131 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 mb-4">
-            <Plane className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-            Sistema de Cotizaciones
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Paquetes Turísticos
-          </p>
+    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden">
+      {/* Left Side - Image & Branding */}
+      <div className="hidden lg:flex relative h-full flex-col bg-muted text-white dark:border-r">
+        <div className="absolute inset-0 bg-zinc-900">
+          <img
+            src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=2021&auto=format&fit=crop"
+            alt="Travel Background"
+            className="h-full w-full object-cover opacity-50"
+          />
         </div>
+        <div className="relative z-20 flex items-center text-lg font-medium p-10">
+          <div className="rounded-full bg-white/10 p-2 mr-2 backdrop-blur-sm">
+            <Plane className="h-6 w-6" />
+          </div>
+          ViajeRápido
+        </div>
+        <div className="relative z-20 mt-auto p-10">
+          <blockquote className="space-y-2">
+            <p className="text-lg">
+              "El mundo es un libro y aquellos que no viajan solo leen una página."
+            </p>
+            <footer className="text-sm text-zinc-300">Agustín de Hipona</footer>
+          </blockquote>
+        </div>
+      </div>
 
-        <Card className="border-2 shadow-xl">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl text-center">Iniciar Sesión</CardTitle>
-            <CardDescription className="text-center">
-              Ingresa tus credenciales para acceder
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Usuario o Correo</Label>
+      {/* Right Side - Login Form */}
+      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background">
+        <div className="mx-auto w-full max-w-[400px] space-y-6">
+          <div className="flex flex-col space-y-2 text-center">
+            <div className="lg:hidden flex justify-center mb-4">
+              <div className="rounded-full bg-primary/10 p-3">
+                <Plane className="h-8 w-8 text-primary" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Bienvenido</h1>
+            <p className="text-sm text-muted-foreground">
+              Ingresa tus credenciales para acceder a tu cuenta
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Usuario o Correo</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="username"
-                  data-testid="input-username"
+                  placeholder="nombre@ejemplo.com"
                   type="text"
-                  placeholder="tu@email.com"
+                  autoCapitalize="none"
+                  autoComplete="username"
+                  autoCorrect="off"
+                  disabled={isLoading}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  className="pl-9 h-11"
                   required
-                  autoComplete="username"
-                  className="h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    data-testid="input-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                    className="h-11 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              <Button
-                type="submit"
-                data-testid="button-login"
-                className="w-full h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-                disabled={isLoading}
-              >
-                {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">¿No tienes cuenta? </span>
-              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium hover:underline" data-testid="link-register">
-                Regístrate aquí
-              </Link>
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Contraseña</Label>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  placeholder="••••••••"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  disabled={isLoading}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-9 pr-10 h-11"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Sistema seguro de gestión de cotizaciones turísticas
-        </p>
+            <Button className="w-full h-11" type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Iniciando sesión...
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  Iniciar Sesión <ArrowRight className="h-4 w-4" />
+                </div>
+              )}
+            </Button>
+          </form>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                ¿No tienes una cuenta?
+              </span>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <Link href="/register">
+              <Button variant="outline" className="w-full h-11" type="button">
+                Crear una cuenta
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import {
   Hotel,
   Inclusion,
   Exclusion,
+  DestinationImage,
   formatUSD,
   formatDate,
 } from "@shared/schema";
@@ -151,6 +152,7 @@ interface PublicQuoteData {
     hotels?: Hotel[];
     inclusions?: Inclusion[];
     exclusions?: Exclusion[];
+    images?: DestinationImage[];
   }>;
   startDate: string;
   endDate: string;
@@ -278,7 +280,19 @@ export async function generatePublicQuotePDF(
   );
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
-  const imagePaths = getDestinationImages(data.destinations);
+  const imagePaths: string[] = [];
+  data.destinations.forEach((dest) => {
+    if (dest.images && dest.images.length > 0) {
+      // Use the first image (cover) from DB
+      const relativePath = dest.images[0].imageUrl;
+      const absolutePath = path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+      imagePaths.push(absolutePath);
+    } else {
+      // Fallback to old logic
+      const oldImages = getDestinationImageSet({ name: dest.name, country: dest.country });
+      if (oldImages.length > 0) imagePaths.push(oldImages[0]);
+    }
+  });
 
   // Add Special Offer banner on first page only (top-right corner) - 100% in corner
   try {
@@ -1110,20 +1124,33 @@ export async function generatePublicQuotePDF(
     );
     doc.moveDown(0.5);
 
-    const destImages = getDestinationImageSet({
-      name: dest.name || "",
-      country: dest.country || "",
-    });
+    let destImages: string[] = [];
+    if (dest.images && dest.images.length > 0) {
+      destImages = dest.images.map(img => {
+        const relativePath = img.imageUrl;
+        return path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+      });
+    } else {
+      destImages = getDestinationImageSet({
+        name: dest.name || "",
+        country: dest.country || "",
+      });
+    }
     if (destImages.length > 0) {
       const imageWidth = (contentWidth - 20) / 3;
       const imageHeight = 100;
       const currentY = doc.y;
 
-      // For itinerary page, use images 4-6 (indices 3-5) if available, otherwise use first 3
-      const imagesToShow =
-        destImages.length >= 6
-          ? destImages.slice(3, 6) // Use last 3 images (banderas, éfeso interior, éfeso arco)
-          : destImages.slice(0, 3); // Fallback to first 3 for other countries
+      // For itinerary page, use images 4-6 (indices 3-5) if available to avoid cover image (index 0)
+      // If not enough images, try to use 2-4 (indices 1-3)
+      let imagesToShow: string[] = [];
+      if (destImages.length >= 6) {
+        imagesToShow = destImages.slice(3, 6);
+      } else if (destImages.length >= 4) {
+        imagesToShow = destImages.slice(1, 4);
+      } else {
+        imagesToShow = destImages.slice(0, 3);
+      }
 
       imagesToShow.forEach((imagePath, index) => {
         if (fs.existsSync(imagePath)) {

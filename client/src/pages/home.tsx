@@ -145,6 +145,11 @@ export default function Home() {
   }, [startDate, hasTurkeyEsencial, toast]);
 
   const getHotelStars = (destId: string): number => {
+    const dest = destinations.find(d => d.id === destId);
+    if (dest?.name === "Turquía Esencial") {
+      return 4;
+    }
+
     const details = destinationDetails[destId];
     if (!details || !details.hotels || details.hotels.length === 0) return 4;
     

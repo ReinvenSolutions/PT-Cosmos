@@ -9,8 +9,12 @@ import bcrypt from "bcrypt";
 import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, type User } from "@shared/schema";
 import multer from "multer";
 import { handleFileUpload, getImageBuffer } from "./upload";
+import path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Servir archivos estáticos de uploads
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }
@@ -484,6 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const hotels = await storage.getHotels(qd.destinationId);
           const inclusions = await storage.getInclusions(qd.destinationId);
           const exclusions = await storage.getExclusions(qd.destinationId);
+          const images = await storage.getDestinationImages(qd.destinationId);
           
           return {
             id: qd.destination.id,
@@ -499,6 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hotels,
             inclusions,
             exclusions,
+            images,
           };
         })
       );

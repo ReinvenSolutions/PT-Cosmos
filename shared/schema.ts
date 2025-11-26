@@ -31,6 +31,21 @@ export const insertDestinationSchema = createInsertSchema(destinations).omit({
 export type InsertDestination = z.infer<typeof insertDestinationSchema>;
 export type Destination = typeof destinations.$inferSelect;
 
+export const destinationImages = pgTable("destination_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  destinationId: varchar("destination_id").notNull().references(() => destinations.id, { onDelete: "cascade" }),
+  imageUrl: text("image_url").notNull(),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDestinationImageSchema = createInsertSchema(destinationImages).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertDestinationImage = z.infer<typeof insertDestinationImageSchema>;
+export type DestinationImage = typeof destinationImages.$inferSelect;
+
 export const itineraryDays = pgTable("itinerary_days", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   destinationId: varchar("destination_id").notNull().references(() => destinations.id, { onDelete: "cascade" }),

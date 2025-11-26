@@ -26,6 +26,8 @@ import {
   type InsertQuote,
   type QuoteDestination,
   type InsertQuoteDestination,
+  destinationImages,
+  type DestinationImage,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, desc } from "drizzle-orm";
@@ -43,6 +45,8 @@ export interface IStorage {
   getInclusions(destinationId: string): Promise<Inclusion[]>;
   
   getExclusions(destinationId: string): Promise<Exclusion[]>;
+
+  getDestinationImages(destinationId: string): Promise<DestinationImage[]>;
 
   createUser(data: InsertUser): Promise<User>;
   findUserByUsername(username: string): Promise<User | undefined>;
@@ -114,6 +118,14 @@ export class DatabaseStorage implements IStorage {
       .from(exclusions)
       .where(eq(exclusions.destinationId, destinationId))
       .orderBy(exclusions.displayOrder);
+  }
+
+  async getDestinationImages(destinationId: string): Promise<DestinationImage[]> {
+    return db
+      .select()
+      .from(destinationImages)
+      .where(eq(destinationImages.destinationId, destinationId))
+      .orderBy(destinationImages.displayOrder);
   }
 
   async createDestination(data: InsertDestination): Promise<Destination> {

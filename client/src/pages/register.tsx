@@ -2,10 +2,9 @@ import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plane, UserPlus, Eye, EyeOff, Check, X } from "lucide-react";
+import { Plane, Eye, EyeOff, Check, X, User, Mail, Lock, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export default function Register() {
@@ -14,8 +13,6 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);alse);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
@@ -106,173 +103,210 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 mb-4">
-            <Plane className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-            Sistema de Cotizaciones
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Paquetes Turísticos
-          </p>
+    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden">
+      {/* Left Side - Image & Branding */}
+      <div className="hidden lg:flex relative h-full flex-col bg-muted text-white dark:border-r">
+        <div className="absolute inset-0 bg-zinc-900">
+          <img
+            src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop"
+            alt="Travel Background"
+            className="h-full w-full object-cover opacity-50"
+          />
         </div>
+        <div className="relative z-20 flex items-center text-lg font-medium p-10">
+          <div className="rounded-full bg-white/10 p-2 mr-2 backdrop-blur-sm">
+            <Plane className="h-6 w-6" />
+          </div>
+          ViajeRápido
+        </div>
+        <div className="relative z-20 mt-auto p-10">
+          <blockquote className="space-y-2">
+            <p className="text-lg">
+              "Un viaje de mil millas comienza con un solo paso."
+            </p>
+            <footer className="text-sm text-zinc-300">Lao Tse</footer>
+          </blockquote>
+        </div>
+      </div>
 
-        <Card className="border-2 shadow-xl">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl text-center flex items-center justify-center gap-2">
-              <UserPlus className="w-6 h-6" />
-              Crear Cuenta
-            </CardTitle>
-            <CardDescription className="text-center">
-              Regístrate como asesor de viajes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
+      {/* Right Side - Register Form */}
+      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background overflow-y-auto h-full">
+        <div className="mx-auto w-full max-w-[450px] space-y-6">
+          <div className="flex flex-col space-y-2 text-center">
+            <div className="lg:hidden flex justify-center mb-4">
+              <div className="rounded-full bg-primary/10 p-3">
+                <Plane className="h-8 w-8 text-primary" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Crear una cuenta</h1>
+            <p className="text-sm text-muted-foreground">
+              Ingresa tus datos para registrarte en la plataforma
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre Completo</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="name"
-                  data-testid="input-name"
-                  type="text"
                   placeholder="Juan Pérez"
+                  type="text"
+                  autoComplete="name"
+                  disabled={isLoading}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  className="pl-9 h-11"
                   required
-                  autoComplete="name"
-                  className="h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo Electrónico</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="email"
-                  data-testid="input-email"
+                  placeholder="nombre@ejemplo.com"
                   type="email"
-                  placeholder="tu@email.com"
+                  autoComplete="email"
+                  disabled={isLoading}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="pl-9 h-11"
                   required
-                  autoComplete="email"
-                  className="h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    data-testid="input-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Mínimo 6 caracteres"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="new-password"
-                    className="h-11 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-                {password && (
-                  <div className="space-y-2 mt-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Fuerza de la contraseña:</span>
-                      <span className={`font-medium ${strengthLabel.color}`}>{strengthLabel.text}</span>
-                    </div>
-                    <Progress value={passwordStrength} className="h-2" />
-                    <div className="space-y-1 mt-2">
-                      {requirements.map((req, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-xs">
-                          {req.met ? (
-                            <Check className="w-3 h-3 text-green-500" />
-                          ) : (
-                            <X className="w-3 h-3 text-muted-foreground" />
-                          )}
-                          <span className={req.met ? "text-green-600" : "text-muted-foreground"}>
-                            {req.text}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    data-testid="input-confirm-password"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Repite tu contraseña"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    autoComplete="new-password"
-                    className="h-11 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-                {confirmPassword && password !== confirmPassword && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <X className="w-3 h-3" />
-                    Las contraseñas no coinciden
-                  </p>
-                )}
-                {confirmPassword && password === confirmPassword && (
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    <Check className="w-3 h-3" />
-                    Las contraseñas coinciden
-                  </p>
-                )}
-              </div>
-              <Button
-                type="submit"
-                data-testid="button-register"
-                className="w-full h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-                disabled={isLoading}
-              >
-                {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">¿Ya tienes cuenta? </span>
-              <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium hover:underline" data-testid="link-login">
-                Inicia sesión
-              </Link>
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  placeholder="••••••••"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  disabled={isLoading}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-9 pr-10 h-11"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {password && (
+                <div className="space-y-2 mt-2 p-3 bg-muted/50 rounded-md">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Fuerza:</span>
+                    <span className={`font-medium ${strengthLabel.color}`}>{strengthLabel.text}</span>
+                  </div>
+                  <Progress value={passwordStrength} className="h-1.5" />
+                  <div className="grid grid-cols-1 gap-1 mt-2">
+                    {requirements.map((req, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-xs">
+                        {req.met ? (
+                          <Check className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <X className="w-3 h-3 text-muted-foreground" />
+                        )}
+                        <span className={req.met ? "text-green-600" : "text-muted-foreground"}>
+                          {req.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="confirmPassword"
+                  placeholder="••••••••"
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  disabled={isLoading}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-9 pr-10 h-11"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {confirmPassword && (
+                <div className="mt-1">
+                  {password !== confirmPassword ? (
+                    <p className="text-xs text-red-500 flex items-center gap-1">
+                      <X className="w-3 h-3" />
+                      Las contraseñas no coinciden
+                    </p>
+                  ) : (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Las contraseñas coinciden
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Al registrarte, podrás crear y gestionar cotizaciones para tus clientes
-        </p>
+            <Button className="w-full h-11" type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Creando cuenta...
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  Crear Cuenta <ArrowRight className="h-4 w-4" />
+                </div>
+              )}
+            </Button>
+          </form>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                ¿Ya tienes una cuenta?
+              </span>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <Link href="/login">
+              <Button variant="outline" className="w-full h-11" type="button">
+                Iniciar Sesión
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );
