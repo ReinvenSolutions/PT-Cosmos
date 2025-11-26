@@ -20,6 +20,33 @@
   2. Ejecutar `db:push` (aplicar migraciones)
   3. Ejecutar `seed-production-full.ts` (poblar datos)
 
+## Configuración de Railway (Producción)
+
+Railway debe estar conectado a la base de datos de **PRODUCCIÓN**.
+
+### Variables de Entorno en Railway
+1. Ve a tu proyecto en Railway
+2. Click en **Variables** → **Service Variables**
+3. Configura las siguientes variables:
+
+#### `DATABASE_URL`
+```
+postgresql://neondb_owner:npg_rQ7QPZuPww0K@ep-late-union-ae03ir4o-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
+```
+**⚠️ IMPORTANTE**: Debe ser la URL de PRODUCCIÓN (ep-late-union), NO la de desarrollo (ep-blue-credit)
+
+#### `NODE_ENV`
+```
+production
+```
+
+#### `SESSION_SECRET`
+```
+5Qd0bCv2y1fsv8xfQIAcZH54gdw6Hxpo190nFZyl30M=
+```
+
+4. **Redeploy** el servicio después de actualizar las variables
+
 ## Configuración de GitHub Secrets
 
 Debes configurar los siguientes secrets en GitHub:
