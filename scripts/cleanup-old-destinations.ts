@@ -16,7 +16,11 @@ async function cleanupOldDestinations() {
       "Tour Cusco Básico + Paracas - Huacachina - Nazca: 6 Días - 5 Noches",
       "Lo Mejor de Cusco + Lima: 7 Días - 6 Noches",
       "Tour Cusco Completo + Lima, Paracas, Nazca, Huacachina: 10 Días - 9 Noches",
-      "Auroras boreales finlandia"
+      "Auroras boreales finlandia",
+      "Gran Tour de Europa",
+      "Italia Turística - Euro Express",
+      "España e Italia Turística - Euro Express",
+      "Perú 7D - 6N / Lima y Cusco"
     ];
 
     console.log("Conservando los siguientes destinos:", keepNames);

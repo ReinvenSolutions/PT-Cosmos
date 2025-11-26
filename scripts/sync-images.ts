@@ -18,14 +18,14 @@ async function syncImages() {
   console.log("Sincronizando imágenes desde carpetas...");
 
   const allDestinations = await db.select().from(destinations);
-  const baseDir = path.join(process.cwd(), "uploads", "destinations");
+  const baseDir = path.join(process.cwd(), "public", "images", "destinations");
 
   for (const dest of allDestinations) {
     const folderName = sanitizeFolderName(dest.name);
     const folderPath = path.join(baseDir, folderName);
 
     if (!fs.existsSync(folderPath)) {
-      console.log(`[SKIP] No existe carpeta para: ${dest.name}`);
+      console.log(`[SKIP] No existe carpeta para: ${dest.name} (Ruta: ${folderPath})`);
       continue;
     }
 
@@ -47,7 +47,7 @@ async function syncImages() {
     // Insertar nuevas imágenes
     for (let i = 0; i < files.length; i++) {
       const fileName = files[i];
-      const publicPath = `/uploads/destinations/${folderName}/${fileName}`;
+      const publicPath = `/images/destinations/${folderName}/${fileName}`;
 
       await db.insert(destinationImages).values({
         destinationId: dest.id,
