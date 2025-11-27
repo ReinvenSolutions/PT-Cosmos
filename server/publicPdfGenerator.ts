@@ -62,35 +62,42 @@ async function preloadStaticImages(): Promise<void> {
   await Promise.all(loadPromises);
 }
 
-// Preload destination images (Colombia/Turkey destination photos)
-async function preloadDestinationImages(): Promise<void> {
-  const destImages = [
-    "1_1763570259884.png",
-    "2_1763570259884.png",
-    "3_1763570259885.png",
-    "4_1763570259885.png",
-    "5_1763570259885.png",
-    "6_1763570259885.png",
-  ];
+// Preload destination images
+async function preloadDestinationImages(imageUrls: string[]): Promise<void> {
+  if (!imageUrls || imageUrls.length === 0) return;
 
-  const loadPromises = destImages.map(async (filename) => {
-    if (imageCache.has(filename)) return;
+  const loadPromises = imageUrls.map(async (imageUrl) => {
+    // Use the full imageUrl as the cache key to avoid conflicts
+    const cacheKey = imageUrl;
+    if (imageCache.has(cacheKey)) return;
 
     try {
-      const imagePath = path.join(process.cwd(), "attached_assets", filename);
-      if (fs.existsSync(imagePath)) {
-        const buffer = await fsPromises.readFile(imagePath);
+      let fullPath: string;
+      
+      if (imageUrl.startsWith('/images/')) {
+         fullPath = path.join(process.cwd(), 'public', imageUrl.slice(1));
+      } else if (imageUrl.startsWith('/attached_assets/')) {
+         fullPath = path.join(process.cwd(), imageUrl.slice(1));
+      } else {
+         // Try standard resolution
+         fullPath = path.join(process.cwd(), imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl);
+      }
+
+      if (fs.existsSync(fullPath)) {
+        const buffer = await fsPromises.readFile(fullPath);
         const dimensions = sizeOf(buffer);
 
-        imageCache.set(filename, {
-          path: imagePath,
+        imageCache.set(cacheKey, {
+          path: fullPath,
           buffer,
           width: dimensions.width || 0,
           height: dimensions.height || 0,
         });
+      } else {
+        console.error(`[PDF Generator] Image not found: ${fullPath}`);
       }
     } catch (error) {
-      console.error(`[PDF Generator] Error preloading destination ${filename}:`, error);
+      console.error(`[PDF Generator] Error preloading destination ${imageUrl}:`, error);
     }
   });
 
@@ -128,8 +135,16 @@ async function preloadFlightImages(imageUrls: string[]): Promise<void> {
 
 // Helper to get cached image or return path (for fallback)
 function getCachedImageOrPath(filePathOrName: string): { buffer: Buffer; width: number; height: number } | string {
+  // Try the full path first (for destination images)
+  let cached = imageCache.get(filePathOrName);
+  
+  if (cached) {
+    return { buffer: cached.buffer, width: cached.width, height: cached.height };
+  }
+  
+  // Fallback to filename only (for static images like logos)
   const filename = path.basename(filePathOrName);
-  const cached = imageCache.get(filename);
+  cached = imageCache.get(filename);
   
   if (cached) {
     return { buffer: cached.buffer, width: cached.width, height: cached.height };
@@ -213,10 +228,23 @@ export async function generatePublicQuotePDF(
   // Clear cache before each PDF generation to avoid stale data
   imageCache.clear();
   
+  // Collect all destination images
+  const allDestImages: string[] = [];
+  data.destinations.forEach(d => {
+    if (d.images && d.images.length > 0) {
+      // Add all images from this destination, not just the first one
+      d.images.forEach(img => {
+        allDestImages.push(img.imageUrl);
+      });
+    }
+  });
+
+  console.log(`[PDF Generator] Collected ${allDestImages.length} destination images to preload`);
+
   // Preload ALL images in parallel for maximum performance
   await Promise.all([
     preloadStaticImages(),
-    preloadDestinationImages(),
+    preloadDestinationImages(allDestImages),
     preloadFlightImages([
       ...(data.outboundFlightImages || []),
       ...(data.returnFlightImages || []),
@@ -280,17 +308,31 @@ export async function generatePublicQuotePDF(
   );
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
-  const imagePaths: string[] = [];
+  // Store both relative (for cache lookup) and absolute (for fallback) paths
+  const imageInfo: Array<{ relativePath: string; absolutePath: string }> = [];
   data.destinations.forEach((dest) => {
     if (dest.images && dest.images.length > 0) {
-      // Use the first image (cover) from DB
-      const relativePath = dest.images[0].imageUrl;
-      const absolutePath = path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
-      imagePaths.push(absolutePath);
+      // Add ALL images from this destination to ensure we have enough for the first page (needs 3)
+      dest.images.forEach(img => {
+        const relativePath = img.imageUrl;
+        let absolutePath: string;
+        
+        if (relativePath.startsWith('/images/')) {
+           absolutePath = path.join(process.cwd(), 'public', relativePath.slice(1));
+        } else if (relativePath.startsWith('/attached_assets/')) {
+           absolutePath = path.join(process.cwd(), relativePath.slice(1));
+        } else {
+           absolutePath = path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+        }
+        
+        imageInfo.push({ relativePath, absolutePath });
+      });
     } else {
-      // Fallback to old logic
+      // Fallback to old logic - get ALL old images
       const oldImages = getDestinationImageSet({ name: dest.name, country: dest.country });
-      if (oldImages.length > 0) imagePaths.push(oldImages[0]);
+      oldImages.forEach(img => {
+        imageInfo.push({ relativePath: img, absolutePath: img });
+      });
     }
   });
 
@@ -378,10 +420,11 @@ export async function generatePublicQuotePDF(
     align: "right",
   });
 
-  if (imagePaths.length > 0) {
+  if (imageInfo.length > 0) {
     try {
-      const cached = getCachedImageOrPath(imagePaths[0]);
-      const imageSource = typeof cached === 'object' ? cached.buffer : imagePaths[0];
+      // Try cache with relative path first, then absolute path as fallback
+      const cached = getCachedImageOrPath(imageInfo[0].relativePath);
+      const imageSource = typeof cached === 'object' ? cached.buffer : imageInfo[0].absolutePath;
       
       doc.image(imageSource, leftMargin, mainImageY, {
         width: contentWidth,
@@ -568,10 +611,10 @@ export async function generatePublicQuotePDF(
   const smallImageWidth = (contentWidth - 20) / 2;
   const smallImageHeight = 150;
 
-  if (imagePaths.length > 1) {
+  if (imageInfo.length > 1) {
     try {
-      const cached = getCachedImageOrPath(imagePaths[1]);
-      const imageSource = typeof cached === 'object' ? cached.buffer : imagePaths[1];
+      const cached = getCachedImageOrPath(imageInfo[1].relativePath);
+      const imageSource = typeof cached === 'object' ? cached.buffer : imageInfo[1].absolutePath;
       
       doc.image(imageSource, leftMargin, smallImagesY, {
         width: smallImageWidth,
@@ -588,10 +631,13 @@ export async function generatePublicQuotePDF(
     }
   }
 
-  if (imagePaths.length > 2 && fs.existsSync(imagePaths[2])) {
+  if (imageInfo.length > 2) {
     try {
+      const cached = getCachedImageOrPath(imageInfo[2].relativePath);
+      const imageSource = typeof cached === 'object' ? cached.buffer : imageInfo[2].absolutePath;
+      
       doc.image(
-        imagePaths[2],
+        imageSource,
         leftMargin + smallImageWidth + 20,
         smallImagesY,
         {
@@ -1128,7 +1174,13 @@ export async function generatePublicQuotePDF(
     if (dest.images && dest.images.length > 0) {
       destImages = dest.images.map(img => {
         const relativePath = img.imageUrl;
-        return path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+        if (relativePath.startsWith('/images/')) {
+           return path.join(process.cwd(), 'public', relativePath.slice(1));
+        } else if (relativePath.startsWith('/attached_assets/')) {
+           return path.join(process.cwd(), relativePath.slice(1));
+        } else {
+           return path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+        }
       });
     } else {
       destImages = getDestinationImageSet({

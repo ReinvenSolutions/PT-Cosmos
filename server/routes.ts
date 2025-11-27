@@ -10,6 +10,7 @@ import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinat
 import multer from "multer";
 import { handleFileUpload, getImageBuffer } from "./upload";
 import path from "path";
+import fs from "fs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Servir archivos estáticos de uploads
@@ -89,6 +90,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/upload", requireAuth, upload.single("file"), handleFileUpload);
 
+  // Endpoint to serve public destination images (no auth required)
+  app.get("/images/destinations/:folder/:filename", async (req, res) => {
+    try {
+      const { folder, filename } = req.params;
+      
+      // Security: validate to prevent directory traversal
+      if (!folder || !filename || folder.includes("..") || filename.includes("..") || folder.includes("/") || filename.includes("/")) {
+        return res.status(400).json({ message: "Invalid path" });
+      }
+      
+      const imagePath = path.join(process.cwd(), "public", "images", "destinations", folder, filename);
+      
+      // Check if file exists
+      if (!fs.existsSync(imagePath)) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      
+      // Determine content type based on extension
+      const ext = filename.split('.').pop()?.toLowerCase();
+      const contentTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp'
+      };
+      
+      const contentType = contentTypes[ext || ''] || 'application/octet-stream';
+      
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      res.sendFile(imagePath);
+    } catch (error) {
+      console.error("Error serving destination image:", error);
+      res.status(404).json({ message: "Image not found" });
+    }
+  });
+
   // Endpoint to serve images from Object Storage with authentication
   app.get("/api/images/:filename", requireAuth, async (req, res) => {
     try {
@@ -144,6 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const hotels = await storage.getHotels(dest.id);
           const inclusionsList = await storage.getInclusions(dest.id);
           const exclusionsList = await storage.getExclusions(dest.id);
+          const images = await storage.getDestinationImages(dest.id);
           
           return {
             ...dest,
@@ -152,6 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hotels,
             inclusions: inclusionsList,
             exclusions: exclusionsList,
+            images,
           };
         })
       );
