@@ -31,7 +31,7 @@ import { eq } from 'drizzle-orm';
 
 const env = process.env.NODE_ENV || 'development';
 const allowProdSync = process.env.ALLOW_PROD_DATA_SYNC === 'true';
-const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
+const isDeployment = process.env.REPLIT_DEPLOYMENT === '1' || !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_STATIC_URL || !!process.env.RAILWAY_GIT_COMMIT_SHA;
 
 async function syncData() {
   console.log('\n========================================');
