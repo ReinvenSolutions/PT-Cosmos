@@ -102,10 +102,17 @@ async function syncData() {
 
     // Paso 3: Limpiar datos relacionados existentes (en orden correcto por FK constraints)
     console.log('3️⃣  Limpiando datos relacionados antiguos...');
-    await db.delete(itineraryDays).where(eq(itineraryDays.destinationId, TURKEY_ESENCIAL_ID));
-    await db.delete(hotels).where(eq(hotels.destinationId, TURKEY_ESENCIAL_ID));
-    await db.delete(inclusions).where(eq(inclusions.destinationId, TURKEY_ESENCIAL_ID));
-    await db.delete(exclusions).where(eq(exclusions.destinationId, TURKEY_ESENCIAL_ID));
+    
+    // Obtener IDs de todos los destinos que vamos a sincronizar
+    const destinationIds = seedDestinations.map(d => d.id);
+    
+    // Eliminar datos relacionados para TODOS los destinos del seed
+    for (const id of destinationIds) {
+      await db.delete(itineraryDays).where(eq(itineraryDays.destinationId, id));
+      await db.delete(hotels).where(eq(hotels.destinationId, id));
+      await db.delete(inclusions).where(eq(inclusions.destinationId, id));
+      await db.delete(exclusions).where(eq(exclusions.destinationId, id));
+    }
     console.log('   ✅ Datos antiguos eliminados\n');
 
     // Paso 4: Insertar itinerarios
