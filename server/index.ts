@@ -87,13 +87,22 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // En producción: primero poblar BD si está vacía, luego sincronizar datos canónicos
+  // En producción: ejecutar seeding y sincronización en background después de iniciar el servidor
   if (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1") {
-    // Paso 1: Seed inicial (solo si BD está vacía)
-    await seedDatabaseIfEmpty();
-    
-    // Paso 2: Sincronizar datos canónicos (SIEMPRE en producción/deployment)
-    await syncCanonicalData();
+    // Ejecutar en background para no bloquear el inicio del servidor
+    (async () => {
+      try {
+        log("🌱 Iniciando sincronización de datos en background...");
+        // Paso 1: Seed inicial (solo si BD está vacía)
+        await seedDatabaseIfEmpty();
+        
+        // Paso 2: Sincronizar datos canónicos (SIEMPRE en producción/deployment)
+        await syncCanonicalData();
+        log("✅ Sincronización completada exitosamente");
+      } catch (error) {
+        log(`❌ Error durante la sincronización: ${error}`);
+      }
+    })();
   }
 
   // importantly only setup vite in development and after
