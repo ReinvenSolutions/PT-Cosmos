@@ -1241,11 +1241,40 @@ export async function generatePublicQuotePDF(
       doc.text(`Día ${day.dayNumber} | ${day.title}`, leftMargin, doc.y);
       doc.moveDown(0.3);
 
-      doc.font("Helvetica").fontSize(8).fillColor(textColor);
-      doc.text(day.description, leftMargin, doc.y, {
-        width: contentWidth,
-        align: "justify",
+      // Process text with bold markdown support
+      doc.fontSize(8).fillColor(textColor);
+      const parts = day.description.split(/(\*\*.*?\*\*)/g);
+      
+      parts.forEach((part, index) => {
+        if (!part) return;
+        
+        // Check if we need a new page before rendering this part
+        if (doc.y > 720) {
+          doc.addPage();
+          addPageBackground();
+          addPlaneLogoBottom();
+        }
+        
+        if (part.startsWith('**') && part.endsWith('**')) {
+          // Bold text - remove the ** markers
+          const boldText = part.slice(2, -2);
+          doc.font("Helvetica-Bold");
+          doc.text(boldText, leftMargin, doc.y, {
+            width: contentWidth,
+            align: "justify",
+            continued: index < parts.length - 1,
+          });
+        } else {
+          // Normal text
+          doc.font("Helvetica");
+          doc.text(part, leftMargin, doc.y, {
+            width: contentWidth,
+            align: "justify",
+            continued: index < parts.length - 1,
+          });
+        }
       });
+      
       doc.moveDown(0.8);
     });
 
@@ -1303,7 +1332,7 @@ export async function generatePublicQuotePDF(
       doc
         .font("Helvetica")
         .fontSize(9)
-        .text(" 8 almuerzos + 2 actividades Estambul", {
+        .text(" 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico", {
           width: contentWidth - boxPadding * 2,
         });
       optionY += 25;
@@ -1319,7 +1348,7 @@ export async function generatePublicQuotePDF(
         .font("Helvetica")
         .fontSize(9)
         .text(
-          " Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul",
+          " Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
           { width: contentWidth - boxPadding * 2 },
         );
       optionY += 25;
@@ -1335,7 +1364,7 @@ export async function generatePublicQuotePDF(
         .font("Helvetica")
         .fontSize(9)
         .text(
-          " Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul",
+          " Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
           { width: contentWidth - boxPadding * 2 },
         );
 
@@ -1346,17 +1375,17 @@ export async function generatePublicQuotePDF(
         [key: string]: { description: string; price: string };
       } = {
         option1: {
-          description: "8 almuerzos + 2 actividades Estambul",
+          description: "8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
           price: "500 USD",
         },
         option2: {
           description:
-            "Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul",
+            "Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
           price: "770 USD",
         },
         option3: {
           description:
-            "Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul",
+            "Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
           price: "1,100 USD",
         },
       };

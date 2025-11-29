@@ -86,7 +86,12 @@ async function syncData() {
             country: dest.country,
             duration: dest.duration,
             nights: dest.nights,
+            description: dest.description,
+            imageUrl: dest.imageUrl,
             basePrice: dest.basePrice,
+            category: dest.category,
+            isPromotion: dest.isPromotion,
+            displayOrder: dest.displayOrder,
             isActive: dest.isActive,
             requiresTuesday: dest.requiresTuesday,
           })

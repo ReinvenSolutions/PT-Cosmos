@@ -796,7 +796,7 @@ export default function QuoteSummary() {
                     <label htmlFor="upgrade-option1" className="font-semibold cursor-pointer">
                       + 500 USD
                     </label>
-                    <p className="text-sm text-gray-600">8 almuerzos + 2 actividades Estambul</p>
+                    <p className="text-sm text-gray-600">8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                   </div>
                 </div>
 
@@ -811,7 +811,7 @@ export default function QuoteSummary() {
                     <label htmlFor="upgrade-option2" className="font-semibold cursor-pointer">
                       + 770 USD
                     </label>
-                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul</p>
+                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                   </div>
                 </div>
 
@@ -826,7 +826,7 @@ export default function QuoteSummary() {
                     <label htmlFor="upgrade-option3" className="font-semibold cursor-pointer">
                       + 1,100 USD
                     </label>
-                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul</p>
+                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                   </div>
                 </div>
               </div>
@@ -1282,7 +1282,7 @@ export default function QuoteSummary() {
                         </div>
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                        <span className="text-purple-700 font-bold">Ganancia Estimada:</span>
+                        <span className="text-purple-700 font-bold">Cargo por Servicio:</span>
                         <div className="text-right">
                             <span className={`font-bold text-xl block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 US$ {formatUSD(profit)}

@@ -229,14 +229,6 @@ export default function Home() {
     return matchesCategory && matchesSearch;
   });
 
-  const groupedByCountry = filteredDestinations.reduce((acc, dest) => {
-    if (!acc[dest.country]) {
-      acc[dest.country] = [];
-    }
-    acc[dest.country].push(dest);
-    return acc;
-  }, {} as Record<string, Destination[]>);
-
   const toggleDestination = (destId: string) => {
     const dest = destinations.find((d) => d.id === destId);
     
@@ -421,113 +413,104 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value={selectedCategory} className="mt-8">
-            {Object.entries(groupedByCountry).map(([country, dests]) => (
-              <div key={country} className="mb-12">
-                <div className="flex items-center gap-2 mb-6">
-                  <MapPin className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-2xl font-bold text-gray-800">{country}</h3>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredDestinations.map((dest) => {
+                const isSelected = selectedDestinations.includes(dest.id);
+                const isExpanded = expandedCard === dest.id;
+                const imageUrl = getDestinationImage(dest);
+                const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
+                const hotelStars = getHotelStars(dest.id);
+                const mealsInfo = getMealsInfo(dest.id);
+                const tooltipText = getTooltipContent(dest);
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {dests.map((dest) => {
-                      const isSelected = selectedDestinations.includes(dest.id);
-                      const isExpanded = expandedCard === dest.id;
-                      const imageUrl = getDestinationImage(dest);
-                      const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
-                      const hotelStars = getHotelStars(dest.id);
-                      const mealsInfo = getMealsInfo(dest.id);
-                      const tooltipText = getTooltipContent(dest);
-                      
-                      return (
-                        <Card
-                          key={dest.id}
-                          className={`transition-all hover:shadow-xl overflow-hidden cursor-pointer ${
-                            isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
-                          }`}
-                          onMouseEnter={() => setExpandedCard(dest.id)}
-                          onMouseLeave={() => setExpandedCard(null)}
-                          onClick={() => toggleDestination(dest.id)}
-                          data-testid={`destination-card-${dest.id}`}
-                        >
-                              <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
-                                {imageUrl && (
-                                  <img
-                                    src={imageUrl}
-                                    alt={dest.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                )}
-                                
-                                <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md flex items-center gap-1">
-                                  <Building2 className="w-3 h-3 text-blue-600" />
-                                  <div className="flex">
-                                    {Array.from({ length: hotelStars }).map((_, i) => (
-                                      <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                    ))}
-                                  </div>
-                                </div>
-                                
-                                <div className="absolute bottom-2 left-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md">
-                                  <div className="flex items-center gap-1 text-xs">
-                                    <UtensilsCrossed className="w-3 h-3 text-orange-600" />
-                                    <span className="font-medium text-gray-700">
-                                      {(() => {
-                                        const parts = [];
-                                        if (mealsInfo.breakfasts > 0) parts.push(`${mealsInfo.breakfasts} desayuno${mealsInfo.breakfasts > 1 ? 's' : ''}`);
-                                        // Skip lunches for Turquía Esencial plan
-                                        if (mealsInfo.lunches > 0 && dest.name !== 'Turquía Esencial') parts.push(`${mealsInfo.lunches} almuerzo${mealsInfo.lunches > 1 ? 's' : ''}`);
-                                        if (mealsInfo.dinners > 0) parts.push(`${mealsInfo.dinners} cena${mealsInfo.dinners > 1 ? 's' : ''}`);
-                                        return parts.length > 0 ? parts.join(' + ') : `${mealsInfo.total} comida${mealsInfo.total > 1 ? 's' : ''}`;
-                                      })()}
-                                    </span>
-                                  </div>
-                                </div>
-                                
-                                {isSelected && (
-                                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shadow-lg z-10">
-                                    <span className="text-white text-xs font-bold">✓</span>
-                                  </div>
-                                )}
-                              </div>
-                              <CardContent className="p-4">
-                                <div className="text-xs font-medium text-gray-500 uppercase mb-1">{dest.country}</div>
-                                <h4 className="font-bold text-lg mb-2 text-gray-800">{dest.name}</h4>
-                                
-                                <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-gray-200 py-3">
-                                  <div className="text-xs text-gray-500 uppercase">
-                                    Precio desde
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-2xl font-extrabold text-orange-500">
-                                      US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                    </span>
-                                    <div className="text-xs text-gray-500">Porción terrestre</div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                                  <Clock className="w-4 h-4" />
-                                  <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
-                                </div>
-                                
-                                {dest.isPromotion && (
-                                  <Badge variant="destructive" className="mt-2">
-                                    ¡Promoción!
-                                  </Badge>
-                                )}
-                              </CardContent>
-                              
-                              {isExpanded && (
-                                <div className="bg-blue-50 border-t border-blue-100 p-4">
-                                  <p className="text-sm text-gray-700">{tooltipText}</p>
-                                </div>
-                              )}
-                            </Card>
-                      );
-                    })}
-                  </div>
-              </div>
-            ))}
+                return (
+                  <Card
+                    key={dest.id}
+                    className={`transition-all hover:shadow-xl overflow-hidden cursor-pointer ${
+                      isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
+                    }`}
+                    onMouseEnter={() => setExpandedCard(dest.id)}
+                    onMouseLeave={() => setExpandedCard(null)}
+                    onClick={() => toggleDestination(dest.id)}
+                    data-testid={`destination-card-${dest.id}`}
+                  >
+                        <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
+                          {imageUrl && (
+                            <img
+                              src={imageUrl}
+                              alt={dest.name}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          
+                          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md flex items-center gap-1">
+                            <Building2 className="w-3 h-3 text-blue-600" />
+                            <div className="flex">
+                              {Array.from({ length: hotelStars }).map((_, i) => (
+                                <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="absolute bottom-2 left-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md">
+                            <div className="flex items-center gap-1 text-xs">
+                              <UtensilsCrossed className="w-3 h-3 text-orange-600" />
+                              <span className="font-medium text-gray-700">
+                                {(() => {
+                                  const parts = [];
+                                  if (mealsInfo.breakfasts > 0) parts.push(`${mealsInfo.breakfasts} desayuno${mealsInfo.breakfasts > 1 ? 's' : ''}`);
+                                  // Skip lunches for Turquía Esencial plan
+                                  if (mealsInfo.lunches > 0 && dest.name !== 'Turquía Esencial') parts.push(`${mealsInfo.lunches} almuerzo${mealsInfo.lunches > 1 ? 's' : ''}`);
+                                  if (mealsInfo.dinners > 0) parts.push(`${mealsInfo.dinners} cena${mealsInfo.dinners > 1 ? 's' : ''}`);
+                                  return parts.length > 0 ? parts.join(' + ') : `${mealsInfo.total} comida${mealsInfo.total > 1 ? 's' : ''}`;
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shadow-lg z-10">
+                              <span className="text-white text-xs font-bold">✓</span>
+                            </div>
+                          )}
+                        </div>
+                        <CardContent className="p-4">
+                          <div className="text-xs font-medium text-gray-500 uppercase mb-1">{dest.country}</div>
+                          <h4 className="font-bold text-lg mb-2 text-gray-800">{dest.name}</h4>
+                          
+                          <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-gray-200 py-3">
+                            <div className="text-xs text-gray-500 uppercase">
+                              Precio desde
+                            </div>
+                            <div className="text-right">
+                              <span className="text-2xl font-extrabold text-orange-500">
+                                US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </span>
+                              <div className="text-xs text-gray-500">Porción terrestre</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                            <Clock className="w-4 h-4" />
+                            <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
+                          </div>
+                          
+                          {dest.isPromotion && (
+                            <Badge variant="destructive" className="mt-2">
+                              ¡Promoción!
+                            </Badge>
+                          )}
+                        </CardContent>
+                        
+                        {isExpanded && (
+                          <div className="bg-blue-50 border-t border-blue-100 p-4">
+                            <p className="text-sm text-gray-700">{tooltipText}</p>
+                          </div>
+                        )}
+                      </Card>
+                );
+              })}
+            </div>
 
             {filteredDestinations.length === 0 && (
               <div className="text-center py-12">
