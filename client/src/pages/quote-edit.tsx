@@ -474,10 +474,10 @@ export default function QuoteEdit() {
                           data-testid="checkbox-upgrade-option1"
                         />
                         <div className="flex-1">
-                          <label htmlFor="upgrade-option1" className="font-semibold cursor-pointer">
-                            + 500 USD
-                          </label>
-                          <p className="text-sm text-gray-600">8 almuerzos + 2 actividades Estambul</p>
+                        <label htmlFor="upgrade-option1" className="font-semibold cursor-pointer">
+                          + 500 USD
+                        </label>
+                        <p className="text-sm text-gray-600">8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                         </div>
                       </div>
 
@@ -489,10 +489,10 @@ export default function QuoteEdit() {
                           data-testid="checkbox-upgrade-option2"
                         />
                         <div className="flex-1">
-                          <label htmlFor="upgrade-option2" className="font-semibold cursor-pointer">
-                            + 770 USD
-                          </label>
-                          <p className="text-sm text-gray-600">Hotel céntrico Estambul + 8 almuerzos + 2 actividades Estambul</p>
+                        <label htmlFor="upgrade-option2" className="font-semibold cursor-pointer">
+                          + 770 USD
+                        </label>
+                        <p className="text-sm text-gray-600">Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                         </div>
                       </div>
 
@@ -504,10 +504,10 @@ export default function QuoteEdit() {
                           data-testid="checkbox-upgrade-option3"
                         />
                         <div className="flex-1">
-                          <label htmlFor="upgrade-option3" className="font-semibold cursor-pointer">
-                            + 1,100 USD
-                          </label>
-                          <p className="text-sm text-gray-600">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + 2 actividades Estambul</p>
+                        <label htmlFor="upgrade-option3" className="font-semibold cursor-pointer">
+                          + 1,100 USD
+                        </label>
+                        <p className="text-sm text-gray-600">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                         </div>
                       </div>
                     </div>
