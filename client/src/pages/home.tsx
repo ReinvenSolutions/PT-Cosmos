@@ -70,6 +70,8 @@ export default function Home() {
   
   const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
+  const hasAllowedDaysRestriction = selectedDests.some((d) => d.allowedDays && d.allowedDays.length > 0);
+  const allowedDaysDestination = selectedDests.find((d) => d.allowedDays && d.allowedDays.length > 0);
   
   const turkeyDestinations = selectedDests.filter((d) => d.requiresTuesday);
   const otherDestinations = selectedDests.filter((d) => !d.requiresTuesday);
@@ -109,10 +111,46 @@ export default function Home() {
 
   const endDate = calculateEndDate();
 
+  const isAllowedDay = (date: Date, allowedDays: string[]): boolean => {
+    const dayOfWeek = date.getDay();
+    const dayNames: Record<number, string> = {
+      0: 'sunday',
+      1: 'monday',
+      2: 'tuesday',
+      3: 'wednesday',
+      4: 'thursday',
+      5: 'friday',
+      6: 'saturday'
+    };
+    return allowedDays.includes(dayNames[dayOfWeek]);
+  };
+
   const disableDates = (date: Date) => {
     // Disable past dates
     if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
       return true;
+    }
+    
+    // For destinations with specific allowed days (e.g., Egypt: Monday and Friday only)
+    if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays) {
+      // First check if it's an allowed day of the week
+      if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
+        return true;
+      }
+      
+      // If priceTiers exist, only allow dates that are exactly in the list
+      if (allowedDaysDestination.priceTiers && allowedDaysDestination.priceTiers.length > 0) {
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // Check if this exact date exists in priceTiers
+        const hasExactDate = allowedDaysDestination.priceTiers.some(tier => tier.endDate === dateStr);
+        
+        if (!hasExactDate) {
+          return true; // Disable if not in the specific list
+        }
+      }
+      
+      return false;
     }
     
     // For Turkey Esencial, disable holidays and non-Tuesday dates
@@ -253,6 +291,37 @@ export default function Home() {
         }
       }
       
+      if (dest?.allowedDays && dest.allowedDays.length > 0 && startDate && !isAllowedDay(startDate, dest.allowedDays)) {
+        const dateStr = startDate.toLocaleDateString("es-CO", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        
+        const allowedDaysText = dest.allowedDays.map(day => {
+          const dayMap: Record<string, string> = {
+            'monday': 'lunes',
+            'tuesday': 'martes',
+            'wednesday': 'miércoles',
+            'thursday': 'jueves',
+            'friday': 'viernes',
+            'saturday': 'sábado',
+            'sunday': 'domingo'
+          };
+          return dayMap[day] || day;
+        }).join(' y ');
+        
+        toast({
+          title: `${dest.name} - Días Limitados`,
+          description: `La fecha seleccionada (${dateStr}) no está disponible. Este programa solo puede iniciarse los días ${allowedDaysText}. Por favor, selecciona una fecha válida.`,
+          variant: "destructive",
+        });
+        
+        setStartDate(undefined);
+        return;
+      }
+      
       if (dest?.requiresTuesday && startDate && !isTuesday(startDate)) {
         const dateStr = startDate.toLocaleDateString("es-CO", {
           weekday: "long",
@@ -329,11 +398,44 @@ export default function Home() {
                 <Calendar className="w-4 h-4" />
                 Fecha de Inicio del Viaje
                 {hasTurkeyDestinations && <Badge variant="secondary" className="ml-2">Solo Martes</Badge>}
+                {hasAllowedDaysRestriction && allowedDaysDestination && (
+                  <Badge variant="secondary" className="ml-2">
+                    Solo {allowedDaysDestination.allowedDays?.map(day => {
+                      const dayMap: Record<string, string> = {
+                        'monday': 'Lunes',
+                        'tuesday': 'Martes',
+                        'wednesday': 'Miércoles',
+                        'thursday': 'Jueves',
+                        'friday': 'Viernes',
+                        'saturday': 'Sábado',
+                        'sunday': 'Domingo'
+                      };
+                      return dayMap[day] || day;
+                    }).join(' y ')}
+                  </Badge>
+                )}
               </label>
               <DatePicker
                 date={startDate}
                 onDateChange={setStartDate}
-                placeholder={hasTurkeyDestinations ? "Selecciona un martes" : "Selecciona una fecha"}
+                placeholder={
+                  hasAllowedDaysRestriction && allowedDaysDestination
+                    ? `Solo ${allowedDaysDestination.allowedDays?.map(d => {
+                        const dayMap: Record<string, string> = {
+                          'monday': 'Lunes',
+                          'tuesday': 'Martes',
+                          'wednesday': 'Miércoles',
+                          'thursday': 'Jueves',
+                          'friday': 'Viernes',
+                          'saturday': 'Sábado',
+                          'sunday': 'Domingo'
+                        };
+                        return dayMap[d] || d;
+                      }).join(' y ')}`
+                    : hasTurkeyDestinations
+                    ? "Selecciona un martes"
+                    : "Selecciona una fecha"
+                }
                 disabled={disableDates}
               />
             </div>
@@ -490,9 +592,17 @@ export default function Home() {
                             </div>
                           </div>
                           
-                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                            <Clock className="w-4 h-4" />
-                            <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Clock className="w-4 h-4" />
+                              <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
+                            </div>
+                            
+                            {dest.priceTiers && dest.priceTiers.length > 0 && (
+                              <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs">
+                                PRECIO DINÁMICO
+                              </Badge>
+                            )}
                           </div>
                           
                           {dest.isPromotion && (

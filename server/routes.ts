@@ -207,6 +207,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("PDF Generation Request:", {
+        startDate,
+        endDate,
         grandTotal: grandTotalValue,
         grandTotalCOP: calculatedGrandTotalCOP,
         finalPrice: finalPrice,
@@ -283,6 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hotels = await storage.getHotels(req.params.id);
       const inclusions = await storage.getInclusions(req.params.id);
       const exclusions = await storage.getExclusions(req.params.id);
+      const images = await storage.getDestinationImages(req.params.id);
       
       res.json({
         ...destination,
@@ -290,6 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hotels,
         inclusions,
         exclusions,
+        images,
       });
     } catch (error) {
       console.error("Error fetching destination:", error);

@@ -17,10 +17,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown } from "lucide-react";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
 import { useAuth } from "@/contexts/AuthContext";
+import { DatePicker } from "@/components/ui/date-picker";
+import { isTuesday } from "date-fns";
+import { isTurkeyHoliday } from "@/lib/turkey-holidays";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -38,11 +41,13 @@ export default function QuoteSummary() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [outboundImages, setOutboundImages] = useState<string[]>([]);
   const [returnImages, setReturnImages] = useState<string[]>([]);
+  const [domesticFlightImages, setDomesticFlightImages] = useState<string[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
+  const [uploadingDomesticFlight, setUploadingDomesticFlight] = useState(false);
   const [flightsCost, setFlightsCost] = useState("");
   const [assistanceCost, setAssistanceCost] = useState("");
   const [inputCurrencyFlights, setInputCurrencyFlights] = useState<"USD" | "COP">("USD");
@@ -56,6 +61,8 @@ export default function QuoteSummary() {
   const [outboundHoldBaggage, setOutboundHoldBaggage] = useState(false);
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
+  const [domesticCabinBaggage, setDomesticCabinBaggage] = useState(false);
+  const [domesticHoldBaggage, setDomesticHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
   const [trm, setTrm] = useState("");
   const [finalPrice, setFinalPrice] = useState("");
@@ -128,7 +135,7 @@ export default function QuoteSummary() {
     if (savedData) {
       const { destinations: destIds, startDate: start } = JSON.parse(savedData);
       setSelectedDestinations(destIds);
-      setStartDate(start);
+      setStartDate(start ? new Date(start) : undefined);
     } else {
       setLocation("/");
     }
@@ -147,6 +154,62 @@ export default function QuoteSummary() {
 
   const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
+  const hasAllowedDaysRestriction = selectedDests.some((d) => d.allowedDays && d.allowedDays.length > 0);
+  const allowedDaysDestination = selectedDests.find((d) => d.allowedDays && d.allowedDays.length > 0);
+
+  const isAllowedDay = (date: Date, allowedDays: string[]): boolean => {
+    const dayOfWeek = date.getDay();
+    const dayNames: Record<number, string> = {
+      0: 'sunday',
+      1: 'monday',
+      2: 'tuesday',
+      3: 'wednesday',
+      4: 'thursday',
+      5: 'friday',
+      6: 'saturday'
+    };
+    return allowedDays.includes(dayNames[dayOfWeek]);
+  };
+
+  const disableDates = (date: Date) => {
+    if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
+      return true;
+    }
+    
+    if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays) {
+      // First check if it's an allowed day of the week
+      if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
+        return true;
+      }
+      
+      // If priceTiers exist, only allow dates that are exactly in the list
+      if (allowedDaysDestination.priceTiers && allowedDaysDestination.priceTiers.length > 0) {
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // Check if this exact date exists in priceTiers
+        const hasExactDate = allowedDaysDestination.priceTiers.some(tier => tier.endDate === dateStr);
+        
+        if (!hasExactDate) {
+          return true; // Disable if not in the specific list
+        }
+      }
+      
+      return false;
+    }
+    
+    if (hasTurkeyEsencial) {
+      if (isTurkeyHoliday(date)) {
+        return true;
+      }
+      return !isTuesday(date);
+    }
+    
+    if (hasTurkeyDestinations) {
+      return !isTuesday(date);
+    }
+    
+    return false;
+  };
 
   const calculateEndDate = (): string => {
     if (!startDate || selectedDests.length === 0) return "";
@@ -161,18 +224,47 @@ export default function QuoteSummary() {
 
     if (totalDuration === 0) return "";
 
-    const start = new Date(startDate);
+    // Convert startDate to YYYY-MM-DD string to avoid timezone issues
+    const startDateStr = startDate.toISOString().split("T")[0];
+    const [year, month, day] = startDateStr.split('-').map(Number);
+    
+    // Create a new date in local timezone
+    const start = new Date(year, month - 1, day);
     const end = new Date(start);
     end.setDate(end.getDate() + totalDuration - 1);
     
-    return end.toISOString().split("T")[0];
+    // Format as YYYY-MM-DD
+    const endYear = end.getFullYear();
+    const endMonth = String(end.getMonth() + 1).padStart(2, '0');
+    const endDay = String(end.getDate()).padStart(2, '0');
+    
+    return `${endYear}-${endMonth}-${endDay}`;
   };
 
   const endDate = calculateEndDate();
   
+  const getPriceForDate = (dest: Destination, date: Date | undefined): number => {
+    if (!date || !dest.priceTiers || dest.priceTiers.length === 0) {
+      return dest.basePrice ? parseFloat(dest.basePrice) : 0;
+    }
+    
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Find the appropriate price tier
+    for (const tier of dest.priceTiers) {
+      if (dateStr <= tier.endDate) {
+        return parseFloat(tier.price);
+      }
+    }
+    
+    // If no tier matches, return the last tier's price
+    const lastTier = dest.priceTiers[dest.priceTiers.length - 1];
+    return parseFloat(lastTier.price);
+  };
+  
   const landPortionPerPerson = selectedDests.reduce((sum, dest) => {
-    const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
-    return sum + basePrice;
+    const price = getPriceForDate(dest, startDate);
+    return sum + price;
   }, 0);
   
   const landPortionTotal = landPortionPerPerson * passengers;
@@ -346,13 +438,55 @@ export default function QuoteSummary() {
     }
   };
 
+  const handleDomesticFlightUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingDomesticFlight(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error("Upload failed");
+        }
+        
+        const { url } = await response.json();
+        uploadedUrls.push(url);
+      }
+      
+      setDomesticFlightImages([...domesticFlightImages, ...uploadedUrls]);
+      
+      toast({
+        title: "Imágenes subidas",
+        description: `${files.length} imagen(es) del vuelo interno guardadas`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron subir algunas imágenes.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDomesticFlight(false);
+      e.target.value = "";
+    }
+  };
+
   const handleSendWhatsApp = () => {
     const whatsappNumber = "573146576500";
     const destinationsText = selectedDests
       .map((d) => `${d.name} (${d.duration}D/${d.nights}N)`)
       .join(", ");
     
-    const startDateFormatted = startDate ? formatDate(new Date(startDate + "T00:00:00")) : "Por definir";
+    const startDateFormatted = startDate ? formatDate(startDate) : "Por definir";
     const endDateFormatted = endDate ? formatDate(new Date(endDate + "T00:00:00")) : "Por definir";
     
     const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDateFormatted} al ${endDateFormatted}. Total: US$ ${formatUSD(grandTotal)}`;
@@ -404,8 +538,10 @@ export default function QuoteSummary() {
     }
 
     const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
+                          domesticFlightImages.length > 0 ||
                           outboundCabinBaggage || outboundHoldBaggage || 
-                          returnCabinBaggage || returnHoldBaggage;
+                          returnCabinBaggage || returnHoldBaggage ||
+                          domesticCabinBaggage || domesticHoldBaggage;
 
     // Calculate Min Payment Payload
     let payloadMinPayment = null;
@@ -447,11 +583,14 @@ export default function QuoteSummary() {
       flightsAndExtras: flightsAndExtrasValue,
       outboundFlightImages: outboundImages,
       returnFlightImages: returnImages,
+      domesticFlightImages: domesticFlightImages,
       includeFlights: hasFlightData,
       outboundCabinBaggage,
       outboundHoldBaggage,
       returnCabinBaggage,
       returnHoldBaggage,
+      domesticCabinBaggage,
+      domesticHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
       trm: effectiveTrm > 0 ? effectiveTrm : null,
       customFilename: customFilename.trim() || null,
@@ -462,7 +601,7 @@ export default function QuoteSummary() {
       finalPriceCurrency: inputCurrencyFinal,
       destinations: selectedDests.map((dest) => ({
         destinationId: dest.id,
-        startDate: new Date(startDate).toISOString().split("T")[0],
+        startDate: startDate?.toISOString().split("T")[0] || "",
         passengers: passengers,
         price: dest.basePrice ? parseFloat(dest.basePrice) : 0,
       })),
@@ -486,8 +625,10 @@ export default function QuoteSummary() {
     
     try {
       const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
+                            domesticFlightImages.length > 0 ||
                             outboundCabinBaggage || outboundHoldBaggage || 
-                            returnCabinBaggage || returnHoldBaggage;
+                            returnCabinBaggage || returnHoldBaggage ||
+                            domesticCabinBaggage || domesticHoldBaggage;
 
       console.log("Starting PDF generation request...");
 
@@ -557,7 +698,7 @@ export default function QuoteSummary() {
             nights: d.nights,
             basePrice: d.basePrice || "0",
           })),
-          startDate,
+          startDate: startDate?.toISOString().split("T")[0] || "",
           endDate,
           flightsAndExtras: flightsAndExtrasValue,
           landPortionTotal,
@@ -565,11 +706,14 @@ export default function QuoteSummary() {
           originCity: originCity || "",
           outboundFlightImages: outboundImages,
           returnFlightImages: returnImages,
+          domesticFlightImages: domesticFlightImages,
           includeFlights: hasFlightData,
           outboundCabinBaggage,
           outboundHoldBaggage,
           returnCabinBaggage,
           returnHoldBaggage,
+          domesticCabinBaggage,
+          domesticHoldBaggage,
           passengers,
           turkeyUpgrade: turkeyUpgrade || null,
           trm: effectiveTrm > 0 ? effectiveTrm : null,
@@ -751,10 +895,49 @@ export default function QuoteSummary() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Fecha de Inicio</p>
-                <p className="font-semibold text-lg" data-testid="text-start-date">
-                  {startDate ? formatDate(new Date(startDate + "T00:00:00")) : "Por definir"}
-                </p>
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  Fecha de Inicio
+                  {hasTurkeyDestinations && <Badge variant="secondary">Solo Martes</Badge>}
+                  {hasAllowedDaysRestriction && allowedDaysDestination && (
+                    <Badge variant="secondary">
+                      Solo {allowedDaysDestination.allowedDays?.map(day => {
+                        const dayMap: Record<string, string> = {
+                          'monday': 'Lunes',
+                          'tuesday': 'Martes',
+                          'wednesday': 'Miércoles',
+                          'thursday': 'Jueves',
+                          'friday': 'Viernes',
+                          'saturday': 'Sábado',
+                          'sunday': 'Domingo'
+                        };
+                        return dayMap[day] || day;
+                      }).join(' y ')}
+                    </Badge>
+                  )}
+                </label>
+                <DatePicker
+                  date={startDate}
+                  onDateChange={setStartDate}
+                  placeholder={
+                    hasAllowedDaysRestriction && allowedDaysDestination
+                      ? `Solo ${allowedDaysDestination.allowedDays?.map(d => {
+                          const dayMap: Record<string, string> = {
+                            'monday': 'Lunes',
+                            'tuesday': 'Martes',
+                            'wednesday': 'Miércoles',
+                            'thursday': 'Jueves',
+                            'friday': 'Viernes',
+                            'saturday': 'Sábado',
+                            'sunday': 'Domingo'
+                          };
+                          return dayMap[d] || d;
+                        }).join(' y ')}`
+                      : hasTurkeyDestinations
+                      ? "Selecciona un martes"
+                      : "Selecciona una fecha"
+                  }
+                  disabled={disableDates}
+                />
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Fecha de Finalización (Calculada)</p>
@@ -959,6 +1142,108 @@ export default function QuoteSummary() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Domestic Flight Card - Only for "Lo Mejor de Cusco + Lima" */}
+        {selectedDestinations.includes('df3a7358-b65f-4849-a16d-bcf0f29cecc8') && (
+          <Card className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plane className="w-5 h-5" />
+                Vuelo Interno
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-3">
+                Sube las imágenes del vuelo interno (máximo 10 imágenes)
+              </p>
+
+              {domesticFlightImages.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+                  {domesticFlightImages.map((url, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={url}
+                        alt={`Vuelo interno ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                      />
+                      <button
+                        onClick={() => setDomesticFlightImages(domesticFlightImages.filter((_, i) => i !== index))}
+                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        type="button"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <input
+                  type="file"
+                  id="domestic-flight-images"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleDomesticFlightUpload}
+                  data-testid="input-domestic-images"
+                />
+                <label htmlFor="domestic-flight-images">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={uploadingDomesticFlight}
+                    asChild
+                  >
+                    <span>
+                      {uploadingDomesticFlight ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Subiendo...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Subir Imágenes de Vuelo Interno
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </label>
+              </div>
+
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="domestic-cabin"
+                      checked={domesticCabinBaggage}
+                      onCheckedChange={(checked) => setDomesticCabinBaggage(checked as boolean)}
+                      data-testid="checkbox-domestic-cabin"
+                    />
+                    <Label htmlFor="domestic-cabin" className="cursor-pointer">
+                      Equipaje de cabina 10kg
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="domestic-hold"
+                      checked={domesticHoldBaggage}
+                      onCheckedChange={(checked) => setDomesticHoldBaggage(checked as boolean)}
+                      data-testid="checkbox-domestic-hold"
+                    />
+                    <Label htmlFor="domestic-hold" className="cursor-pointer">
+                      Equipaje de bodega 23kg
+                    </Label>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="mb-8">
           <CardHeader>
@@ -1379,7 +1664,7 @@ export default function QuoteSummary() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
-              Nombre del Archivo (Opcional)
+              Nombre del Archivo
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1501,7 +1786,7 @@ export default function QuoteSummary() {
                 <Label>Resumen</Label>
                 <div className="text-sm space-y-1 text-muted-foreground">
                   <p>Destinos: {selectedDests.map(d => d.name).join(", ")}</p>
-                  <p>Fecha inicio: {startDate}</p>
+                  <p>Fecha inicio: {startDate ? formatDate(startDate) : "Por definir"}</p>
                   <p>Total: US$ {formatUSD(grandTotal)}</p>
                 </div>
               </div>
