@@ -177,11 +177,14 @@ interface PublicQuoteData {
   originCity: string;
   outboundFlightImages?: string[];
   returnFlightImages?: string[];
+  domesticFlightImages?: string[];
   includeFlights?: boolean;
   outboundCabinBaggage?: boolean;
   outboundHoldBaggage?: boolean;
   returnCabinBaggage?: boolean;
   returnHoldBaggage?: boolean;
+  domesticCabinBaggage?: boolean;
+  domesticHoldBaggage?: boolean;
   passengers?: number;
   turkeyUpgrade?: string | null;
   trm?: number | null;
@@ -248,6 +251,7 @@ export async function generatePublicQuotePDF(
     preloadFlightImages([
       ...(data.outboundFlightImages || []),
       ...(data.returnFlightImages || []),
+      ...(data.domesticFlightImages || []),
     ]),
   ]);
   
@@ -451,9 +455,13 @@ export async function generatePublicQuotePDF(
   );
 
   // Format dates without slashes
+  console.log("[PDF Generator] Received dates:", { startDate: data.startDate, endDate: data.endDate });
+  
   const startDateFormatted = data.startDate
     ? (() => {
-        const d = new Date(data.startDate);
+        // Parse date string as YYYY-MM-DD to avoid timezone issues
+        const [year, month, day] = data.startDate.split('-').map(Number);
+        console.log("[PDF Generator] Start date parsed:", { year, month, day });
         const months = [
           "Enero",
           "Febrero",
@@ -468,12 +476,16 @@ export async function generatePublicQuotePDF(
           "Noviembre",
           "Diciembre",
         ];
-        return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        const formatted = `${day} ${months[month - 1]} ${year}`;
+        console.log("[PDF Generator] Start date formatted:", formatted);
+        return formatted;
       })()
     : "Por definir";
   const endDateFormatted = data.endDate
     ? (() => {
-        const d = new Date(data.endDate);
+        // Parse date string as YYYY-MM-DD to avoid timezone issues
+        const [year, month, day] = data.endDate.split('-').map(Number);
+        console.log("[PDF Generator] End date parsed:", { year, month, day });
         const months = [
           "Enero",
           "Febrero",
@@ -488,7 +500,9 @@ export async function generatePublicQuotePDF(
           "Noviembre",
           "Diciembre",
         ];
-        return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        const formatted = `${day} ${months[month - 1]} ${year}`;
+        console.log("[PDF Generator] End date formatted:", formatted);
+        return formatted;
       })()
     : "Por definir";
 
@@ -1145,6 +1159,178 @@ export async function generatePublicQuotePDF(
     }
   }
 
+  // VUELO INTERNO - Nueva sección (solo si hay imágenes)
+  if (
+    data.includeFlights &&
+    data.domesticFlightImages &&
+    data.domesticFlightImages.length > 0
+  ) {
+    console.log(
+      "[PDF Generator] Domestic flight images:",
+      data.domesticFlightImages,
+    );
+    doc.addPage();
+    addPageBackground();
+    addPlaneLogoBottom();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(18)
+      .fillColor(textColor)
+      .text("VUELO INTERNO", leftMargin, 80, {
+        align: "center",
+        width: contentWidth,
+      });
+
+    // Generar texto de equipajes dinámicamente
+    const baggageItems = ["PERSONAL 8KG"];
+    if (data.domesticCabinBaggage) {
+      baggageItems.push("CABINA 10KG");
+    }
+    if (data.domesticHoldBaggage) {
+      baggageItems.push("BODEGA 23KG");
+    }
+    const baggageText = baggageItems.join(" + ");
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor(textColor)
+      .text(baggageText, leftMargin, 110, {
+        align: "center",
+        width: contentWidth,
+      });
+
+    const termsHeight = calculateFlightTermsHeight();
+    let flightImageY = 140; // Start closer to baggage text
+
+    for (let index = 0; index < data.domesticFlightImages.length; index++) {
+      const imageUrl = data.domesticFlightImages[index];
+      console.log(
+        `[PDF Generator] Processing domestic image ${index}:`,
+        imageUrl,
+      );
+      // Extract filename from URL (format: /api/images/filename.ext)
+      const filename = imageUrl.split("/").pop();
+      if (filename) {
+        // Use cached image data for faster processing
+        const cachedImage = imageCache.get(filename);
+        
+        if (cachedImage) {
+          try {
+            const imageWidth = contentWidth;
+
+            // Calculate natural height based on aspect ratio from cached dimensions
+            let naturalHeight =
+              cachedImage.height && cachedImage.width
+                ? (cachedImage.height / cachedImage.width) * imageWidth
+                : contentWidth * 0.6; // Fallback estimate
+
+              // For the last image, maximize to fit available space with terms
+              const isLastImage =
+                index === data.domesticFlightImages.length - 1;
+              let imageHeight = naturalHeight;
+
+              if (isLastImage) {
+                // Recalculate available space based on CURRENT position (after previous images)
+                let maxAvailableHeight = Math.max(
+                  0,
+                  pageHeight - 50 - flightImageY - termsHeight - 40,
+                );
+
+                // If available space is too small (less than 200px), move to new page WITH section header
+                const minimumImageHeight = 200;
+                if (maxAvailableHeight < minimumImageHeight) {
+                  console.log(
+                    `[PDF Generator] Insufficient space for domestic image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
+                  );
+                  doc.addPage();
+                  addPageBackground();
+                  addPlaneLogoBottom();
+
+                  // Re-render section title and baggage text on new page
+                  doc
+                    .font("Helvetica-Bold")
+                    .fontSize(18)
+                    .fillColor(textColor)
+                    .text("VUELO INTERNO", leftMargin, 80, {
+                      align: "center",
+                      width: contentWidth,
+                    });
+                  doc
+                    .font("Helvetica-Bold")
+                    .fontSize(12)
+                    .fillColor(textColor)
+                    .text(baggageText, leftMargin, 110, {
+                      align: "center",
+                      width: contentWidth,
+                    });
+
+                  flightImageY = 140; // Start after header
+                  maxAvailableHeight = Math.max(
+                    0,
+                    pageHeight - 50 - flightImageY - termsHeight - 40,
+                  );
+                }
+
+                // Maximize to fit available space, but respect natural height if smaller
+                imageHeight = Math.min(naturalHeight, maxAvailableHeight);
+              }
+
+            doc.image(cachedImage.buffer, leftMargin, flightImageY, {
+              width: imageWidth,
+              height: imageHeight,
+              align: "center",
+            });
+
+            flightImageY += imageHeight + 10; // Add spacing between images
+          } catch (error) {
+            console.error(
+              `[PDF Generator] Error rendering domestic image ${index}:`,
+              error,
+            );
+          }
+        } else {
+          console.error(
+            `[PDF Generator] Image not found in cache: ${filename}`,
+          );
+        }
+      }
+    }
+
+    // Add flight terms and conditions after images
+    if (flightImageY > 80) {
+      flightImageY += 20; // Add some spacing
+
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+      doc.text("Términos y condiciones", leftMargin, flightImageY, {
+        width: contentWidth,
+      });
+      doc.moveDown(0.5);
+
+      doc.font("Helvetica").fontSize(9).fillColor(textColor);
+
+      const termsText = [
+        "Los boletos de avión no son reembolsables.",
+        "",
+        "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
+        "",
+        "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
+        "",
+        "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
+      ];
+
+      termsText.forEach((line) => {
+        if (line === "") {
+          doc.moveDown(0.3);
+        } else {
+          doc.text(line, { width: contentWidth, align: "left" });
+          doc.moveDown(0.3);
+        }
+      });
+    }
+  }
+
   doc.addPage();
   addPageBackground();
   addPlaneLogoBottom();
@@ -1241,37 +1427,51 @@ export async function generatePublicQuotePDF(
       doc.text(`Día ${day.dayNumber} | ${day.title}`, leftMargin, doc.y);
       doc.moveDown(0.3);
 
-      // Process text with bold markdown support
+      // Process text with bold markdown and line break support
       doc.fontSize(8).fillColor(textColor);
-      const parts = day.description.split(/(\*\*.*?\*\*)/g);
       
-      parts.forEach((part, index) => {
-        if (!part) return;
+      // Split by line breaks first
+      const lines = day.description.split('\n');
+      
+      lines.forEach((line, lineIndex) => {
+        if (!line.trim()) {
+          // Empty line - add small spacing
+          doc.moveDown(0.2);
+          return;
+        }
         
-        // Check if we need a new page before rendering this part
+        // Check if we need a new page
         if (doc.y > 720) {
           doc.addPage();
           addPageBackground();
           addPlaneLogoBottom();
         }
         
-        if (part.startsWith('**') && part.endsWith('**')) {
-          // Bold text - remove the ** markers
-          const boldText = part.slice(2, -2);
-          doc.font("Helvetica-Bold");
-          doc.text(boldText, leftMargin, doc.y, {
-            width: contentWidth,
-            align: "justify",
-            continued: index < parts.length - 1,
-          });
-        } else {
-          // Normal text
-          doc.font("Helvetica");
-          doc.text(part, leftMargin, doc.y, {
-            width: contentWidth,
-            align: "justify",
-            continued: index < parts.length - 1,
-          });
+        // Process bold markers within the line
+        const parts = line.split(/(\*\*.*?\*\*)/g);
+        
+        parts.forEach((part, partIndex) => {
+          if (!part) return;
+          
+          if (part.startsWith('**') && part.endsWith('**')) {
+            // Bold text - remove the ** markers
+            const boldText = part.slice(2, -2);
+            doc.font("Helvetica-Bold");
+            doc.text(boldText, {
+              continued: partIndex < parts.length - 1,
+            });
+          } else {
+            // Normal text
+            doc.font("Helvetica");
+            doc.text(part, {
+              continued: partIndex < parts.length - 1,
+            });
+          }
+        });
+        
+        // Move to next line after processing all parts of current line
+        if (lineIndex < lines.length - 1) {
+          doc.moveDown(0.3);
         }
       });
       

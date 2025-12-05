@@ -17,7 +17,8 @@ import {
   itineraryDays, 
   hotels, 
   inclusions, 
-  exclusions 
+  exclusions,
+  destinationImages
 } from '../shared/schema';
 import {
   seedDestinations,
@@ -25,6 +26,7 @@ import {
   seedHotels,
   seedInclusions,
   seedExclusions,
+  seedDestinationImages,
   TURKEY_ESENCIAL_ID
 } from '../shared/seed-data';
 import { eq } from 'drizzle-orm';
@@ -94,6 +96,8 @@ async function syncData() {
             displayOrder: dest.displayOrder,
             isActive: dest.isActive,
             requiresTuesday: dest.requiresTuesday,
+            allowedDays: dest.allowedDays,
+            priceTiers: dest.priceTiers,
           })
           .where(eq(destinations.id, dest.id));
         console.log(`   ✅ Actualizado: ${dest.name}`);
@@ -113,6 +117,7 @@ async function syncData() {
     
     // Eliminar datos relacionados para TODOS los destinos del seed
     for (const id of destinationIds) {
+      await db.delete(destinationImages).where(eq(destinationImages.destinationId, id));
       await db.delete(itineraryDays).where(eq(itineraryDays.destinationId, id));
       await db.delete(hotels).where(eq(hotels.destinationId, id));
       await db.delete(inclusions).where(eq(inclusions.destinationId, id));
@@ -166,8 +171,19 @@ async function syncData() {
     }
     console.log(`   ✅ ${seedExclusions.length} exclusiones insertadas\n`);
 
+    // Paso 8: Insertar imágenes de destinos
+    console.log('8️⃣  Insertando imágenes de destinos...');
+    for (const image of seedDestinationImages) {
+      await db.insert(destinationImages).values({
+        destinationId: image.destinationId,
+        imageUrl: image.imageUrl,
+        displayOrder: image.displayOrder,
+      });
+    }
+    console.log(`   ✅ ${seedDestinationImages.length} imágenes insertadas\n`);
+
     // Verificación final
-    console.log('8️⃣  Verificando sincronización...');
+    console.log('9️⃣  Verificando sincronización...');
     const activeDestinations = await db
       .select()
       .from(destinations)
