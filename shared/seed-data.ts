@@ -34,15 +34,15 @@ export const seedDestinations = [
     nights: 4,
     description: "Descubre la magia de Dubai con visitas a la ciudad, Abu Dhabi, safari por el desierto con cena BBQ y crucero en barco tradicional Dhow. Un viaje inolvidable entre modernidad y tradición.",
     imageUrl: "/images/destinations/dubai-maravilloso/1.jpg",
-    basePrice: '657.00',
+    basePrice: '660.00',
     category: "internacional",
     isPromotion: false,
     displayOrder: 2,
     isActive: true,
     requiresTuesday: false,
     priceTiers: [
-      { endDate: '2026-04-30', price: '657.00' },
-      { endDate: '2026-09-30', price: '550.00' }
+      { endDate: '2026-04-30', price: '660.00' },
+      { endDate: '2026-09-30', price: '560.00' }
     ],
   },
   {

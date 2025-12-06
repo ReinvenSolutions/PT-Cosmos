@@ -354,7 +354,7 @@ export default function Home() {
               <div className="flex items-center gap-4">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
-                  Cosmos <span className="text-blue-400 font-light">Industria de Viajes</span>
+                  Cosmos <span className="text-blue-400 font-light">Mayorista</span>
                 </h1>
               </div>
             </div>
@@ -656,7 +656,7 @@ export default function Home() {
 
             <footer className="bg-gray-800 text-white mt-12">
               <div className="container mx-auto px-4 py-8 text-center">
-                <p className="text-sm">&copy; 2025 Cosmos Industria de Viajes. Todos los derechos reservados.</p>
+                <p className="text-sm">&copy; 2025 Cosmos Mayorista. Todos los derechos reservados.</p>
               </div>
             </footer>
           </main>
