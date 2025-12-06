@@ -65,7 +65,7 @@ export function AppSidebar() {
             C
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">Cosmos</span>
+            <span className="text-sm font-semibold">Cosmos Mayorista</span>
             <span className="text-xs text-muted-foreground">
               {user?.role === "super_admin" ? "Administrador" : "Asesor"}
             </span>
