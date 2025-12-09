@@ -642,5 +642,15 @@ export const seedDestinationImages = [
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', imageUrl: '/images/destinations/dubai-maravilloso/5.jpg', displayOrder: 5 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', imageUrl: '/images/destinations/dubai-maravilloso/6.jpg', displayOrder: 6 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', imageUrl: '/images/destinations/dubai-maravilloso/7.jpg', displayOrder: 7 },
+  
+  // Gran Tour de Europa
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/1.jpg', displayOrder: 1 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/2.jpg', displayOrder: 2 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/3.jpg', displayOrder: 3 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/4.jpg', displayOrder: 4 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/5.jpg', displayOrder: 5 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/6.jpg', displayOrder: 6 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/7.jpg', displayOrder: 7 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/8.jpg', displayOrder: 8 },
 ];
 
