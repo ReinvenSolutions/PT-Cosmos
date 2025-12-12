@@ -117,7 +117,7 @@ export default function Register() {
           <div className="rounded-full bg-white/10 p-2 mr-2 backdrop-blur-sm">
             <Plane className="h-6 w-6" />
           </div>
-          ViajeRápido
+          Cotizador Cosmos
         </div>
         <div className="relative z-20 mt-auto p-10">
           <blockquote className="space-y-2">

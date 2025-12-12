@@ -54,7 +54,7 @@ export default function Login() {
           <div className="rounded-full bg-white/10 p-2 mr-2 backdrop-blur-sm">
             <Plane className="h-6 w-6" />
           </div>
-          ViajeRápido
+          Cotizador Cosmos
         </div>
         <div className="relative z-20 mt-auto p-10">
           <blockquote className="space-y-2">
@@ -67,7 +67,28 @@ export default function Login() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background">
+      <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background min-h-screen">
+        {/* Destinations Banner */}
+        <div className="text-center space-y-6 mb-10 w-full max-w-[600px]">
+          <h2 className="text-3xl font-bold text-gray-800">
+            Descubre el Mundo con Cosmos
+          </h2>
+          
+          <div className="flex flex-wrap justify-center items-center gap-8">
+            <span className="text-4xl" title="Perú">🇵🇪</span>
+            <span className="text-4xl" title="Turquía">🇹🇷</span>
+            <span className="text-4xl" title="Emiratos Árabes">🇦🇪</span>
+            <span className="text-4xl" title="Egipto">🇪🇬</span>
+            <span className="text-4xl" title="Finlandia">🇫🇮</span>
+            <span className="text-4xl" title="España">🇪🇸</span>
+            <span className="text-4xl" title="Francia">🇫🇷</span>
+            <span className="text-4xl" title="Suiza">🇨🇭</span>
+            <span className="text-4xl" title="Italia">🇮🇹</span>
+          </div>
+          
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+        </div>
+
         <div className="mx-auto w-full max-w-[400px] space-y-6">
           <div className="flex flex-col space-y-2 text-center">
             <div className="lg:hidden flex justify-center mb-4">
