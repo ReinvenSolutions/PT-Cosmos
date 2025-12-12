@@ -251,13 +251,59 @@ export const seedDestinations = [
     nights: 10,
     description: "Un viaje de 11 días conectando las joyas del Mediterráneo. Comienza en Madrid y Barcelona, cruza la Costa Azul francesa, visita la icónica Torre de Pisa y explora las grandes ciudades italianas: Roma, Florencia, Venecia y Milán.",
     imageUrl: "/images/destinations/espana-e-italia-turistica-euro-express/1.jpg",
-    basePrice: '0.00',
+    basePrice: '2080.00',
     category: "internacional",
     isPromotion: false,
     displayOrder: 7,
     isActive: true,
     requiresTuesday: false,
-    priceTiers: [],
+    allowedDays: ['sunday'],
+    priceTiers: [
+      // Abril 2026
+      { endDate: '2026-04-06', price: '2080.00' },
+      { endDate: '2026-04-13', price: '2080.00' },
+      { endDate: '2026-04-20', price: '2110.00' },
+      { endDate: '2026-04-27', price: '2120.00' },
+      // Mayo 2026
+      { endDate: '2026-05-04', price: '2175.00' },
+      { endDate: '2026-05-11', price: '2190.00' },
+      { endDate: '2026-05-18', price: '2175.00' },
+      { endDate: '2026-05-25', price: '2175.00' },
+      // Junio 2026
+      { endDate: '2026-06-01', price: '2190.00' },
+      { endDate: '2026-06-08', price: '2225.00' },
+      { endDate: '2026-06-15', price: '2175.00' },
+      { endDate: '2026-06-22', price: '2175.00' },
+      { endDate: '2026-06-29', price: '2165.00' },
+      // Julio 2026
+      { endDate: '2026-07-06', price: '2105.00' },
+      { endDate: '2026-07-13', price: '2055.00' },
+      { endDate: '2026-07-20', price: '1995.00' },
+      { endDate: '2026-07-27', price: '1965.00' },
+      // Agosto 2026
+      { endDate: '2026-08-03', price: '1960.00' },
+      { endDate: '2026-08-10', price: '1960.00' },
+      { endDate: '2026-08-17', price: '1960.00' },
+      { endDate: '2026-08-24', price: '1960.00' },
+      { endDate: '2026-08-31', price: '2120.00' },
+      // Septiembre 2026
+      { endDate: '2026-09-07', price: '2180.00' },
+      { endDate: '2026-09-14', price: '2175.00' },
+      { endDate: '2026-09-21', price: '2175.00' },
+      { endDate: '2026-09-28', price: '2145.00' },
+      // Octubre 2026
+      { endDate: '2026-10-05', price: '2145.00' },
+      { endDate: '2026-10-12', price: '2140.00' },
+      { endDate: '2026-10-19', price: '2140.00' },
+      { endDate: '2026-10-26', price: '2145.00' },
+      // Noviembre 2026
+      { endDate: '2026-11-02', price: '2055.00' },
+      { endDate: '2026-11-09', price: '2015.00' },
+      { endDate: '2026-11-23', price: '1945.00' },
+      // Diciembre 2026
+      { endDate: '2026-12-07', price: '1915.00' },
+      { endDate: '2026-12-21', price: '1870.00' },
+    ],
   },
 ];
 
@@ -642,5 +688,25 @@ export const seedDestinationImages = [
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', imageUrl: '/images/destinations/dubai-maravilloso/5.jpg', displayOrder: 5 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', imageUrl: '/images/destinations/dubai-maravilloso/6.jpg', displayOrder: 6 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', imageUrl: '/images/destinations/dubai-maravilloso/7.jpg', displayOrder: 7 },
+  
+  // Gran Tour de Europa
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/1.jpg', displayOrder: 1 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/2.jpg', displayOrder: 2 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/3.jpg', displayOrder: 3 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/4.jpg', displayOrder: 4 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/5.jpg', displayOrder: 5 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/6.jpg', displayOrder: 6 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/7.jpg', displayOrder: 7 },
+  { destinationId: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc', imageUrl: '/images/destinations/gran-tour-de-europa/8.jpg', displayOrder: 8 },
+  
+  // España e Italia Turística - Euro Express
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/1.jpg', displayOrder: 1 },
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/2.jpg', displayOrder: 2 },
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/3.jpg', displayOrder: 3 },
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/4.jpg', displayOrder: 4 },
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/5.jpg', displayOrder: 5 },
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/6.jpg', displayOrder: 6 },
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/7.jpg', displayOrder: 7 },
+  { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/8.jpg', displayOrder: 8 },
 ];
 

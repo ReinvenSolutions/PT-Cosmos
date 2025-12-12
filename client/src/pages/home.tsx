@@ -366,14 +366,44 @@ export default function Home() {
           <span className="text-blue-500 text-lg font-semibold uppercase">Cotiza tu Aventura</span>
           <h2 className="text-5xl font-extrabold text-gray-800 mt-2 mb-4">Descubre el Mundo con Cosmos</h2>
           
-          <div className="max-w-4xl mx-auto bg-blue-50 border border-blue-200 rounded-lg p-6 mt-8 mb-8">
-            <p className="text-gray-700 leading-relaxed">
-              <strong className="text-blue-600">Porciones terrestres garantizadas desde 2 pax</strong> en cualquiera de nuestros programas, sean nacionales o internacionales.
-              Incluyen: <span className="font-semibold">guía de habla hispana garantizada desde 2 pax, asistencia al viajero, hoteles, transporte, actividades, impuestos y complementos de programas</span>.
-            </p>
-            <div className="flex items-center gap-2 mt-3 text-sm text-gray-600 font-medium">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>Solo montamos vuelos - cotización terrestre únicamente</span>
+          <div className="max-w-full mx-auto bg-blue-50 border border-blue-200 rounded-lg p-8 mt-8 mb-8 overflow-x-auto">
+            <div className="flex flex-nowrap justify-center items-center gap-x-24 gap-y-8 px-8 w-full py-4">
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇵🇪</span>
+                <span className="text-sm font-semibold text-gray-700">Perú</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇹🇷</span>
+                <span className="text-sm font-semibold text-gray-700">Turquía</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇦🇪</span>
+                <span className="text-sm font-semibold text-gray-700">Emiratos Árabes</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇪🇬</span>
+                <span className="text-sm font-semibold text-gray-700">Egipto</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇫🇮</span>
+                <span className="text-sm font-semibold text-gray-700">Finlandia</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇪🇸</span>
+                <span className="text-sm font-semibold text-gray-700">España</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇫🇷</span>
+                <span className="text-sm font-semibold text-gray-700">Francia</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇨🇭</span>
+                <span className="text-sm font-semibold text-gray-700">Suiza</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 min-w-max">
+                <span className="text-5xl">🇮🇹</span>
+                <span className="text-sm font-semibold text-gray-700">Italia</span>
+              </div>
             </div>
           </div>
         </div>
@@ -504,7 +534,7 @@ export default function Home() {
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-8">
             <TabsTrigger value="nacional" data-testid="tab-nacional">
-              Planes Nacionales
+              Colombia
             </TabsTrigger>
             <TabsTrigger value="internacional" data-testid="tab-internacional">
               Planes Internacionales
