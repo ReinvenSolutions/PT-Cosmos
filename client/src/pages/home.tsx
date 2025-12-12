@@ -362,52 +362,6 @@ export default function Home() {
 
           <main className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50 to-white">
             <div className="container mx-auto px-4 py-12 lg:py-16">
-        <div className="text-center mb-12">
-          <span className="text-blue-500 text-lg font-semibold uppercase">Cotiza tu Aventura</span>
-          <h2 className="text-5xl font-extrabold text-gray-800 mt-2 mb-4">Descubre el Mundo con Cosmos</h2>
-          
-          <div className="max-w-full mx-auto bg-blue-50 border border-blue-200 rounded-lg p-8 mt-8 mb-8 overflow-x-auto">
-            <div className="flex flex-nowrap justify-center items-center gap-x-24 gap-y-8 px-8 w-full py-4">
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇵🇪</span>
-                <span className="text-sm font-semibold text-gray-700">Perú</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇹🇷</span>
-                <span className="text-sm font-semibold text-gray-700">Turquía</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇦🇪</span>
-                <span className="text-sm font-semibold text-gray-700">Emiratos Árabes</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇪🇬</span>
-                <span className="text-sm font-semibold text-gray-700">Egipto</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇫🇮</span>
-                <span className="text-sm font-semibold text-gray-700">Finlandia</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇪🇸</span>
-                <span className="text-sm font-semibold text-gray-700">España</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇫🇷</span>
-                <span className="text-sm font-semibold text-gray-700">Francia</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇨🇭</span>
-                <span className="text-sm font-semibold text-gray-700">Suiza</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-max">
-                <span className="text-5xl">🇮🇹</span>
-                <span className="text-sm font-semibold text-gray-700">Italia</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           {hasTurkeyDestinations && (
             <Alert className="mb-4 border-orange-200 bg-orange-50">
