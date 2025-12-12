@@ -189,21 +189,20 @@ export default function QuoteSummary() {
     }
     
     if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays) {
-      // First check if it's an allowed day of the week
-      if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
-        return true;
-      }
-      
-      // If priceTiers exist, only allow dates that are exactly in the list
+      // If priceTiers exist with specific dates, only allow those exact dates
       if (allowedDaysDestination.priceTiers && allowedDaysDestination.priceTiers.length > 0) {
         const dateStr = date.toISOString().split('T')[0];
         
         // Check if this exact date exists in priceTiers
         const hasExactDate = allowedDaysDestination.priceTiers.some(tier => tier.endDate === dateStr);
         
-        if (!hasExactDate) {
-          return true; // Disable if not in the specific list
-        }
+        // Only enable dates that are in the priceTiers list
+        return !hasExactDate;
+      }
+      
+      // Otherwise, just check if it's an allowed day of the week
+      if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
+        return true;
       }
       
       return false;
