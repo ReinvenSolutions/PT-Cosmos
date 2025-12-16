@@ -3,10 +3,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plane, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
+
+// Componente de Bandera Estilizada "Shiny"
+// Usamos flagsapi.com con el estilo 'shiny' que da ese efecto 3D/Ondeado premium
+// compatible con Windows y todos los navegadores.
+const FlagIcon = ({ code, title }: { code: string, title: string }) => (
+  <img 
+    src={`https://flagsapi.com/${code.toUpperCase()}/shiny/64.png`}
+    alt={title}
+    title={title}
+    className="h-12 w-auto object-contain drop-shadow-md hover:scale-125 hover:-rotate-6 transition-all duration-300 cursor-help filter hover:brightness-110"
+  />
+);
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -74,16 +85,17 @@ export default function Login() {
             Descubre el Mundo con Cosmos
           </h2>
           
-          <div className="flex flex-wrap justify-center items-center gap-8">
-            <span className="text-4xl" title="Perú">🇵🇪</span>
-            <span className="text-4xl" title="Turquía">🇹🇷</span>
-            <span className="text-4xl" title="Emiratos Árabes">🇦🇪</span>
-            <span className="text-4xl" title="Egipto">🇪🇬</span>
-            <span className="text-4xl" title="Finlandia">🇫🇮</span>
-            <span className="text-4xl" title="España">🇪🇸</span>
-            <span className="text-4xl" title="Francia">🇫🇷</span>
-            <span className="text-4xl" title="Suiza">🇨🇭</span>
-            <span className="text-4xl" title="Italia">🇮🇹</span>
+          {/* Banderas estilo Shiny (3D/Brillantes) */}
+          <div className="flex flex-wrap justify-center items-center gap-4 md:gap-4.5 p-3">
+            <FlagIcon code="PE" title="Perú" />
+            <FlagIcon code="TR" title="Turquía" />
+            <FlagIcon code="AE" title="Emiratos Árabes" />
+            <FlagIcon code="EG" title="Egipto" />
+            <FlagIcon code="FI" title="Finlandia" />
+            <FlagIcon code="ES" title="España" />
+            <FlagIcon code="FR" title="Francia" />
+            <FlagIcon code="CH" title="Suiza" />
+            <FlagIcon code="IT" title="Italia" />
           </div>
           
           <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>

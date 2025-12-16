@@ -305,6 +305,51 @@ export const seedDestinations = [
       { endDate: '2026-12-21', price: '1870.00' },
     ],
   },
+  {
+    id: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p',
+    name: "Plan Amazonas 5 Días - 4 Noches 2025",
+    country: "Colombia",
+    duration: 5,
+    nights: 4,
+    description: "Explora la selva amazónica colombiana con este plan completo. Visita Leticia y Tabatinga (Brasil), vive la cultura indígena Huitoto y Ticuna, realiza un safari con kayak y búfalos, y navega el río Amazonas hasta Puerto Nariño avistando delfines rosados y micos. Vigencia Temporada 2025.",
+    imageUrl: "/images/destinations/amazonas/1.jpg",
+    basePrice: '0.00',
+    category: "nacional",
+    isPromotion: false,
+    displayOrder: 13,
+    isActive: true,
+    requiresTuesday: false,
+  },
+  {
+    id: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q',
+    name: "Aventura en Santander",
+    country: "Colombia",
+    duration: 4,
+    nights: 3,
+    description: "Descubre la tierra de aventura y naturaleza extrema. Visita el majestuoso Cañón del Chicamocha, practica deportes de aventura en San Gil, explora el pueblito colonial de Barichara y conoce la cueva más grande de Colombia, la Cueva del Indio. Ideal para amantes de la adrenalina.",
+    imageUrl: "/images/destinations/santander/1.jpg",
+    basePrice: '780.00',
+    category: "nacional",
+    isPromotion: false,
+    displayOrder: 14,
+    isActive: true,
+    requiresTuesday: false,
+  },
+  {
+    id: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r',
+    name: "Desierto de La Guajira",
+    country: "Colombia",
+    duration: 3,
+    nights: 2,
+    description: "Vive una experiencia única en el desierto más septentrional de Sudamérica. Descubre el Cabo de la Vela, las dunas de Taroa, el Pilón de Azúcar con vistas espectaculares al Mar Caribe y conoce la cultura Wayúu. Un viaje místico entre el desierto y el mar.",
+    imageUrl: "/images/destinations/la-guajira/1.jpg",
+    basePrice: '650.00',
+    category: "nacional",
+    isPromotion: false,
+    displayOrder: 15,
+    isActive: true,
+    requiresTuesday: false,
+  },
 ];
 
 export const seedItineraryDays = [
@@ -407,6 +452,21 @@ export const seedItineraryDays = [
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', dayNumber: 9, title: "Florencia - Venecia - Véneto", description: "Desayuno. Salida a Venecia. Paseo panorámico en barco. Visita a fábrica de cristal de Murano. Opcional: Paseo en Góndola. Traslado al hotel en la región del Véneto." },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', dayNumber: 10, title: "Véneto - Milán", description: "Desayuno. Salida hacia Milán. Tiempo libre para visitar el Duomo, la Galería Vittorio Emanuele y el Castello Sforzesco. Alojamiento." },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', dayNumber: 11, title: "Salida de Milán", description: "Desayuno. Tiempo libre hasta la hora del traslado al aeropuerto. Fin de servicios." },
+  // Amazonas - Colombia
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', dayNumber: 1, title: "City Tour Tres Fronteras", description: "City tour por Leticia y Tabatinga (Brasil) visitando los puntos turísticos más representativos del Amazonas. Inicia en el Letrero Fronterizo (punto limítrofe entre Colombia, Brasil y Perú), continúa a la Mansión del Chocolate para souvenirs, mirador con vista a los tres países, y La Komara donde aprecia el ancho del Río Amazonas. Finaliza en el Parque Santander para el avistamiento de entre 1,000 y 3,000 loros. Incluye almuerzo y cena. Alojamiento: Hotel Madre Selva." },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', dayNumber: 2, title: "Full Day Selva y Cultura Huitoto", description: "Inmersión cultural y natural con la comunidad indígena Huitoto. Visita a la Maloca (casa indígena), charla ancestral sobre Mambe, Rapé y Ambil (derivados de la hoja de coca) con opción de degustar y ver el proceso. Cantos tradicionales, mitos y costumbres. Caminata ecológica diurna y nocturna por la selva, visita a quebrada para bañarse, avistamiento de fauna (ranas, tarántulas, escorpiones, hongos luminosos), plantas medicinales y árboles frutales. De 9:00 am a 9:00 pm. Incluye transporte, almuerzo, cena típica y guianza. Alojamiento: Hotel Madre Selva." },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', dayNumber: 3, title: "Safari Amazónico: Búfalos y Kayak", description: "Día de aventura en el centro de la selva amazónica. Disfruta de actividades como uso de piscina, cabalgata en búfalos y kayak. Alojamiento especial en el Hotel Amazon para una noche inmersa en la selva y continuar la aventura al día siguiente. Recogida entre 7:30 am y 8:00 am. Incluye almuerzo, cena y desayuno del día siguiente." },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', dayNumber: 4, title: "Puerto Nariño, Delfines y Micos", description: "Visita al primer destino natural sostenible del país, conocido como el 'Pesebre natural de Colombia' (sin motocicletas ni automóviles). Conocerás la comunidad indígena de Macedonia (Ticuna o Yaguas) con rituales, tradiciones ancestrales, danzas típicas y exhibición de artesanías. Contacto directo con micos Fraile en la Reserva de los Micos y avistamiento de delfines grises y rosados en su hábitat natural. Recorrido por el pueblo de Puerto Nariño. Incluye transporte fluvial, guianza, almuerzo buffet en el mejor restaurante y cena en el hotel. Nota: No incluye impuesto de entrada ($20,000 COP). Alojamiento: Hotel Madre Selva." },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', dayNumber: 5, title: "Salida de Leticia", description: "Último día del viaje. Desayuno en el Hotel Madre Selva. Check out a las 12:00 pm. Mañana libre para disfrutar las instalaciones del hotel. Si tu vuelo es en la noche, puedes dejar las maletas guardadas y usar las áreas comunes. Traslado al aeropuerto según horario de tu vuelo (mañana o noche). Fin de servicios." },
+  // Santander - Colombia
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', dayNumber: 1, title: "Llegada a Bucaramanga - San Gil", description: "Llegada al aeropuerto de Bucaramanga. Recepción y traslado a San Gil (2 horas). Acomodación en el hotel. Por la tarde, caminata por el Parque El Gallineral, un hermoso parque natural con árboles cubiertos de barba de viejo. Cena." },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', dayNumber: 2, title: "Barichara y Aventura", description: "Desayuno. Visita a Barichara, considerado el pueblo más lindo de Colombia. Recorrido por sus calles empedradas, iglesias coloniales y talleres de artesanía. Caminata opcional por el Camino Real (1.5 horas) hasta Guane, pueblito colonial. Almuerzo. Por la tarde, actividad de rafting en el río Fonce o rapel en cascadas (según preferencia). Retorno a San Gil. Cena." },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', dayNumber: 3, title: "Cañón del Chicamocha y Cueva del Indio", description: "Desayuno. Salida hacia el Parque Nacional del Chicamocha (PANACHI). Recorrido por el teleférico con vistas espectaculares del cañón. Tiempo libre en el parque. Almuerzo. Por la tarde, visita a la Cueva del Indio, la cueva más grande de Colombia con formaciones rocosas impresionantes. Retorno a San Gil. Cena." },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', dayNumber: 4, title: "San Gil - Bucaramanga - Retorno", description: "Desayuno. Traslado a Bucaramanga. City tour panorámico por la 'Ciudad de los Parques': Parque Santander, Parque García Rovira, Catedral de la Sagrada Familia. Visita al mirador del Cañón del Chicamocha. Almuerzo. Traslado al aeropuerto según horario de vuelo. Fin de servicios." },
+  // La Guajira - Colombia
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', dayNumber: 1, title: "Riohacha - Cabo de la Vela", description: "Recogida en Riohacha (hotel o aeropuerto). Salida en vehículo 4x4 hacia el Cabo de la Vela atravesando el desierto guajiro. Paradas en rancherías Wayúu para conocer su cultura y artesanías. Llegada al Cabo de la Vela. Acomodación en hospedaje típico (chinchorro o hamaca). Almuerzo típico Wayúu. Por la tarde, caminata al Pilón de Azúcar para ver el atardecer sobre el Mar Caribe con vistas panorámicas del desierto. Cena. Noche bajo las estrellas del desierto." },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', dayNumber: 2, title: "Punta Gallinas", description: "Desayuno muy temprano. Salida hacia Punta Gallinas, el punto más septentrional de Sudamérica. Recorrido por el desierto hasta llegar a las dunas de Taroa, enormes dunas de arena que caen directamente al mar Caribe. Tiempo para disfrutar de la playa y las aguas turquesas. Almuerzo en ranchería local. Visita al Faro de Punta Gallinas. Baño en Bahía Hondita. Retorno al Cabo de la Vela. Cena y alojamiento." },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', dayNumber: 3, title: "Cabo de la Vela - Riohacha", description: "Desayuno. Tiempo libre para disfrutar de la playa Ojo de Agua o para un último baño en el mar Caribe. Visita opcional a la playa del Pilón de Azúcar. Almuerzo. Retorno a Riohacha haciendo paradas fotográficas en el camino y visita a salinas de Manaure (opcional, según disponibilidad). Llegada a Riohacha. Traslado al hotel o aeropuerto según itinerario. Fin de servicios." },
 ];
 
 export const seedHotels = [
@@ -462,6 +522,15 @@ export const seedHotels = [
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', name: "Ibis Firenze Nord / The Gate Florencia", category: "Clásico (Turista/Primera)", location: "Florencia" },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', name: "Alexander Palace / Da Poppi / B&B Padova", category: "Clásico (Turista/Primera)", location: "Venecia (Área)" },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', name: "B&B Milano Ornato / Ibis Malpensa / B&B Malpensa", category: "Clásico (Turista/Primera)", location: "Milán" },
+  // Amazonas - Colombia
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', name: "Hotel Madre Selva", category: "Ecohotel", location: "Leticia" },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', name: "Hotel Amazon", category: "Lodge", location: "Selva / Leticia" },
+  // Santander - Colombia
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', name: "Hotel Bella Isla", category: "3 Estrellas", location: "San Gil" },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', name: "Hotel Hacienda El Carmen", category: "3 Estrellas", location: "San Gil" },
+  // La Guajira - Colombia
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', name: "Hospedaje Wayúu (Chinchorro/Hamaca)", category: "Hospedaje Típico", location: "Cabo de la Vela" },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', name: "Ranchería Local", category: "Hospedaje Comunitario", location: "Punta Gallinas" },
 ];
 
 export const seedInclusions = [
@@ -614,6 +683,45 @@ export const seedInclusions = [
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', item: "Seguro de viaje", displayOrder: 0 },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', item: "Servicio de asistencia telefónica 24 horas", displayOrder: 0 },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', item: "Alojamiento en hoteles previstos (categoría turista/primera)", displayOrder: 0 },
+  // Amazonas - Colombia
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Traslados Aeropuerto - Hotel - Aeropuerto", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Alojamiento 3 noches en Hotel Madre Selva", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Alojamiento 1 noche en Hotel Amazon (Safari)", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Alimentación completa (Desayunos, Almuerzos y Cenas según itinerario)", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Transporte fluvial y terrestre para los tours", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Guianza especializada", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Tarjeta de asistencia médica (Assist Card)", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "City Tour Leticia y Tabatinga", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Full Day Selva (Comunidad Huitoto)", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Tour Safari (Búfalos y Kayak)", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Tour Puerto Nariño, Micos y Delfines", displayOrder: 0 },
+  // Santander - Colombia
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "3 noches de alojamiento en hotel 3 estrellas en San Gil", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Alimentación completa (desayunos, almuerzos y cenas)", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Traslado aeropuerto de Bucaramanga - San Gil - Bucaramanga", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Visita al Parque El Gallineral", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Tour a Barichara y Guane", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Actividad de rafting en el río Fonce o rapel", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Entrada al Parque Nacional del Chicamocha (PANACHI)", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Recorrido en teleférico del Chicamocha", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Visita a la Cueva del Indio", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "City tour en Bucaramanga", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Todas las entradas mencionadas en el itinerario", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Guía profesional en español", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Seguro de asistencia médica", displayOrder: 0 },
+  // La Guajira - Colombia
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "2 noches de alojamiento en hospedaje típico Wayúu (Cabo de la Vela)", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Alimentación completa (desayunos, almuerzos y cenas típicas)", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Recogida en Riohacha (hotel o aeropuerto)", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Transporte en vehículo 4x4 durante todo el recorrido", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Visita al Cabo de la Vela y Pilón de Azúcar", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Excursión a Punta Gallinas (punto más norte de Sudamérica)", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Visita a las dunas de Taroa", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Visita al Faro de Punta Gallinas", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Baño en Bahía Hondita", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Interacción con comunidades Wayúu y sus artesanías", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Guía local Wayúu en español", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Seguro de asistencia básica", displayOrder: 0 },
 ];
 
 export const seedExclusions = [
@@ -677,6 +785,24 @@ export const seedExclusions = [
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', item: "Visado", displayOrder: 0 },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', item: "Maleteros", displayOrder: 0 },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', item: "Bebidas y comidas no especificadas", displayOrder: 0 },
+  // Amazonas - Colombia
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Tiquetes aéreos", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Impuesto de entrada a Leticia (aprox. 50.000 COP)", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Impuesto de entrada a Puerto Nariño (aprox. 20.000 COP)", displayOrder: 0 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', item: "Gastos no especificados", displayOrder: 0 },
+  // Santander - Colombia
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Tiquetes aéreos a Bucaramanga", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Gastos personales", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Propinas (opcional)", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Bebidas alcohólicas", displayOrder: 0 },
+  { destinationId: 'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', item: "Actividades de aventura adicionales no incluidas", displayOrder: 0 },
+  // La Guajira - Colombia
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Tiquetes aéreos a Riohacha", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Gastos personales", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Propinas (opcional)", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Bebidas alcohólicas", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Seguro de viaje internacional", displayOrder: 0 },
+  { destinationId: 'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r', item: "Actividades opcionales no mencionadas", displayOrder: 0 },
 ];
 
 export const seedDestinationImages = [
@@ -708,5 +834,23 @@ export const seedDestinationImages = [
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/6.jpg', displayOrder: 6 },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/7.jpg', displayOrder: 7 },
   { destinationId: '65f63cd4-418a-43e3-b376-0c354bd31b72', imageUrl: '/images/destinations/espana-e-italia-turistica-euro-express/8.jpg', displayOrder: 8 },
+  
+  // Egipto (Con Crucero) + Emiratos Árabes
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/1.jpg', displayOrder: 1 },
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/2.jpg', displayOrder: 2 },
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/3.jpg', displayOrder: 3 },
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/4.jpg', displayOrder: 4 },
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/5.jpg', displayOrder: 5 },
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/6.jpg', displayOrder: 6 },
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/7.jpg', displayOrder: 7 },
+  { destinationId: '60434e51-e976-4d81-b697-b4eff3719cba', imageUrl: '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/8.jpg', displayOrder: 8 },
+  
+  // Plan Amazonas 5 Días - 4 Noches 2025
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', imageUrl: '/images/destinations/amazonas/1.jpg', displayOrder: 1 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', imageUrl: '/images/destinations/amazonas/2.jpg', displayOrder: 2 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', imageUrl: '/images/destinations/amazonas/3.jpg', displayOrder: 3 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', imageUrl: '/images/destinations/amazonas/4.jpg', displayOrder: 4 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', imageUrl: '/images/destinations/amazonas/5.jpg', displayOrder: 5 },
+  { destinationId: 'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', imageUrl: '/images/destinations/amazonas/6.jpg', displayOrder: 6 },
 ];
 
