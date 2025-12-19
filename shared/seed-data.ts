@@ -159,9 +159,9 @@ export const seedDestinations = [
     id: 'e4ff361a-d04c-45b7-892f-a3dda97fc0bc',
     name: "Gran Tour de Europa",
     country: "España, Francia, Suiza, Italia",
-    duration: 16,
+    duration: 17,
     nights: 15,
-    description: "Un recorrido completo de 16 días por el corazón de Europa. Inicia y termina en Madrid, visitando ciudades icónicas como Burdeos, París, Zúrich, Milán, Venecia, Florencia, Roma, Pisa, la Costa Azul y Barcelona. Incluye visitas panorámicas en las principales capitales y recorrido en barco en Venecia. Disponible solo lunes.",
+    description: "Un recorrido completo de 17 días por el corazón de Europa (incluye 1 día de vuelo desde Colombia). Inicia y termina en Madrid, visitando ciudades icónicas como Burdeos, París, Zúrich, Milán, Venecia, Florencia, Roma, Pisa, la Costa Azul y Barcelona. Incluye visitas panorámicas en las principales capitales y recorrido en barco en Venecia. Salidas domingos desde Colombia (llegas lunes a Madrid).",
     imageUrl: "/images/destinations/gran-tour-de-europa/1.jpg",
     basePrice: '3675.00',
     category: "internacional",
@@ -169,7 +169,7 @@ export const seedDestinations = [
     displayOrder: 5,
     isActive: true,
     requiresTuesday: false,
-    allowedDays: ['monday'],
+    allowedDays: ['sunday', 'monday'],
     priceTiers: [
       // 2026
       { endDate: '2026-04-06', price: '3675.00' },
@@ -235,13 +235,70 @@ export const seedDestinations = [
     nights: 6,
     description: "Recorrido esencial por Italia de 7 días. Inicia en Roma con visita panorámica, continúa hacia Florencia para descubrir el Renacimiento, Venecia con paseo en barco y finaliza en la moderna Milán. Una inmersión rápida y completa en la cultura italiana.",
     imageUrl: "/images/destinations/italia-turistica-euro-express/1.jpg",
-    basePrice: '0.00',
+    basePrice: '1090.00',
     category: "internacional",
     isPromotion: false,
     displayOrder: 6,
     isActive: true,
     requiresTuesday: false,
-    priceTiers: [],
+    allowedDays: ['friday'],
+    priceTiers: [
+      // Enero 2026
+      { startDate: '2026-01-23', endDate: '2026-01-23', price: '1165.00' },
+      // Febrero 2026
+      { startDate: '2026-02-06', endDate: '2026-02-06', price: '1090.00' },
+      { startDate: '2026-02-20', endDate: '2026-02-20', price: '1090.00' },
+      // Marzo 2026
+      { startDate: '2026-03-06', endDate: '2026-03-06', price: '1090.00' },
+      { startDate: '2026-03-13', endDate: '2026-03-13', price: '1150.00' },
+      { startDate: '2026-03-20', endDate: '2026-03-20', price: '1165.00' },
+      { startDate: '2026-03-27', endDate: '2026-03-27', price: '1165.00' },
+      // Abril 2026
+      { startDate: '2026-04-03', endDate: '2026-04-03', price: '1240.00' },
+      { startDate: '2026-04-10', endDate: '2026-04-10', price: '1245.00' },
+      { startDate: '2026-04-17', endDate: '2026-04-17', price: '1245.00' },
+      { startDate: '2026-04-24', endDate: '2026-04-24', price: '1245.00' },
+      // Mayo 2026
+      { startDate: '2026-05-01', endDate: '2026-05-01', price: '1290.00' },
+      { startDate: '2026-05-08', endDate: '2026-05-08', price: '1290.00' },
+      { startDate: '2026-05-15', endDate: '2026-05-15', price: '1290.00' },
+      { startDate: '2026-05-22', endDate: '2026-05-22', price: '1290.00' },
+      { startDate: '2026-05-29', endDate: '2026-05-29', price: '1290.00' },
+      // Junio 2026
+      { startDate: '2026-06-05', endDate: '2026-06-05', price: '1290.00' },
+      { startDate: '2026-06-12', endDate: '2026-06-12', price: '1340.00' },
+      { startDate: '2026-06-19', endDate: '2026-06-19', price: '1290.00' },
+      { startDate: '2026-06-26', endDate: '2026-06-26', price: '1290.00' },
+      // Julio 2026
+      { startDate: '2026-07-03', endDate: '2026-07-03', price: '1240.00' },
+      { startDate: '2026-07-10', endDate: '2026-07-10', price: '1240.00' },
+      { startDate: '2026-07-17', endDate: '2026-07-17', price: '1205.00' },
+      { startDate: '2026-07-24', endDate: '2026-07-24', price: '1220.00' },
+      { startDate: '2026-07-31', endDate: '2026-07-31', price: '1190.00' },
+      // Agosto 2026
+      { startDate: '2026-08-07', endDate: '2026-08-07', price: '1185.00' },
+      { startDate: '2026-08-14', endDate: '2026-08-14', price: '1185.00' },
+      { startDate: '2026-08-21', endDate: '2026-08-21', price: '1185.00' },
+      { startDate: '2026-08-28', endDate: '2026-08-28', price: '1185.00' },
+      // Septiembre 2026
+      { startDate: '2026-09-04', endDate: '2026-09-04', price: '1290.00' },
+      { startDate: '2026-09-11', endDate: '2026-09-11', price: '1290.00' },
+      { startDate: '2026-09-18', endDate: '2026-09-18', price: '1290.00' },
+      { startDate: '2026-09-25', endDate: '2026-09-25', price: '1290.00' },
+      // Octubre 2026
+      { startDate: '2026-10-02', endDate: '2026-10-02', price: '1280.00' },
+      { startDate: '2026-10-09', endDate: '2026-10-09', price: '1280.00' },
+      { startDate: '2026-10-16', endDate: '2026-10-16', price: '1275.00' },
+      { startDate: '2026-10-23', endDate: '2026-10-23', price: '1275.00' },
+      { startDate: '2026-10-30', endDate: '2026-10-30', price: '1275.00' },
+      // Noviembre 2026
+      { startDate: '2026-11-06', endDate: '2026-11-06', price: '1200.00' },
+      { startDate: '2026-11-13', endDate: '2026-11-13', price: '1200.00' },
+      { startDate: '2026-11-27', endDate: '2026-11-27', price: '1130.00' },
+      // Diciembre 2026
+      { startDate: '2026-12-11', endDate: '2026-12-11', price: '1130.00' },
+      { startDate: '2026-12-25', endDate: '2026-12-25', price: '1170.00' },
+    ],
   },
   {
     id: '65f63cd4-418a-43e3-b376-0c354bd31b72',

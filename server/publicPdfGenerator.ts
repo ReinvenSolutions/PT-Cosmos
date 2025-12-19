@@ -187,6 +187,8 @@ interface PublicQuoteData {
   domesticHoldBaggage?: boolean;
   passengers?: number;
   turkeyUpgrade?: string | null;
+  italiaUpgrade?: string | null;
+  granTourUpgrade?: string | null;
   trm?: number | null;
   grandTotalCOP?: number | null;
   finalPrice?: number | null;
@@ -679,7 +681,7 @@ export async function generatePublicQuotePDF(
   const commentsY = smallImagesY + smallImageHeight + 35;
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
-  doc.text("C O M E N T A R I O S", 0, commentsY, {
+  doc.text("COMENTARIOS", 0, commentsY, {
     width: pageWidth,
     align: "center",
   });
@@ -688,24 +690,54 @@ export async function generatePublicQuotePDF(
   const commentsStartY = commentsY + 15;
   doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
 
-  doc.text(
-    "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. ",
-    leftMargin,
-    commentsStartY,
-    { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+  // Check if this is Turquía Esencial - using simple name check
+  const isTurkeyEsencialComments = data.destinations.some(
+    (d) =>
+      d.name?.toLowerCase().includes("turquía esencial") ||
+      d.name?.toLowerCase().includes("turquia esencial"),
   );
 
-  doc.font("Helvetica-Bold");
-  doc.text(
-    "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
-    { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-  );
+  if (isTurkeyEsencialComments) {
+    // Text for Turquía Esencial (keep original)
+    doc.text(
+      "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. ",
+      leftMargin,
+      commentsStartY,
+      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+    );
 
-  doc.font("Helvetica");
-  doc.text(
-    "NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
-    { width: contentWidth, align: "justify", lineGap: 2 },
-  );
+    doc.font("Helvetica-Bold");
+    doc.text(
+      "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
+      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+    );
+
+    doc.font("Helvetica");
+    doc.text(
+      "NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
+      { width: contentWidth, align: "justify", lineGap: 2 },
+    );
+  } else {
+    // New text for all other programs
+    doc.text(
+      "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guia de habla hispana.  Recuerda consultar los servicios no incluidos. ",
+      leftMargin,
+      commentsStartY,
+      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+    );
+
+    doc.font("Helvetica-Bold");
+    doc.text(
+      "Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
+      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+    );
+
+    doc.font("Helvetica");
+    doc.text(
+      "NOCHE ADICIONAL APLICA SUPLEMENTO A TRANSFER",
+      { width: contentWidth, align: "justify", lineGap: 2 },
+    );
+  }
 
   doc.addPage();
   addPageBackground();
@@ -749,6 +781,13 @@ export async function generatePublicQuotePDF(
     (d) =>
       d.name?.toLowerCase().includes("turquía esencial") ||
       d.name?.toLowerCase().includes("turquia esencial"),
+  );
+
+  // Check if this is specifically the "Italia Turística - Euro Express" plan
+  const isItaliaTuristica = data.destinations.some(
+    (d) =>
+      d.name?.toLowerCase().includes("italia turística") ||
+      d.name?.toLowerCase().includes("italia turistica"),
   );
 
   // For general Turkey check (for map and other features)
@@ -1440,38 +1479,88 @@ export async function generatePublicQuotePDF(
           return;
         }
         
-        // Check if we need a new page
-        if (doc.y > 720) {
-          doc.addPage();
-          addPageBackground();
-          addPlaneLogoBottom();
-        }
+        // Check if line contains multiple sentences (separated by ". ")
+        // Split sentences to show them as bullet points for better readability
+        const sentences = line.split(/\.\s+/).filter(s => s.trim());
         
-        // Process bold markers within the line
-        const parts = line.split(/(\*\*.*?\*\*)/g);
-        
-        parts.forEach((part, partIndex) => {
-          if (!part) return;
-          
-          if (part.startsWith('**') && part.endsWith('**')) {
-            // Bold text - remove the ** markers
-            const boldText = part.slice(2, -2);
-            doc.font("Helvetica-Bold");
-            doc.text(boldText, {
-              continued: partIndex < parts.length - 1,
+        if (sentences.length > 1) {
+          // Multiple sentences - show as bullet points
+          sentences.forEach((sentence, sentIndex) => {
+            // Check if we need a new page
+            if (doc.y > 720) {
+              doc.addPage();
+              addPageBackground();
+              addPlaneLogoBottom();
+            }
+            
+            // Add bullet point
+            const bulletX = leftMargin + 5;
+            const textX = bulletX + 10;
+            
+            doc.font("Helvetica-Bold").fontSize(8).fillColor(textColor);
+            doc.text("•", bulletX, doc.y);
+            
+            // Process bold markers within the sentence
+            const parts = sentence.split(/(\*\*.*?\*\*)/g);
+            const startY = doc.y;
+            doc.y = startY; // Reset Y to align with bullet
+            
+            parts.forEach((part, partIndex) => {
+              if (!part) return;
+              
+              if (part.startsWith('**') && part.endsWith('**')) {
+                const boldText = part.slice(2, -2);
+                doc.font("Helvetica-Bold").fontSize(8);
+                doc.text(boldText, textX, doc.y, {
+                  continued: partIndex < parts.length - 1,
+                  width: contentWidth - 20
+                });
+              } else {
+                doc.font("Helvetica").fontSize(8);
+                doc.text(part, partIndex === 0 ? textX : undefined, partIndex === 0 ? doc.y : undefined, {
+                  continued: partIndex < parts.length - 1,
+                  width: contentWidth - 20
+                });
+              }
             });
-          } else {
-            // Normal text
-            doc.font("Helvetica");
-            doc.text(part, {
-              continued: partIndex < parts.length - 1,
-            });
+            
+            doc.moveDown(0.4);
+          });
+        } else {
+          // Single sentence or no period - display normally
+          // Check if we need a new page
+          if (doc.y > 720) {
+            doc.addPage();
+            addPageBackground();
+            addPlaneLogoBottom();
           }
-        });
-        
-        // Move to next line after processing all parts of current line
-        if (lineIndex < lines.length - 1) {
-          doc.moveDown(0.3);
+          
+          // Process bold markers within the line
+          const parts = line.split(/(\*\*.*?\*\*)/g);
+          
+          parts.forEach((part, partIndex) => {
+            if (!part) return;
+            
+            if (part.startsWith('**') && part.endsWith('**')) {
+              // Bold text - remove the ** markers
+              const boldText = part.slice(2, -2);
+              doc.font("Helvetica-Bold");
+              doc.text(boldText, {
+                continued: partIndex < parts.length - 1,
+              });
+            } else {
+              // Normal text
+              doc.font("Helvetica");
+              doc.text(part, {
+                continued: partIndex < parts.length - 1,
+              });
+            }
+          });
+          
+          // Move to next line after processing all parts of current line
+          if (lineIndex < lines.length - 1) {
+            doc.moveDown(0.3);
+          }
         }
       });
       
@@ -1607,6 +1696,258 @@ export async function generatePublicQuotePDF(
         doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
         doc.text(
           "MEJORA INCLUIDA EN ESTA COTIZACIÓN:",
+          leftMargin + boxPadding,
+          boxY + boxPadding,
+          { width: contentWidth - boxPadding * 2 },
+        );
+
+        doc.moveDown(0.5);
+
+        // Description
+        doc.font("Helvetica").fontSize(10).fillColor(boxTextColor);
+        doc.text(
+          `• ${selectedUpgrade.description}`,
+          leftMargin + boxPadding,
+          doc.y,
+          { width: contentWidth - boxPadding * 2 },
+        );
+
+        doc.y = boxY + boxHeight + 10;
+      }
+    }
+
+    doc.moveDown(1);
+  }
+
+  // For Italia Turística - Euro Express, show upgrade options or selected upgrade in blue box
+  if (isItaliaTuristica) {
+    doc.moveDown(1);
+
+    // Check if we need space for the upgrade section
+    if (doc.y > 620) {
+      doc.addPage();
+      addPageBackground();
+      addPlaneLogoBottom();
+      doc.y = 80;
+    }
+
+    const boxY = doc.y;
+    const boxPadding = 15;
+    const boxColor = "#dbeafe"; // Light blue background
+    const borderColor = "#2563eb"; // Blue border
+    const boxTextColor = "#1e40af"; // Dark blue text
+
+    if (!data.italiaUpgrade) {
+      // No upgrade selected - show available upgrade options
+      const boxHeight = 90; // Estimated height for the upgrade options
+
+      // Draw blue background box with thicker border
+      doc
+        .rect(leftMargin, boxY, contentWidth, boxHeight)
+        .lineWidth(3)
+        .fillAndStroke(boxColor, borderColor);
+
+      // Title
+      doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
+      doc.text(
+        "MEJORA TU PLAN (VALOR POR PERSONA):",
+        leftMargin + boxPadding,
+        boxY + boxPadding,
+        { width: contentWidth - boxPadding * 2 },
+      );
+
+      let optionY = boxY + boxPadding + 25;
+      doc.font("Helvetica").fontSize(9).fillColor(boxTextColor);
+
+      // Option VI
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("+ 120 USD (VI):", leftMargin + boxPadding, optionY, {
+          continued: true,
+        });
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .text(" Visitas incluidas", {
+          width: contentWidth - boxPadding * 2,
+        });
+      optionY += 20;
+
+      // Option SI
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("+ 230 USD (SI):", leftMargin + boxPadding, optionY, {
+          continued: true,
+        });
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .text(" Special Incluido - Visitas + Comidas", {
+          width: contentWidth - boxPadding * 2,
+        });
+
+      doc.y = boxY + boxHeight + 10;
+    } else {
+      // Upgrade selected - show which upgrade was included
+      const upgradeOptions: {
+        [key: string]: { description: string; price: string };
+      } = {
+        VI: {
+          description: "Visitas incluidas",
+          price: "120 USD",
+        },
+        SI: {
+          description: "Special Incluido - Visitas + Comidas",
+          price: "230 USD",
+        },
+      };
+
+      const selectedUpgrade = data.italiaUpgrade
+        ? upgradeOptions[data.italiaUpgrade]
+        : undefined;
+
+      if (selectedUpgrade) {
+        const boxHeight = 70;
+
+        // Draw blue background box with thicker border
+        doc
+          .rect(leftMargin, boxY, contentWidth, boxHeight)
+          .lineWidth(3)
+          .fillAndStroke(boxColor, borderColor);
+
+        // Title
+        doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
+        doc.text(
+          "MEJORA INCLUIDA EN ESTA COTIZACIÓN:",
+          leftMargin + boxPadding,
+          boxY + boxPadding,
+          { width: contentWidth - boxPadding * 2 },
+        );
+
+        doc.moveDown(0.5);
+
+        // Description
+        doc.font("Helvetica").fontSize(10).fillColor(boxTextColor);
+        doc.text(
+          `• ${selectedUpgrade.description}`,
+          leftMargin + boxPadding,
+          doc.y,
+          { width: contentWidth - boxPadding * 2 },
+        );
+
+        doc.y = boxY + boxHeight + 10;
+      }
+    }
+
+    doc.moveDown(1);
+  }
+
+  // Gran Tour de Europa Upgrade Section
+  const hasGranTourEuropa = data.destinations.some(
+    (d) => d.name === "Gran Tour de Europa"
+  );
+
+  if (hasGranTourEuropa) {
+    let boxY = doc.y;
+
+    if (boxY > 650) {
+      doc.addPage();
+      addPageBackground();
+      addPlaneLogoBottom();
+      boxY = 90;
+    }
+
+    const boxPadding = 15;
+    const boxColor = "#f3e8ff"; // Light purple background
+    const borderColor = "#9333ea"; // Purple border
+    const boxTextColor = "#6b21a8"; // Dark purple text
+
+    if (!data.granTourUpgrade) {
+      // No upgrade selected - show available upgrade options
+      const boxHeight = 90; // Estimated height for the upgrade options
+
+      // Draw purple background box with thicker border
+      doc
+        .rect(leftMargin, boxY, contentWidth, boxHeight)
+        .lineWidth(3)
+        .fillAndStroke(boxColor, borderColor);
+
+      // Title
+      doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
+      doc.text(
+        "MEJORA TU PLAN GRAN TOUR (VALOR POR PERSONA):",
+        leftMargin + boxPadding,
+        boxY + boxPadding,
+        { width: contentWidth - boxPadding * 2 },
+      );
+
+      let optionY = boxY + boxPadding + 25;
+      doc.font("Helvetica").fontSize(9).fillColor(boxTextColor);
+
+      // Option VI
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("+ 595 USD (VI):", leftMargin + boxPadding, optionY, {
+          continued: true,
+        });
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .text(" Visitas incluidas", {
+          width: contentWidth - boxPadding * 2,
+        });
+      optionY += 20;
+
+      // Option SI
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("+ 670 USD (SI):", leftMargin + boxPadding, optionY, {
+          continued: true,
+        });
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .text(" Special Incluido - Visitas + Comidas", {
+          width: contentWidth - boxPadding * 2,
+        });
+
+      doc.y = boxY + boxHeight + 10;
+    } else {
+      // Upgrade selected - show which upgrade was included
+      const upgradeOptions: {
+        [key: string]: { description: string; price: string };
+      } = {
+        VI: {
+          description: "Visitas incluidas",
+          price: "595 USD",
+        },
+        SI: {
+          description: "Special Incluido - Visitas + Comidas",
+          price: "670 USD",
+        },
+      };
+
+      const selectedUpgrade = data.granTourUpgrade
+        ? upgradeOptions[data.granTourUpgrade]
+        : undefined;
+
+      if (selectedUpgrade) {
+        const boxHeight = 70;
+
+        // Draw purple background box with thicker border
+        doc
+          .rect(leftMargin, boxY, contentWidth, boxHeight)
+          .lineWidth(3)
+          .fillAndStroke(boxColor, borderColor);
+
+        // Title
+        doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
+        doc.text(
+          "MEJORA GRAN TOUR INCLUIDA EN ESTA COTIZACIÓN:",
           leftMargin + boxPadding,
           boxY + boxPadding,
           { width: contentWidth - boxPadding * 2 },

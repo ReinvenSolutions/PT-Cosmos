@@ -20,11 +20,19 @@ interface Client {
   email: string;
 }
 
+interface Upgrade {
+  code: string;
+  name: string;
+  description?: string;
+  price: number;
+}
+
 interface Destination {
   id: string;
   name: string;
   country: string;
   duration: number;
+  upgrades?: Upgrade[];
 }
 
 interface QuoteDestination {
@@ -50,6 +58,7 @@ interface Quote {
   returnCabinBaggage: boolean | null;
   returnHoldBaggage: boolean | null;
   turkeyUpgrade: string | null;
+  italiaUpgrade: string | null;
   trm: string | null;
   customFilename: string | null;
   minPayment: string | null;
@@ -82,6 +91,7 @@ export default function QuoteEdit() {
   const [returnCabinBaggage, setReturnCabinBaggage] = useState(false);
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
+  const [italiaUpgrade, setItaliaUpgrade] = useState<string>("");
   
   // New fields state
   const [trm, setTrm] = useState("");
@@ -129,6 +139,7 @@ export default function QuoteEdit() {
       setReturnCabinBaggage(quote.returnCabinBaggage ?? false);
       setReturnHoldBaggage(quote.returnHoldBaggage ?? false);
       setTurkeyUpgrade(quote.turkeyUpgrade || "");
+      setItaliaUpgrade(quote.italiaUpgrade || "");
       
       // Set new fields
       setTrm(quote.trm || "");
@@ -257,6 +268,10 @@ export default function QuoteEdit() {
   };
 
   const hasTurkeyEsencial = quote?.destinations.some(qd => qd.destination.name === "Turquía Esencial") || false;
+  
+  const hasItaliaTuristica = quote?.destinations.some(qd => qd.destination.name === "Italia Turística - Euro Express") || false;
+  const italiaDestination = quote?.destinations.find(qd => qd.destination.name === "Italia Turística - Euro Express")?.destination;
+  const italiaUpgrades = italiaDestination?.upgrades || [];
 
   const getTurkeyUpgradeCost = () => {
     if (!hasTurkeyEsencial || !turkeyUpgrade) return 0;
@@ -264,6 +279,12 @@ export default function QuoteEdit() {
     if (turkeyUpgrade === "option2") return 770;
     if (turkeyUpgrade === "option3") return 1100;
     return 0;
+  };
+
+  const getItaliaUpgradeCost = () => {
+    if (!hasItaliaTuristica || !italiaUpgrade) return 0;
+    const upgrade = italiaUpgrades.find(u => u.code === italiaUpgrade);
+    return upgrade ? Number(upgrade.price) : 0;
   };
 
   const handleDownloadPDF = async () => {
@@ -328,6 +349,7 @@ export default function QuoteEdit() {
       returnCabinBaggage,
       returnHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
+      italiaUpgrade: italiaUpgrade || null,
       trm: trm || null,
       customFilename: customFilename || null,
       minPayment: minPayment || null,
@@ -515,6 +537,49 @@ export default function QuoteEdit() {
                       <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
                         <p className="text-sm font-semibold text-orange-700">
                           Mejora seleccionada: +US$ {formatUSD(getTurkeyUpgradeCost())}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {hasItaliaTuristica && italiaUpgrades.length > 0 && (
+                <Card className="border-blue-200">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-blue-600">
+                      <Star className="w-5 h-5" />
+                      Mejora tu Plan Italia Turística
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Selecciona una opción para mejorar tu experiencia en Italia:
+                    </p>
+                    <div className="space-y-3">
+                      {italiaUpgrades.map((upgrade) => (
+                        <div key={upgrade.code} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                          <Checkbox
+                            id={`upgrade-${upgrade.code}`}
+                            checked={italiaUpgrade === upgrade.code}
+                            onCheckedChange={(checked) => setItaliaUpgrade(checked ? upgrade.code : "")}
+                          />
+                          <div className="flex-1">
+                            <label htmlFor={`upgrade-${upgrade.code}`} className="font-semibold cursor-pointer">
+                              + {formatUSD(Number(upgrade.price))} USD
+                            </label>
+                            <p className="text-sm text-gray-600">
+                              <span className="font-medium">{upgrade.name}</span>
+                              {upgrade.description && ` - ${upgrade.description}`}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {italiaUpgrade && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm font-semibold text-blue-700">
+                          Mejora seleccionada: +US$ {formatUSD(getItaliaUpgradeCost())}
                         </p>
                       </div>
                     )}

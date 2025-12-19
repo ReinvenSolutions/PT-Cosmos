@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane, MessageCircle } from "lucide-react";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane, MessageCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,6 +76,8 @@ export default function QuoteSummary() {
   const [domesticCabinBaggage, setDomesticCabinBaggage] = useState(false);
   const [domesticHoldBaggage, setDomesticHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
+  const [italiaUpgrade, setItaliaUpgrade] = useState<string>("");
+  const [granTourUpgrade, setGranTourUpgrade] = useState<string>("");
   const [trm, setTrm] = useState("");
   const [finalPrice, setFinalPrice] = useState("");
   const [minPayment, setMinPayment] = useState("");
@@ -147,7 +149,14 @@ export default function QuoteSummary() {
     if (savedData) {
       const { destinations: destIds, startDate: start } = JSON.parse(savedData);
       setSelectedDestinations(destIds);
-      setStartDate(start ? new Date(start) : undefined);
+      
+      // Parsear fecha en zona horaria local para evitar problemas de UTC
+      if (start) {
+        const [year, month, day] = start.split('-').map(Number);
+        setStartDate(new Date(year, month - 1, day));
+      } else {
+        setStartDate(undefined);
+      }
     } else {
       setLocation("/");
     }
@@ -166,6 +175,15 @@ export default function QuoteSummary() {
 
   const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
+  const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
+  
+  const hasItaliaTuristica = selectedDests.some((d) => d.name === "Italia Turística - Euro Express");
+  const italiaDestination = selectedDests.find((d) => d.name === "Italia Turística - Euro Express");
+  const italiaUpgrades = italiaDestination?.upgrades || [];
+  
+  const granTourDestination = selectedDests.find((d) => d.name === "Gran Tour de Europa");
+  const granTourUpgrades = granTourDestination?.upgrades || [];
+
   const hasAllowedDaysRestriction = selectedDests.some((d) => d.allowedDays && d.allowedDays.length > 0);
   const allowedDaysDestination = selectedDests.find((d) => d.allowedDays && d.allowedDays.length > 0);
 
@@ -208,11 +226,21 @@ export default function QuoteSummary() {
       return false;
     }
     
+    // For Turkey Esencial, allow Tuesday (flight day) or Wednesday (direct arrival)
     if (hasTurkeyEsencial) {
       if (isTurkeyHoliday(date)) {
         return true;
       }
-      return !isTuesday(date);
+      const dayOfWeek = date.getDay();
+      // Allow Tuesday (2) for Colombia flights and Wednesday (3) for direct arrivals
+      return !(dayOfWeek === 2 || dayOfWeek === 3);
+    }
+    
+    // For Gran Tour de Europa, allow Sunday (flight day) or Monday (direct arrival)
+    if (hasGranTourEuropa) {
+      const dayOfWeek = date.getDay();
+      // Allow Sunday (0) for Colombia flights and Monday (1) for direct arrivals
+      return !(dayOfWeek === 0 || dayOfWeek === 1);
     }
     
     if (hasTurkeyDestinations) {
@@ -226,10 +254,41 @@ export default function QuoteSummary() {
     if (!startDate || selectedDests.length === 0) return "";
     
     let totalDuration = selectedDests.reduce((sum, dest) => {
-      return sum + (dest.duration || 0);
+      let duration = dest.duration || 0;
+      
+      // Ajuste especial para Turquía Esencial
+      if (dest.name === "Turquía Esencial") {
+        const dayOfWeek = startDate.getDay();
+        // Si es martes (día 2): vuelo desde Colombia, son 11 días
+        // Si es miércoles (día 3): llegada directa, son 10 días
+        if (dayOfWeek === 2) {
+          duration = 11; // Martes: incluye día de vuelo
+        } else if (dayOfWeek === 3) {
+          duration = 10; // Miércoles: llegada directa
+        }
+      }
+      
+      // Ajuste especial para Gran Tour de Europa
+      if (dest.name === "Gran Tour de Europa") {
+        const dayOfWeek = startDate.getDay();
+        // Si es domingo (día 0): vuelo desde Colombia, son 17 días
+        // Si es lunes (día 1): llegada directa, son 16 días
+        if (dayOfWeek === 0) {
+          duration = 17; // Domingo: incluye día de vuelo
+        } else if (dayOfWeek === 1) {
+          duration = 16; // Lunes: llegada directa
+        }
+      }
+      
+      return sum + duration;
     }, 0);
 
-    if (hasTurkeyDestinations) {
+    // No agregar día extra si ya se ajustó en Turquía o Gran Tour
+    const hasTurkeyEsencialAdjusted = selectedDests.some(d => 
+      d.name === "Turquía Esencial" && (startDate.getDay() === 2 || startDate.getDay() === 3)
+    );
+    
+    if (hasTurkeyDestinations && !hasTurkeyEsencialAdjusted) {
       totalDuration += 1;
     }
 
@@ -327,9 +386,23 @@ export default function QuoteSummary() {
     if (turkeyUpgrade === "option3") return 1100;
     return 0;
   };
+
+  const getItaliaUpgradeCost = () => {
+    if (!hasItaliaTuristica || !italiaUpgrade) return 0;
+    const upgrade = italiaUpgrades.find(u => u.code === italiaUpgrade);
+    return upgrade ? Number(upgrade.price) : 0;
+  };
+  
+  const getGranTourUpgradeCost = () => {
+    if (!hasGranTourEuropa || !granTourUpgrade) return 0;
+    const upgrade = granTourUpgrades.find(u => u.code === granTourUpgrade);
+    return upgrade ? Number(upgrade.price) : 0;
+  };
   
   const turkeyUpgradeCost = getTurkeyUpgradeCost();
-  const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost;
+  const italiaUpgradeCost = getItaliaUpgradeCost();
+  const granTourUpgradeCost = getGranTourUpgradeCost();
+  const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost;
   
   const grandTotalCOP = effectiveTrm > 0 ? grandTotal * effectiveTrm : 0;
 
@@ -603,6 +676,8 @@ export default function QuoteSummary() {
       domesticCabinBaggage,
       domesticHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
+      italiaUpgrade: italiaUpgrade || null,
+      granTourUpgrade: granTourUpgrade || null,
       trm: effectiveTrm > 0 ? effectiveTrm : null,
       customFilename: customFilename.trim() || null,
       minPayment: payloadMinPayment,
@@ -727,6 +802,8 @@ export default function QuoteSummary() {
           domesticHoldBaggage,
           passengers,
           turkeyUpgrade: turkeyUpgrade || null,
+          italiaUpgrade: italiaUpgrade || null,
+          granTourUpgrade: granTourUpgrade || null,
           trm: effectiveTrm > 0 ? effectiveTrm : null,
           grandTotalCOP: effectiveTrm > 0 ? grandTotalCOP : null,
           finalPrice: payloadFinalPrice,
@@ -908,7 +985,9 @@ export default function QuoteSummary() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Fecha de Inicio
-                  {hasTurkeyDestinations && <Badge variant="secondary">Solo Martes</Badge>}
+                  {hasTurkeyEsencial && <Badge variant="secondary">Martes o Miércoles</Badge>}
+                  {hasGranTourEuropa && <Badge variant="secondary" className="bg-purple-100 text-purple-800">Domingo o Lunes</Badge>}
+                  {hasTurkeyDestinations && !hasTurkeyEsencial && <Badge variant="secondary">Solo Martes</Badge>}
                   {hasAllowedDaysRestriction && allowedDaysDestination && (
                     <Badge variant="secondary">
                       Solo {allowedDaysDestination.allowedDays?.map(day => {
@@ -943,12 +1022,53 @@ export default function QuoteSummary() {
                           };
                           return dayMap[d] || d;
                         }).join(' y ')}`
+                      : hasTurkeyEsencial
+                      ? "Selecciona martes o miércoles"
+                      : hasGranTourEuropa
+                      ? "Selecciona domingo o lunes"
                       : hasTurkeyDestinations
                       ? "Selecciona un martes"
                       : "Selecciona una fecha"
                   }
                   disabled={disableDates}
+                  priceTiers={
+                    selectedDestinations.length > 0 
+                      ? selectedDests.flatMap(dest => 
+                          (dest.priceTiers || []).map(tier => ({
+                            ...tier,
+                            destinationName: dest.name
+                          }))
+                        )
+                      : undefined
+                  }
                 />
+                {selectedDestinations.length > 0 && selectedDests.some(d => d.priceTiers && d.priceTiers.length > 0) && (
+                  <div className="mt-2 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-emerald-800 space-y-1">
+                        <p className="font-semibold">Información del Calendario:</p>
+                        <ul className="list-disc list-inside space-y-0.5 ml-1">
+                          <li>Las fechas con <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[0.65rem] font-medium">precio</span> están disponibles</li>
+                          {hasTurkeyEsencial && (
+                            <li>
+                              <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[0.6rem] font-medium">🛫 COL</span> = Vuelo desde Colombia (lunes, 11 días total)
+                            </li>
+                          )}
+                          {hasTurkeyEsencial && (
+                            <li>
+                              Martes = Llegada directa desde otro país (10 días)
+                            </li>
+                          )}
+                          {selectedDestinations.length > 1 && (
+                            <li>El número <span className="bg-blue-600 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[0.5rem] font-bold">2+</span> indica múltiples destinos en esa fecha</li>
+                          )}
+                          <li>Pasa el mouse sobre una fecha para ver detalles de precio por destino</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Fecha de Finalización (Calculada)</p>
@@ -1028,6 +1148,92 @@ export default function QuoteSummary() {
                 <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
                   <p className="text-sm font-semibold text-orange-700">
                     Mejora seleccionada: +US$ {formatUSD(turkeyUpgradeCost)}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {hasItaliaTuristica && italiaUpgrades.length > 0 && (
+          <Card className="mb-6 border-blue-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-600">
+                <Star className="w-5 h-5" />
+                Mejora tu Plan Italia Turística
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Selecciona una opción para mejorar tu experiencia en Italia:
+              </p>
+              <div className="space-y-3">
+                {italiaUpgrades.map((upgrade) => (
+                  <div key={upgrade.code} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                    <Checkbox
+                      id={`upgrade-${upgrade.code}`}
+                      checked={italiaUpgrade === upgrade.code}
+                      onCheckedChange={(checked) => setItaliaUpgrade(checked ? upgrade.code : "")}
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`upgrade-${upgrade.code}`} className="font-semibold cursor-pointer">
+                        + {formatUSD(Number(upgrade.price))} USD
+                      </label>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">{upgrade.name}</span>
+                        {upgrade.description && ` - ${upgrade.description}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {italiaUpgrade && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm font-semibold text-blue-700">
+                    Mejora seleccionada: +US$ {formatUSD(italiaUpgradeCost)}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {hasGranTourEuropa && granTourUpgrades.length > 0 && (
+          <Card className="mb-6 border-purple-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-purple-600">
+                <Star className="w-5 h-5" />
+                Mejora tu Plan Gran Tour de Europa
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Selecciona una opción para mejorar tu experiencia en Europa:
+              </p>
+              <div className="space-y-3">
+                {granTourUpgrades.map((upgrade) => (
+                  <div key={upgrade.code} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                    <Checkbox
+                      id={`grantour-upgrade-${upgrade.code}`}
+                      checked={granTourUpgrade === upgrade.code}
+                      onCheckedChange={(checked) => setGranTourUpgrade(checked ? upgrade.code : "")}
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`grantour-upgrade-${upgrade.code}`} className="font-semibold cursor-pointer">
+                        + {formatUSD(Number(upgrade.price))} USD
+                      </label>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">{upgrade.name}</span>
+                        {upgrade.description && ` - ${upgrade.description}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {granTourUpgrade && (
+                <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="text-sm font-semibold text-purple-700">
+                    Mejora seleccionada: +US$ {formatUSD(granTourUpgradeCost)}
                   </p>
                 </div>
               )}

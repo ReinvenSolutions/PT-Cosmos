@@ -14,7 +14,7 @@ async function checkDestinationsOrder() {
       displayOrder: destinations.displayOrder,
       imageUrl: destinations.imageUrl,
       isActive: destinations.isActive,
-    })
+    })  
     .from(destinations)
     .where(eq(destinations.isActive, true))
     .orderBy(destinations.displayOrder, destinations.name);

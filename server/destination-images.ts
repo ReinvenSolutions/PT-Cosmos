@@ -48,14 +48,27 @@ export const countryImageSets: Record<string, string[]> = {
     path.join(ASSETS_PATH, 'vietnam_hoi_an_ancie_5aef2cfa.jpg')
   ],
   'Perú': [
-    path.join(ASSETS_PATH, 'machu_picchu_peru_an_85367025.jpg'),
-    path.join(ASSETS_PATH, 'peru_cusco_city_plaz_4a297d1e.jpg'),
-    path.join(ASSETS_PATH, 'peru_sacred_valley_m_89f0ed5a.jpg')
+    path.join(ASSETS_PATH, 'machu_picchu_peru_an_85367025.jpg'),        // 1
+    path.join(ASSETS_PATH, 'peru_cusco_city_plaz_4a297d1e.jpg'),       // 2
+    path.join(ASSETS_PATH, 'peru_sacred_valley_m_89f0ed5a.jpg'),       // 3
+    path.join(ASSETS_PATH, 'peru_cusco_city_plaz_c99e2aa0.jpg'),       // 4
+    path.join(ASSETS_PATH, 'peru_sacred_valley_m_de41c327.jpg'),       // 5
+    path.join(ASSETS_PATH, 'amazon_rainforest_ri_e3f6da86.jpg'),       // 6
+    path.join(ASSETS_PATH, 'machu_picchu_peru_an_85367025.jpg'),       // 7 (repeat)
+    path.join(ASSETS_PATH, 'peru_cusco_city_plaz_4a297d1e.jpg'),       // 8 (repeat)
+    path.join(ASSETS_PATH, 'peru_sacred_valley_m_89f0ed5a.jpg'),       // 9 (repeat)
+    path.join(ASSETS_PATH, 'peru_cusco_city_plaz_c99e2aa0.jpg'),       // 10 (repeat)
+    path.join(ASSETS_PATH, 'peru_sacred_valley_m_de41c327.jpg'),       // 11 (repeat)
   ],
   'Colombia': [
     path.join(ASSETS_PATH, 'cartagena_colombia_c_b5845004.jpg'),
     path.join(ASSETS_PATH, 'medellin_colombia_ca_be5f2e82.jpg'),
     path.join(ASSETS_PATH, 'coffee_plantation_co_803c7456.jpg')
+  ],
+  'España, Francia, Suiza, Italia': [
+    path.join(ASSETS_PATH, 'santorini_greece_whi_25df22f7.jpg'), // Usar imágenes europeas disponibles
+    path.join(ASSETS_PATH, 'greece_athens_parthe_078be842.jpg'),
+    path.join(ASSETS_PATH, 'greece_mykonos_white_034716bc.jpg')
   ],
 };
 
@@ -67,6 +80,7 @@ export const destinationImagePaths: Record<string, string> = {
   'Amazonas Selvático y Aventura': path.join(ASSETS_PATH, 'amazon_rainforest_ri_e3f6da86.jpg'),
   'La Guajira y Cabo de la Vela': path.join(ASSETS_PATH, 'la_guajira_desert_be_5a4f4bb5.jpg'),
   'Santander y Aventura Extrema': path.join(ASSETS_PATH, 'santander_adventure__6c5cbff4.jpg'),
+  'Gran Tour de Europa': path.join(ASSETS_PATH, 'santorini_greece_whi_25df22f7.jpg'),
 };
 
 export function getDestinationImagePath(destination: { name: string; country: string }): string | null {
@@ -81,7 +95,7 @@ export function getDestinationImagePath(destination: { name: string; country: st
   return null;
 }
 
-export function getDestinationImages(destinations: Array<{ name: string; country: string }>): string[] {
+export function getDestinationImages(destinations: Array<{ name: string; country: string; duration?: number }>): string[] {
   // Si hay solo un destino, usar el set de imágenes del país para mostrar 3 imágenes diferentes
   if (destinations.length === 1) {
     const imageSet = getDestinationImageSet(destinations[0]);

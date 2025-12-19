@@ -4,7 +4,7 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar, type PriceTier } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
@@ -17,6 +17,7 @@ interface DatePickerProps {
   placeholder?: string;
   disabled?: (date: Date) => boolean;
   className?: string;
+  priceTiers?: PriceTier[];
 }
 
 export function DatePicker({
@@ -25,7 +26,10 @@ export function DatePicker({
   placeholder = "Selecciona una fecha",
   disabled,
   className,
+  priceTiers,
 }: DatePickerProps) {
+  const today = new Date();
+  
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -50,6 +54,9 @@ export function DatePicker({
           disabled={disabled}
           initialFocus
           locale={es}
+          numberOfMonths={2}
+          defaultMonth={date || today}
+          priceTiers={priceTiers}
         />
       </PopoverContent>
     </Popover>

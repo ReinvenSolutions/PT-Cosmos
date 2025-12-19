@@ -168,7 +168,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, 
         originCity, outboundFlightImages, returnFlightImages, includeFlights, 
         outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
-        turkeyUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
+        domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
+        turkeyUpgrade, italiaUpgrade, granTourUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
         customFilename, minPayment, minPaymentCOP
       } = req.body;
       
@@ -231,7 +232,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outboundHoldBaggage: outboundHoldBaggage ?? false,
         returnCabinBaggage: returnCabinBaggage ?? false,
         returnHoldBaggage: returnHoldBaggage ?? false,
+        domesticFlightImages: domesticFlightImages || undefined,
+        domesticCabinBaggage: domesticCabinBaggage ?? false,
+        domesticHoldBaggage: domesticHoldBaggage ?? false,
         turkeyUpgrade: turkeyUpgrade || null,
+        italiaUpgrade: italiaUpgrade || null,
+        granTourUpgrade: granTourUpgrade || null,
         trm: trmValue > 0 ? trmValue : null,
         grandTotalCOP: calculatedGrandTotalCOP,
         finalPrice: (finalPrice !== undefined && finalPrice !== null) ? Number(finalPrice) : null,
@@ -376,8 +382,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user as User;
       const { 
         clientId, totalPrice, destinations, originCity, flightsAndExtras, 
-        outboundFlightImages, returnFlightImages, turkeyUpgrade, includeFlights, 
+        outboundFlightImages, returnFlightImages, domesticFlightImages,
+        turkeyUpgrade, italiaUpgrade, granTourUpgrade,
+        includeFlights, 
         outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage,
+        domesticCabinBaggage, domesticHoldBaggage,
         trm, customFilename, minPayment, minPaymentCOP, finalPrice, finalPriceCOP, finalPriceCurrency
       } = req.body;
 
@@ -406,12 +415,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         flightsAndExtras: flightsAndExtras || null,
         outboundFlightImages: outboundFlightImages || null,
         returnFlightImages: returnFlightImages || null,
+        domesticFlightImages: domesticFlightImages || null,
         includeFlights: includeFlights ?? false,
         outboundCabinBaggage: outboundCabinBaggage ?? false,
         outboundHoldBaggage: outboundHoldBaggage ?? false,
         returnCabinBaggage: returnCabinBaggage ?? false,
         returnHoldBaggage: returnHoldBaggage ?? false,
+        domesticCabinBaggage: domesticCabinBaggage ?? false,
+        domesticHoldBaggage: domesticHoldBaggage ?? false,
         turkeyUpgrade: turkeyUpgrade || null,
+        italiaUpgrade: italiaUpgrade || null,
+        granTourUpgrade: granTourUpgrade || null,
         trm: trm || null,
         customFilename: customFilename || null,
         minPayment: minPayment || null,
@@ -435,9 +449,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user as User;
       const { 
         clientId, totalPrice, destinations, originCity, flightsAndExtras, 
-        outboundFlightImages, returnFlightImages, includeFlights, 
+        outboundFlightImages, returnFlightImages, domesticFlightImages,
+        includeFlights, 
         outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
-        turkeyUpgrade, trm, customFilename, minPayment, minPaymentCOP, finalPrice, finalPriceCOP, finalPriceCurrency
+        domesticCabinBaggage, domesticHoldBaggage,
+        turkeyUpgrade, italiaUpgrade, granTourUpgrade,
+        trm, customFilename, minPayment, minPaymentCOP, finalPrice, finalPriceCOP, finalPriceCurrency
       } = req.body;
 
       if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
@@ -464,12 +481,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         flightsAndExtras: flightsAndExtras || null,
         outboundFlightImages: outboundFlightImages || null,
         returnFlightImages: returnFlightImages || null,
+        domesticFlightImages: domesticFlightImages || null,
         includeFlights: includeFlights ?? false,
         outboundCabinBaggage: outboundCabinBaggage ?? false,
         outboundHoldBaggage: outboundHoldBaggage ?? false,
         returnCabinBaggage: returnCabinBaggage ?? false,
         returnHoldBaggage: returnHoldBaggage ?? false,
+        domesticCabinBaggage: domesticCabinBaggage ?? false,
+        domesticHoldBaggage: domesticHoldBaggage ?? false,
         turkeyUpgrade: turkeyUpgrade || null,
+        italiaUpgrade: italiaUpgrade || null,
+        granTourUpgrade: granTourUpgrade || null,
         trm: trm || null,
         customFilename: customFilename || null,
         minPayment: minPayment || null,
@@ -589,7 +611,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outboundHoldBaggage: quote.outboundHoldBaggage ?? false,
         returnCabinBaggage: quote.returnCabinBaggage ?? false,
         returnHoldBaggage: quote.returnHoldBaggage ?? false,
+        domesticFlightImages: quote.domesticFlightImages || undefined,
+        domesticCabinBaggage: quote.domesticCabinBaggage ?? false,
+        domesticHoldBaggage: quote.domesticHoldBaggage ?? false,
         turkeyUpgrade: quote.turkeyUpgrade || null,
+        italiaUpgrade: quote.italiaUpgrade || null,
+        granTourUpgrade: quote.granTourUpgrade || null,
         trm: trmValue > 0 ? trmValue : null,
         grandTotalCOP: calculatedGrandTotalCOP,
         minPayment: quote.minPayment ? Number(quote.minPayment) : undefined,

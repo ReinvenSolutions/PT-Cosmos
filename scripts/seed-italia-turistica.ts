@@ -1,6 +1,7 @@
 
+import 'dotenv/config';
 import { db } from "../server/db";
-import { destinations, hotels, itineraryDays, inclusions, exclusions } from "../shared/schema";
+import { destinations, hotels, itineraryDays, inclusions, exclusions, destinationImages } from "../shared/schema";
 import { eq, and } from "drizzle-orm";
 
 async function seedItaliaTuristica() {
@@ -19,14 +20,77 @@ async function seedItaliaTuristica() {
     const [destination] = await db.insert(destinations).values({
       name: "Italia Turística - Euro Express",
       description: "Recorrido esencial por Italia de 7 días. Inicia en Roma con visita panorámica, continúa hacia Florencia para descubrir el Renacimiento, Venecia con paseo en barco y finaliza en la moderna Milán. Una inmersión rápida y completa en la cultura italiana.",
-      basePrice: "0",
+      basePrice: "1090.00",
       duration: 7,
       nights: 6,
       country: "Italia",
-      imageUrl: "https://images.unsplash.com/photo-1529260830199-42c42dda5f3d?auto=format&fit=crop&q=80",
+      imageUrl: "/images/destinations/italia-turistica-euro-express/1.jpg",
       isPromotion: false,
       category: "internacional",
-      isActive: true
+      isActive: true,
+      displayOrder: 6, // Después de Gran Tour Europa (5) y antes de España e Italia (7)
+      allowedDays: ['friday'],
+      priceTiers: [
+        // Enero 2026
+        { startDate: '2026-01-23', endDate: '2026-01-23', price: '1165.00' },
+        // Febrero 2026
+        { startDate: '2026-02-06', endDate: '2026-02-06', price: '1090.00' },
+        { startDate: '2026-02-20', endDate: '2026-02-20', price: '1090.00' },
+        // Marzo 2026
+        { startDate: '2026-03-06', endDate: '2026-03-06', price: '1090.00' },
+        { startDate: '2026-03-13', endDate: '2026-03-13', price: '1150.00' },
+        { startDate: '2026-03-20', endDate: '2026-03-20', price: '1165.00' },
+        { startDate: '2026-03-27', endDate: '2026-03-27', price: '1165.00' },
+        // Abril 2026
+        { startDate: '2026-04-03', endDate: '2026-04-03', price: '1240.00' },
+        { startDate: '2026-04-10', endDate: '2026-04-10', price: '1245.00' },
+        { startDate: '2026-04-17', endDate: '2026-04-17', price: '1245.00' },
+        { startDate: '2026-04-24', endDate: '2026-04-24', price: '1245.00' },
+        // Mayo 2026
+        { startDate: '2026-05-01', endDate: '2026-05-01', price: '1290.00' },
+        { startDate: '2026-05-08', endDate: '2026-05-08', price: '1290.00' },
+        { startDate: '2026-05-15', endDate: '2026-05-15', price: '1290.00' },
+        { startDate: '2026-05-22', endDate: '2026-05-22', price: '1290.00' },
+        { startDate: '2026-05-29', endDate: '2026-05-29', price: '1290.00' },
+        // Junio 2026
+        { startDate: '2026-06-05', endDate: '2026-06-05', price: '1290.00' },
+        { startDate: '2026-06-12', endDate: '2026-06-12', price: '1340.00' },
+        { startDate: '2026-06-19', endDate: '2026-06-19', price: '1290.00' },
+        { startDate: '2026-06-26', endDate: '2026-06-26', price: '1290.00' },
+        // Julio 2026
+        { startDate: '2026-07-03', endDate: '2026-07-03', price: '1240.00' },
+        { startDate: '2026-07-10', endDate: '2026-07-10', price: '1240.00' },
+        { startDate: '2026-07-17', endDate: '2026-07-17', price: '1205.00' },
+        { startDate: '2026-07-24', endDate: '2026-07-24', price: '1220.00' },
+        { startDate: '2026-07-31', endDate: '2026-07-31', price: '1190.00' },
+        // Agosto 2026
+        { startDate: '2026-08-07', endDate: '2026-08-07', price: '1185.00' },
+        { startDate: '2026-08-14', endDate: '2026-08-14', price: '1185.00' },
+        { startDate: '2026-08-21', endDate: '2026-08-21', price: '1185.00' },
+        { startDate: '2026-08-28', endDate: '2026-08-28', price: '1185.00' },
+        // Septiembre 2026
+        { startDate: '2026-09-04', endDate: '2026-09-04', price: '1290.00' },
+        { startDate: '2026-09-11', endDate: '2026-09-11', price: '1290.00' },
+        { startDate: '2026-09-18', endDate: '2026-09-18', price: '1290.00' },
+        { startDate: '2026-09-25', endDate: '2026-09-25', price: '1290.00' },
+        // Octubre 2026
+        { startDate: '2026-10-02', endDate: '2026-10-02', price: '1280.00' },
+        { startDate: '2026-10-09', endDate: '2026-10-09', price: '1280.00' },
+        { startDate: '2026-10-16', endDate: '2026-10-16', price: '1275.00' },
+        { startDate: '2026-10-23', endDate: '2026-10-23', price: '1275.00' },
+        { startDate: '2026-10-30', endDate: '2026-10-30', price: '1275.00' },
+        // Noviembre 2026
+        { startDate: '2026-11-06', endDate: '2026-11-06', price: '1200.00' },
+        { startDate: '2026-11-13', endDate: '2026-11-13', price: '1200.00' },
+        { startDate: '2026-11-27', endDate: '2026-11-27', price: '1130.00' },
+        // Diciembre 2026
+        { startDate: '2026-12-11', endDate: '2026-12-11', price: '1130.00' },
+        { startDate: '2026-12-25', endDate: '2026-12-25', price: '1170.00' },
+      ],
+      upgrades: [
+        { code: "VI", name: "Visitas incluidas", price: 120 },
+        { code: "SI", name: "Special Incluido", description: "Visitas + Comidas", price: 230 }
+      ]
     }).returning();
 
     console.log(`Destino creado con ID: ${destination.id}`);
@@ -166,6 +230,19 @@ async function seedItaliaTuristica() {
 
     await db.insert(exclusions).values(exclusionsData);
     console.log("Exclusiones insertadas");
+
+    // 6. Insertar Imágenes del destino
+    const imagesData = [
+      { imageUrl: "/images/destinations/italia-turistica-euro-express/1.jpg", displayOrder: 0 },
+      { imageUrl: "/images/destinations/italia-turistica-euro-express/2.jpg", displayOrder: 1 },
+      { imageUrl: "/images/destinations/italia-turistica-euro-express/3.jpg", displayOrder: 2 }
+    ].map(img => ({
+      ...img,
+      destinationId: destination.id
+    }));
+
+    await db.insert(destinationImages).values(imagesData);
+    console.log("Imágenes insertadas");
 
     console.log("¡Programa Italia Turística - Euro Express cargado exitosamente!");
   } catch (error) {

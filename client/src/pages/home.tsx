@@ -70,6 +70,7 @@ export default function Home() {
   
   const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
+  const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
   const hasAllowedDaysRestriction = selectedDests.some((d) => d.allowedDays && d.allowedDays.length > 0);
   const allowedDaysDestination = selectedDests.find((d) => d.allowedDays && d.allowedDays.length > 0);
   
@@ -94,10 +95,41 @@ export default function Home() {
     
     let totalDuration = selectedDestinations.reduce((sum, destId) => {
       const dest = destinations.find((d) => d.id === destId);
-      return sum + (dest?.duration || 0);
+      let duration = dest?.duration || 0;
+      
+      // Ajuste especial para Turquía Esencial
+      if (dest?.name === "Turquía Esencial") {
+        const dayOfWeek = startDate.getDay();
+        // Si es martes (día 2): vuelo desde Colombia, son 11 días
+        // Si es miércoles (día 3): llegada directa, son 10 días
+        if (dayOfWeek === 2) {
+          duration = 11; // Martes: incluye día de vuelo
+        } else if (dayOfWeek === 3) {
+          duration = 10; // Miércoles: llegada directa
+        }
+      }
+      
+      // Ajuste especial para Gran Tour de Europa
+      if (dest?.name === "Gran Tour de Europa") {
+        const dayOfWeek = startDate.getDay();
+        // Si es domingo (día 0): vuelo desde Colombia, son 17 días
+        // Si es lunes (día 1): llegada directa, son 16 días
+        if (dayOfWeek === 0) {
+          duration = 17; // Domingo: incluye día de vuelo
+        } else if (dayOfWeek === 1) {
+          duration = 16; // Lunes: llegada directa
+        }
+      }
+      
+      return sum + duration;
     }, 0);
 
-    if (hasTurkeyDestinations) {
+    // No agregar día extra si ya se ajustó en Turquía o Gran Tour
+    const hasTurkeyEsencialAdjusted = selectedDests.some(d => 
+      d.name === "Turquía Esencial" && (startDate.getDay() === 1 || startDate.getDay() === 2)
+    );
+    
+    if (hasTurkeyDestinations && !hasTurkeyEsencialAdjusted) {
       totalDuration += 1;
     }
 
@@ -153,12 +185,21 @@ export default function Home() {
       return false;
     }
     
-    // For Turkey Esencial, disable holidays and non-Tuesday dates
+    // For Turkey Esencial, allow Tuesday (flight day) or Wednesday (direct arrival)
     if (hasTurkeyEsencial) {
       if (isTurkeyHoliday(date)) {
         return true;
       }
-      return !isTuesday(date);
+      const dayOfWeek = date.getDay();
+      // Allow Tuesday (2) for Colombia flights and Wednesday (3) for direct arrivals
+      return !(dayOfWeek === 2 || dayOfWeek === 3);
+    }
+    
+    // For Gran Tour de Europa, allow Sunday (flight day) or Monday (direct arrival)
+    if (hasGranTourEuropa) {
+      const dayOfWeek = date.getDay();
+      // Allow Sunday (0) for Colombia flights and Monday (1) for direct arrivals
+      return !(dayOfWeek === 0 || dayOfWeek === 1);
     }
     
     // For other Turkey destinations, only disable non-Tuesday dates
@@ -237,6 +278,36 @@ export default function Home() {
   };
   
   const getTooltipContent = (dest: Destination): string => {
+    // Tooltip específico para Dubai Maravilloso
+    if (dest.name === "DUBAI Maravilloso") {
+      return "Salidas diarias desde 2 pax. Combinalo facil. Tarifa dinamica. Plan no requiere mejoras. Impuestos no incluidos. Acompañamiento de guia durante todo el recorrido";
+    }
+    
+    // Tooltip específico para Auroras Boreales Finlandia
+    if (dest.name === "Auroras boreales finlandia") {
+      return "Salidas diarias desde 2 pax. Programa se sugiere combinar con Madrid o Paris al inicio y/o final del viaje. Impuestos incluidos. Acompañamiento de guia, solo en las actividades. Permite mejoras o cambios, bajo solicitud. Temporada de auroras de diciembre a marzo";
+    }
+    
+    // Tooltip específico para Egipto con Crucero + Emiratos
+    if (dest.name === "Egipto (Con Crucero) + Emiratos Árabes") {
+      return "Fechas puntuales (revisar disponibilidad). Programa combinado con vuelos internos incluidos en EGIPTO (El Cairo- Aswan/ Luxor- El Cairo en clase turista). Guia acompañante durante recorrido en El Cairo - Dubai. Programa no requeire mejoras";
+    }
+    
+    // Tooltip específico para Gran Tour de Europa
+    if (dest.name === "Gran Tour de Europa") {
+      return "Salidas dias lunes (revisar disponibilidad). Programa circuito con acompañamiento de guia durante todo el recorrido. Inicia en MAD - termina en MAD. Programa permite incluir mejoras (actividades opcionales no incluidas)";
+    }
+    
+    // Tooltip específico para Italia Turística - Euro Express
+    if (dest.name === "Italia Turística - Euro Express") {
+      return "Salidas dias viernes (validar disponibilidad) Programa circuito con acompañamiento de guia de habla hispana, durante todo el recorrido. Programa inicia en Roma y termina en Milán. Programa APLICA para mejoras";
+    }
+    
+    // Tooltip específico para España e Italia Turística - Euro Express
+    if (dest.name === "España e Italia Turística - Euro Express") {
+      return "Salidas dias lunes (validar disponibilidad) Programa circuito con acompañamiento de guia de habla hispana durante todo el recorrido. Programa inicia en Madrid y termina en Milan.  Programa NO requiere mejoras.";
+    }
+    
     // Tooltip específico para Turquía Esencial
     if (dest.name === "Turquía Esencial") {
       return "Salidas todos los miércoles del año. Sabados entre marzo a nov 2026. Si vendes con vuelo, debes cotizar salida los martes y viernes desde Colombia. Programa terrestre con acompañamiento de guía habla hispana en destino";
@@ -363,7 +434,28 @@ export default function Home() {
           <main className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50 to-white">
             <div className="container mx-auto px-4 py-12 lg:py-16">
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          {hasTurkeyDestinations && (
+          {hasTurkeyEsencial && (
+            <Alert className="mb-4 border-blue-200 bg-blue-50">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Turquía Esencial:</strong> Puedes seleccionar <strong>martes</strong> (vuelo desde Colombia, 11 días) o <strong>miércoles</strong> (llegada directa, 10 días).
+                {otherDestinations.length > 0 && (
+                  <span className="block mt-1">Los destinos de Turquía se han movido al inicio del itinerario automáticamente.</span>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {hasGranTourEuropa && (
+            <Alert className="mb-4 border-purple-200 bg-purple-50">
+              <Info className="h-4 w-4 text-purple-600" />
+              <AlertDescription className="text-purple-800">
+                <strong>Gran Tour de Europa:</strong> Puedes seleccionar <strong>domingo</strong> (vuelo desde Colombia, 17 días) o <strong>lunes</strong> (llegada directa, 16 días).
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {hasTurkeyDestinations && !hasTurkeyEsencial && (
             <Alert className="mb-4 border-orange-200 bg-orange-50">
               <Info className="h-4 w-4 text-orange-600" />
               <AlertDescription className="text-orange-800">
@@ -381,7 +473,9 @@ export default function Home() {
               <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 Fecha de Inicio del Viaje
-                {hasTurkeyDestinations && <Badge variant="secondary" className="ml-2">Solo Martes</Badge>}
+                {hasTurkeyEsencial && <Badge variant="secondary" className="ml-2">Martes o Miércoles</Badge>}
+                {hasGranTourEuropa && <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800">Domingo o Lunes</Badge>}
+                {hasTurkeyDestinations && !hasTurkeyEsencial && <Badge variant="secondary" className="ml-2">Solo Martes</Badge>}
                 {hasAllowedDaysRestriction && allowedDaysDestination && (
                   <Badge variant="secondary" className="ml-2">
                     Solo {allowedDaysDestination.allowedDays?.map(day => {
@@ -416,12 +510,51 @@ export default function Home() {
                         };
                         return dayMap[d] || d;
                       }).join(' y ')}`
+                    : hasTurkeyEsencial
+                    ? "Selecciona martes o miércoles"
                     : hasTurkeyDestinations
                     ? "Selecciona un martes"
                     : "Selecciona una fecha"
                 }
                 disabled={disableDates}
+                priceTiers={
+                  selectedDestinations.length > 0 
+                    ? selectedDests.flatMap(dest => 
+                        (dest.priceTiers || []).map(tier => ({
+                          ...tier,
+                          destinationName: dest.name
+                        }))
+                      )
+                    : undefined
+                }
               />
+              {selectedDestinations.length > 0 && selectedDests.some(d => d.priceTiers && d.priceTiers.length > 0) && (
+                <div className="mt-2 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-emerald-800 space-y-1">
+                      <p className="font-semibold">Información del Calendario:</p>
+                      <ul className="list-disc list-inside space-y-0.5 ml-1">
+                        <li>Las fechas con <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[0.65rem] font-medium">precio</span> están disponibles</li>
+                        {hasTurkeyEsencial && (
+                          <li>
+                            <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[0.6rem] font-medium">🛫 COL</span> = Vuelo desde Colombia (lunes, 11 días total)
+                          </li>
+                        )}
+                        {hasTurkeyEsencial && (
+                          <li>
+                            Martes = Llegada directa desde otro país (10 días)
+                          </li>
+                        )}
+                        {selectedDestinations.length > 1 && (
+                          <li>El número <span className="bg-blue-600 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[0.5rem] font-bold">2+</span> indica múltiples destinos en esa fecha</li>
+                        )}
+                        <li>Pasa el mouse sobre una fecha para ver detalles de precio por destino</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -582,7 +715,7 @@ export default function Home() {
                               <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
                             </div>
                             
-                            {dest.priceTiers && dest.priceTiers.length > 0 && (
+                            {dest.priceTiers && dest.priceTiers.length > 0 && dest.name !== "Turquía Esencial" && (
                               <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs">
                                 PRECIO DINÁMICO
                               </Badge>
@@ -622,9 +755,17 @@ export default function Home() {
               size="lg"
               className="bg-blue-600 hover:bg-blue-700 text-white shadow-xl"
               onClick={() => {
+                // Formatear fecha en zona horaria local para evitar problemas de UTC
+                const formatLocalDate = (date: Date) => {
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  return `${year}-${month}-${day}`;
+                };
+                
                 const selectedData = {
                   destinations: selectedDestinations,
-                  startDate: startDate?.toISOString().split("T")[0] || "",
+                  startDate: startDate ? formatLocalDate(startDate) : "",
                 };
                 sessionStorage.setItem("quoteData", JSON.stringify(selectedData));
                 setLocation("/cotizacion");
