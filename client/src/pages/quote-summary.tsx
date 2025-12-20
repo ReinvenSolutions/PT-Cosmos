@@ -342,6 +342,32 @@ export default function QuoteSummary() {
   const trmValue = trm ? parseFloat(trm) : 0;
   const effectiveTrm = trmValue > 0 ? trmValue + 30 : 0;
 
+  const formatAllowedDays = (days: string[]): string => {
+    const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const dayMapSpanish: Record<string, string> = {
+      'monday': 'Lunes',
+      'tuesday': 'Martes',
+      'wednesday': 'Miércoles',
+      'thursday': 'Jueves',
+      'friday': 'Viernes',
+      'saturday': 'Sábado',
+      'sunday': 'Domingo'
+    };
+    
+    // Sort days by their order in the week
+    const sortedDays = days.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
+    
+    // Check for consecutive days to create ranges
+    if (sortedDays.length >= 5) {
+      const firstDay = dayMapSpanish[sortedDays[0]];
+      const lastDay = dayMapSpanish[sortedDays[sortedDays.length - 1]];
+      return `${firstDay} a ${lastDay}`;
+    }
+    
+    // For few days, list them
+    return sortedDays.map(d => dayMapSpanish[d]).join(' y ');
+  };
+
   // Auto-switch to COP when TRM is entered
   useEffect(() => {
     if (trmValue > 0) {
@@ -990,18 +1016,7 @@ export default function QuoteSummary() {
                   {hasTurkeyDestinations && !hasTurkeyEsencial && <Badge variant="secondary">Solo Martes</Badge>}
                   {hasAllowedDaysRestriction && allowedDaysDestination && (
                     <Badge variant="secondary">
-                      Solo {allowedDaysDestination.allowedDays?.map(day => {
-                        const dayMap: Record<string, string> = {
-                          'monday': 'Lunes',
-                          'tuesday': 'Martes',
-                          'wednesday': 'Miércoles',
-                          'thursday': 'Jueves',
-                          'friday': 'Viernes',
-                          'saturday': 'Sábado',
-                          'sunday': 'Domingo'
-                        };
-                        return dayMap[day] || day;
-                      }).join(' y ')}
+                      {formatAllowedDays(allowedDaysDestination.allowedDays || [])}
                     </Badge>
                   )}
                 </label>
@@ -1010,18 +1025,7 @@ export default function QuoteSummary() {
                   onDateChange={setStartDate}
                   placeholder={
                     hasAllowedDaysRestriction && allowedDaysDestination
-                      ? `Solo ${allowedDaysDestination.allowedDays?.map(d => {
-                          const dayMap: Record<string, string> = {
-                            'monday': 'Lunes',
-                            'tuesday': 'Martes',
-                            'wednesday': 'Miércoles',
-                            'thursday': 'Jueves',
-                            'friday': 'Viernes',
-                            'saturday': 'Sábado',
-                            'sunday': 'Domingo'
-                          };
-                          return dayMap[d] || d;
-                        }).join(' y ')}`
+                      ? formatAllowedDays(allowedDaysDestination.allowedDays || [])
                       : hasTurkeyEsencial
                       ? "Selecciona martes o miércoles"
                       : hasGranTourEuropa

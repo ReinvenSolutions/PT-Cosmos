@@ -86,10 +86,38 @@ export function generateQuotePDF(quote: QuoteWithFullDetails): PDFDocument {
         doc.font("Helvetica-Bold").fontSize(10).fillColor(primaryColor);
         doc.text(`Día ${day.dayNumber}: ${day.title}`);
         doc.font("Helvetica").fontSize(9).fillColor(textColor);
-        const shortDesc = day.description.length > 150 
-          ? day.description.substring(0, 150) + "..." 
-          : day.description;
-        doc.text(shortDesc, { indent: 10 });
+        
+        // Process description to handle bullet points properly
+        const description = day.description || "";
+        
+        // Split by newlines and process each line
+        const lines = description.split('\n').filter(line => line.trim());
+        
+        if (lines.length > 1) {
+          // Multiple lines - render each as a separate bullet or paragraph
+          lines.forEach((line, idx) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine) {
+              // Check if this looks like a bullet point (starts with •, -, *, or is short enough)
+              if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+                doc.text(trimmedLine, { indent: 10, align: 'left' });
+              } else {
+                // Regular paragraph
+                doc.text(trimmedLine, { indent: 10, align: 'left' });
+              }
+              if (idx < lines.length - 1) {
+                doc.moveDown(0.2);
+              }
+            }
+          });
+        } else {
+          // Single line description - truncate if too long
+          const shortDesc = description.length > 150 
+            ? description.substring(0, 150) + "..." 
+            : description;
+          doc.text(shortDesc, { indent: 10 });
+        }
+        
         doc.moveDown(0.5);
       });
       if (destData.itinerary.length > 5) {

@@ -241,6 +241,32 @@ export default function Home() {
     return Math.max(...starCounts, 4);
   };
   
+  const formatAllowedDays = (days: string[]): string => {
+    const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const dayMapSpanish: Record<string, string> = {
+      'monday': 'Lunes',
+      'tuesday': 'Martes',
+      'wednesday': 'Miércoles',
+      'thursday': 'Jueves',
+      'friday': 'Viernes',
+      'saturday': 'Sábado',
+      'sunday': 'Domingo'
+    };
+    
+    // Sort days by their order in the week
+    const sortedDays = days.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
+    
+    // Check for consecutive days to create ranges
+    if (sortedDays.length >= 5) {
+      const firstDay = dayMapSpanish[sortedDays[0]];
+      const lastDay = dayMapSpanish[sortedDays[sortedDays.length - 1]];
+      return `${firstDay} a ${lastDay}`;
+    }
+    
+    // For few days, list them
+    return sortedDays.map(d => dayMapSpanish[d]).join(' y ');
+  };
+
   const getMealsInfo = (destId: string): { breakfasts: number; lunches: number; dinners: number; total: number } => {
     const dest = destinations.find(d => d.id === destId);
     
@@ -478,18 +504,7 @@ export default function Home() {
                 {hasTurkeyDestinations && !hasTurkeyEsencial && <Badge variant="secondary" className="ml-2">Solo Martes</Badge>}
                 {hasAllowedDaysRestriction && allowedDaysDestination && (
                   <Badge variant="secondary" className="ml-2">
-                    Solo {allowedDaysDestination.allowedDays?.map(day => {
-                      const dayMap: Record<string, string> = {
-                        'monday': 'Lunes',
-                        'tuesday': 'Martes',
-                        'wednesday': 'Miércoles',
-                        'thursday': 'Jueves',
-                        'friday': 'Viernes',
-                        'saturday': 'Sábado',
-                        'sunday': 'Domingo'
-                      };
-                      return dayMap[day] || day;
-                    }).join(' y ')}
+                    {formatAllowedDays(allowedDaysDestination.allowedDays || [])}
                   </Badge>
                 )}
               </label>
@@ -498,18 +513,7 @@ export default function Home() {
                 onDateChange={setStartDate}
                 placeholder={
                   hasAllowedDaysRestriction && allowedDaysDestination
-                    ? `Solo ${allowedDaysDestination.allowedDays?.map(d => {
-                        const dayMap: Record<string, string> = {
-                          'monday': 'Lunes',
-                          'tuesday': 'Martes',
-                          'wednesday': 'Miércoles',
-                          'thursday': 'Jueves',
-                          'friday': 'Viernes',
-                          'saturday': 'Sábado',
-                          'sunday': 'Domingo'
-                        };
-                        return dayMap[d] || d;
-                      }).join(' y ')}`
+                    ? formatAllowedDays(allowedDaysDestination.allowedDays || [])
                     : hasTurkeyEsencial
                     ? "Selecciona martes o miércoles"
                     : hasTurkeyDestinations
