@@ -178,6 +178,7 @@ interface PublicQuoteData {
   outboundFlightImages?: string[];
   returnFlightImages?: string[];
   domesticFlightImages?: string[];
+  connectionFlightImages?: string[];
   includeFlights?: boolean;
   outboundCabinBaggage?: boolean;
   outboundHoldBaggage?: boolean;
@@ -185,6 +186,8 @@ interface PublicQuoteData {
   returnHoldBaggage?: boolean;
   domesticCabinBaggage?: boolean;
   domesticHoldBaggage?: boolean;
+  connectionCabinBaggage?: boolean;
+  connectionHoldBaggage?: boolean;
   passengers?: number;
   turkeyUpgrade?: string | null;
   italiaUpgrade?: string | null;
@@ -254,6 +257,7 @@ export async function generatePublicQuotePDF(
       ...(data.outboundFlightImages || []),
       ...(data.returnFlightImages || []),
       ...(data.domesticFlightImages || []),
+      ...(data.connectionFlightImages || []),
     ]),
   ]);
   
@@ -308,10 +312,57 @@ export async function generatePublicQuotePDF(
   addPageBackground();
 
   const destinationNames = data.destinations.map((d) => d.name).join(" + ");
-  const totalDuration = data.destinations.reduce(
-    (sum, d) => sum + d.duration,
-    0,
+  
+  // Calculate total duration with Turkey + Dubai combination logic
+  const hasTurkeyEsencial = data.destinations.some(d => 
+    d.name?.toLowerCase().includes("turquía esencial") || 
+    d.name?.toLowerCase().includes("turquia esencial")
   );
+  const hasDubaiMaravilloso = data.destinations.some(d => 
+    d.name?.toLowerCase().includes("dubai maravilloso") || 
+    d.name?.toLowerCase().includes("dubai")
+  );
+  
+  let totalDuration = 0;
+  
+  // Parse start date to get day of week
+  const startDate = data.startDate ? new Date(data.startDate + 'T00:00:00') : null;
+  const dayOfWeek = startDate ? startDate.getDay() : -1;
+  
+  // Calculate duration with special logic for Turkey and Gran Tour
+  totalDuration = data.destinations.reduce((sum, d) => {
+    let duration = d.duration || 0;
+    
+    // Special adjustment for Turquía Esencial
+    if (d.name === "Turquía Esencial" && startDate) {
+      // Si es martes (día 2): vuelo desde Colombia, son 11 días
+      // Si es miércoles (día 3): llegada directa, son 10 días
+      if (dayOfWeek === 2) {
+        duration = 11; // Martes: incluye día de vuelo
+      } else if (dayOfWeek === 3) {
+        duration = 10; // Miércoles: llegada directa
+      }
+    }
+    
+    // Special adjustment for Gran Tour de Europa
+    if (d.name === "Gran Tour de Europa" && startDate) {
+      // Si es domingo (día 0): vuelo desde Colombia, son 17 días
+      // Si es lunes (día 1): llegada directa, son 16 días
+      if (dayOfWeek === 0) {
+        duration = 17; // Domingo: incluye día de vuelo
+      } else if (dayOfWeek === 1) {
+        duration = 16; // Lunes: llegada directa
+      }
+    }
+    
+    return sum + duration;
+  }, 0);
+  
+  // Adjustment for Turkey + Dubai combination: subtract 1 day for connection flight overlap
+  if (hasTurkeyEsencial && hasDubaiMaravilloso) {
+    totalDuration -= 1;
+  }
+  
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
   // Store both relative (for cache lookup) and absolute (for fallback) paths
@@ -577,9 +628,34 @@ export async function generatePublicQuotePDF(
   doc.font("Helvetica-Bold").fontSize(12);
   doc.text(`$${formatUSD(minPaymentValue)} ${minPaymentCurrency}`);
 
-  const priceBoxX = pageWidth - rightMargin - 150;
+  // Calculate dynamic width for price box
+  let priceString = "";
+  let priceFontSize = 0;
+  
+  if (showInCOP) {
+    priceString = `$ ${formatUSD(displayPrice)}`;
+    priceFontSize = 22;
+  } else {
+    priceString = `$ ${formatUSD(displayPrice)}`;
+    priceFontSize = 26;
+  }
+
+  // Measure text width to ensure it fits
+  doc.font("Helvetica-Bold").fontSize(priceFontSize);
+  const textWidth = doc.widthOfString(priceString);
+  
+  // Default dimensions
+  let priceBoxWidth = 150;
+  const minPadding = 20; // 10px on each side
+  
+  // Expand if necessary
+  if (textWidth + minPadding > priceBoxWidth) {
+    priceBoxWidth = textWidth + minPadding;
+  }
+
+  // Anchor to right margin
+  const priceBoxX = pageWidth - rightMargin - priceBoxWidth;
   const priceBoxY = budgetY;
-  const priceBoxWidth = 150;
   const priceBoxHeight = 70;
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
@@ -597,8 +673,8 @@ export async function generatePublicQuotePDF(
 
   if (showInCOP) {
     // COP version
-    doc.font("Helvetica-Bold").fontSize(22).fillColor(priceTextColor);
-    doc.text(`$ ${formatUSD(displayPrice)}`, priceBoxX + 5, priceBoxY + 28, {
+    doc.font("Helvetica-Bold").fontSize(priceFontSize).fillColor(priceTextColor);
+    doc.text(priceString, priceBoxX + 5, priceBoxY + 28, {
       width: priceBoxWidth - 10,
       align: "center",
     });
@@ -610,8 +686,8 @@ export async function generatePublicQuotePDF(
     });
   } else {
     // USD version
-    doc.font("Helvetica-Bold").fontSize(26).fillColor(priceTextColor);
-    doc.text(`$ ${formatUSD(displayPrice)}`, priceBoxX + 5, priceBoxY + 30, {
+    doc.font("Helvetica-Bold").fontSize(priceFontSize).fillColor(priceTextColor);
+    doc.text(priceString, priceBoxX + 5, priceBoxY + 30, {
       width: priceBoxWidth - 10,
       align: "center",
     });
@@ -783,6 +859,13 @@ export async function generatePublicQuotePDF(
       d.name?.toLowerCase().includes("turquia esencial"),
   );
 
+  // Check if this is specifically the "Dubai Maravilloso" plan
+  const isDubaiMaravilloso = data.destinations.some(
+    (d) =>
+      d.name?.toLowerCase().includes("dubai maravilloso") ||
+      d.name?.toLowerCase().includes("dubai"),
+  );
+
   // Check if this is specifically the "Italia Turística - Euro Express" plan
   const isItaliaTuristica = data.destinations.some(
     (d) =>
@@ -797,14 +880,34 @@ export async function generatePublicQuotePDF(
       d.country?.toLowerCase().includes("turkey"),
   );
 
-  if (isTurkeyEsencial) {
+  // Check for Turkey + Dubai combination
+  const isTurkeyDubaiCombo = isTurkeyEsencial && isDubaiMaravilloso;
+  
+  console.log("[PDF Generator - Itinerary Summary]", {
+    isTurkeyEsencial,
+    isDubaiMaravilloso,
+    isTurkeyDubaiCombo,
+    destinations: data.destinations.map(d => d.name)
+  });
+
+  if (isTurkeyDubaiCombo) {
+    // Combined itinerary: Turkey first, then Dubai
+    cityStops.push(
+      { number: 1, name: "Estambul", country: "Turquía", nights: 3 },
+      { number: 2, name: "Capadocia", country: "Turquía", nights: 3 },
+      { number: 3, name: "Pamukkale", country: "Turquía", nights: 1 },
+      { number: 4, name: "Esmirna", country: "Turquía", nights: 1 },
+      { number: 5, name: "Estambul", country: "Turquía", nights: 1 },
+      { number: 6, name: "Dubai", country: "Emiratos Árabes Unidos", nights: 4 },
+    );
+  } else if (isTurkeyEsencial) {
     // Use exact hardcoded itinerary for Turkey Esencial only
     cityStops.push(
       { number: 1, name: "Estambul", country: "Turquía", nights: 3 },
-      { number: 3, name: "Capadocia", country: "Turquía", nights: 3 },
-      { number: 4, name: "Pamukkale", country: "Turquía", nights: 1 },
-      { number: 5, name: "Esmirna", country: "Turquía", nights: 1 },
-      { number: 7, name: "Estambul", country: "Turquía", nights: 1 },
+      { number: 2, name: "Capadocia", country: "Turquía", nights: 3 },
+      { number: 3, name: "Pamukkale", country: "Turquía", nights: 1 },
+      { number: 4, name: "Esmirna", country: "Turquía", nights: 1 },
+      { number: 5, name: "Estambul", country: "Turquía", nights: 1 },
     );
   } else {
     // Original logic for non-Turkey destinations
@@ -1479,88 +1582,164 @@ export async function generatePublicQuotePDF(
           return;
         }
         
-        // Check if line contains multiple sentences (separated by ". ")
-        // Split sentences to show them as bullet points for better readability
-        const sentences = line.split(/\.\s+/).filter(s => s.trim());
+        // Check if we need a new page
+        if (doc.y > 720) {
+          doc.addPage();
+          addPageBackground();
+          addPlaneLogoBottom();
+        }
         
-        if (sentences.length > 1) {
-          // Multiple sentences - show as bullet points
-          sentences.forEach((sentence, sentIndex) => {
-            // Check if we need a new page
-            if (doc.y > 720) {
-              doc.addPage();
-              addPageBackground();
-              addPlaneLogoBottom();
+        // Check if line starts with a bullet - if so, render as bullet list item
+        const startsWithBullet = line.trim().startsWith('•');
+        
+        if (startsWithBullet) {
+          // Remove the bullet from the text and render manually
+          const textWithoutBullet = line.trim().substring(1).trim();
+          
+          const bulletX = leftMargin + 5;
+          const textX = bulletX + 8;
+          const textWidth = contentWidth - (textX - leftMargin);
+          const currentY = doc.y;
+          
+          // Draw the bullet
+          doc.font("Helvetica").fontSize(8).fillColor(textColor);
+          doc.text("•", bulletX, currentY, { lineBreak: false });
+          
+          // Draw the text next to the bullet with bold parsing
+          const parts = textWithoutBullet.split(/(\*\*.*?\*\*)/g).filter(p => p);
+          let isFirst = true;
+          
+          parts.forEach((part, partIndex) => {
+            const isBold = part.startsWith('**') && part.endsWith('**');
+            const text = isBold ? part.slice(2, -2) : part;
+            const font = isBold ? "Helvetica-Bold" : "Helvetica";
+            
+            doc.font(font).fontSize(8);
+            
+            if (isFirst) {
+              doc.text(text, textX, currentY, {
+                width: textWidth,
+                align: 'left',
+                continued: partIndex < parts.length - 1
+              });
+            } else {
+              doc.text(text, {
+                continued: partIndex < parts.length - 1
+              });
             }
-            
-            // Add bullet point
-            const bulletX = leftMargin + 5;
-            const textX = bulletX + 10;
-            
-            doc.font("Helvetica-Bold").fontSize(8).fillColor(textColor);
-            doc.text("•", bulletX, doc.y);
-            
-            // Process bold markers within the sentence
-            const parts = sentence.split(/(\*\*.*?\*\*)/g);
-            const startY = doc.y;
-            doc.y = startY; // Reset Y to align with bullet
-            
-            parts.forEach((part, partIndex) => {
-              if (!part) return;
+            isFirst = false;
+          });
+          
+          doc.moveDown(0.25);
+          return;
+        }
+        
+        // Normal line rendering
+        // Check if this is a bold-only line (like titles) or starts with bold
+        const parts = line.split(/(\*\*.*?\*\*)/g).filter(p => p);
+        const isBoldOnly = parts.length === 1 && line.includes('**');
+        
+        if (isBoldOnly || line.trim().startsWith('**')) {
+          // Bold title - render on its own line without continuation
+          const boldText = line.replace(/\*\*/g, '');
+          doc.font("Helvetica-Bold").fontSize(8);
+          doc.text(boldText, leftMargin, doc.y, {
+            width: contentWidth,
+            align: 'left'
+          });
+        } else {
+          // Check if we should split into bullets (auto-bullet logic)
+          // Split by period followed by space and a capital letter (to avoid splitting abbreviations like "aprox.")
+          // Also split if it's just a period at the end of the line
+          const sentences = line.split(/\.\s+(?=[A-ZÁÉÍÓÚÑ¿¡])/).filter(s => s.trim().length > 0);
+          
+          if (sentences.length > 1) {
+            // Multiple sentences detected - render as bullets
+            sentences.forEach((sentence) => {
+              if (doc.y > 720) {
+                doc.addPage();
+                addPageBackground();
+                addPlaneLogoBottom();
+              }
               
+              // Clean up sentence
+              let text = sentence.trim();
+              // If the sentence ends with a period and it's not the last one (split consumed it), we might need to handle it.
+              // But split consumes the separator.
+              // If the original text was "A. B.", split gives "A" and "B.".
+              // So "A" lost its period. "B." kept it (if it was at the end).
+              // Let's add period back if it's missing and looks like a sentence?
+              // Or just leave it without period for bullet style.
+              if (text.endsWith('.')) text = text.slice(0, -1);
+              
+              const bulletX = leftMargin + 5;
+              const textX = bulletX + 8;
+              const textWidth = contentWidth - (textX - leftMargin);
+              const currentY = doc.y;
+              
+              // Draw the bullet
+              doc.font("Helvetica").fontSize(8).fillColor(textColor);
+              doc.text("•", bulletX, currentY, { lineBreak: false });
+              
+              // Draw the text next to the bullet with bold parsing
+              const parts = text.split(/(\*\*.*?\*\*)/g).filter(p => p);
+              let isFirst = true;
+              
+              parts.forEach((part, partIndex) => {
+                const isBold = part.startsWith('**') && part.endsWith('**');
+                const partText = isBold ? part.slice(2, -2) : part;
+                const font = isBold ? "Helvetica-Bold" : "Helvetica";
+                
+                doc.font(font).fontSize(8);
+                
+                if (isFirst) {
+                  doc.text(partText, textX, currentY, {
+                    width: textWidth,
+                    align: 'left',
+                    continued: partIndex < parts.length - 1
+                  });
+                } else {
+                  doc.text(partText, {
+                    continued: partIndex < parts.length - 1
+                  });
+                }
+                isFirst = false;
+              });
+              
+              doc.moveDown(0.25);
+            });
+          } else {
+            // Single sentence or fragment - render as normal paragraph (or single bullet?)
+            // User said "rest of the itinerary to be seen in bullets".
+            // If it's a long paragraph that didn't split (e.g. no periods), maybe it should be a bullet too?
+            // But titles like "Día libre." might look weird as bullets if they are short.
+            // Let's try rendering as bullet if it's long enough (> 20 chars) or if it's the only content?
+            // For now, let's keep single sentences as paragraphs to avoid over-bulleting titles/notes.
+            // BUT, if the user wants "list look", maybe I should force bullet?
+            // Let's stick to paragraph for single lines unless they are explicitly bullets.
+            
+            // Mixed content - render with proper inline formatting
+            let isFirst = true;
+            parts.forEach((part, partIndex) => {
               if (part.startsWith('**') && part.endsWith('**')) {
                 const boldText = part.slice(2, -2);
                 doc.font("Helvetica-Bold").fontSize(8);
-                doc.text(boldText, textX, doc.y, {
-                  continued: partIndex < parts.length - 1,
-                  width: contentWidth - 20
+                doc.text(boldText, isFirst ? leftMargin : undefined, isFirst ? doc.y : undefined, {
+                  continued: partIndex < parts.length - 1
                 });
               } else {
                 doc.font("Helvetica").fontSize(8);
-                doc.text(part, partIndex === 0 ? textX : undefined, partIndex === 0 ? doc.y : undefined, {
-                  continued: partIndex < parts.length - 1,
-                  width: contentWidth - 20
+                doc.text(part, isFirst ? leftMargin : undefined, isFirst ? doc.y : undefined, {
+                  continued: partIndex < parts.length - 1
                 });
               }
+              isFirst = false;
             });
-            
-            doc.moveDown(0.4);
-          });
-        } else {
-          // Single sentence or no period - display normally
-          // Check if we need a new page
-          if (doc.y > 720) {
-            doc.addPage();
-            addPageBackground();
-            addPlaneLogoBottom();
           }
-          
-          // Process bold markers within the line
-          const parts = line.split(/(\*\*.*?\*\*)/g);
-          
-          parts.forEach((part, partIndex) => {
-            if (!part) return;
-            
-            if (part.startsWith('**') && part.endsWith('**')) {
-              // Bold text - remove the ** markers
-              const boldText = part.slice(2, -2);
-              doc.font("Helvetica-Bold");
-              doc.text(boldText, {
-                continued: partIndex < parts.length - 1,
-              });
-            } else {
-              // Normal text
-              doc.font("Helvetica");
-              doc.text(part, {
-                continued: partIndex < parts.length - 1,
-              });
-            }
-          });
-          
-          // Move to next line after processing all parts of current line
-          if (lineIndex < lines.length - 1) {
-            doc.moveDown(0.3);
-          }
+        }
+        
+        if (lineIndex < lines.length - 1) {
+          doc.moveDown(0.3);
         }
       });
       
@@ -1568,6 +1747,185 @@ export async function generatePublicQuotePDF(
     });
 
     doc.moveDown(0.5);
+
+    // Check for Connection Flight after Turkey itinerary
+    const isTurkeyDest = dest.name.toLowerCase().includes("turquía");
+    const hasDubaiDestination = data.destinations.some(d => d.name.toLowerCase().includes("dubai"));
+    
+    console.log("[PDF Generator - Connection Flight Debug]", {
+      currentDest: dest.name,
+      isTurkeyDest,
+      hasDubaiDestination,
+      hasConnectionImages: !!data.connectionFlightImages,
+      connectionImagesLength: data.connectionFlightImages?.length || 0,
+      connectionImages: data.connectionFlightImages
+    });
+    
+    if (isTurkeyDest && hasDubaiDestination && data.connectionFlightImages && data.connectionFlightImages.length > 0) {
+      console.log("[PDF Generator] Rendering connection flight page with images:", data.connectionFlightImages);
+      doc.addPage();
+      addPageBackground();
+      addPlaneLogoBottom();
+
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(18)
+        .fillColor(textColor)
+        .text("VUELO DE CONEXIÓN TURQUÍA - DUBAI", leftMargin, 80, {
+          align: "center",
+          width: contentWidth,
+        });
+
+      // Generar texto de equipajes dinámicamente
+      const baggageItems = ["PERSONAL 8KG"];
+      if (data.connectionCabinBaggage) {
+        baggageItems.push("CABINA 10KG");
+      }
+      if (data.connectionHoldBaggage) {
+        baggageItems.push("BODEGA 23KG");
+      }
+      const baggageText = baggageItems.join(" + ");
+
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(12)
+        .fillColor(textColor)
+        .text(baggageText, leftMargin, 110, {
+          align: "center",
+          width: contentWidth,
+        });
+
+      const termsHeight = calculateFlightTermsHeight();
+      let flightImageY = 140; // Start closer to baggage text
+
+      for (let index = 0; index < data.connectionFlightImages.length; index++) {
+        const imageUrl = data.connectionFlightImages[index];
+        console.log(`[PDF Generator] Processing connection image ${index}:`, imageUrl);
+        // Extract filename from URL (format: /api/images/filename.ext)
+        const filename = imageUrl.split("/").pop();
+        if (filename) {
+          // Use cached image data for faster processing
+          const cachedImage = imageCache.get(filename);
+          
+          if (cachedImage) {
+            try {
+              const imageWidth = contentWidth;
+
+              // Calculate natural height based on aspect ratio from cached dimensions
+              let naturalHeight =
+                cachedImage.height && cachedImage.width
+                  ? (cachedImage.height / cachedImage.width) * imageWidth
+                  : contentWidth * 0.6; // Fallback estimate
+
+              // For the last image, maximize to fit available space with terms
+              const isLastImage = index === data.connectionFlightImages.length - 1;
+              let imageHeight = naturalHeight;
+
+              if (isLastImage) {
+                // Recalculate available space based on CURRENT position (after previous images)
+                let maxAvailableHeight = Math.max(
+                  0,
+                  pageHeight - 50 - flightImageY - termsHeight - 40,
+                );
+
+                // If available space is too small (less than 200px), move to new page WITH section header
+                const minimumImageHeight = 200;
+                if (maxAvailableHeight < minimumImageHeight) {
+                  console.log(
+                    `[PDF Generator] Insufficient space for connection image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
+                  );
+                  doc.addPage();
+                  addPageBackground();
+                  addPlaneLogoBottom();
+
+                  // Re-render section title and baggage text on new page
+                  doc
+                    .font("Helvetica-Bold")
+                    .fontSize(18)
+                    .fillColor(textColor)
+                    .text("VUELO DE CONEXIÓN TURQUÍA - DUBAI", leftMargin, 80, {
+                      align: "center",
+                      width: contentWidth,
+                    });
+                  doc
+                    .font("Helvetica-Bold")
+                    .fontSize(12)
+                    .fillColor(textColor)
+                    .text(baggageText, leftMargin, 110, {
+                      align: "center",
+                      width: contentWidth,
+                    });
+
+                  flightImageY = 140; // Start after header
+                  maxAvailableHeight = Math.max(
+                    0,
+                    pageHeight - 50 - flightImageY - termsHeight - 40,
+                  );
+                }
+
+                // Maximize to fit available space, but respect natural height if smaller
+                imageHeight = Math.min(naturalHeight, maxAvailableHeight);
+              }
+
+              doc.image(cachedImage.buffer, leftMargin, flightImageY, {
+                width: imageWidth,
+                height: imageHeight,
+                align: "center",
+              });
+
+              flightImageY += imageHeight + 10; // Add spacing between images
+            } catch (error) {
+              console.error(
+                `[PDF Generator] Error rendering connection image ${index}:`,
+                error,
+              );
+            }
+          } else {
+            console.error(
+              `[PDF Generator] Image not found in cache: ${filename}`,
+            );
+          }
+        }
+      }
+
+      // Add flight terms and conditions after images
+      if (flightImageY > 80) {
+        flightImageY += 20; // Add some spacing
+
+        doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+        doc.text("Términos y condiciones", leftMargin, flightImageY, {
+          width: contentWidth,
+        });
+        doc.moveDown(0.5);
+
+        doc.font("Helvetica").fontSize(9).fillColor(textColor);
+
+        const termsText = [
+          "Los boletos de avión no son reembolsables.",
+          "",
+          "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
+          "",
+          "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
+          "",
+          "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
+        ];
+
+        termsText.forEach((line) => {
+          if (line === "") {
+            doc.moveDown(0.3);
+          } else {
+            doc.text(line, { width: contentWidth, align: "left" });
+            doc.moveDown(0.3);
+          }
+        });
+      }
+      
+      // Add new page after connection flight so Dubai starts on its own page
+      console.log("[PDF Generator] Adding new page after connection flight");
+      doc.addPage();
+      addPageBackground();
+      addPlaneLogoBottom();
+    }
   });
 
   // For Turkey Esencial, show upgrade options or selected upgrade in blue box
@@ -1972,11 +2330,39 @@ export async function generatePublicQuotePDF(
   }
 
   const allHotels: Hotel[] = [];
-  data.destinations.forEach((dest) => {
-    if (dest.hotels && dest.hotels.length > 0) {
-      allHotels.push(...dest.hotels);
+  
+  // Check for Turkey + Dubai combination for hotels
+  const hasTurkeyDubaiComboHotels = data.destinations.some(d => 
+    d.name?.toLowerCase().includes("turquía") || d.name?.toLowerCase().includes("turquia")
+  ) && data.destinations.some(d => 
+    d.name?.toLowerCase().includes("dubai")
+  );
+  
+  // For Turkey + Dubai combo, maintain order: Turkey first, then Dubai
+  if (hasTurkeyDubaiComboHotels) {
+    // First add Turkey hotels
+    const turkeyDest = data.destinations.find(d => 
+      d.name?.toLowerCase().includes("turquía") || d.name?.toLowerCase().includes("turquia")
+    );
+    if (turkeyDest && turkeyDest.hotels && turkeyDest.hotels.length > 0) {
+      allHotels.push(...turkeyDest.hotels);
     }
-  });
+    
+    // Then add Dubai hotels
+    const dubaiDest = data.destinations.find(d => 
+      d.name?.toLowerCase().includes("dubai")
+    );
+    if (dubaiDest && dubaiDest.hotels && dubaiDest.hotels.length > 0) {
+      allHotels.push(...dubaiDest.hotels);
+    }
+  } else {
+    // Original logic for other destinations
+    data.destinations.forEach((dest) => {
+      if (dest.hotels && dest.hotels.length > 0) {
+        allHotels.push(...dest.hotels);
+      }
+    });
+  }
 
   if (allHotels.length > 0) {
     if (doc.y > 680) {
@@ -2055,21 +2441,62 @@ export async function generatePublicQuotePDF(
 
   const allInclusions: Inclusion[] = [];
   const allExclusions: Exclusion[] = [];
-  data.destinations.forEach((dest) => {
-    if (dest.inclusions && dest.inclusions.length > 0) {
-      allInclusions.push(...dest.inclusions);
+  
+  // Check for Turkey + Dubai combination
+  const hasTurkeyDubaiCombo = data.destinations.some(d => 
+    d.name?.toLowerCase().includes("turquía") || d.name?.toLowerCase().includes("turquia")
+  ) && data.destinations.some(d => 
+    d.name?.toLowerCase().includes("dubai")
+  );
+  
+  // For Turkey + Dubai combo, maintain order: Turkey first, then Dubai
+  if (hasTurkeyDubaiCombo) {
+    // First add Turkey inclusions/exclusions
+    const turkeyDest = data.destinations.find(d => 
+      d.name?.toLowerCase().includes("turquía") || d.name?.toLowerCase().includes("turquia")
+    );
+    if (turkeyDest) {
+      if (turkeyDest.inclusions && turkeyDest.inclusions.length > 0) {
+        allInclusions.push(...turkeyDest.inclusions);
+      }
+      if (turkeyDest.exclusions && turkeyDest.exclusions.length > 0) {
+        allExclusions.push(...turkeyDest.exclusions);
+      }
     }
-    if (dest.exclusions && dest.exclusions.length > 0) {
-      allExclusions.push(...dest.exclusions);
+    
+    // Then add Dubai inclusions/exclusions
+    const dubaiDest = data.destinations.find(d => 
+      d.name?.toLowerCase().includes("dubai")
+    );
+    if (dubaiDest) {
+      if (dubaiDest.inclusions && dubaiDest.inclusions.length > 0) {
+        allInclusions.push(...dubaiDest.inclusions);
+      }
+      if (dubaiDest.exclusions && dubaiDest.exclusions.length > 0) {
+        allExclusions.push(...dubaiDest.exclusions);
+      }
     }
-  });
+  } else {
+    // Original logic for other destinations
+    data.destinations.forEach((dest) => {
+      if (dest.inclusions && dest.inclusions.length > 0) {
+        allInclusions.push(...dest.inclusions);
+      }
+      if (dest.exclusions && dest.exclusions.length > 0) {
+        allExclusions.push(...dest.exclusions);
+      }
+    });
+  }
 
-  const uniqueInclusions = Array.from(
-    new Set(allInclusions.map((i) => i.item)),
-  );
-  const uniqueExclusions = Array.from(
-    new Set(allExclusions.map((e) => e.item)),
-  );
+  // For Turkey + Dubai combo, keep items in order (don't deduplicate)
+  // For other destinations, deduplicate as before
+  const uniqueInclusions = hasTurkeyDubaiCombo 
+    ? allInclusions.map((i) => i.item)
+    : Array.from(new Set(allInclusions.map((i) => i.item)));
+    
+  const uniqueExclusions = hasTurkeyDubaiCombo
+    ? allExclusions.map((e) => e.item)
+    : Array.from(new Set(allExclusions.map((e) => e.item)));
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
   doc.text("I N C L U I D O", leftMargin, doc.y);

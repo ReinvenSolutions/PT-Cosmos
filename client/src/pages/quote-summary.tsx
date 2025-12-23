@@ -57,9 +57,11 @@ export default function QuoteSummary() {
   const [outboundImages, setOutboundImages] = useState<string[]>([]);
   const [returnImages, setReturnImages] = useState<string[]>([]);
   const [domesticFlightImages, setDomesticFlightImages] = useState<string[]>([]);
+  const [connectionFlightImages, setConnectionFlightImages] = useState<string[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
   const [uploadingDomesticFlight, setUploadingDomesticFlight] = useState(false);
+  const [uploadingConnectionFlight, setUploadingConnectionFlight] = useState(false);
   const [flightsCost, setFlightsCost] = useState("");
   const [assistanceCost, setAssistanceCost] = useState("");
   const [inputCurrencyFlights, setInputCurrencyFlights] = useState<"USD" | "COP">("USD");
@@ -75,6 +77,8 @@ export default function QuoteSummary() {
   const [returnHoldBaggage, setReturnHoldBaggage] = useState(false);
   const [domesticCabinBaggage, setDomesticCabinBaggage] = useState(false);
   const [domesticHoldBaggage, setDomesticHoldBaggage] = useState(false);
+  const [connectionCabinBaggage, setConnectionCabinBaggage] = useState(false);
+  const [connectionHoldBaggage, setConnectionHoldBaggage] = useState(false);
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
   const [italiaUpgrade, setItaliaUpgrade] = useState<string>("");
   const [granTourUpgrade, setGranTourUpgrade] = useState<string>("");
@@ -176,6 +180,8 @@ export default function QuoteSummary() {
   const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
+  const hasDubaiMaravilloso = selectedDests.some((d) => d.name === "DUBAI Maravilloso");
+  const showConnectionFlight = hasTurkeyEsencial && hasDubaiMaravilloso;
   
   const hasItaliaTuristica = selectedDests.some((d) => d.name === "Italia Turística - Euro Express");
   const italiaDestination = selectedDests.find((d) => d.name === "Italia Turística - Euro Express");
@@ -283,6 +289,11 @@ export default function QuoteSummary() {
       return sum + duration;
     }, 0);
 
+    // Ajuste para combinado Turquía + Dubai: Restar 1 día por el vuelo de conexión/solapamiento
+    if (hasTurkeyEsencial && hasDubaiMaravilloso) {
+      totalDuration -= 1;
+    }
+
     // No agregar día extra si ya se ajustó en Turquía o Gran Tour
     const hasTurkeyEsencialAdjusted = selectedDests.some(d => 
       d.name === "Turquía Esencial" && (startDate.getDay() === 2 || startDate.getDay() === 3)
@@ -312,6 +323,45 @@ export default function QuoteSummary() {
   };
 
   const endDate = calculateEndDate();
+
+  // Calculate display duration (same logic as calculateEndDate but returning number)
+  const calculateDisplayDuration = (): number => {
+    if (!startDate || selectedDests.length === 0) return 0;
+    
+    let totalDuration = selectedDests.reduce((sum, dest) => {
+      let duration = dest.duration || 0;
+      
+      if (dest.name === "Turquía Esencial") {
+        const dayOfWeek = startDate.getDay();
+        if (dayOfWeek === 2) duration = 11;
+        else if (dayOfWeek === 3) duration = 10;
+      }
+      
+      if (dest.name === "Gran Tour de Europa") {
+        const dayOfWeek = startDate.getDay();
+        if (dayOfWeek === 0) duration = 17;
+        else if (dayOfWeek === 1) duration = 16;
+      }
+      
+      return sum + duration;
+    }, 0);
+
+    if (hasTurkeyEsencial && hasDubaiMaravilloso) {
+      totalDuration -= 1;
+    }
+
+    const hasTurkeyEsencialAdjusted = selectedDests.some(d => 
+      d.name === "Turquía Esencial" && (startDate.getDay() === 2 || startDate.getDay() === 3)
+    );
+    
+    if (hasTurkeyDestinations && !hasTurkeyEsencialAdjusted) {
+      totalDuration += 1;
+    }
+
+    return totalDuration;
+  };
+
+  const displayDuration = calculateDisplayDuration();
   
   const getPriceForDate = (dest: Destination, date: Date | undefined): number => {
     if (!date || !dest.priceTiers || dest.priceTiers.length === 0) {
@@ -590,6 +640,48 @@ export default function QuoteSummary() {
     }
   };
 
+  const handleConnectionFlightUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingConnectionFlight(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error("Upload failed");
+        }
+        
+        const { url } = await response.json();
+        uploadedUrls.push(url);
+      }
+      
+      setConnectionFlightImages([...connectionFlightImages, ...uploadedUrls]);
+      
+      toast({
+        title: "Imágenes subidas",
+        description: `${files.length} imagen(es) del vuelo de conexión guardadas`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron subir algunas imágenes.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingConnectionFlight(false);
+      e.target.value = "";
+    }
+  };
+
   const handleSendWhatsApp = () => {
     const whatsappNumber = "573146576500";
     const destinationsText = selectedDests
@@ -648,10 +740,11 @@ export default function QuoteSummary() {
     }
 
     const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
-                          domesticFlightImages.length > 0 ||
+                          domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
                           outboundCabinBaggage || outboundHoldBaggage || 
                           returnCabinBaggage || returnHoldBaggage ||
-                          domesticCabinBaggage || domesticHoldBaggage;
+                          domesticCabinBaggage || domesticHoldBaggage ||
+                          connectionCabinBaggage || connectionHoldBaggage;
 
     // Calculate Min Payment Payload
     let payloadMinPayment = null;
@@ -694,6 +787,7 @@ export default function QuoteSummary() {
       outboundFlightImages: outboundImages,
       returnFlightImages: returnImages,
       domesticFlightImages: domesticFlightImages,
+      connectionFlightImages: connectionFlightImages,
       includeFlights: hasFlightData,
       outboundCabinBaggage,
       outboundHoldBaggage,
@@ -701,6 +795,8 @@ export default function QuoteSummary() {
       returnHoldBaggage,
       domesticCabinBaggage,
       domesticHoldBaggage,
+      connectionCabinBaggage,
+      connectionHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
       italiaUpgrade: italiaUpgrade || null,
       granTourUpgrade: granTourUpgrade || null,
@@ -737,10 +833,11 @@ export default function QuoteSummary() {
     
     try {
       const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
-                            domesticFlightImages.length > 0 ||
+                            domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
                             outboundCabinBaggage || outboundHoldBaggage || 
                             returnCabinBaggage || returnHoldBaggage ||
-                            domesticCabinBaggage || domesticHoldBaggage;
+                            domesticCabinBaggage || domesticHoldBaggage ||
+                            connectionCabinBaggage || connectionHoldBaggage;
 
       console.log("Starting PDF generation request...");
 
@@ -819,6 +916,7 @@ export default function QuoteSummary() {
           outboundFlightImages: outboundImages,
           returnFlightImages: returnImages,
           domesticFlightImages: domesticFlightImages,
+          connectionFlightImages: connectionFlightImages,
           includeFlights: hasFlightData,
           outboundCabinBaggage,
           outboundHoldBaggage,
@@ -826,6 +924,8 @@ export default function QuoteSummary() {
           returnHoldBaggage,
           domesticCabinBaggage,
           domesticHoldBaggage,
+          connectionCabinBaggage,
+          connectionHoldBaggage,
           passengers,
           turkeyUpgrade: turkeyUpgrade || null,
           italiaUpgrade: italiaUpgrade || null,
@@ -1081,7 +1181,7 @@ export default function QuoteSummary() {
                 </p>
                 {endDate && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Duración total: {selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0)}{hasTurkeyDestinations && " +1 día"} de viaje
+                    Duración total: {displayDuration} días de viaje
                     {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
                   </p>
                 )}
@@ -1456,6 +1556,108 @@ export default function QuoteSummary() {
                       data-testid="checkbox-domestic-hold"
                     />
                     <Label htmlFor="domestic-hold" className="cursor-pointer">
+                      Equipaje de bodega 23kg
+                    </Label>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Connection Flight Card - Only for "Turquía Esencial + Dubai Maravilloso" */}
+        {showConnectionFlight && (
+          <Card className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plane className="w-5 h-5" />
+                Vuelo de Conexión Turquía-Dubai
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-3">
+                Sube las imágenes del vuelo de conexión (máximo 10 imágenes)
+              </p>
+
+              {connectionFlightImages.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+                  {connectionFlightImages.map((url, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={url}
+                        alt={`Vuelo conexión ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                      />
+                      <button
+                        onClick={() => setConnectionFlightImages(connectionFlightImages.filter((_, i) => i !== index))}
+                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        type="button"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <input
+                  type="file"
+                  id="connection-flight-images"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleConnectionFlightUpload}
+                  data-testid="input-connection-images"
+                />
+                <label htmlFor="connection-flight-images">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={uploadingConnectionFlight}
+                    asChild
+                  >
+                    <span>
+                      {uploadingConnectionFlight ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Subiendo...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Subir Imágenes de Vuelo de Conexión
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </label>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-orange-200">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="connection-cabin"
+                      checked={connectionCabinBaggage}
+                      onCheckedChange={(checked) => setConnectionCabinBaggage(checked as boolean)}
+                      data-testid="checkbox-connection-cabin"
+                    />
+                    <Label htmlFor="connection-cabin" className="cursor-pointer">
+                      Equipaje de cabina 10kg
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="connection-hold"
+                      checked={connectionHoldBaggage}
+                      onCheckedChange={(checked) => setConnectionHoldBaggage(checked as boolean)}
+                      data-testid="checkbox-connection-hold"
+                    />
+                    <Label htmlFor="connection-hold" className="cursor-pointer">
                       Equipaje de bodega 23kg
                     </Label>
                   </div>

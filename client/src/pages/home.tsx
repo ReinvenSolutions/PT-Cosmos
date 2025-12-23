@@ -90,8 +90,8 @@ export default function Home() {
     }
   }, [selectedDestinations, hasTurkeyDestinations, turkeyDestinations, otherDestinations]);
 
-  const calculateEndDate = (): string => {
-    if (!startDate || selectedDestinations.length === 0) return "";
+  const calculateTotalDuration = (): number => {
+    if (!startDate || selectedDestinations.length === 0) return 0;
     
     let totalDuration = selectedDestinations.reduce((sum, destId) => {
       const dest = destinations.find((d) => d.id === destId);
@@ -124,16 +124,30 @@ export default function Home() {
       return sum + duration;
     }, 0);
 
+    // Ajuste por conexión Turquía - Dubai (ahorro de 1 día solo si es martes/vuelo desde COL)
+    const hasTurkey = selectedDests.some(d => d.name.toLowerCase().includes('turquía'));
+    const hasDubai = selectedDests.some(d => d.name.toLowerCase().includes('dubai'));
+    
+    if (hasTurkey && hasDubai && startDate.getDay() === 2) {
+      totalDuration -= 1;
+    }
+
     // No agregar día extra si ya se ajustó en Turquía o Gran Tour
     const hasTurkeyEsencialAdjusted = selectedDests.some(d => 
-      d.name === "Turquía Esencial" && (startDate.getDay() === 1 || startDate.getDay() === 2)
+      d.name === "Turquía Esencial" && (startDate.getDay() === 2 || startDate.getDay() === 3)
     );
     
     if (hasTurkeyDestinations && !hasTurkeyEsencialAdjusted) {
       totalDuration += 1;
     }
 
-    if (totalDuration === 0) return "";
+    return totalDuration;
+  };
+
+  const calculateEndDate = (): string => {
+    const totalDuration = calculateTotalDuration();
+
+    if (totalDuration === 0 || !startDate) return "";
 
     const end = new Date(startDate);
     end.setDate(end.getDate() + totalDuration - 1);
@@ -581,10 +595,7 @@ export default function Home() {
               </div>
               {endDate && selectedDestinations.length > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Basado en {selectedDestinations.reduce((sum, destId) => {
-                    const dest = destinations.find((d) => d.id === destId);
-                    return sum + (dest?.duration || 0);
-                  }, 0)}{hasTurkeyDestinations && " +1 día"} de viaje
+                  Basado en {calculateTotalDuration()} días de viaje
                   {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
                 </p>
               )}

@@ -169,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originCity, outboundFlightImages, returnFlightImages, includeFlights, 
         outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
         domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
+        connectionFlightImages, connectionCabinBaggage, connectionHoldBaggage,
         turkeyUpgrade, italiaUpgrade, granTourUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
         customFilename, minPayment, minPaymentCOP
       } = req.body;
@@ -235,6 +236,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         domesticFlightImages: domesticFlightImages || undefined,
         domesticCabinBaggage: domesticCabinBaggage ?? false,
         domesticHoldBaggage: domesticHoldBaggage ?? false,
+        connectionFlightImages: connectionFlightImages || undefined,
+        connectionCabinBaggage: connectionCabinBaggage ?? false,
+        connectionHoldBaggage: connectionHoldBaggage ?? false,
         turkeyUpgrade: turkeyUpgrade || null,
         italiaUpgrade: italiaUpgrade || null,
         granTourUpgrade: granTourUpgrade || null,
