@@ -171,49 +171,85 @@ export default function Home() {
     return allowedDays.includes(dayNames[dayOfWeek]);
   };
 
+  const getDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const disableDates = (date: Date) => {
     // Disable past dates
     if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
       return true;
     }
     
-    // For destinations with specific allowed days (e.g., Egypt: Monday and Friday only)
-    if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays) {
-      // First check if it's an allowed day of the week
-      if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
-        return true;
-      }
-      
-      // If priceTiers exist, only allow dates that are exactly in the list
-      if (allowedDaysDestination.priceTiers && allowedDaysDestination.priceTiers.length > 0) {
-        const dateStr = date.toISOString().split('T')[0];
-        
-        // Check if this exact date exists in priceTiers
-        const hasExactDate = allowedDaysDestination.priceTiers.some(tier => tier.endDate === dateStr);
-        
-        if (!hasExactDate) {
-          return true; // Disable if not in the specific list
-        }
-      }
-      
-      return false;
-    }
-    
-    // For Turkey Esencial, allow Tuesday (flight day) or Wednesday (direct arrival)
+    // For Turkey Esencial, check if date has exact priceTier match (Monday or Tuesday only)
     if (hasTurkeyEsencial) {
       if (isTurkeyHoliday(date)) {
         return true;
       }
+      
+      const destinationWithTiers = selectedDests.find(d => d.name === "Turquía Esencial");
+      if (destinationWithTiers?.priceTiers) {
+        const dateStr = getDateString(date);
+        // Only allow dates that have an exact match in priceTiers (Monday with COL or Tuesday with price)
+        const hasExactDate = destinationWithTiers.priceTiers.some(tier => tier.endDate === dateStr);
+        return !hasExactDate;
+      }
+      
+      // Fallback: allow Monday (1) for flight and Tuesday (2) for arrival
       const dayOfWeek = date.getDay();
-      // Allow Tuesday (2) for Colombia flights and Wednesday (3) for direct arrivals
-      return !(dayOfWeek === 2 || dayOfWeek === 3);
+      return !(dayOfWeek === 1 || dayOfWeek === 2);
     }
     
-    // For Gran Tour de Europa, allow Sunday (flight day) or Monday (direct arrival)
-    if (hasGranTourEuropa) {
-      const dayOfWeek = date.getDay();
-      // Allow Sunday (0) for Colombia flights and Monday (1) for direct arrivals
-      return !(dayOfWeek === 0 || dayOfWeek === 1);
+    // For Europe plans with priceTiers and flight days, check exact date matches
+    const europePlan = selectedDests.find(d => 
+      (d.name.includes("Italia Turística") || 
+       d.name.includes("España e Italia") || 
+       d.name.includes("Gran Tour de Europa")) && 
+      d.priceTiers && d.priceTiers.length > 0
+    );
+    
+    if (europePlan) {
+      const dateStr = getDateString(date);
+      // Only allow dates that have an exact match in priceTiers (flight day or arrival day)
+      const hasExactDate = europePlan.priceTiers.some(tier => tier.endDate === dateStr);
+      return !hasExactDate; // Return immediately - don't check other conditions
+    }
+    
+    // For destinations with priceTiers (date ranges like Dubai), check if date is within valid range
+    // Exclude Europe plans and Turkey Esencial
+    const destinationWithTiers = selectedDests.find(d => 
+      d.priceTiers && d.priceTiers.length > 0 && 
+      d.name !== "Turquía Esencial" &&
+      !d.name.includes("Italia Turística") &&
+      !d.name.includes("España e Italia") &&
+      !d.name.includes("Gran Tour de Europa")
+    );
+    
+    if (destinationWithTiers) {
+      const dateStr = getDateString(date);
+      const isWithinRange = destinationWithTiers.priceTiers!.some(tier => {
+        const startDate = tier.startDate || '2000-01-01'; // If no startDate, use a past date
+        return dateStr >= startDate && dateStr <= tier.endDate;
+      });
+      
+      if (!isWithinRange) {
+        return true; // Disable dates outside all price tier ranges
+      }
+    }
+    
+    // For destinations with specific allowed days (e.g., Egypt: Monday and Friday only)
+    // Don't apply to Europe plans as they handle their own date logic
+    if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays && 
+        !europePlan) {
+      // Check if it's an allowed day of the week
+      if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
+        return true;
+      }
+      
+      return false;
     }
     
     // For other Turkey destinations, only disable non-Tuesday dates
@@ -241,6 +277,22 @@ export default function Home() {
     const dest = destinations.find(d => d.id === destId);
     if (dest?.name === "Turquía Esencial") {
       return 4;
+    }
+    
+    // Planes con hoteles 3 estrellas
+    const threeStarPlans = [
+      "Lo Mejor de Cusco",
+      "Tour Cusco Básico + Huacachina",
+      "Tour Cusco Básico + Paracas - Huacachina - Nazca",
+      "Lo Mejor de Cusco + Lima",
+      "Tour Cusco Completo + Lima, Paracas, Nazca, Huacachina",
+      "Gran Tour de Europa",
+      "Italia Turística - Euro Express",
+      "España e Italia Turística - Euro Express"
+    ];
+    
+    if (dest && threeStarPlans.includes(dest.name)) {
+      return 3;
     }
 
     const details = destinationDetails[destId];

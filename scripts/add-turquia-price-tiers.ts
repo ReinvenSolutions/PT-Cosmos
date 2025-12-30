@@ -4,7 +4,7 @@ import { destinations } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
 async function addTurquiaPriceTiers() {
-  console.log("Agregando priceTiers a Turquía Esencial (todos los martes)...\n");
+  console.log("Agregando priceTiers a Turquía Esencial (martes con precio + lunes con vuelo)...\n");
 
   try {
     // Generar fechas de todos los martes desde enero 2026 hasta diciembre 2026
@@ -17,28 +17,39 @@ async function addTurquiaPriceTiers() {
     while (currentDate <= endDate) {
       // Verificar que sea martes (día 2 en JavaScript: 0=Domingo, 1=Lunes, 2=Martes)
       if (currentDate.getDay() === 2) {
-        const dateStr = currentDate.toISOString().split('T')[0];
+        // Agregar el lunes previo como día de vuelo desde Colombia
+        const monday = new Date(currentDate);
+        monday.setDate(monday.getDate() - 1);
+        const mondayStr = monday.toISOString().split('T')[0];
+        
+        const tuesdayStr = currentDate.toISOString().split('T')[0];
+        
         priceTiers.push({
-          endDate: dateStr,
-          price: "710.00" // Precio base de Turquía Esencial
+          endDate: mondayStr,
+          price: "710.00",
+          isFlightDay: true,
+          flightLabel: "🛫 COL"
+        });
+        
+        // Agregar el martes como día de llegada directa con precio
+        priceTiers.push({
+          endDate: tuesdayStr,
+          price: "710.00"
         });
       }
       // Avanzar al siguiente día
       currentDate.setDate(currentDate.getDate() + 1);
     }
     
-    console.log(`Generados ${priceTiers.length} martes con precios\n`);
+    console.log(`Generados ${priceTiers.length / 2} martes con precios + ${priceTiers.length / 2} lunes con vuelos\n`);
     
     // Mostrar algunos ejemplos
-    console.log("Primeros 5 martes:");
-    priceTiers.slice(0, 5).forEach(tier => {
-      console.log(`  - ${tier.endDate}: $${tier.price}`);
-    });
+    console.log("Primeros 3 pares (lunes vuelo + martes llegada):");
+    for (let i = 0; i < 6 && i < priceTiers.length; i += 2) {
+      console.log(`  Lunes: ${priceTiers[i].endDate} (${priceTiers[i].flightLabel})`);
+      console.log(`  Martes: ${priceTiers[i + 1].endDate} ($${priceTiers[i + 1].price})`);
+    }
     console.log("...");
-    console.log("Últimos 3 martes:");
-    priceTiers.slice(-3).forEach(tier => {
-      console.log(`  - ${tier.endDate}: $${tier.price}`);
-    });
     
     // Actualizar Turquía Esencial
     const result = await db
@@ -48,7 +59,7 @@ async function addTurquiaPriceTiers() {
       .returning();
     
     if (result.length > 0) {
-      console.log(`\n✅ Turquía Esencial actualizada con ${priceTiers.length} fechas (todos los martes)`);
+      console.log(`\n✅ Turquía Esencial actualizada con ${priceTiers.length} fechas (lunes + martes)`);
     } else {
       console.log("\n❌ No se encontró Turquía Esencial");
     }
