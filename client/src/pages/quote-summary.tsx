@@ -181,7 +181,25 @@ export default function QuoteSummary() {
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
   const hasDubaiMaravilloso = selectedDests.some((d) => d.name === "DUBAI Maravilloso");
-  const showConnectionFlight = hasTurkeyEsencial && hasDubaiMaravilloso;
+  
+  // Detectar cualquier destino de Turquía
+  const hasTurkey = selectedDests.some((d) => 
+    d.country?.toLowerCase().includes('turquía') || 
+    d.country?.toLowerCase().includes('turquia') ||
+    d.name.toLowerCase().includes('turquía') ||
+    d.name.toLowerCase().includes('turquia')
+  );
+  
+  // Detectar cualquier destino de Dubai o Emiratos
+  const hasDubaiOrEmirates = selectedDests.some((d) => 
+    d.country?.toLowerCase().includes('emiratos') ||
+    d.country?.toLowerCase().includes('emirates') ||
+    d.name.toLowerCase().includes('dubai') ||
+    d.name.toLowerCase().includes('emiratos')
+  );
+  
+  // Mostrar vuelo de conexión si hay combinación de Turquía + Dubai/Emiratos
+  const showConnectionFlight = hasTurkey && hasDubaiOrEmirates;
   
   const hasItaliaTuristica = selectedDests.some((d) => d.name === "Italia Turística - Euro Express");
   const italiaDestination = selectedDests.find((d) => d.name === "Italia Turística - Euro Express");
@@ -1566,18 +1584,18 @@ export default function QuoteSummary() {
           </Card>
         )}
 
-        {/* Connection Flight Card - Only for "Turquía Esencial + Dubai Maravilloso" */}
+        {/* Connection Flight Card - For Turkey + Dubai/Emirates combinations */}
         {showConnectionFlight && (
           <Card className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Plane className="w-5 h-5" />
-                Vuelo de Conexión Turquía-Dubai
+                Vuelo de Conexión entre Destinos
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-3">
-                Sube las imágenes del vuelo de conexión (máximo 10 imágenes)
+                Sube las imágenes del vuelo de conexión entre destinos (máximo 10 imágenes)
               </p>
 
               {connectionFlightImages.length > 0 && (
