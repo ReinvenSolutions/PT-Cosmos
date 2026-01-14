@@ -32,35 +32,53 @@ function Calendar({
 }: CalendarProps) {
   const isDualView = numberOfMonths === 2;
 
+  const getDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const getPrice = (date: Date) => {
     if (!priceTiers?.length) return null;
-    const tier = priceTiers.find(tier => {
-        // Support both startDate and endDate (fallback for legacy data)
-        const dateToCheck = tier.startDate || tier.endDate;
-        if (!dateToCheck) return false;
-        try {
-            const tierDate = parseISO(dateToCheck);
-            return isSameDay(date, tierDate);
-        } catch {
-            return false;
-        }
+    const dateStr = getDateString(date);
+    
+    // First, try to find exact date match (for specific date tiers like Turkey)
+    const exactTier = priceTiers.find(tier => tier.endDate === dateStr);
+    
+    if (exactTier) return exactTier.price;
+    
+    // If no exact match, check if date falls within a price tier range (for destinations like Dubai)
+    // Only use range matching if tier has explicit startDate (meaning it's a range tier)
+    const sortedTiers = [...priceTiers].sort((a, b) => a.endDate.localeCompare(b.endDate));
+    const rangeTier = sortedTiers.find(tier => {
+      // Only treat as range if startDate is explicitly provided
+      if (!tier.startDate) return false;
+      return dateStr >= tier.startDate && dateStr <= tier.endDate;
     });
-    return tier?.price;
+    
+    return rangeTier?.price;
   };
 
   const getPricesForDate = (date: Date) => {
     if (!priceTiers?.length) return [];
-    return priceTiers.filter(tier => {
-        // Support both startDate and endDate (fallback for legacy data)
-        const dateToCheck = tier.startDate || tier.endDate;
-        if (!dateToCheck) return false;
-        try {
-            const tierDate = parseISO(dateToCheck);
-            return isSameDay(date, tierDate);
-        } catch {
-            return false;
-        }
+    const dateStr = getDateString(date);
+    
+    // First, collect exact date matches (for specific dates like Turkey)
+    const exactMatches = priceTiers.filter(tier => tier.endDate === dateStr);
+    
+    if (exactMatches.length > 0) return exactMatches;
+    
+    // If no exact matches, check for range matches (for destinations like Dubai)
+    // Only use range matching if tier has explicit startDate
+    const sortedTiers = [...priceTiers].sort((a, b) => a.endDate.localeCompare(b.endDate));
+    const rangeTier = sortedTiers.find(tier => {
+      // Only treat as range if startDate is explicitly provided
+      if (!tier.startDate) return false;
+      return dateStr >= tier.startDate && dateStr <= tier.endDate;
     });
+    
+    return rangeTier ? [rangeTier] : [];
   };
   
   return (

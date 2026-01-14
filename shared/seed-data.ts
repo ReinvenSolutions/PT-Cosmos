@@ -28,7 +28,7 @@ export const seedDestinations = [
   },
   {
     id: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c',
-    name: "DUBAI Maravilloso",
+    name: "Dubai Maravilloso",
     country: "Emiratos Árabes Unidos",
     duration: 5,
     nights: 4,
@@ -41,13 +41,13 @@ export const seedDestinations = [
     isActive: true,
     requiresTuesday: false,
     priceTiers: [
-      { endDate: '2026-04-30', price: '660.00' },
-      { endDate: '2026-09-30', price: '560.00' }
+      { startDate: '2026-01-01', endDate: '2026-04-30', price: '660.00' },
+      { startDate: '2026-05-01', endDate: '2026-09-30', price: '560.00' }
     ],
   },
   {
     id: '60c7d15d-df04-48ed-8024-ba8bfb6db088',
-    name: "Lo Mejor de Cusco: 4 Días - 3 Noches",
+    name: "Lo Mejor de Cusco",
     country: "Perú",
     duration: 4,
     nights: 3,
@@ -62,7 +62,7 @@ export const seedDestinations = [
   },
   {
     id: '2b2b0a9a-b958-49e2-a34e-21b23b96b416',
-    name: "Tour Cusco Básico + Huacachina: 5 Días - 4 Noches",
+    name: "Tour Cusco Básico + Huacachina",
     country: "Perú",
     duration: 5,
     nights: 4,
@@ -77,7 +77,7 @@ export const seedDestinations = [
   },
   {
     id: '61077f10-c7db-4303-9f82-fecd43d67fbc',
-    name: "Tour Cusco Básico + Paracas - Huacachina - Nazca: 6 Días - 5 Noches",
+    name: "Tour Cusco Básico + Paracas - Huacachina - Nazca",
     country: "Perú",
     duration: 6,
     nights: 5,
@@ -92,7 +92,7 @@ export const seedDestinations = [
   },
   {
     id: 'df3a7358-b65f-4849-a16d-bcf0f29cecc8',
-    name: "Lo Mejor de Cusco + Lima: 7 Días - 6 Noches",
+    name: "Lo Mejor de Cusco + Lima",
     country: "Perú",
     duration: 7,
     nights: 6,
@@ -127,7 +127,7 @@ export const seedDestinations = [
   },
   {
     id: '861faa80-223e-4ea1-b90c-4f3053cc12ff',
-    name: "Auroras boreales finlandia",
+    name: "Auroras Boreales Finlandia",
     country: "Finlandia",
     duration: 7,
     nights: 6,
@@ -142,7 +142,7 @@ export const seedDestinations = [
   },
   {
     id: '352ae191-fabe-4e09-874b-ee978a95b6ce',
-    name: "Tour Cusco Completo + Lima, Paracas, Nazca, Huacachina: 10 Días - 9 Noches",
+    name: "Tour Cusco Completo + Lima, Paracas, Nazca, Huacachina",
     country: "Perú",
     duration: 10,
     nights: 9,
@@ -412,11 +412,11 @@ export const seedDestinations = [
 export const seedItineraryDays = [
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 1, title: "Estambul", description: "Llegada al aeropuerto y traslado al hotel con un asistente de habla portuguesa / española. Llegada al hotel. Alojamiento." },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 2, title: "Estambul", description: "Desayuno en el hotel. Salida para una visita panorámica. Recorrido por una de las zonas más antiguas. Pasaremos por las murallas que rodean la ciudad, construidas en el siglo V y que han sido destruidas y reconstruidas cuatro veces. Durante todo el recorrido podrá disfrutar de la maravillosa vista del Bósforo. El recorrido continúa por Dolmabahce, el estadio Beeiktae, Taksim, Siehane y Eminonu. Nota: Los pasajeros que no adquieran la visita panorámica posterior opcional dispondrán de tiempo libre y regresarán al hotel por su cuenta.\n\n**(ACTIVIDAD INCLUIDA SI TU PLAN INCLUYE MEJORA.)**\n**Tour Opcional - Bósforo con almuerzo**\n\n• Barrio de Balat (y Fener): Exploración de la zona exterior occidental de Estambul Es un área histórica, lejos de las rutas turísticas típicas, conocida por sus casas otomanas coloridas y cultura local\n• Mezquita Süleymaniye: Visita a la mezquita construida por Mimar Sinan (1551-1557) en honor a Solimán el Magnífico\n• Almuerzo: Parada en un restaurante local\n• Crucero por el Bósforo: Viaje en transbordadores regulares navegando entre Asia y Europa\n• Vistas: Palacios otomanos a las orillas, la plaza y cafés de Ortaköy, la mezquita de Mecidiye y los puentes colgantes intercontinentales\n• Bazar Egipcio (Bazar de las Especias): Visita al segundo bazar más grande y antiguo de la ciudad para comprar especias, frutos secos, dulces, té y caviar\n• Cierre: Llegada al hotel y alojamiento" },
-  { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 3, title: "Estambul - Ancara - Capadócia", description: "Suplemento no obligatorio de vuelo interno IST-CAP. Desayuno en el hotel y salida hacia Ankara. Llegada y visita panorámica de la ciudad con parada en el mausoleo de Ataturk. Continuación hacia Capadocia. Llegada al hotel. Cena en el hotel y alojamiento." },
+  { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 3, title: "Estambul - Ancara - Capadócia", description: "Desayuno en el hotel y salida hacia Ankara. Llegada y visita panorámica de la ciudad con parada en el mausoleo de Ataturk. Continuación hacia Capadocia. Llegada al hotel. Cena en el hotel y alojamiento." },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 4, title: "Capadócia", description: "Desayuno en el hotel. Salida para visitar la ciudad subterránea de Ozkonak, construida por comunidades cristianas que necesitaban protegerse de los romanos. Por la tarde, visita al Museo Abierto de Goreme, que alberga numerosas capillas y casas talladas en piedra y decoradas con frescos del siglo X, algunos de los cuales representan a San Jorge, que nació allí. Visita a Avanos, tradicional por sus famosas alfombras hechas a mano con una técnica ancestral, donde tendremos la oportunidad de visitar una cooperativa especializada. Por la tarde visitaremos una joyería de piedras típicas de Capadocia. Cena en el hotel y alojamiento." },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 5, title: "Capadócia", description: "Desayuno en el hotel y visita a Avcilar y Guvercinlik, donde podrá disfrutar del paisaje único de la «Chimenea de las Hadas» con vistas a Capadocia. Visita a la ciudad troglodita de Uchisar en el punto más alto de Capadocia. Por la tarde, visita a una cooperativa de cerámica de Capadocia. Cena en el hotel y alojamiento." },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 6, title: "Capadócia - Pamukkale", description: "Desayuno en el hotel y salida hacia Pamukkale. Visita a una tienda Outlet. Llegada a Pamukkale. Visita de Hierápolis y del \"Castillo de Algodón\", una verdadera maravilla natural, con su increíble formación calcárea y sus piscinas blancas naturales. Cena en el hotel y alojamiento." },
-  { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 7, title: "Pamukkale - Éfeso - Esmirna", description: "Desayuno en el hotel y salida para visitar las ruinas de Éfeso, la antigua ciudad grecorromana mejor conservada de Turquía. Fue la capital asiática del Imperio Romano. Podrá ver la magnífica Biblioteca Celso y la Calle de Mármol, así como el teatro con capacidad para 25.000 personas. Aquí es donde San Pablo habló a sus seguidores. Almuerzo en un restaurante local. Visita de la Casa de la Virgen María, lugar religioso cristiano cerca de Éfeso, a siete kilómetros de Selcuk, donde, según la tradición, Juan el Evangelista llevó a la Virgen María después de la crucifixión de Cristo, huyendo de la persecución en Jerusalén, e incluso su bendita asunción, según los ortodoxos. Todavía tendremos tiempo de visitar un excelente punto de venta de cuero de alta calidad procedente de esta región. Cena en el hotel y alojamiento." },
+  { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 7, title: "Pamukkale - Éfeso - Esmirna", description: "Desayuno en el hotel y salida para visitar las ruinas de Éfeso, la antigua ciudad grecorromana mejor conservada de Turquía. Fue la capital asiática del Imperio Romano. Podrá ver la magnífica Biblioteca Celso y la Calle de Mármol, así como el teatro con capacidad para 25.000 personas. Aquí es donde San Pablo habló a sus seguidores. Visita de la Casa de la Virgen María, lugar religioso cristiano cerca de Éfeso, a siete kilómetros de Selcuk, donde, según la tradición, Juan el Evangelista llevó a la Virgen María después de la crucifixión de Cristo, huyendo de la persecución en Jerusalén, e incluso su bendita asunción, según los ortodoxos. Todavía tendremos tiempo de visitar un excelente punto de venta de cuero de alta calidad procedente de esta región. Cena en el hotel y alojamiento." },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 8, title: "Esmirna - Bursa - Estambul", description: "Desayuno en el hotel y salida hacia Bursa. Parada para visitar una tienda de exquisiteces turcas, las famosas Delicias Turcas. Visita panorámica de la ciudad que fue capital del Imperio Otomano antes de Edirne. Visita de la Mezquita Verde, el Mausoleo Verde, que fue construido a petición del Sultán Mehmet I. La mezquita está decorada con azulejos de Iznik de colores verde y turquesa. Mehmet I y su dinastía están enterrados en el Mausoleo Verde, que forma parte del complejo de la mezquita. En Bursa también tendremos la oportunidad de pasear por el mercado de la seda, donde se pueden comprar antigüedades, sedas, perfumes y pashminas. Regreso a Estambul. Llegada al hotel, alojamiento." },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 9, title: "Estambul", description: "Desayuno en el hotel. Día libre.\n\n**(ACTIVIDAD INCLUIDA SI TU PLAN INCLUYE MEJORA.)**\n**Tour Opcional: Estambul Clásico con almuerzo**\n\n• Palacio de Topkapı: Vista panorámica (sin entrada al palacio). Lugar de residencia de los sultanes otomanos\n• Basílica de Santa Sofía: Visita a este monumento que posee la cúpula más grande del mundo cristiano por 900 años. Ha servido como iglesia, museo y actualmente es una mezquita\n• Mezquita Azul: La más visitada de la ciudad. Famosa por su colección de azulejos de Iznik y por ser una réplica de Santa Sofía ordenada por el sultán Ahmet\n• Gran Bazar: Parada final para realizar compras\n• Cierre: Alojamiento" },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', dayNumber: 10, title: "Estambul", description: "Desayuno en el hotel y traslado al aeropuerto para el vuelo de regreso. Fin de nuestros servicios." },
@@ -787,6 +787,7 @@ export const seedExclusions = [
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', item: "Gastos personales", displayOrder: 0 },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', item: "Equipaje adicional", displayOrder: 0 },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', item: "Propinas para el guía y el conductor (se sugieren 5 USD P.P. por día)", displayOrder: 0 },
+  { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', item: "Impuesto de $550 USD", displayOrder: 0 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Fee bancario 2.5% sobre el total", displayOrder: 0 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Visado DE ENTRADA. SI REQUIERE DEPENDE DE LA NACIONALIDAD", displayOrder: 0 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Propinas durante todo el viaje", displayOrder: 0 },
