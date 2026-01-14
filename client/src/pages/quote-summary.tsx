@@ -201,6 +201,16 @@ export default function QuoteSummary() {
   // Mostrar vuelo de conexión si hay combinación de Turquía + Dubai/Emiratos
   const showConnectionFlight = hasTurkey && hasDubaiOrEmirates;
   
+  // Debug logs
+  console.log('🔍 Connection Flight Debug:', {
+    selectedDestsCount: selectedDests.length,
+    selectedDestsNames: selectedDests.map(d => d.name),
+    hasTurkey,
+    hasDubaiOrEmirates,
+    showConnectionFlight,
+    countries: selectedDests.map(d => d.country)
+  });
+  
   const hasItaliaTuristica = selectedDests.some((d) => d.name === "Italia Turística - Euro Express");
   const italiaDestination = selectedDests.find((d) => d.name === "Italia Turística - Euro Express");
   const italiaUpgrades = italiaDestination?.upgrades || [];

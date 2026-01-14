@@ -1,3 +1,4 @@
+import "dotenv/config"; // Must be first to load environment variables
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
