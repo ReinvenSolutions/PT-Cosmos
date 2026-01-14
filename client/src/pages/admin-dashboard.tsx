@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LogOut, Users, FileText, UserPlus } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
@@ -159,6 +159,9 @@ export default function AdminDashboard() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Crear Nuevo Cliente</DialogTitle>
+                    <DialogDescription>
+                      Ingresa los datos del nuevo cliente
+                    </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleCreateClient} className="space-y-4">
                     <div className="space-y-2">

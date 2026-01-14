@@ -8,9 +8,9 @@ async function updateDisplayOrder() {
 
   const orderedDestinations = [
     { name: "Turquía Esencial", order: 1 },
-    { name: "DUBAI Maravilloso", order: 2 },
-    { name: "DUBAI Y LOS EMIRATOS", order: 3 },
-    { name: "Auroras boreales finlandia", order: 4 },
+    { name: "Dubai Maravilloso", order: 2 },
+    { name: "Dubai y Los Emiratos", order: 3 },
+    { name: "Auroras Boreales Finlandia", order: 4 },
     { name: "Egipto (Con Crucero) + Emiratos Árabes", order: 5 },
     { name: "Gran Tour de Europa", order: 6 },
     { name: "Italia Turística - Euro Express", order: 7 },

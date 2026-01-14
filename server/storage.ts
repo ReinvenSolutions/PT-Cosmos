@@ -31,6 +31,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, desc } from "drizzle-orm";
+import { logger } from "./logger";
 
 export interface IStorage {
   getDestinations(params?: { isActive?: boolean }): Promise<Destination[]>;
@@ -90,11 +91,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getItineraryDays(destinationId: string): Promise<ItineraryDay[]> {
-    return db
+    const allDays = await db
       .select()
       .from(itineraryDays)
       .where(eq(itineraryDays.destinationId, destinationId))
       .orderBy(itineraryDays.dayNumber);
+    
+    // Remove duplicates: keep only the first occurrence of each dayNumber
+    // This prevents duplicate itinerary days from appearing in PDFs
+    const seenDays = new Map<number, ItineraryDay>();
+    const uniqueDays: ItineraryDay[] = [];
+    
+    for (const day of allDays) {
+      if (!seenDays.has(day.dayNumber)) {
+        seenDays.set(day.dayNumber, day);
+        uniqueDays.push(day);
+      } else {
+        // Log duplicate for debugging
+        logger.warn("Duplicate itinerary day found", {
+          destinationId,
+          dayNumber: day.dayNumber,
+          keptId: seenDays.get(day.dayNumber)?.id,
+          duplicateId: day.id,
+        });
+      }
+    }
+    
+    return uniqueDays;
   }
 
   async getHotels(destinationId: string): Promise<Hotel[]> {

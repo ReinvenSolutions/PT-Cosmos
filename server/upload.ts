@@ -4,6 +4,8 @@ import { join } from "path";
 import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { validateFile } from "./utils/validateFile";
+import { logger } from "./logger";
 
 // Determine storage mode
 let useObjectStorage = false;
@@ -24,17 +26,17 @@ const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 async function initializeStorage() {
   try {
     // Check if Object Storage environment variables are set
-    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID; // Keep process.env here as it's called before env validation
     
     if (bucketId) {
       // Try to initialize Object Storage
       objectStorageService = new ObjectStorageService();
       useObjectStorage = true;
-      console.log('[Upload] Using Replit Object Storage');
+      logger.info('[Upload] Using Replit Object Storage');
       return;
     }
   } catch (error) {
-    console.log('[Upload] Object Storage not available:', error);
+    logger.warn('[Upload] Object Storage not available', { error });
   }
 
   // Fallback to local filesystem for development
@@ -43,11 +45,14 @@ async function initializeStorage() {
   if (!existsSync(localUploadDir)) {
     await mkdir(localUploadDir, { recursive: true });
   }
-  console.log('[Upload] Using local filesystem:', localUploadDir);
+  logger.info('[Upload] Using local filesystem', { path: localUploadDir });
 }
 
 // Initialize on module load
-initializeStorage().catch(console.error);
+initializeStorage().catch((error) => {
+  // Use console here as logger might not be initialized yet
+  console.error('[Upload] Initialization error:', error);
+});
 
 export async function handleFileUpload(req: Request, res: Response) {
   try {
@@ -55,20 +60,31 @@ export async function handleFileUpload(req: Request, res: Response) {
       return res.status(400).json({ message: "No file uploaded" });
     }
     
-    // Validate MIME type
-    if (!ALLOWED_MIME_TYPES.includes(req.file.mimetype)) {
-      return res.status(400).json({ message: "Invalid file type. Only images are allowed." });
+    // Validate file size first (before reading buffer)
+    if (req.file.size > 10 * 1024 * 1024) {
+      return res.status(400).json({ message: "File too large. Maximum size is 10MB." });
     }
     
-    // Validate file extension
+    // Validate file using magic bytes (prevents MIME type spoofing)
+    const validation = await validateFile(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    );
+    
+    if (!validation.valid) {
+      logger.warn("File upload rejected", { 
+        reason: validation.error,
+        filename: req.file.originalname,
+        reportedMimeType: req.file.mimetype,
+      });
+      return res.status(400).json({ message: validation.error || "Invalid file type" });
+    }
+    
+    // Get extension from validated file
     const ext = req.file.originalname.split('.').pop()?.toLowerCase();
     if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
       return res.status(400).json({ message: "Invalid file extension. Only image files are allowed." });
-    }
-    
-    // Validate file size
-    if (req.file.size > 10 * 1024 * 1024) {
-      return res.status(400).json({ message: "File too large. Maximum size is 10MB." });
     }
     
     let filename: string;
@@ -77,9 +93,9 @@ export async function handleFileUpload(req: Request, res: Response) {
       // Upload to Object Storage
       try {
         filename = await objectStorageService.uploadFile(req.file.originalname, req.file.buffer);
-        console.log('[Upload] File uploaded to Object Storage:', filename);
+        logger.info('[Upload] File uploaded to Object Storage', { filename, size: req.file.size });
       } catch (error) {
-        console.error('[Upload] Object Storage upload failed:', error);
+        logger.error('[Upload] Object Storage upload failed', { error, filename: req.file.originalname });
         return res.status(500).json({ message: "Failed to upload to Object Storage" });
       }
     } else {
@@ -94,14 +110,14 @@ export async function handleFileUpload(req: Request, res: Response) {
       filename = `${randomBytes(16).toString('hex')}.${ext}`;
       const filepath = join(localUploadDir, filename);
       await writeFile(filepath, req.file.buffer);
-      console.log('[Upload] File uploaded to local filesystem:', filename);
+      logger.info('[Upload] File uploaded to local filesystem', { filename, size: req.file.size });
     }
     
     // Return the URL to access the image
     const url = `/api/images/${filename}`;
     res.json({ url });
   } catch (error) {
-    console.error("File upload error:", error);
+    logger.error("File upload error", { error, filename: req.file?.originalname });
     res.status(500).json({ message: "Failed to upload file" });
   }
 }
@@ -121,7 +137,7 @@ export async function getImageBuffer(filename: string): Promise<Buffer> {
       if (error instanceof ObjectNotFoundError) {
         throw new Error("File not found");
       }
-      console.error('[Upload] Failed to download from Object Storage:', error);
+      logger.error('[Upload] Failed to download from Object Storage', { error, filename });
       throw error;
     }
   } else {

@@ -1749,8 +1749,10 @@ export async function generatePublicQuotePDF(
     doc.moveDown(0.5);
 
     // Check for Connection Flight after Turkey itinerary
-    const isTurkeyDest = dest.name.toLowerCase().includes("turquía");
-    const hasDubaiDestination = data.destinations.some(d => d.name.toLowerCase().includes("dubai"));
+    const isTurkeyDest = dest.destination?.name?.toLowerCase().includes("turquía") || dest.name?.toLowerCase().includes("turquía");
+    const hasDubaiDestination = data.destinations.some(d => 
+      d.destination?.name?.toLowerCase().includes("dubai") || d.name?.toLowerCase().includes("dubai")
+    );
     
     console.log("[PDF Generator - Connection Flight Debug]", {
       currentDest: dest.name,

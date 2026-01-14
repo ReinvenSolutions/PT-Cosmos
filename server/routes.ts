@@ -5,24 +5,138 @@ import express from "express";
 import { generatePublicQuotePDF } from "./publicPdfGenerator";
 import passport from "./auth";
 import { requireAuth, requireRole, requireRoles } from "./middleware";
+import { authLimiter, publicPdfLimiter, apiLimiter } from "./rateLimiter";
+import { userRateLimiter } from "./middleware/userRateLimiter";
+import { asyncHandler } from "./utils/asyncHandler";
+import { logger } from "./logger";
+import { quoteService } from "./services/quoteService";
+import { ValidationError, NotFoundError } from "./errors/AppError";
+import { getOrSetCache, CacheKeys, clearDestinationCache } from "./utils/cache";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
-import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, type User } from "@shared/schema";
+import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, insertQuoteDestinationSchema, type User } from "@shared/schema";
+import { z } from "zod";
+import validator from "validator";
 import multer from "multer";
 import { handleFileUpload, getImageBuffer } from "./upload";
 import path from "path";
 import fs from "fs";
+import type { DestinationInput } from "./types";
+
+// Validation schemas
+const registerSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido").max(255),
+  email: z.string()
+    .email("El correo electrónico no es válido")
+    .max(255)
+    .refine((email) => {
+      // Validate domain
+      const domain = email.split('@')[1];
+      return domain && domain.includes('.') && validator.isEmail(email);
+    }, "Dominio de email inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").max(255),
+});
+
+const publicQuotePdfSchema = z.object({
+  destinations: z.array(z.object({
+    id: z.string().uuid("ID de destino inválido"),
+  })).min(1, "Al menos un destino es requerido"),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  flightsAndExtras: z.union([z.number(), z.string()]).optional(),
+  landPortionTotal: z.union([z.number(), z.string()]).optional(),
+  grandTotal: z.union([z.number(), z.string()]).optional(),
+  originCity: z.string().optional(),
+  outboundFlightImages: z.array(z.string()).optional(),
+  returnFlightImages: z.array(z.string()).optional(),
+  includeFlights: z.boolean().optional(),
+  outboundCabinBaggage: z.boolean().optional(),
+  outboundHoldBaggage: z.boolean().optional(),
+  returnCabinBaggage: z.boolean().optional(),
+  returnHoldBaggage: z.boolean().optional(),
+  domesticFlightImages: z.array(z.string()).optional(),
+  domesticCabinBaggage: z.boolean().optional(),
+  domesticHoldBaggage: z.boolean().optional(),
+  connectionFlightImages: z.array(z.string()).optional(),
+  connectionCabinBaggage: z.boolean().optional(),
+  connectionHoldBaggage: z.boolean().optional(),
+  turkeyUpgrade: z.string().nullable().optional(),
+  italiaUpgrade: z.string().nullable().optional(),
+  granTourUpgrade: z.string().nullable().optional(),
+  trm: z.union([z.number(), z.string()]).nullable().optional(),
+  grandTotalCOP: z.union([z.number(), z.string()]).nullable().optional(),
+  finalPrice: z.union([z.number(), z.string()]).nullable().optional(),
+  finalPriceCOP: z.union([z.number(), z.string()]).nullable().optional(),
+  finalPriceCurrency: z.string().optional(),
+  customFilename: z.string().nullable().optional(),
+  minPayment: z.union([z.number(), z.string()]).nullable().optional(),
+  minPaymentCOP: z.union([z.number(), z.string()]).nullable().optional(),
+});
+
+const createQuoteSchema = z.object({
+  clientId: z.string().uuid("ID de cliente inválido"),
+  totalPrice: z.union([z.number(), z.string()]),
+  destinations: z.array(insertQuoteDestinationSchema).min(1, "Al menos un destino es requerido"),
+  originCity: z.string().nullable().optional(),
+  flightsAndExtras: z.union([z.number(), z.string()]).nullable().optional(),
+  outboundFlightImages: z.array(z.string()).nullable().optional(),
+  returnFlightImages: z.array(z.string()).nullable().optional(),
+  domesticFlightImages: z.array(z.string()).nullable().optional(),
+  includeFlights: z.boolean().optional(),
+  outboundCabinBaggage: z.boolean().optional(),
+  outboundHoldBaggage: z.boolean().optional(),
+  returnCabinBaggage: z.boolean().optional(),
+  returnHoldBaggage: z.boolean().optional(),
+  domesticCabinBaggage: z.boolean().optional(),
+  domesticHoldBaggage: z.boolean().optional(),
+  turkeyUpgrade: z.string().nullable().optional(),
+  italiaUpgrade: z.string().nullable().optional(),
+  granTourUpgrade: z.string().nullable().optional(),
+  trm: z.union([z.number(), z.string()]).nullable().optional(),
+  customFilename: z.string().nullable().optional(),
+  minPayment: z.union([z.number(), z.string()]).nullable().optional(),
+  minPaymentCOP: z.union([z.number(), z.string()]).nullable().optional(),
+  finalPrice: z.union([z.number(), z.string()]).nullable().optional(),
+  finalPriceCOP: z.union([z.number(), z.string()]).nullable().optional(),
+  finalPriceCurrency: z.string().optional(),
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint (before rate limiting)
+  app.get("/health", asyncHandler(async (req, res) => {
+    try {
+      // Check database connection
+      await db.execute(sql`SELECT 1`);
+      res.json({
+        status: "healthy",
+        database: "connected",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+      });
+    } catch (error) {
+      logger.error("Health check failed", { error });
+      res.status(503).json({
+        status: "unhealthy",
+        database: "disconnected",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }));
+
   // Servir archivos estáticos de uploads
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+  // Apply general API rate limiting
+  app.use("/api", apiLimiter);
 
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: User | false, info: any) => {
+  app.post("/api/auth/login", authLimiter, (req, res, next) => {
+    passport.authenticate("local", (err: unknown, user: User | false, info: { message?: string }) => {
       if (err) {
         return next(err);
       }
@@ -48,36 +162,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const { name, email, password } = req.body;
+  app.post("/api/auth/register", authLimiter, asyncHandler(async (req, res) => {
+    // Validate input with Zod
+    const validatedData = registerSchema.parse(req.body);
+    const { name, email, password } = validatedData;
 
-      if (!name || !email || !password) {
-        return res.status(400).json({ message: "Nombre, correo y contraseña son requeridos" });
-      }
-
-      const existingUser = await storage.findUserByUsername(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "El correo ya está registrado" });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const newUser = await storage.createUser({
-        name,
-        username: email,
-        email,
-        passwordHash: hashedPassword,
-        role: "advisor",
-      });
-
-      const { passwordHash, ...userWithoutPassword } = newUser;
-      res.status(201).json({ user: userWithoutPassword });
-    } catch (error: any) {
-      console.error("Error en registro:", error);
-      res.status(500).json({ message: "Error al crear usuario" });
+    const existingUser = await storage.findUserByUsername(email);
+    if (existingUser) {
+      throw new ValidationError("El correo ya está registrado");
     }
-  });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Use insertUserSchema for additional validation
+    const userData = insertUserSchema.parse({
+      name,
+      username: email,
+      email,
+      passwordHash: hashedPassword,
+      role: "advisor",
+    });
+    
+    const newUser = await storage.createUser(userData);
+
+    const { passwordHash, ...userWithoutPassword } = newUser;
+    logger.info("User registered", { userId: newUser.id, email });
+    res.status(201).json({ user: userWithoutPassword });
+  }));
 
   app.get("/api/auth/me", (req, res) => {
     if (!req.isAuthenticated()) {
@@ -123,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
       res.sendFile(imagePath);
     } catch (error) {
-      console.error("Error serving destination image:", error);
+      logger.error("Error serving destination image", { error, folder, filename });
       res.status(404).json({ message: "Image not found" });
     }
   });
@@ -157,401 +268,290 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
       res.send(imageBuffer);
     } catch (error) {
-      console.error("Error serving image:", error);
+      logger.error("Error serving image", { error, filename });
       res.status(404).json({ message: "Image not found" });
     }
   });
 
-  app.post("/api/public/quote-pdf", async (req, res) => {
+  app.post("/api/public/quote-pdf", publicPdfLimiter, asyncHandler(async (req, res) => {
+    // Validate input with Zod
+    let validatedData;
     try {
-      const { 
-        destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, 
-        originCity, outboundFlightImages, returnFlightImages, includeFlights, 
-        outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
-        domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
-        connectionFlightImages, connectionCabinBaggage, connectionHoldBaggage,
-        turkeyUpgrade, italiaUpgrade, granTourUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
-        customFilename, minPayment, minPaymentCOP
-      } = req.body;
-      
-      if (!destinations || !Array.isArray(destinations) || destinations.length === 0) {
-        return res.status(400).json({ message: "Destinations are required" });
-      }
-      
-      const destinationDetails = await Promise.all(
-        destinations.map(async (dest: any) => {
-          const destination = await storage.getDestination(dest.id);
-          const itinerary = await storage.getItineraryDays(dest.id);
-          const hotels = await storage.getHotels(dest.id);
-          const inclusionsList = await storage.getInclusions(dest.id);
-          const exclusionsList = await storage.getExclusions(dest.id);
-          const images = await storage.getDestinationImages(dest.id);
-          
-          return {
-            ...dest,
-            destination,
-            itinerary,
-            hotels,
-            inclusions: inclusionsList,
-            exclusions: exclusionsList,
-            images,
-          };
-        })
-      );
-      
-      // Calculate grandTotalCOP if TRM is provided but grandTotalCOP is not
-      const trmValue = Number(trm) || 0;
-      const grandTotalValue = Number(grandTotal) || 0;
-      let calculatedGrandTotalCOP = Number(grandTotalCOP) || null;
-      
-      if (trmValue > 0 && !calculatedGrandTotalCOP) {
-        calculatedGrandTotalCOP = grandTotalValue * trmValue;
-      }
-
-      console.log("PDF Generation Request:", {
-        startDate,
-        endDate,
-        grandTotal: grandTotalValue,
-        grandTotalCOP: calculatedGrandTotalCOP,
-        finalPrice: finalPrice,
-        finalPriceCOP: finalPriceCOP,
-        finalPriceCurrency: finalPriceCurrency
-      });
-      
-      const pdfDoc = await generatePublicQuotePDF({
-        destinations: destinationDetails,
-        startDate,
-        endDate,
-        flightsAndExtras: Number(flightsAndExtras) || 0,
-        landPortionTotal: Number(landPortionTotal) || 0,
-        grandTotal: grandTotalValue,
-        originCity: originCity || "",
-        outboundFlightImages: outboundFlightImages || undefined,
-        returnFlightImages: returnFlightImages || undefined,
-        includeFlights: includeFlights ?? false,
-        outboundCabinBaggage: outboundCabinBaggage ?? false,
-        outboundHoldBaggage: outboundHoldBaggage ?? false,
-        returnCabinBaggage: returnCabinBaggage ?? false,
-        returnHoldBaggage: returnHoldBaggage ?? false,
-        domesticFlightImages: domesticFlightImages || undefined,
-        domesticCabinBaggage: domesticCabinBaggage ?? false,
-        domesticHoldBaggage: domesticHoldBaggage ?? false,
-        connectionFlightImages: connectionFlightImages || undefined,
-        connectionCabinBaggage: connectionCabinBaggage ?? false,
-        connectionHoldBaggage: connectionHoldBaggage ?? false,
-        turkeyUpgrade: turkeyUpgrade || null,
-        italiaUpgrade: italiaUpgrade || null,
-        granTourUpgrade: granTourUpgrade || null,
-        trm: trmValue > 0 ? trmValue : null,
-        grandTotalCOP: calculatedGrandTotalCOP,
-        finalPrice: (finalPrice !== undefined && finalPrice !== null) ? Number(finalPrice) : null,
-        finalPriceCOP: (finalPriceCOP !== undefined && finalPriceCOP !== null) ? Number(finalPriceCOP) : null,
-        finalPriceCurrency: finalPriceCurrency || "USD",
-        minPayment: (minPayment !== undefined && minPayment !== null) ? Number(minPayment) : null,
-        minPaymentCOP: (minPaymentCOP !== undefined && minPaymentCOP !== null) ? Number(minPaymentCOP) : null,
-      });
-      
-      res.setHeader('Content-Type', 'application/pdf');
-      
-      let filename = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
-      if (customFilename && typeof customFilename === 'string' && customFilename.trim() !== '') {
-        filename = customFilename.trim();
-        if (!filename.toLowerCase().endsWith('.pdf')) {
-          filename += '.pdf';
-        }
-        // Sanitize filename to prevent header injection or invalid characters
-        filename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      }
-      
-      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-      
-      pdfDoc.pipe(res);
-      pdfDoc.end();
+      validatedData = publicQuotePdfSchema.parse(req.body);
     } catch (error) {
-      console.error("Error generating PDF:", error);
-      res.status(500).json({ message: "Failed to generate PDF" });
-    }
-  });
-
-  app.get("/api/destinations", async (req, res) => {
-    try {
-      const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
-      const destinations = await storage.getDestinations({ isActive });
-      res.json(destinations);
-    } catch (error) {
-      console.error("Error fetching destinations:", error);
-      res.status(500).json({ message: "Failed to fetch destinations" });
-    }
-  });
-
-  app.get("/api/destinations/:id", async (req, res) => {
-    try {
-      const destination = await storage.getDestination(req.params.id);
-      if (!destination) {
-        return res.status(404).json({ message: "Destination not found" });
+      if (error instanceof z.ZodError) {
+        throw new ValidationError("Datos inválidos", error.errors.map(e => ({ 
+          field: e.path.join('.'), 
+          message: e.message 
+        })));
       }
-      
-      const itinerary = await storage.getItineraryDays(req.params.id);
-      const hotels = await storage.getHotels(req.params.id);
-      const inclusions = await storage.getInclusions(req.params.id);
-      const exclusions = await storage.getExclusions(req.params.id);
-      const images = await storage.getDestinationImages(req.params.id);
-      
-      res.json({
-        ...destination,
-        itinerary,
-        hotels,
-        inclusions,
-        exclusions,
-        images,
-      });
-    } catch (error) {
-      console.error("Error fetching destination:", error);
-      res.status(500).json({ message: "Failed to fetch destination" });
+      throw error;
     }
-  });
+    
+    const { 
+      destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, 
+      originCity, outboundFlightImages, returnFlightImages, includeFlights, 
+      outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
+      domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
+      connectionFlightImages, connectionCabinBaggage, connectionHoldBaggage,
+      turkeyUpgrade, italiaUpgrade, granTourUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
+      customFilename, minPayment, minPaymentCOP
+    } = validatedData;
+    
+    const destinationDetails = await Promise.all(
+      destinations.map(async (dest: { id: string }) => {
+        // Use cache for destination data
+        const destination = await getOrSetCache(
+          CacheKeys.destination(dest.id),
+          () => storage.getDestination(dest.id)
+        );
+        
+        const itinerary = await getOrSetCache(
+          CacheKeys.itinerary(dest.id),
+          () => storage.getItineraryDays(dest.id)
+        );
+        
+        const hotels = await getOrSetCache(
+          CacheKeys.hotels(dest.id),
+          () => storage.getHotels(dest.id)
+        );
+        
+        const inclusionsList = await getOrSetCache(
+          CacheKeys.inclusions(dest.id),
+          () => storage.getInclusions(dest.id)
+        );
+        
+        const exclusionsList = await getOrSetCache(
+          CacheKeys.exclusions(dest.id),
+          () => storage.getExclusions(dest.id)
+        );
+        
+        const images = await getOrSetCache(
+          CacheKeys.images(dest.id),
+          () => storage.getDestinationImages(dest.id)
+        );
+        
+        return {
+          id: dest.id,
+          name: destination?.name || "",
+          country: destination?.country || "",
+          duration: destination?.duration || 0,
+          nights: destination?.nights || 0,
+          basePrice: destination?.basePrice || "0",
+          destination,
+          itinerary,
+          hotels,
+          inclusions: inclusionsList,
+          exclusions: exclusionsList,
+          images,
+        };
+      })
+    );
+    
+    // Calculate grandTotalCOP if TRM is provided but grandTotalCOP is not
+    const trmValue = Number(trm) || 0;
+    const grandTotalValue = Number(grandTotal) || 0;
+    let calculatedGrandTotalCOP = Number(grandTotalCOP) || null;
+    
+    if (trmValue > 0 && !calculatedGrandTotalCOP) {
+      calculatedGrandTotalCOP = grandTotalValue * trmValue;
+    }
 
-  app.post("/api/admin/clients", requireRoles(["super_admin", "advisor"]), async (req, res) => {
+    logger.info("PDF Generation Request", {
+      startDate,
+      endDate,
+      grandTotal: grandTotalValue,
+      grandTotalCOP: calculatedGrandTotalCOP,
+      finalPrice: finalPrice,
+      finalPriceCOP: finalPriceCOP,
+      finalPriceCurrency: finalPriceCurrency,
+      destinationsCount: destinations.length,
+    });
+    
+    const pdfDoc = await generatePublicQuotePDF({
+      destinations: destinationDetails,
+      startDate,
+      endDate,
+      flightsAndExtras: Number(flightsAndExtras) || 0,
+      landPortionTotal: Number(landPortionTotal) || 0,
+      grandTotal: grandTotalValue,
+      originCity: originCity || "",
+      outboundFlightImages: outboundFlightImages || undefined,
+      returnFlightImages: returnFlightImages || undefined,
+      includeFlights: includeFlights ?? false,
+      outboundCabinBaggage: outboundCabinBaggage ?? false,
+      outboundHoldBaggage: outboundHoldBaggage ?? false,
+      returnCabinBaggage: returnCabinBaggage ?? false,
+      returnHoldBaggage: returnHoldBaggage ?? false,
+      domesticFlightImages: domesticFlightImages || undefined,
+      domesticCabinBaggage: domesticCabinBaggage ?? false,
+      domesticHoldBaggage: domesticHoldBaggage ?? false,
+      connectionFlightImages: connectionFlightImages || undefined,
+      connectionCabinBaggage: connectionCabinBaggage ?? false,
+      connectionHoldBaggage: connectionHoldBaggage ?? false,
+      turkeyUpgrade: turkeyUpgrade || null,
+      italiaUpgrade: italiaUpgrade || null,
+      granTourUpgrade: granTourUpgrade || null,
+      trm: trmValue > 0 ? trmValue : null,
+      grandTotalCOP: calculatedGrandTotalCOP,
+      finalPrice: (finalPrice !== undefined && finalPrice !== null) ? Number(finalPrice) : null,
+      finalPriceCOP: (finalPriceCOP !== undefined && finalPriceCOP !== null) ? Number(finalPriceCOP) : null,
+      finalPriceCurrency: finalPriceCurrency || "USD",
+      minPayment: (minPayment !== undefined && minPayment !== null) ? Number(minPayment) : null,
+      minPaymentCOP: (minPaymentCOP !== undefined && minPaymentCOP !== null) ? Number(minPaymentCOP) : null,
+    });
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    
+    let filename = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
+    if (customFilename && typeof customFilename === 'string' && customFilename.trim() !== '') {
+      filename = customFilename.trim();
+      if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename += '.pdf';
+      }
+      // Sanitize filename to prevent header injection or invalid characters
+      filename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+    
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    
+    pdfDoc.pipe(res);
+    pdfDoc.end();
+  }));
+
+  app.get("/api/destinations", asyncHandler(async (req, res) => {
+    const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
+    const cacheKey = CacheKeys.destinations(isActive);
+    const destinations = await getOrSetCache(cacheKey, () => storage.getDestinations({ isActive }));
+    res.json(destinations);
+  }));
+
+  app.get("/api/destinations/:id", asyncHandler(async (req, res) => {
+    const destination = await getOrSetCache(
+      CacheKeys.destination(req.params.id),
+      () => storage.getDestination(req.params.id)
+    );
+    
+    if (!destination) {
+      throw new NotFoundError("Destination");
+    }
+    
+    const [itinerary, hotels, inclusions, exclusions, images] = await Promise.all([
+      getOrSetCache(CacheKeys.itinerary(req.params.id), () => storage.getItineraryDays(req.params.id)),
+      getOrSetCache(CacheKeys.hotels(req.params.id), () => storage.getHotels(req.params.id)),
+      getOrSetCache(CacheKeys.inclusions(req.params.id), () => storage.getInclusions(req.params.id)),
+      getOrSetCache(CacheKeys.exclusions(req.params.id), () => storage.getExclusions(req.params.id)),
+      getOrSetCache(CacheKeys.images(req.params.id), () => storage.getDestinationImages(req.params.id)),
+    ]);
+    
+    res.json({
+      ...destination,
+      itinerary,
+      hotels,
+      inclusions,
+      exclusions,
+      images,
+    });
+  }));
+
+  app.post("/api/admin/clients", requireRoles(["super_admin", "advisor"]), asyncHandler(async (req, res) => {
+    const validatedData = insertClientSchema.parse(req.body);
     try {
-      const validatedData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(validatedData);
+      logger.info("Client created", { clientId: client.id });
       res.json(client);
     } catch (error: any) {
-      console.error("Error creating client:", error);
       if (error.code === '23505') {
-        res.status(400).json({ message: "Ya existe un cliente con este email" });
-      } else {
-        res.status(500).json({ message: "Failed to create client" });
+        throw new ValidationError("Ya existe un cliente con este email");
       }
+      throw error;
     }
-  });
+  }));
 
-  app.get("/api/admin/clients", requireRoles(["super_admin", "advisor"]), async (req, res) => {
-    try {
-      const clients = await storage.listClients();
-      res.json(clients);
-    } catch (error) {
-      console.error("Error fetching clients:", error);
-      res.status(500).json({ message: "Failed to fetch clients" });
-    }
-  });
+  app.get("/api/admin/clients", requireRoles(["super_admin", "advisor"]), asyncHandler(async (req, res) => {
+    const clients = await storage.listClients();
+    res.json(clients);
+  }));
 
-  app.post("/api/admin/destinations", requireRole("super_admin"), async (req, res) => {
+  app.post("/api/admin/destinations", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const validatedData = insertDestinationSchema.parse(req.body);
     try {
-      const validatedData = insertDestinationSchema.parse(req.body);
       const destination = await storage.createDestination(validatedData);
+      logger.info("Destination created", { destinationId: destination.id, name: destination.name });
       res.json(destination);
     } catch (error: any) {
-      console.error("Error creating destination:", error);
       if (error.code === '23505') {
-        res.status(400).json({ message: "Ya existe un destino con este nombre y país" });
-      } else {
-        res.status(500).json({ message: "Failed to create destination" });
+        throw new ValidationError("Ya existe un destino con este nombre y país");
       }
+      throw error;
     }
-  });
+  }));
 
-  app.put("/api/admin/destinations/:id", requireRole("super_admin"), async (req, res) => {
-    try {
-      const destination = await storage.updateDestination(req.params.id, req.body);
-      res.json(destination);
-    } catch (error) {
-      console.error("Error updating destination:", error);
-      res.status(500).json({ message: "Failed to update destination" });
+  app.put("/api/admin/destinations/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const destination = await storage.updateDestination(req.params.id, req.body);
+    clearDestinationCache(req.params.id);
+    logger.info("Destination updated", { destinationId: req.params.id });
+    res.json(destination);
+  }));
+
+  app.get("/api/admin/quotes", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const quotes = await storage.listAllQuotes();
+    res.json(quotes);
+  }));
+
+  app.get("/api/admin/quotes/stats", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const stats = await storage.getQuoteStats();
+    res.json(stats);
+  }));
+
+  app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), userRateLimiter, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    
+    // Validate input with Zod
+    const validatedData = createQuoteSchema.parse(req.body);
+    
+    const quote = await quoteService.createQuote(validatedData, user);
+    
+    logger.info("Quote created", { quoteId: quote.id, userId: user.id });
+    res.json(quote);
+  }));
+
+  app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), userRateLimiter, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    
+    // Validate input with Zod
+    const validatedData = createQuoteSchema.parse(req.body);
+    
+    const quote = await quoteService.updateQuote(req.params.id, validatedData, user);
+    
+    logger.info("Quote updated", { quoteId: quote.id, userId: user.id });
+    res.json(quote);
+  }));
+
+  app.get("/api/quotes", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const quotes = await storage.listQuotesByUser(user.id);
+    res.json(quotes);
+  }));
+
+  app.get("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const quote = await storage.getQuote(req.params.id, user.id);
+    
+    if (!quote) {
+      throw new NotFoundError("Quote");
     }
-  });
 
-  app.get("/api/admin/quotes", requireRole("super_admin"), async (req, res) => {
-    try {
-      const quotes = await storage.listAllQuotes();
-      res.json(quotes);
-    } catch (error) {
-      console.error("Error fetching all quotes:", error);
-      res.status(500).json({ message: "Failed to fetch quotes" });
+    res.json(quote);
+  }));
+
+  app.get("/api/quotes/:id/pdf", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const quote = await storage.getQuote(req.params.id, user.id);
+    
+    if (!quote) {
+      throw new NotFoundError("Quote");
     }
-  });
-
-  app.get("/api/admin/quotes/stats", requireRole("super_admin"), async (req, res) => {
-    try {
-      const stats = await storage.getQuoteStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching quote stats:", error);
-      res.status(500).json({ message: "Failed to fetch stats" });
-    }
-  });
-
-  app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
-    try {
-      const user = req.user as User;
-      const { 
-        clientId, totalPrice, destinations, originCity, flightsAndExtras, 
-        outboundFlightImages, returnFlightImages, domesticFlightImages,
-        turkeyUpgrade, italiaUpgrade, granTourUpgrade,
-        includeFlights, 
-        outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage,
-        domesticCabinBaggage, domesticHoldBaggage,
-        trm, customFilename, minPayment, minPaymentCOP, finalPrice, finalPriceCOP, finalPriceCurrency
-      } = req.body;
-
-      if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
-        return res.status(400).json({ message: "Missing required fields" });
-      }
-
-      // Validate turkeyUpgrade - only allow if Turquía Esencial is in destinations
-      if (turkeyUpgrade) {
-        const destinationIds = destinations.map((d: any) => d.destinationId);
-        const allDestinations = await storage.getDestinations();
-        const hasTurkeyEsencial = allDestinations.some((dest: any) => 
-          destinationIds.includes(dest.id) && dest.name === "Turquía Esencial"
-        );
-        
-        if (!hasTurkeyEsencial) {
-          return res.status(400).json({ message: "Turkey upgrade can only be selected for Turquía Esencial destination" });
-        }
-      }
-
-      const quoteData = {
-        clientId,
-        userId: user.id,
-        totalPrice,
-        originCity: originCity || null,
-        flightsAndExtras: flightsAndExtras || null,
-        outboundFlightImages: outboundFlightImages || null,
-        returnFlightImages: returnFlightImages || null,
-        domesticFlightImages: domesticFlightImages || null,
-        includeFlights: includeFlights ?? false,
-        outboundCabinBaggage: outboundCabinBaggage ?? false,
-        outboundHoldBaggage: outboundHoldBaggage ?? false,
-        returnCabinBaggage: returnCabinBaggage ?? false,
-        returnHoldBaggage: returnHoldBaggage ?? false,
-        domesticCabinBaggage: domesticCabinBaggage ?? false,
-        domesticHoldBaggage: domesticHoldBaggage ?? false,
-        turkeyUpgrade: turkeyUpgrade || null,
-        italiaUpgrade: italiaUpgrade || null,
-        granTourUpgrade: granTourUpgrade || null,
-        trm: trm || null,
-        customFilename: customFilename || null,
-        minPayment: minPayment || null,
-        minPaymentCOP: minPaymentCOP || null,
-        finalPrice: finalPrice || null,
-        finalPriceCOP: finalPriceCOP || null,
-        finalPriceCurrency: finalPriceCurrency || "USD",
-        status: "draft",
-      };
-
-      const quote = await storage.createQuote(quoteData, destinations);
-      res.json(quote);
-    } catch (error) {
-      console.error("Error creating quote:", error);
-      res.status(500).json({ message: "Failed to create quote" });
-    }
-  });
-
-  app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
-    try {
-      const user = req.user as User;
-      const { 
-        clientId, totalPrice, destinations, originCity, flightsAndExtras, 
-        outboundFlightImages, returnFlightImages, domesticFlightImages,
-        includeFlights, 
-        outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
-        domesticCabinBaggage, domesticHoldBaggage,
-        turkeyUpgrade, italiaUpgrade, granTourUpgrade,
-        trm, customFilename, minPayment, minPaymentCOP, finalPrice, finalPriceCOP, finalPriceCurrency
-      } = req.body;
-
-      if (!clientId || !totalPrice || !destinations || !Array.isArray(destinations)) {
-        return res.status(400).json({ message: "Missing required fields" });
-      }
-
-      // Validate turkeyUpgrade - only allow if Turquía Esencial is in destinations
-      if (turkeyUpgrade) {
-        const destinationIds = destinations.map((d: any) => d.destinationId);
-        const allDestinations = await storage.getDestinations();
-        const hasTurkeyEsencial = allDestinations.some((dest: any) => 
-          destinationIds.includes(dest.id) && dest.name === "Turquía Esencial"
-        );
-        
-        if (!hasTurkeyEsencial) {
-          return res.status(400).json({ message: "Turkey upgrade can only be selected for Turquía Esencial destination" });
-        }
-      }
-
-      const quoteData = {
-        clientId,
-        totalPrice,
-        originCity: originCity || null,
-        flightsAndExtras: flightsAndExtras || null,
-        outboundFlightImages: outboundFlightImages || null,
-        returnFlightImages: returnFlightImages || null,
-        domesticFlightImages: domesticFlightImages || null,
-        includeFlights: includeFlights ?? false,
-        outboundCabinBaggage: outboundCabinBaggage ?? false,
-        outboundHoldBaggage: outboundHoldBaggage ?? false,
-        returnCabinBaggage: returnCabinBaggage ?? false,
-        returnHoldBaggage: returnHoldBaggage ?? false,
-        domesticCabinBaggage: domesticCabinBaggage ?? false,
-        domesticHoldBaggage: domesticHoldBaggage ?? false,
-        turkeyUpgrade: turkeyUpgrade || null,
-        italiaUpgrade: italiaUpgrade || null,
-        granTourUpgrade: granTourUpgrade || null,
-        trm: trm || null,
-        customFilename: customFilename || null,
-        minPayment: minPayment || null,
-        minPaymentCOP: minPaymentCOP || null,
-        finalPrice: finalPrice || null,
-        finalPriceCOP: finalPriceCOP || null,
-        finalPriceCurrency: finalPriceCurrency || "USD",
-      };
-
-      const quote = await storage.updateQuote(req.params.id, user.id, quoteData, destinations);
-      res.json(quote);
-    } catch (error) {
-      console.error("Error updating quote:", error);
-      if (error instanceof Error && error.message.includes("not found or unauthorized")) {
-        res.status(404).json({ message: "Quote not found or unauthorized" });
-      } else {
-        res.status(500).json({ message: "Failed to update quote" });
-      }
-    }
-  });
-
-  app.get("/api/quotes", requireRoles(["advisor", "super_admin"]), async (req, res) => {
-    try {
-      const user = req.user as User;
-      const quotes = await storage.listQuotesByUser(user.id);
-      res.json(quotes);
-    } catch (error) {
-      console.error("Error fetching quotes:", error);
-      res.status(500).json({ message: "Failed to fetch quotes" });
-    }
-  });
-
-  app.get("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
-    try {
-      const user = req.user as User;
-      const quote = await storage.getQuote(req.params.id, user.id);
-      
-      if (!quote) {
-        return res.status(404).json({ message: "Quote not found" });
-      }
-
-      res.json(quote);
-    } catch (error) {
-      console.error("Error fetching quote:", error);
-      res.status(500).json({ message: "Failed to fetch quote" });
-    }
-  });
-
-  app.get("/api/quotes/:id/pdf", requireRoles(["advisor", "super_admin"]), async (req, res) => {
-    try {
-      const user = req.user as User;
-      const quote = await storage.getQuote(req.params.id, user.id);
-      
-      if (!quote) {
-        return res.status(404).json({ message: "Quote not found" });
-      }
 
       const destinationsWithDetails = await Promise.all(
         quote.destinations.map(async (qd) => {
@@ -630,36 +630,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         finalPriceCurrency: (quote.finalPriceCurrency as "USD" | "COP") || "USD",
       });
       
-      res.setHeader('Content-Type', 'application/pdf');
-      const filename = quote.customFilename 
-        ? (quote.customFilename.endsWith('.pdf') ? quote.customFilename : `${quote.customFilename}.pdf`)
-        : `cotizacion-${quote.id}.pdf`;
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      
-      pdfDoc.pipe(res);
-      pdfDoc.end();
-    } catch (error) {
-      console.error("Error generating quote PDF:", error);
-      res.status(500).json({ message: "Failed to generate PDF" });
-    }
-  });
+    res.setHeader('Content-Type', 'application/pdf');
+    const filename = quote.customFilename 
+      ? (quote.customFilename.endsWith('.pdf') ? quote.customFilename : `${quote.customFilename}.pdf`)
+      : `cotizacion-${quote.id}.pdf`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    pdfDoc.pipe(res);
+    pdfDoc.end();
+  }));
 
-  app.delete("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), async (req, res) => {
-    try {
-      const user = req.user as User;
-      const quote = await storage.getQuote(req.params.id, user.id);
-      
-      if (!quote) {
-        return res.status(404).json({ message: "Quote not found" });
-      }
-
-      await storage.deleteQuote(req.params.id, user.id);
-      res.json({ message: "Quote deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting quote:", error);
-      res.status(500).json({ message: "Failed to delete quote" });
+  app.delete("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const quote = await storage.getQuote(req.params.id, user.id);
+    
+    if (!quote) {
+      throw new NotFoundError("Quote");
     }
-  });
+
+    await storage.deleteQuote(req.params.id, user.id);
+    logger.info("Quote deleted", { quoteId: req.params.id, userId: user.id });
+    res.json({ message: "Quote deleted successfully" });
+  }));
 
   const httpServer = createServer(app);
   return httpServer;
