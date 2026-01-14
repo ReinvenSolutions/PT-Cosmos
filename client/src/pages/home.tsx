@@ -370,6 +370,23 @@ export default function Home() {
   };
   
   const getTooltipContent = (dest: Destination): string => {
+    // Tooltip específico para Lo Mejor de Cusco + Lima
+    if (dest.name === "Lo Mejor de Cusco + Lima") {
+      return "Salidas diarias, programa incluye todas las actividades de interes para los dias de viaje. Cualquier cambio, bajo solicitud. Incluye impuestos. Acompañamiento de guia, solo en actividades. Requiere vuelos internos para el 4to dia; se recomienda sea antes de las 07:00am, tienen incluida actividad el primer dia de llegada a CUZ.";
+    }
+    
+    // Tooltip específico para todos los programas de Perú
+    if (dest.country === "Perú" || 
+        dest.name.includes("Cusco") || 
+        dest.name.includes("Perú") ||
+        dest.name.includes("Lima") ||
+        dest.name.includes("Machu Picchu") ||
+        dest.name.includes("Paracas") ||
+        dest.name.includes("Nazca") ||
+        dest.name.includes("Huacachina")) {
+      return "Salidas diarias, programa incluye todas las actividades de interes para los dias de viaje. Cualquier cambio, bajo solicitud. Incluye impuestos. Acompañamiento de guia, solo en actividades. No requiere vuelos internos";
+    }
+    
     // Tooltip específico para Dubai Maravilloso
     if (dest.name === "DUBAI Maravilloso") {
       return "Salidas diarias desde 2 pax. Combinalo facil. Tarifa dinamica. Plan no requiere mejoras. Impuestos no incluidos. Acompañamiento de guia durante todo el recorrido";
