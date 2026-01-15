@@ -136,7 +136,6 @@ async function seedCuscoLima7Dv2() {
 
     // 5. Insertar Exclusiones
     const exclusionsData = [
-      "Boletos aéreos Lima - Cusco - Lima",
       "Almuerzos (excepto en Vinicunca)",
       "Cenas",
       "Comisión por transferencia de dinero"

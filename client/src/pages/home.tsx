@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { isTurkeyHoliday, getTurkeyHolidayDescription } from "@/lib/turkey-holidays";
+import { GroupDiscountBanner } from "@/components/group-discount-banner";
 
 interface DestinationDetail {
   destination: Destination;
@@ -286,6 +287,7 @@ export default function Home() {
       "Tour Cusco Básico + Paracas - Huacachina - Nazca",
       "Lo Mejor de Cusco + Lima",
       "Tour Cusco Completo + Lima, Paracas, Nazca, Huacachina",
+      "Tour Cusco Aventura",
       "Gran Tour de Europa",
       "Italia Turística - Euro Express",
       "España e Italia Turística - Euro Express"
@@ -419,7 +421,7 @@ export default function Home() {
     
     // Tooltip específico para Turquía Esencial
     if (dest.name === "Turquía Esencial") {
-      return "Salidas todos los miércoles del año. Sabados entre marzo a nov 2026. Si vendes con vuelo, debes cotizar salida los martes y viernes desde Colombia. Programa terrestre con acompañamiento de guía habla hispana en destino";
+      return "Salidas todos los miércoles del año. Sabados entre marzo a nov 2026. Si vendes con vuelo, debes cotizar salida los martes y viernes desde Colombia. Programa terrestre con acompañamiento de guía habla hispana en destino. No incluye impuestos.";
     }
     
     if (dest.requiresTuesday) {
@@ -539,6 +541,8 @@ export default function Home() {
               </div>
             </div>
           </header>
+
+          <GroupDiscountBanner />
 
           <main className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50 to-white">
             <div className="container mx-auto px-4 py-12 lg:py-16">
@@ -799,7 +803,7 @@ export default function Home() {
                               <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
                             </div>
                             
-                            {dest.priceTiers && dest.priceTiers.length > 0 && dest.name !== "Turquía Esencial" && (
+                            {dest.priceTiers && dest.priceTiers.length > 0 && dest.name !== "Turquía Esencial" && dest.name !== "Tour Cusco Aventura" && (
                               <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs">
                                 PRECIO DINÁMICO
                               </Badge>

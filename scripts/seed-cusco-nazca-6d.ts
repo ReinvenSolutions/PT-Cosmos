@@ -138,7 +138,6 @@ async function seedCuscoNazca6D() {
 
     // 5. Insertar Exclusiones
     const exclusionsData = [
-      "Boletos aéreos Lima - Cusco - Lima",
       "Almuerzos",
       "Cenas",
       "Comisión por transferencia de dinero"
