@@ -4,9 +4,11 @@
  * Este módulo sincroniza los datos canónicos (shared/seed-data.ts) con la base de datos
  * cada vez que la aplicación se inicia en producción o deployment.
  * 
- * A diferencia del seed tradicional que solo se ejecuta si la DB está vacía,
- * este sistema SIEMPRE sincroniza los datos canónicos para garantizar que producción
- * esté actualizada con los últimos cambios.
+ * COMPORTAMIENTO:
+ * - Solo actualiza/inserta los destinos que están en shared/seed-data.ts
+ * - NO desactiva destinos que no están en la lista canónica
+ * - Permite tener destinos adicionales en BD que no son parte del seed canónico
+ * - Ideal para destinos creados manualmente o por scripts específicos
  */
 
 import { db } from "./db";
@@ -68,16 +70,8 @@ export async function syncCanonicalData() {
       console.log('   ℹ️  Continuando con la sincronización...\n');
     }
 
-    // Paso 1: Desactivar TODOS los destinos existentes
-    console.log('1️⃣  Desactivando destinos antiguos...');
-    await db
-      .update(destinations)
-      .set({ isActive: false })
-      .execute();
-    console.log('   ✅ Destinos desactivados\n');
-
-    // Paso 2: Insertar o actualizar destinos activos
-    console.log('2️⃣  Sincronizando destinos activos...');
+    // Paso 1: Sincronizar destinos canónicos (sin desactivar los demás)
+    console.log('1️⃣  Sincronizando destinos canónicos...');
     for (const dest of seedDestinations) {
       // Verificar si el destino ya existe
       const existing = await db
@@ -173,8 +167,10 @@ export async function syncCanonicalData() {
     console.log('\n========================================');
     console.log('✅ SINCRONIZACIÓN COMPLETADA');
     console.log('========================================');
-    console.log(`Destinos activos: ${activeDestinations.length}`);
-    activeDestinations.forEach(d => {
+    console.log(`Total de destinos activos en DB: ${activeDestinations.length}`);
+    console.log(`Destinos canónicos sincronizados: ${seedDestinations.length}`);
+    console.log('\n📋 Destinos canónicos actualizados:');
+    seedDestinations.forEach(d => {
       console.log(`  - ${d.name} (${d.country})`);
     });
     console.log('========================================\n');
