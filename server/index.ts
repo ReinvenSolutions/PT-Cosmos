@@ -41,7 +41,8 @@ app.use(compression({
     if (req.headers['x-no-compression']) return false;
     return compression.filter(req, res);
   },
-  level: 6,
+  level: 3,
+  threshold: 10240,
 }));
 
 // Limit request body size to prevent DoS attacks
@@ -65,7 +66,7 @@ app.use(
       secure: env.NODE_ENV === "production",
       httpOnly: true,
       sameSite: env.NODE_ENV === "production" ? "lax" : "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000,
       // Domain should not be set - let the browser handle it automatically
       // This ensures cookies work on both replit.app and custom domains
     },
@@ -121,7 +122,7 @@ app.use((req, res, next) => {
         logger.info("🌱 Iniciando sincronización de datos en background...");
         // Paso 1: Seed inicial (solo si BD está vacía)
         await seedDatabaseIfEmpty();
-        
+
         // Paso 2: Sincronizar datos canónicos (SIEMPRE en producción/deployment)
         await syncCanonicalData();
         logger.info("✅ Sincronización completada exitosamente");
