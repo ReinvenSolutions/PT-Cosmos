@@ -12,7 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Home, FileText, Users, BarChart3, LogOut, Plane } from "lucide-react";
+import { Home, FileText, Users, BarChart3, LogOut, Plane, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -31,6 +31,11 @@ export function AppSidebar() {
       icon: Plane,
     },
     {
+      title: "Cotización Express",
+      url: "/cotizacion-express",
+      icon: Zap,
+    },
+    {
       title: "Mis Cotizaciones",
       url: "/advisor",
       icon: FileText,
@@ -41,17 +46,22 @@ export function AppSidebar() {
     {
       title: "Dashboard",
       url: "/admin",
-      icon: Home,
+      icon: BarChart3,
     },
     {
       title: "Clientes",
-      url: "/admin",
+      url: "/admin/clients",
       icon: Users,
     },
     {
       title: "Nueva Cotización",
       url: "/",
       icon: Plane,
+    },
+    {
+      title: "Cotización Express",
+      url: "/cotizacion-express",
+      icon: Zap,
     },
   ];
 

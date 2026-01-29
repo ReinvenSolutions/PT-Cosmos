@@ -2,9 +2,11 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import type { Request, Response, NextFunction } from "express";
 import { ForbiddenError } from "../errors/AppError";
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // Rate limiter for authenticated users
 const userLimiter = new RateLimiterMemory({
-  points: 100, // Number of requests
+  points: isDevelopment ? 10000 : 100, // More permissive in development
   duration: 60, // Per 60 seconds
 });
 

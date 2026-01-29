@@ -16,9 +16,9 @@ async function activateAllNewDestinations() {
   // Activate Colombia destinations
   console.log("2. Activando destinos de Colombia...");
   const colombiaIds = [
-    'a1b2c3d4-5e6f-7g8h-9i0j-1k2l3m4n5o6p', // Plan Amazonas
-    'b2c3d4e5-6f7g-8h9i-0j1k-2l3m4n5o6p7q', // Aventura en Santander
-    'c3d4e5f6-7g8h-9i0j-1k2l-3m4n5o6p7q8r'  // Desierto de La Guajira
+    'a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d', // Plan Amazonas
+    'b2c3d4e5-6f7a-8b9c-0d1e-2f3a4b5c6d7e', // Aventura en Santander
+    'c3d4e5f6-7a8b-9c0d-1e2f-3a4b5c6d7e8f'  // Desierto de La Guajira
   ];
   
   for (const id of colombiaIds) {

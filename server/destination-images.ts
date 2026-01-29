@@ -73,6 +73,7 @@ export const countryImageSets: Record<string, string[]> = {
 };
 
 export const destinationImagePaths: Record<string, string> = {
+  // Destinos viejos (stock images)
   'Cartagena Colonial y Playas de Barú': path.join(ASSETS_PATH, 'cartagena_colombia_c_b5845004.jpg'),
   'Medellín Ciudad de la Eterna Primavera': path.join(ASSETS_PATH, 'medellin_colombia_ca_be5f2e82.jpg'),
   'Eje Cafetero y Cultura Paisa': path.join(ASSETS_PATH, 'coffee_plantation_co_803c7456.jpg'),
@@ -81,6 +82,14 @@ export const destinationImagePaths: Record<string, string> = {
   'La Guajira y Cabo de la Vela': path.join(ASSETS_PATH, 'la_guajira_desert_be_5a4f4bb5.jpg'),
   'Santander y Aventura Extrema': path.join(ASSETS_PATH, 'santander_adventure__6c5cbff4.jpg'),
   'Gran Tour de Europa': path.join(ASSETS_PATH, 'santorini_greece_whi_25df22f7.jpg'),
+  
+  // Destinos nacionales nuevos (imágenes reales - rutas absolutas)
+  'Plan Amazonas 5 Días - 4 Noches 2025': path.join(process.cwd(), 'public', 'images', 'destinations', 'amazonas', '1.jpg'),
+  'Aventura en Santander': path.join(process.cwd(), 'public', 'images', 'destinations', 'puebliando-santander', '1.jpg'),
+  'Guajira Cabo de la Vela y Punta Gallinas': path.join(process.cwd(), 'public', 'images', 'destinations', 'guajira-cabo-de-la-vela-y-punta-gallinas', '1.jpg'),
+  'Capurganá': path.join(process.cwd(), 'public', 'images', 'destinations', 'capurgana', '1.jpg'),
+  'Amazonas - Encuentro con la Selva': path.join(process.cwd(), 'public', 'images', 'destinations', 'amazonas-encuentro-selva', '1.jpg'),
+  'Puebliando por Santander': path.join(process.cwd(), 'public', 'images', 'destinations', 'puebliando-santander', '1.jpg'),
 };
 
 export function getDestinationImagePath(destination: { name: string; country: string }): string | null {
@@ -133,11 +142,70 @@ export function getDestinationImages(destinations: Array<{ name: string; country
   return images.slice(0, 3);
 }
 
+// Mapeo de destinos específicos a sus conjuntos de imágenes
+const destinationSpecificImageSets: Record<string, string[]> = {
+  'Plan Amazonas 5 Días - 4 Noches 2025': [
+    '/images/destinations/amazonas/1.jpg',
+    '/images/destinations/amazonas/2.jpg',
+    '/images/destinations/amazonas/3.jpg',
+    '/images/destinations/amazonas/4.jpg',
+    '/images/destinations/amazonas/5.jpg',
+    '/images/destinations/amazonas/6.jpg',
+  ],
+  'Aventura en Santander': [
+    '/images/destinations/puebliando-santander/1.jpg',
+    '/images/destinations/puebliando-santander/2.jpg',
+    '/images/destinations/puebliando-santander/3.jpg',
+    '/images/destinations/puebliando-santander/4.jpg',
+    '/images/destinations/puebliando-santander/5.jpg',
+    '/images/destinations/puebliando-santander/6.jpg',
+  ],
+  'Guajira Cabo de la Vela y Punta Gallinas': [
+    '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/1.jpg',
+    '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/2.jpg',
+    '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/3.jpg',
+    '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/4.jpg',
+    '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/5.jpg',
+    '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/6.jpg',
+  ],
+  'Capurganá': [
+    '/images/destinations/capurgana/1.jpg',
+    '/images/destinations/capurgana/2.jpg',
+    '/images/destinations/capurgana/3.jpg',
+    '/images/destinations/capurgana/4.jpg',
+    '/images/destinations/capurgana/5.jpg',
+    '/images/destinations/capurgana/6.jpg',
+  ],
+  'Amazonas - Encuentro con la Selva': [
+    '/images/destinations/amazonas-encuentro-selva/1.jpg',
+    '/images/destinations/amazonas-encuentro-selva/2.jpg',
+    '/images/destinations/amazonas-encuentro-selva/3.jpg',
+    '/images/destinations/amazonas-encuentro-selva/4.jpg',
+    '/images/destinations/amazonas-encuentro-selva/5.jpg',
+    '/images/destinations/amazonas-encuentro-selva/6.jpg',
+  ],
+  'Puebliando por Santander': [
+    '/images/destinations/puebliando-santander/1.jpg',
+    '/images/destinations/puebliando-santander/2.jpg',
+    '/images/destinations/puebliando-santander/3.jpg',
+    '/images/destinations/puebliando-santander/4.jpg',
+    '/images/destinations/puebliando-santander/5.jpg',
+    '/images/destinations/puebliando-santander/6.jpg',
+  ],
+};
+
 export function getDestinationImageSet(destination: { name: string; country: string }): string[] {
+  // Primero intentar buscar por nombre específico del destino
+  if (destinationSpecificImageSets[destination.name]) {
+    return destinationSpecificImageSets[destination.name];
+  }
+  
+  // Luego intentar por país
   if (countryImageSets[destination.country]) {
     return countryImageSets[destination.country];
   }
   
+  // Fallback a una sola imagen repetida
   const singleImage = getDestinationImagePath(destination);
   if (singleImage) {
     return [singleImage, singleImage, singleImage];

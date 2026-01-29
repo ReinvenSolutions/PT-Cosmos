@@ -126,6 +126,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Servir archivos estáticos de uploads
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+  // Servir imágenes estáticas de public/images
+  app.use("/images", express.static(path.join(process.cwd(), "public", "images")));
 
   // Apply general API rate limiting
   app.use("/api", apiLimiter);
@@ -173,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     // Use insertUserSchema for additional validation
     const userData = insertUserSchema.parse({
       name,
@@ -182,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       passwordHash: hashedPassword,
       role: "advisor",
     });
-    
+
     const newUser = await storage.createUser(userData);
 
     const { passwordHash, ...userWithoutPassword } = newUser;
@@ -203,21 +205,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint to serve public destination images (no auth required)
   app.get("/images/destinations/:folder/:filename", async (req, res) => {
+    const { folder, filename } = req.params;
     try {
-      const { folder, filename } = req.params;
-      
+
       // Security: validate to prevent directory traversal
       if (!folder || !filename || folder.includes("..") || filename.includes("..") || folder.includes("/") || filename.includes("/")) {
         return res.status(400).json({ message: "Invalid path" });
       }
-      
+
       const imagePath = path.join(process.cwd(), "public", "images", "destinations", folder, filename);
-      
+
       // Check if file exists
       if (!fs.existsSync(imagePath)) {
         return res.status(404).json({ message: "Image not found" });
       }
-      
+
       // Determine content type based on extension
       const ext = filename.split('.').pop()?.toLowerCase();
       const contentTypes: Record<string, string> = {
@@ -227,9 +229,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'gif': 'image/gif',
         'webp': 'image/webp'
       };
-      
+
       const contentType = contentTypes[ext || ''] || 'application/octet-stream';
-      
+
       res.set('Content-Type', contentType);
       res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
       res.sendFile(imagePath);
@@ -241,17 +243,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint to serve images from Object Storage with authentication
   app.get("/api/images/:filename", requireAuth, async (req, res) => {
+    const { filename } = req.params;
     try {
-      const { filename } = req.params;
-      
+
       // Security: validate filename to prevent directory traversal
       if (!filename || filename.includes("..") || filename.includes("/")) {
         return res.status(400).json({ message: "Invalid filename" });
       }
-      
+
       // Get image buffer from Object Storage or local filesystem
       const imageBuffer = await getImageBuffer(filename);
-      
+
       // Determine content type based on extension
       const ext = filename.split('.').pop()?.toLowerCase();
       const contentTypes: Record<string, string> = {
@@ -261,9 +263,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'gif': 'image/gif',
         'webp': 'image/webp'
       };
-      
+
       const contentType = contentTypes[ext || ''] || 'application/octet-stream';
-      
+
       res.set('Content-Type', contentType);
       res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
       res.send(imageBuffer);
@@ -280,24 +282,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       validatedData = publicQuotePdfSchema.parse(req.body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError("Datos inválidos", error.errors.map(e => ({ 
-          field: e.path.join('.'), 
-          message: e.message 
+        throw new ValidationError("Datos inválidos", error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
         })));
       }
       throw error;
     }
-    
-    const { 
-      destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal, 
-      originCity, outboundFlightImages, returnFlightImages, includeFlights, 
-      outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage, 
+
+    const {
+      destinations, startDate, endDate, flightsAndExtras, landPortionTotal, grandTotal,
+      originCity, outboundFlightImages, returnFlightImages, includeFlights,
+      outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage,
       domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
       connectionFlightImages, connectionCabinBaggage, connectionHoldBaggage,
       turkeyUpgrade, italiaUpgrade, granTourUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
       customFilename, minPayment, minPaymentCOP
     } = validatedData;
-    
+
     const destinationDetails = await Promise.all(
       destinations.map(async (dest: { id: string }) => {
         // Use cache for destination data
@@ -305,32 +307,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           CacheKeys.destination(dest.id),
           () => storage.getDestination(dest.id)
         );
-        
+
         const itinerary = await getOrSetCache(
           CacheKeys.itinerary(dest.id),
           () => storage.getItineraryDays(dest.id)
         );
-        
+
         const hotels = await getOrSetCache(
           CacheKeys.hotels(dest.id),
           () => storage.getHotels(dest.id)
         );
-        
+
         const inclusionsList = await getOrSetCache(
           CacheKeys.inclusions(dest.id),
           () => storage.getInclusions(dest.id)
         );
-        
+
         const exclusionsList = await getOrSetCache(
           CacheKeys.exclusions(dest.id),
           () => storage.getExclusions(dest.id)
         );
-        
+
         const images = await getOrSetCache(
           CacheKeys.images(dest.id),
           () => storage.getDestinationImages(dest.id)
         );
-        
+
         return {
           id: dest.id,
           name: destination?.name || "",
@@ -347,12 +349,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       })
     );
-    
+
     // Calculate grandTotalCOP if TRM is provided but grandTotalCOP is not
     const trmValue = Number(trm) || 0;
     const grandTotalValue = Number(grandTotal) || 0;
     let calculatedGrandTotalCOP = Number(grandTotalCOP) || null;
-    
+
     if (trmValue > 0 && !calculatedGrandTotalCOP) {
       calculatedGrandTotalCOP = grandTotalValue * trmValue;
     }
@@ -367,11 +369,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       finalPriceCurrency: finalPriceCurrency,
       destinationsCount: destinations.length,
     });
-    
+
     const pdfDoc = await generatePublicQuotePDF({
       destinations: destinationDetails,
-      startDate,
-      endDate,
+      startDate: startDate || new Date().toISOString(),
+      endDate: endDate || new Date().toISOString(),
       flightsAndExtras: Number(flightsAndExtras) || 0,
       landPortionTotal: Number(landPortionTotal) || 0,
       grandTotal: grandTotalValue,
@@ -396,13 +398,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       grandTotalCOP: calculatedGrandTotalCOP,
       finalPrice: (finalPrice !== undefined && finalPrice !== null) ? Number(finalPrice) : null,
       finalPriceCOP: (finalPriceCOP !== undefined && finalPriceCOP !== null) ? Number(finalPriceCOP) : null,
-      finalPriceCurrency: finalPriceCurrency || "USD",
+      finalPriceCurrency: (finalPriceCurrency as "USD" | "COP" | undefined) || "USD",
       minPayment: (minPayment !== undefined && minPayment !== null) ? Number(minPayment) : null,
       minPaymentCOP: (minPaymentCOP !== undefined && minPaymentCOP !== null) ? Number(minPaymentCOP) : null,
     });
-    
+
     res.setHeader('Content-Type', 'application/pdf');
-    
+
     let filename = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
     if (customFilename && typeof customFilename === 'string' && customFilename.trim() !== '') {
       filename = customFilename.trim();
@@ -412,9 +414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sanitize filename to prevent header injection or invalid characters
       filename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
     }
-    
+
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-    
+
     pdfDoc.pipe(res);
     pdfDoc.end();
   }));
@@ -431,11 +433,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       CacheKeys.destination(req.params.id),
       () => storage.getDestination(req.params.id)
     );
-    
+
     if (!destination) {
       throw new NotFoundError("Destination");
     }
-    
+
     const [itinerary, hotels, inclusions, exclusions, images] = await Promise.all([
       getOrSetCache(CacheKeys.itinerary(req.params.id), () => storage.getItineraryDays(req.params.id)),
       getOrSetCache(CacheKeys.hotels(req.params.id), () => storage.getHotels(req.params.id)),
@@ -443,7 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       getOrSetCache(CacheKeys.exclusions(req.params.id), () => storage.getExclusions(req.params.id)),
       getOrSetCache(CacheKeys.images(req.params.id), () => storage.getDestinationImages(req.params.id)),
     ]);
-    
+
     res.json({
       ...destination,
       itinerary,
@@ -506,24 +508,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), userRateLimiter, asyncHandler(async (req, res) => {
     const user = req.user as User;
-    
+
     // Validate input with Zod
     const validatedData = createQuoteSchema.parse(req.body);
-    
+
     const quote = await quoteService.createQuote(validatedData, user);
-    
+
     logger.info("Quote created", { quoteId: quote.id, userId: user.id });
     res.json(quote);
   }));
 
   app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), userRateLimiter, asyncHandler(async (req, res) => {
     const user = req.user as User;
-    
+
     // Validate input with Zod
     const validatedData = createQuoteSchema.parse(req.body);
-    
+
     const quote = await quoteService.updateQuote(req.params.id, validatedData, user);
-    
+
     logger.info("Quote updated", { quoteId: quote.id, userId: user.id });
     res.json(quote);
   }));
@@ -537,7 +539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const quote = await storage.getQuote(req.params.id, user.id);
-    
+
     if (!quote) {
       throw new NotFoundError("Quote");
     }
@@ -548,94 +550,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/quotes/:id/pdf", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const quote = await storage.getQuote(req.params.id, user.id);
-    
+
     if (!quote) {
       throw new NotFoundError("Quote");
     }
 
-      const destinationsWithDetails = await Promise.all(
-        quote.destinations.map(async (qd) => {
-          const itinerary = await storage.getItineraryDays(qd.destinationId);
-          const hotels = await storage.getHotels(qd.destinationId);
-          const inclusions = await storage.getInclusions(qd.destinationId);
-          const exclusions = await storage.getExclusions(qd.destinationId);
-          const images = await storage.getDestinationImages(qd.destinationId);
-          
-          return {
-            id: qd.destination.id,
-            name: qd.destination.name,
-            country: qd.destination.country,
-            duration: qd.destination.duration,
-            nights: qd.destination.nights,
-            basePrice: qd.price ? qd.price.toString() : qd.destination.basePrice || "0",
-            startDate: qd.startDate.toISOString(),
-            passengers: qd.passengers,
-            destination: qd.destination,
-            itinerary,
-            hotels,
-            inclusions,
-            exclusions,
-            images,
-          };
-        })
-      );
+    const destinationsWithDetails = await Promise.all(
+      quote.destinations.map(async (qd) => {
+        const itinerary = await storage.getItineraryDays(qd.destinationId);
+        const hotels = await storage.getHotels(qd.destinationId);
+        const inclusions = await storage.getInclusions(qd.destinationId);
+        const exclusions = await storage.getExclusions(qd.destinationId);
+        const images = await storage.getDestinationImages(qd.destinationId);
 
-      const startDate = destinationsWithDetails[0]?.startDate || new Date().toISOString();
-      let totalDuration = destinationsWithDetails.reduce((sum, d) => sum + (d.duration || 0), 0);
-      const hasTurkeyDestinations = quote.destinations.some(qd => qd.destination.requiresTuesday);
-      if (hasTurkeyDestinations) {
-        totalDuration += 1;
-      }
-      
-      const start = new Date(startDate);
-      const end = new Date(start);
-      end.setDate(end.getDate() + totalDuration - 1);
-      const endDate = end.toISOString();
+        return {
+          id: qd.destination.id,
+          name: qd.destination.name,
+          country: qd.destination.country,
+          duration: qd.destination.duration,
+          nights: qd.destination.nights,
+          basePrice: qd.price ? qd.price.toString() : qd.destination.basePrice || "0",
+          startDate: qd.startDate.toISOString(),
+          passengers: qd.passengers,
+          destination: qd.destination,
+          itinerary,
+          hotels,
+          inclusions,
+          exclusions,
+          images,
+        };
+      })
+    );
 
-      const landPortionTotal = destinationsWithDetails.reduce((sum, d) => sum + parseFloat(d.basePrice), 0);
-      const flightsAndExtras = quote.flightsAndExtras ? parseFloat(quote.flightsAndExtras.toString()) : 0;
-      
-      // Calculate grandTotalCOP if TRM exists in the saved quote
-      const trmValue = quote.trm ? parseFloat(quote.trm.toString()) : 0;
-      const grandTotalValue = Number(quote.totalPrice);
-      const calculatedGrandTotalCOP = trmValue > 0 ? grandTotalValue * trmValue : null;
+    const startDate = destinationsWithDetails[0]?.startDate || new Date().toISOString();
 
-      const pdfDoc = await generatePublicQuotePDF({
-        destinations: destinationsWithDetails,
-        startDate,
-        endDate,
-        flightsAndExtras,
-        landPortionTotal,
-        grandTotal: grandTotalValue,
-        originCity: quote.originCity || "",
-        outboundFlightImages: quote.outboundFlightImages || undefined,
-        returnFlightImages: quote.returnFlightImages || undefined,
-        includeFlights: quote.includeFlights ?? false,
-        outboundCabinBaggage: quote.outboundCabinBaggage ?? false,
-        outboundHoldBaggage: quote.outboundHoldBaggage ?? false,
-        returnCabinBaggage: quote.returnCabinBaggage ?? false,
-        returnHoldBaggage: quote.returnHoldBaggage ?? false,
-        domesticFlightImages: quote.domesticFlightImages || undefined,
-        domesticCabinBaggage: quote.domesticCabinBaggage ?? false,
-        domesticHoldBaggage: quote.domesticHoldBaggage ?? false,
-        turkeyUpgrade: quote.turkeyUpgrade || null,
-        italiaUpgrade: quote.italiaUpgrade || null,
-        granTourUpgrade: quote.granTourUpgrade || null,
-        trm: trmValue > 0 ? trmValue : null,
-        grandTotalCOP: calculatedGrandTotalCOP,
-        minPayment: quote.minPayment ? Number(quote.minPayment) : undefined,
-        minPaymentCOP: quote.minPaymentCOP ? Number(quote.minPaymentCOP) : undefined,
-        finalPrice: quote.finalPrice ? Number(quote.finalPrice) : undefined,
-        finalPriceCOP: quote.finalPriceCOP ? Number(quote.finalPriceCOP) : undefined,
-        finalPriceCurrency: (quote.finalPriceCurrency as "USD" | "COP") || "USD",
-      });
-      
+    // Calculate total duration - suma las duraciones base
+    let totalDuration = destinationsWithDetails.reduce((sum, d) => sum + (d.duration || 0), 0);
+
+    // Verificar si hay destinos internacionales que requieren día extra
+    // Perú NO requiere día extra (vuelo corto desde Colombia)
+    const requiresExtraDay = destinationsWithDetails.some(d => {
+      const country = d.country?.toLowerCase() || "";
+      return country !== "colombia" && country !== "perú" && country !== "peru";
+    });
+
+    // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
+    if (requiresExtraDay) {
+      totalDuration += 1;
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + totalDuration - 1);
+    const endDate = end.toISOString();
+
+    const landPortionTotal = destinationsWithDetails.reduce((sum, d) => sum + parseFloat(d.basePrice), 0);
+    const flightsAndExtras = quote.flightsAndExtras ? parseFloat(quote.flightsAndExtras.toString()) : 0;
+
+    // Calculate grandTotalCOP if TRM exists in the saved quote
+    const trmValue = quote.trm ? parseFloat(quote.trm.toString()) : 0;
+    const grandTotalValue = Number(quote.totalPrice);
+    const calculatedGrandTotalCOP = trmValue > 0 ? grandTotalValue * trmValue : null;
+
+    const pdfDoc = await generatePublicQuotePDF({
+      destinations: destinationsWithDetails,
+      startDate,
+      endDate,
+      flightsAndExtras,
+      landPortionTotal,
+      grandTotal: grandTotalValue,
+      originCity: quote.originCity || "",
+      outboundFlightImages: quote.outboundFlightImages || undefined,
+      returnFlightImages: quote.returnFlightImages || undefined,
+      includeFlights: quote.includeFlights ?? false,
+      outboundCabinBaggage: quote.outboundCabinBaggage ?? false,
+      outboundHoldBaggage: quote.outboundHoldBaggage ?? false,
+      returnCabinBaggage: quote.returnCabinBaggage ?? false,
+      returnHoldBaggage: quote.returnHoldBaggage ?? false,
+      domesticFlightImages: quote.domesticFlightImages || undefined,
+      domesticCabinBaggage: quote.domesticCabinBaggage ?? false,
+      domesticHoldBaggage: quote.domesticHoldBaggage ?? false,
+      turkeyUpgrade: quote.turkeyUpgrade || null,
+      italiaUpgrade: quote.italiaUpgrade || null,
+      granTourUpgrade: quote.granTourUpgrade || null,
+      trm: trmValue > 0 ? trmValue : null,
+      grandTotalCOP: calculatedGrandTotalCOP,
+      minPayment: quote.minPayment ? Number(quote.minPayment) : undefined,
+      minPaymentCOP: quote.minPaymentCOP ? Number(quote.minPaymentCOP) : undefined,
+      finalPrice: quote.finalPrice ? Number(quote.finalPrice) : undefined,
+      finalPriceCOP: quote.finalPriceCOP ? Number(quote.finalPriceCOP) : undefined,
+      finalPriceCurrency: (quote.finalPriceCurrency as "USD" | "COP") || "USD",
+    });
+
     res.setHeader('Content-Type', 'application/pdf');
-    const filename = quote.customFilename 
+    const filename = quote.customFilename
       ? (quote.customFilename.endsWith('.pdf') ? quote.customFilename : `${quote.customFilename}.pdf`)
       : `cotizacion-${quote.id}.pdf`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    
+
     pdfDoc.pipe(res);
     pdfDoc.end();
   }));
@@ -643,7 +655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const quote = await storage.getQuote(req.params.id, user.id);
-    
+
     if (!quote) {
       throw new NotFoundError("Quote");
     }
@@ -651,6 +663,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await storage.deleteQuote(req.params.id, user.id);
     logger.info("Quote deleted", { quoteId: req.params.id, userId: user.id });
     res.json({ message: "Quote deleted successfully" });
+  }));
+
+  // Analytics routes
+  app.get("/api/admin/analytics/summary", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const metrics = await storage.getDashboardMetrics();
+    res.json(metrics);
+  }));
+
+  app.get("/api/admin/analytics/quotes-over-time", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const days = parseInt(req.query.days as string) || 30;
+    const stats = await storage.getQuotesByDateRange(days);
+    res.json(stats);
+  }));
+
+  app.get("/api/admin/quotes/client/:clientId", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const { clientId } = req.params;
+    const quotes = await storage.getQuotesByClient(clientId);
+    res.json(quotes);
+  }));
+
+  app.post("/api/quotes/track", requireAuth, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const data = req.body;
+
+    const log = await storage.createQuoteLog({
+      userId: user.id,
+      clientId: data.clientId,
+      totalPrice: data.totalPrice?.toString(),
+      destinationId: data.destinationId,
+      passengers: data.passengers,
+      startDate: data.startDate ? new Date(data.startDate) : null,
+      isSaved: data.isSaved || false,
+      metadata: data.metadata || {},
+    });
+
+    res.status(201).json(log);
   }));
 
   const httpServer = createServer(app);

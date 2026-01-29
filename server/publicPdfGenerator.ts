@@ -244,6 +244,10 @@ export async function generatePublicQuotePDF(
       d.images.forEach(img => {
         allDestImages.push(img.imageUrl);
       });
+    } else {
+      // Fallback logic to ensure images are preloaded for old/national destinations
+      const fallbackImages = getDestinationImageSet({ name: d.name, country: d.country });
+      fallbackImages.forEach(img => allDestImages.push(img));
     }
   });
 
@@ -313,7 +317,22 @@ export async function generatePublicQuotePDF(
 
   const destinationNames = data.destinations.map((d) => d.name).join(" + ");
   
-  // Calculate total duration with Turkey + Dubai combination logic
+  // Calculate total duration - suma las duraciones base
+  let totalDuration = data.destinations.reduce((sum, d) => sum + (d.duration || 0), 0);
+  
+  // Verificar si hay destinos internacionales que requieren día extra
+  // Perú NO requiere día extra (vuelo corto desde Colombia)
+  const requiresExtraDay = data.destinations.some(d => {
+    const country = d.country?.toLowerCase() || "";
+    return country !== "colombia" && country !== "perú" && country !== "peru";
+  });
+  
+  // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
+  if (requiresExtraDay) {
+    totalDuration += 1;
+  }
+  
+  // Mantener referencias para otras partes del código
   const hasTurkeyEsencial = data.destinations.some(d => 
     d.name?.toLowerCase().includes("turquía esencial") || 
     d.name?.toLowerCase().includes("turquia esencial")
@@ -322,46 +341,6 @@ export async function generatePublicQuotePDF(
     d.name?.toLowerCase().includes("dubai maravilloso") || 
     d.name?.toLowerCase().includes("dubai")
   );
-  
-  let totalDuration = 0;
-  
-  // Parse start date to get day of week
-  const startDate = data.startDate ? new Date(data.startDate + 'T00:00:00') : null;
-  const dayOfWeek = startDate ? startDate.getDay() : -1;
-  
-  // Calculate duration with special logic for Turkey and Gran Tour
-  totalDuration = data.destinations.reduce((sum, d) => {
-    let duration = d.duration || 0;
-    
-    // Special adjustment for Turquía Esencial
-    if (d.name === "Turquía Esencial" && startDate) {
-      // Si es martes (día 2): vuelo desde Colombia, son 11 días
-      // Si es miércoles (día 3): llegada directa, son 10 días
-      if (dayOfWeek === 2) {
-        duration = 11; // Martes: incluye día de vuelo
-      } else if (dayOfWeek === 3) {
-        duration = 10; // Miércoles: llegada directa
-      }
-    }
-    
-    // Special adjustment for Gran Tour de Europa
-    if (d.name === "Gran Tour de Europa" && startDate) {
-      // Si es domingo (día 0): vuelo desde Colombia, son 17 días
-      // Si es lunes (día 1): llegada directa, son 16 días
-      if (dayOfWeek === 0) {
-        duration = 17; // Domingo: incluye día de vuelo
-      } else if (dayOfWeek === 1) {
-        duration = 16; // Lunes: llegada directa
-      }
-    }
-    
-    return sum + duration;
-  }, 0);
-  
-  // Adjustment for Turkey + Dubai combination: subtract 1 day for connection flight overlap
-  if (hasTurkeyEsencial && hasDubaiMaravilloso) {
-    totalDuration -= 1;
-  }
   
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
@@ -388,7 +367,15 @@ export async function generatePublicQuotePDF(
       // Fallback to old logic - get ALL old images
       const oldImages = getDestinationImageSet({ name: dest.name, country: dest.country });
       oldImages.forEach(img => {
-        imageInfo.push({ relativePath: img, absolutePath: img });
+        let absolutePath = img;
+        
+        if (img.startsWith('/images/')) {
+           absolutePath = path.join(process.cwd(), 'public', img.slice(1));
+        } else if (img.startsWith('/attached_assets/')) {
+           absolutePath = path.join(process.cwd(), img.slice(1));
+        }
+        
+        imageInfo.push({ relativePath: img, absolutePath });
       });
     }
   });
@@ -1511,9 +1498,19 @@ export async function generatePublicQuotePDF(
         }
       });
     } else {
-      destImages = getDestinationImageSet({
+      // Fallback: get images from destination-images.ts and convert to absolute paths
+      const fallbackImages = getDestinationImageSet({
         name: dest.name || "",
         country: dest.country || "",
+      });
+      destImages = fallbackImages.map(img => {
+        if (img.startsWith('/images/')) {
+           return path.join(process.cwd(), 'public', img.slice(1));
+        } else if (img.startsWith('/attached_assets/')) {
+           return path.join(process.cwd(), img.slice(1));
+        } else {
+           return img; // Already absolute path
+        }
       });
     }
     if (destImages.length > 0) {

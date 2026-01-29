@@ -25,9 +25,8 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { isTuesday } from "date-fns";
 import { isTurkeyHoliday } from "@/lib/turkey-holidays";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 import { PDFLoadingModal } from "@/components/pdf-loading-modal";
+import { trackQuote } from "@/lib/tracking";
 
 // WhatsApp Icon Component
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -37,7 +36,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
     className={className}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
   </svg>
 );
 
@@ -153,7 +152,7 @@ export default function QuoteSummary() {
     if (savedData) {
       const { destinations: destIds, startDate: start } = JSON.parse(savedData);
       setSelectedDestinations(destIds);
-      
+
       // Parsear fecha en zona horaria local para evitar problemas de UTC
       if (start) {
         const [year, month, day] = start.split('-').map(Number);
@@ -181,30 +180,30 @@ export default function QuoteSummary() {
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
   const hasDubaiMaravilloso = selectedDests.some((d) => d.name === "DUBAI Maravilloso");
-  
+
   // Detectar cualquier destino de Turquía
-  const hasTurkey = selectedDests.some((d) => 
-    d.country?.toLowerCase().includes('turquía') || 
+  const hasTurkey = selectedDests.some((d) =>
+    d.country?.toLowerCase().includes('turquía') ||
     d.country?.toLowerCase().includes('turquia') ||
     d.name.toLowerCase().includes('turquía') ||
     d.name.toLowerCase().includes('turquia')
   );
-  
+
   // Detectar cualquier destino de Dubai o Emiratos
-  const hasDubaiOrEmirates = selectedDests.some((d) => 
+  const hasDubaiOrEmirates = selectedDests.some((d) =>
     d.country?.toLowerCase().includes('emiratos') ||
     d.country?.toLowerCase().includes('emirates') ||
     d.name.toLowerCase().includes('dubai') ||
     d.name.toLowerCase().includes('emiratos')
   );
-  
+
   // Mostrar vuelo de conexión si hay combinación de Turquía + Dubai/Emiratos
   const showConnectionFlight = hasTurkey && hasDubaiOrEmirates;
-  
+
   const hasItaliaTuristica = selectedDests.some((d) => d.name === "Italia Turística - Euro Express");
   const italiaDestination = selectedDests.find((d) => d.name === "Italia Turística - Euro Express");
   const italiaUpgrades = italiaDestination?.upgrades || [];
-  
+
   const granTourDestination = selectedDests.find((d) => d.name === "Gran Tour de Europa");
   const granTourUpgrades = granTourDestination?.upgrades || [];
 
@@ -229,27 +228,27 @@ export default function QuoteSummary() {
     if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
       return true;
     }
-    
+
     if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays) {
       // If priceTiers exist with specific dates, only allow those exact dates
       if (allowedDaysDestination.priceTiers && allowedDaysDestination.priceTiers.length > 0) {
         const dateStr = date.toISOString().split('T')[0];
-        
+
         // Check if this exact date exists in priceTiers
         const hasExactDate = allowedDaysDestination.priceTiers.some(tier => tier.endDate === dateStr);
-        
+
         // Only enable dates that are in the priceTiers list
         return !hasExactDate;
       }
-      
+
       // Otherwise, just check if it's an allowed day of the week
       if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
         return true;
       }
-      
+
       return false;
     }
-    
+
     // For Turkey Esencial, allow Tuesday (flight day) or Wednesday (direct arrival)
     if (hasTurkeyEsencial) {
       if (isTurkeyHoliday(date)) {
@@ -259,65 +258,36 @@ export default function QuoteSummary() {
       // Allow Tuesday (2) for Colombia flights and Wednesday (3) for direct arrivals
       return !(dayOfWeek === 2 || dayOfWeek === 3);
     }
-    
+
     // For Gran Tour de Europa, allow Sunday (flight day) or Monday (direct arrival)
     if (hasGranTourEuropa) {
       const dayOfWeek = date.getDay();
       // Allow Sunday (0) for Colombia flights and Monday (1) for direct arrivals
       return !(dayOfWeek === 0 || dayOfWeek === 1);
     }
-    
+
     if (hasTurkeyDestinations) {
       return !isTuesday(date);
     }
-    
+
     return false;
   };
 
   const calculateEndDate = (): string => {
     if (!startDate || selectedDests.length === 0) return "";
-    
-    let totalDuration = selectedDests.reduce((sum, dest) => {
-      let duration = dest.duration || 0;
-      
-      // Ajuste especial para Turquía Esencial
-      if (dest.name === "Turquía Esencial") {
-        const dayOfWeek = startDate.getDay();
-        // Si es martes (día 2): vuelo desde Colombia, son 11 días
-        // Si es miércoles (día 3): llegada directa, son 10 días
-        if (dayOfWeek === 2) {
-          duration = 11; // Martes: incluye día de vuelo
-        } else if (dayOfWeek === 3) {
-          duration = 10; // Miércoles: llegada directa
-        }
-      }
-      
-      // Ajuste especial para Gran Tour de Europa
-      if (dest.name === "Gran Tour de Europa") {
-        const dayOfWeek = startDate.getDay();
-        // Si es domingo (día 0): vuelo desde Colombia, son 17 días
-        // Si es lunes (día 1): llegada directa, son 16 días
-        if (dayOfWeek === 0) {
-          duration = 17; // Domingo: incluye día de vuelo
-        } else if (dayOfWeek === 1) {
-          duration = 16; // Lunes: llegada directa
-        }
-      }
-      
-      return sum + duration;
-    }, 0);
 
-    // Ajuste para combinado Turquía + Dubai: Restar 1 día por el vuelo de conexión/solapamiento
-    if (hasTurkeyEsencial && hasDubaiMaravilloso) {
-      totalDuration -= 1;
-    }
+    // Sumar todas las duraciones base
+    let totalDuration = selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0);
 
-    // No agregar día extra si ya se ajustó en Turquía o Gran Tour
-    const hasTurkeyEsencialAdjusted = selectedDests.some(d => 
-      d.name === "Turquía Esencial" && (startDate.getDay() === 2 || startDate.getDay() === 3)
-    );
-    
-    if (hasTurkeyDestinations && !hasTurkeyEsencialAdjusted) {
+    // Verificar si hay destinos internacionales que requieren día extra
+    // Perú NO requiere día extra (vuelo corto desde Colombia)
+    const requiresExtraDay = selectedDests.some(dest => {
+      const country = dest.country?.toLowerCase() || "";
+      return country !== "colombia" && country !== "perú" && country !== "peru";
+    });
+
+    // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
+    if (requiresExtraDay) {
       totalDuration += 1;
     }
 
@@ -326,17 +296,17 @@ export default function QuoteSummary() {
     // Convert startDate to YYYY-MM-DD string to avoid timezone issues
     const startDateStr = startDate.toISOString().split("T")[0];
     const [year, month, day] = startDateStr.split('-').map(Number);
-    
+
     // Create a new date in local timezone
     const start = new Date(year, month - 1, day);
     const end = new Date(start);
     end.setDate(end.getDate() + totalDuration - 1);
-    
+
     // Format as YYYY-MM-DD
     const endYear = end.getFullYear();
     const endMonth = String(end.getMonth() + 1).padStart(2, '0');
     const endDay = String(end.getDate()).padStart(2, '0');
-    
+
     return `${endYear}-${endMonth}-${endDay}`;
   };
 
@@ -345,34 +315,19 @@ export default function QuoteSummary() {
   // Calculate display duration (same logic as calculateEndDate but returning number)
   const calculateDisplayDuration = (): number => {
     if (!startDate || selectedDests.length === 0) return 0;
-    
-    let totalDuration = selectedDests.reduce((sum, dest) => {
-      let duration = dest.duration || 0;
-      
-      if (dest.name === "Turquía Esencial") {
-        const dayOfWeek = startDate.getDay();
-        if (dayOfWeek === 2) duration = 11;
-        else if (dayOfWeek === 3) duration = 10;
-      }
-      
-      if (dest.name === "Gran Tour de Europa") {
-        const dayOfWeek = startDate.getDay();
-        if (dayOfWeek === 0) duration = 17;
-        else if (dayOfWeek === 1) duration = 16;
-      }
-      
-      return sum + duration;
-    }, 0);
 
-    if (hasTurkeyEsencial && hasDubaiMaravilloso) {
-      totalDuration -= 1;
-    }
+    // Sumar todas las duraciones base
+    let totalDuration = selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0);
 
-    const hasTurkeyEsencialAdjusted = selectedDests.some(d => 
-      d.name === "Turquía Esencial" && (startDate.getDay() === 2 || startDate.getDay() === 3)
-    );
-    
-    if (hasTurkeyDestinations && !hasTurkeyEsencialAdjusted) {
+    // Verificar si hay destinos internacionales que requieren día extra
+    // Perú NO requiere día extra (vuelo corto desde Colombia)
+    const requiresExtraDay = selectedDests.some(dest => {
+      const country = dest.country?.toLowerCase() || "";
+      return country !== "colombia" && country !== "perú" && country !== "peru";
+    });
+
+    // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
+    if (requiresExtraDay) {
       totalDuration += 1;
     }
 
@@ -380,33 +335,33 @@ export default function QuoteSummary() {
   };
 
   const displayDuration = calculateDisplayDuration();
-  
+
   const getPriceForDate = (dest: Destination, date: Date | undefined): number => {
     if (!date || !dest.priceTiers || dest.priceTiers.length === 0) {
       return dest.basePrice ? parseFloat(dest.basePrice) : 0;
     }
-    
+
     const dateStr = date.toISOString().split('T')[0];
-    
+
     // Find the appropriate price tier
     for (const tier of dest.priceTiers) {
       if (dateStr <= tier.endDate) {
         return parseFloat(tier.price);
       }
     }
-    
+
     // If no tier matches, return the last tier's price
     const lastTier = dest.priceTiers[dest.priceTiers.length - 1];
     return parseFloat(lastTier.price);
   };
-  
+
   const landPortionPerPerson = selectedDests.reduce((sum, dest) => {
     const price = getPriceForDate(dest, startDate);
     return sum + price;
   }, 0);
-  
+
   const landPortionTotal = landPortionPerPerson * passengers;
-  
+
   const trmValue = trm ? parseFloat(trm) : 0;
   const effectiveTrm = trmValue > 0 ? trmValue + 30 : 0;
 
@@ -421,17 +376,17 @@ export default function QuoteSummary() {
       'saturday': 'Sábado',
       'sunday': 'Domingo'
     };
-    
+
     // Sort days by their order in the week
     const sortedDays = days.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
-    
+
     // Check for consecutive days to create ranges
     if (sortedDays.length >= 5) {
       const firstDay = dayMapSpanish[sortedDays[0]];
       const lastDay = dayMapSpanish[sortedDays[sortedDays.length - 1]];
       return `${firstDay} a ${lastDay}`;
     }
-    
+
     // For few days, list them
     return sortedDays.map(d => dayMapSpanish[d]).join(' y ');
   };
@@ -472,7 +427,7 @@ export default function QuoteSummary() {
   const flightsCostUSD = getUSDValue(flightsCost, inputCurrencyFlights);
   const assistanceCostUSD = getUSDValue(assistanceCost, inputCurrencyAssistance);
   const flightsAndExtrasValue = flightsCostUSD + assistanceCostUSD;
-  
+
   const getTurkeyUpgradeCost = () => {
     if (!hasTurkeyEsencial || !turkeyUpgrade) return 0;
     if (turkeyUpgrade === "option1") return 500;
@@ -486,18 +441,18 @@ export default function QuoteSummary() {
     const upgrade = italiaUpgrades.find(u => u.code === italiaUpgrade);
     return upgrade ? Number(upgrade.price) : 0;
   };
-  
+
   const getGranTourUpgradeCost = () => {
     if (!hasGranTourEuropa || !granTourUpgrade) return 0;
     const upgrade = granTourUpgrades.find(u => u.code === granTourUpgrade);
     return upgrade ? Number(upgrade.price) : 0;
   };
-  
+
   const turkeyUpgradeCost = getTurkeyUpgradeCost();
   const italiaUpgradeCost = getItaliaUpgradeCost();
   const granTourUpgradeCost = getGranTourUpgradeCost();
   const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost;
-  
+
   const grandTotalCOP = effectiveTrm > 0 ? grandTotal * effectiveTrm : 0;
 
   const finalPriceValue = getUSDValue(finalPrice, inputCurrencyFinal);
@@ -510,7 +465,7 @@ export default function QuoteSummary() {
     const landPortionWithUpgrade = landPortionTotal + turkeyUpgradeCost;
     const thirtyPercentLand = landPortionWithUpgrade * 0.30;
     const baseMinPaymentUSD = flightsAndExtrasValue + thirtyPercentLand + 200;
-    
+
     return baseMinPaymentUSD;
   };
 
@@ -519,16 +474,16 @@ export default function QuoteSummary() {
 
   const handlePercentageClick = (percentage: number) => {
     if (!finalPrice) return;
-    
+
     const rawFinalPrice = parseNumber(finalPrice);
     const calculatedValue = rawFinalPrice * (percentage / 100);
-    
+
     // Format the value back to string with commas
-    const formattedValue = calculatedValue.toLocaleString('en-US', { 
-      minimumFractionDigits: inputCurrencyFinal === "USD" ? 2 : 0, 
-      maximumFractionDigits: inputCurrencyFinal === "USD" ? 2 : 0 
+    const formattedValue = calculatedValue.toLocaleString('en-US', {
+      minimumFractionDigits: inputCurrencyFinal === "USD" ? 2 : 0,
+      maximumFractionDigits: inputCurrencyFinal === "USD" ? 2 : 0
     });
-    
+
     setMinPayment(formattedValue);
   };
 
@@ -542,22 +497,22 @@ export default function QuoteSummary() {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        
+
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
         });
-        
+
         if (!response.ok) {
           throw new Error("Upload failed");
         }
-        
+
         const { url } = await response.json();
         uploadedUrls.push(url);
       }
-      
+
       setOutboundImages([...outboundImages, ...uploadedUrls]);
-      
+
       toast({
         title: "Imágenes subidas",
         description: `${files.length} imagen(es) del vuelo de ida guardadas`,
@@ -584,22 +539,22 @@ export default function QuoteSummary() {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        
+
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
         });
-        
+
         if (!response.ok) {
           throw new Error("Upload failed");
         }
-        
+
         const { url } = await response.json();
         uploadedUrls.push(url);
       }
-      
+
       setReturnImages([...returnImages, ...uploadedUrls]);
-      
+
       toast({
         title: "Imágenes subidas",
         description: `${files.length} imagen(es) del vuelo de regreso guardadas`,
@@ -626,22 +581,22 @@ export default function QuoteSummary() {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        
+
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
         });
-        
+
         if (!response.ok) {
           throw new Error("Upload failed");
         }
-        
+
         const { url } = await response.json();
         uploadedUrls.push(url);
       }
-      
+
       setDomesticFlightImages([...domesticFlightImages, ...uploadedUrls]);
-      
+
       toast({
         title: "Imágenes subidas",
         description: `${files.length} imagen(es) del vuelo interno guardadas`,
@@ -668,22 +623,22 @@ export default function QuoteSummary() {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        
+
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
         });
-        
+
         if (!response.ok) {
           throw new Error("Upload failed");
         }
-        
+
         const { url } = await response.json();
         uploadedUrls.push(url);
       }
-      
+
       setConnectionFlightImages([...connectionFlightImages, ...uploadedUrls]);
-      
+
       toast({
         title: "Imágenes subidas",
         description: `${files.length} imagen(es) del vuelo de conexión guardadas`,
@@ -705,15 +660,30 @@ export default function QuoteSummary() {
     const destinationsText = selectedDests
       .map((d) => `${d.name} (${d.duration}D/${d.nights}N)`)
       .join(", ");
-    
+
     const startDateFormatted = startDate ? formatDate(startDate) : "Por definir";
     const endDateFormatted = endDate ? formatDate(new Date(endDate + "T00:00:00")) : "Por definir";
-    
+
     const message = `Hola! Quiero cotizar los siguientes destinos: ${destinationsText}. Fechas: ${startDateFormatted} al ${endDateFormatted}. Total: US$ ${formatUSD(grandTotal)}`;
-    
+
+
+    // Track WhatsApp attempt
+    trackQuote({
+      clientId: selectedClientId || null,
+      totalPrice: grandTotal,
+      destinationId: selectedDestinations[0] || null,
+      passengers: passengers,
+      startDate: startDate,
+      isSaved: false,
+      metadata: {
+        action: "whatsapp",
+        destinations: selectedDests.map(d => d.name),
+      }
+    });
+
     window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
   };
-  
+
   const handleSaveQuote = async () => {
     let clientIdToUse = selectedClientId;
 
@@ -757,17 +727,17 @@ export default function QuoteSummary() {
       return;
     }
 
-    const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
-                          domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
-                          outboundCabinBaggage || outboundHoldBaggage || 
-                          returnCabinBaggage || returnHoldBaggage ||
-                          domesticCabinBaggage || domesticHoldBaggage ||
-                          connectionCabinBaggage || connectionHoldBaggage;
+    const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 ||
+      domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
+      outboundCabinBaggage || outboundHoldBaggage ||
+      returnCabinBaggage || returnHoldBaggage ||
+      domesticCabinBaggage || domesticHoldBaggage ||
+      connectionCabinBaggage || connectionHoldBaggage;
 
     // Calculate Min Payment Payload
     let payloadMinPayment = null;
     let payloadMinPaymentCOP = null;
-    
+
     if (minPayment && minPayment.trim() !== "") {
       const rawMinPayment = parseNumber(minPayment);
       if (inputCurrencyFinal === "USD") {
@@ -834,6 +804,20 @@ export default function QuoteSummary() {
     };
 
     await saveQuoteMutation.mutateAsync(quoteData);
+
+    // Track saved quote
+    trackQuote({
+      clientId: clientIdToUse,
+      totalPrice: grandTotal,
+      destinationId: selectedDestinations[0] || null,
+      passengers: passengers,
+      startDate: startDate,
+      isSaved: true,
+      metadata: {
+        action: "save",
+        destinations: selectedDests.map(d => d.name),
+      }
+    });
   };
 
   const handleExportPDF = async () => {
@@ -843,19 +827,32 @@ export default function QuoteSummary() {
     // Clear any existing completion timeout
     if (pdfCompletionTimeoutRef.current) {
       clearTimeout(pdfCompletionTimeoutRef.current);
-      pdfCompletionTimeoutRef.current = null;
     }
+
+    // Track PDF export attempt
+    trackQuote({
+      clientId: selectedClientId || null,
+      totalPrice: grandTotal,
+      destinationId: selectedDestinations[0] || null,
+      passengers: passengers,
+      startDate: startDate,
+      isSaved: false,
+      metadata: {
+        action: "export_pdf",
+        destinations: selectedDests.map(d => d.name),
+      }
+    });
 
     setIsGeneratingPDF(true);
     setIsPDFComplete(false);
-    
+
     try {
-      const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 || 
-                            domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
-                            outboundCabinBaggage || outboundHoldBaggage || 
-                            returnCabinBaggage || returnHoldBaggage ||
-                            domesticCabinBaggage || domesticHoldBaggage ||
-                            connectionCabinBaggage || connectionHoldBaggage;
+      const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 ||
+        domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
+        outboundCabinBaggage || outboundHoldBaggage ||
+        returnCabinBaggage || returnHoldBaggage ||
+        domesticCabinBaggage || domesticHoldBaggage ||
+        connectionCabinBaggage || connectionHoldBaggage;
 
       console.log("Starting PDF generation request...");
 
@@ -882,11 +879,11 @@ export default function QuoteSummary() {
       // Calculate Min Payment Payload
       let payloadMinPayment = null;
       let payloadMinPaymentCOP = null;
-      
+
       if (minPayment && minPayment.trim() !== "") {
         // User entered a manual value
         const rawMinPayment = parseNumber(minPayment);
-        
+
         // Assume the currency matches the Final Price currency input
         if (inputCurrencyFinal === "USD") {
           payloadMinPayment = rawMinPayment;
@@ -958,20 +955,20 @@ export default function QuoteSummary() {
           minPaymentCOP: payloadMinPaymentCOP,
         }),
       });
-      
+
       console.log("PDF response received:", response.status, response.ok);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error("PDF generation failed:", errorText);
         throw new Error(`Failed to generate PDF: ${response.status} - ${errorText}`);
       }
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      
+
       // Use custom filename if provided, otherwise default
       let downloadFilename = `cotizacion-${new Date().toISOString().split('T')[0]}.pdf`;
       if (customFilename.trim()) {
@@ -980,28 +977,28 @@ export default function QuoteSummary() {
           downloadFilename += '.pdf';
         }
       }
-      
+
       a.download = downloadFilename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       // Mark PDF as complete and show completion state
       setIsPDFComplete(true);
-      
+
       // Clear any existing timeout (defensive - should already be cleared)
       if (pdfCompletionTimeoutRef.current) {
         clearTimeout(pdfCompletionTimeoutRef.current);
       }
-      
+
       // Keep modal open for 1.5s to show completion state, then close
       pdfCompletionTimeoutRef.current = setTimeout(() => {
         setIsGeneratingPDF(false);
         setIsPDFComplete(false);
         pdfCompletionTimeoutRef.current = null;
       }, 1500);
-      
+
       toast({
         title: "PDF generado",
         description: "Tu cotización ha sido descargada exitosamente",
@@ -1022,29 +1019,18 @@ export default function QuoteSummary() {
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="bg-white shadow-md border-b">
-            <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
-                Cosmos <span className="text-blue-400 font-light">Mayorista</span>
-              </h1>
-              <Button
-                variant="ghost"
-                onClick={() => setLocation("/")}
-                data-testid="button-back"
-                className="ml-auto"
-              >
-                ← Volver
-              </Button>
-            </div>
-          </header>
+    <div className="max-w-4xl mx-auto space-y-4">
+      <div className="flex justify-end pt-4">
+        <Button
+          variant="ghost"
+          onClick={() => setLocation("/")}
+          data-testid="button-back"
+        >
+          ← Volver
+        </Button>
+      </div>
 
-          <main className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50 to-white">
-            <div className="container mx-auto px-4 py-12 max-w-4xl">
+      <div className="container mx-auto px-4 py-12 max-w-4xl">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-extrabold text-gray-800 mb-2">Resumen de tu Cotización</h2>
           <p className="text-gray-600">Revisa los detalles y agrega la información de tus vuelos</p>
@@ -1062,13 +1048,13 @@ export default function QuoteSummary() {
               {selectedDests.map((dest) => {
                 const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
                 const imageUrl = getDestinationImage(dest);
-                
+
                 return (
                   <div key={dest.id} className="flex gap-4 p-3 bg-gradient-to-r from-blue-50 to-white rounded-lg border border-blue-100">
                     {imageUrl && (
                       <div className="w-32 h-24 flex-shrink-0 rounded-md overflow-hidden">
-                        <img 
-                          src={imageUrl} 
+                        <img
+                          src={imageUrl}
                           alt={dest.name}
                           className="w-full h-full object-cover"
                         />
@@ -1097,7 +1083,7 @@ export default function QuoteSummary() {
                   </div>
                 );
               })}
-              
+
               <div className="border-t border-blue-200 pt-3 mt-3">
                 <div className="flex justify-between items-center text-lg font-semibold">
                   <span className="text-gray-700">Subtotal Porciones Terrestres:</span>
@@ -1145,22 +1131,22 @@ export default function QuoteSummary() {
                     hasAllowedDaysRestriction && allowedDaysDestination
                       ? formatAllowedDays(allowedDaysDestination.allowedDays || [])
                       : hasTurkeyEsencial
-                      ? "Selecciona martes o miércoles"
-                      : hasGranTourEuropa
-                      ? "Selecciona domingo o lunes"
-                      : hasTurkeyDestinations
-                      ? "Selecciona un martes"
-                      : "Selecciona una fecha"
+                        ? "Selecciona martes o miércoles"
+                        : hasGranTourEuropa
+                          ? "Selecciona domingo o lunes"
+                          : hasTurkeyDestinations
+                            ? "Selecciona un martes"
+                            : "Selecciona una fecha"
                   }
                   disabled={disableDates}
                   priceTiers={
-                    selectedDestinations.length > 0 
-                      ? selectedDests.flatMap(dest => 
-                          (dest.priceTiers || []).map(tier => ({
-                            ...tier,
-                            destinationName: dest.name
-                          }))
-                        )
+                    selectedDestinations.length > 0
+                      ? selectedDests.flatMap(dest =>
+                        (dest.priceTiers || []).map(tier => ({
+                          ...tier,
+                          destinationName: dest.name
+                        }))
+                      )
                       : undefined
                   }
                 />
@@ -1397,9 +1383,9 @@ export default function QuoteSummary() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
                 {outboundImages.map((url, idx) => (
                   <div key={idx} className="relative border rounded-md overflow-hidden">
-                    <img 
-                      src={url} 
-                      alt={`Vuelo ida ${idx + 1}`} 
+                    <img
+                      src={url}
+                      alt={`Vuelo ida ${idx + 1}`}
                       className="w-full h-32 object-cover"
                     />
                     <Button
@@ -1698,9 +1684,9 @@ export default function QuoteSummary() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
                 {returnImages.map((url, idx) => (
                   <div key={idx} className="relative border rounded-md overflow-hidden">
-                    <img 
-                      src={url} 
-                      alt={`Vuelo regreso ${idx + 1}`} 
+                    <img
+                      src={url}
+                      alt={`Vuelo regreso ${idx + 1}`}
                       className="w-full h-32 object-cover"
                     />
                     <Button
@@ -1851,7 +1837,7 @@ export default function QuoteSummary() {
                 </div>
                 {effectiveTrm > 0 && (
                   <div className="mt-1 text-xs text-gray-500">
-                    {inputCurrencyFlights === "USD" 
+                    {inputCurrencyFlights === "USD"
                       ? `$ ${(getUSDValue(flightsCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
                       : `US$ ${getUSDValue(flightsCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     }
@@ -1887,7 +1873,7 @@ export default function QuoteSummary() {
                 </div>
                 {effectiveTrm > 0 && (
                   <div className="mt-1 text-xs text-gray-500">
-                    {inputCurrencyAssistance === "USD" 
+                    {inputCurrencyAssistance === "USD"
                       ? `$ ${(getUSDValue(assistanceCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
                       : `US$ ${getUSDValue(assistanceCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     }
@@ -1895,17 +1881,17 @@ export default function QuoteSummary() {
                 )}
               </div>
             </div>
-            
+
             <div className="mt-4 pt-4 border-t border-orange-200 flex justify-between items-center">
-               <span className="font-semibold text-gray-700">Total Vuelos y Asistencia:</span>
-               <div className="text-right">
-                 <span className="text-xl font-bold text-orange-700 block">US$ {formatUSD(flightsAndExtrasValue)}</span>
-                 {effectiveTrm > 0 && (
-                   <span className="text-sm font-semibold text-orange-600 block">
-                     $ {(flightsAndExtrasValue * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
-                   </span>
-                 )}
-               </div>
+              <span className="font-semibold text-gray-700">Total Vuelos y Asistencia:</span>
+              <div className="text-right">
+                <span className="text-xl font-bold text-orange-700 block">US$ {formatUSD(flightsAndExtrasValue)}</span>
+                {effectiveTrm > 0 && (
+                  <span className="text-sm font-semibold text-orange-600 block">
+                    $ {(flightsAndExtrasValue * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                  </span>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1993,35 +1979,35 @@ export default function QuoteSummary() {
                 }
               </div>
             )}
-            
+
             {finalPriceValue > 0 && (
-                <div className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-gray-600">Costo Total (Neto):</span>
-                        <div className="text-right">
-                            <span className="font-semibold block">US$ {formatUSD(grandTotal)}</span>
-                            {effectiveTrm > 0 && (
-                                <span className="text-xs text-gray-500 block">
-                                    $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                        <span className="text-purple-700 font-bold">Cargo por Servicio:</span>
-                        <div className="text-right">
-                            <span className={`font-bold text-xl block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                US$ {formatUSD(profit)}
-                            </span>
-                            {effectiveTrm > 0 && (
-                                <span className={`text-sm font-semibold block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    $ {(profit * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
-                                </span>
-                            )}
-                        </div>
-                    </div>
+              <div className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-600">Costo Total (Neto):</span>
+                  <div className="text-right">
+                    <span className="font-semibold block">US$ {formatUSD(grandTotal)}</span>
+                    {effectiveTrm > 0 && (
+                      <span className="text-xs text-gray-500 block">
+                        $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                      </span>
+                    )}
+                  </div>
                 </div>
-             )}
+                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                  <span className="text-purple-700 font-bold">Cargo por Servicio:</span>
+                  <div className="text-right">
+                    <span className={`font-bold text-xl block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      US$ {formatUSD(profit)}
+                    </span>
+                    {effectiveTrm > 0 && (
+                      <span className={`text-sm font-semibold block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        $ {(profit * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -2035,30 +2021,30 @@ export default function QuoteSummary() {
           <CardContent>
             <p className="text-sm text-gray-600 mb-3">
               Ingresa el valor mínimo para separar. Si se deja vacío, el sistema calculará automáticamente:
-              <br/>
+              <br />
               <span className="text-xs italic">(Vuelos + Asistencia + 30% Porción Terrestre + 200 USD)</span>
             </p>
-            
+
             <div className="flex flex-wrap gap-2 mb-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => handlePercentageClick(60)}
                 className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
               >
                 60% del PVP
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => handlePercentageClick(70)}
                 className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
               >
                 70% del PVP
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => handlePercentageClick(100)}
                 className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
               >
@@ -2072,8 +2058,8 @@ export default function QuoteSummary() {
               </span>
               <Input
                 type="text"
-                placeholder={inputCurrencyFinal === "USD" 
-                  ? formatNumber(defaultMinPaymentUSD.toFixed(2)) 
+                placeholder={inputCurrencyFinal === "USD"
+                  ? formatNumber(defaultMinPaymentUSD.toFixed(2))
                   : formatNumber(defaultMinPaymentCOP.toFixed(0))
                 }
                 value={formatNumber(minPayment)}
@@ -2082,7 +2068,7 @@ export default function QuoteSummary() {
                 data-testid="input-min-payment"
               />
             </div>
-            
+
             {effectiveTrm > 0 && (
               <div className="text-sm text-indigo-700 font-medium">
                 {minPayment ? (
@@ -2134,7 +2120,7 @@ export default function QuoteSummary() {
             <FileText className="w-5 h-5 mr-2" />
             {isGeneratingPDF ? "Generando..." : "Exportar PDF"}
           </Button>
-          
+
           <Button
             size="lg"
             className="w-full bg-green-600 hover:bg-green-700 text-white"
@@ -2164,13 +2150,13 @@ export default function QuoteSummary() {
                 Selecciona un cliente existente o crea uno nuevo
               </DialogDescription>
             </DialogHeader>
-            
+
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="existing">Cliente Existente</TabsTrigger>
                 <TabsTrigger value="new">Nuevo Cliente</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="existing" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="client">Cliente</Label>
@@ -2188,32 +2174,32 @@ export default function QuoteSummary() {
                   </Select>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="new" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="new-name">Nombre Completo</Label>
-                  <Input 
-                    id="new-name" 
-                    placeholder="Ej: Juan Pérez" 
+                  <Input
+                    id="new-name"
+                    placeholder="Ej: Juan Pérez"
                     value={newClientName}
                     onChange={(e) => setNewClientName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-email">Correo Electrónico</Label>
-                  <Input 
-                    id="new-email" 
-                    type="email" 
-                    placeholder="juan@ejemplo.com" 
+                  <Input
+                    id="new-email"
+                    type="email"
+                    placeholder="juan@ejemplo.com"
                     value={newClientEmail}
                     onChange={(e) => setNewClientEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-phone">Teléfono (Opcional)</Label>
-                  <Input 
-                    id="new-phone" 
-                    placeholder="+57 300 123 4567" 
+                  <Input
+                    id="new-phone"
+                    placeholder="+57 300 123 4567"
                     value={newClientPhone}
                     onChange={(e) => setNewClientPhone(e.target.value)}
                   />
@@ -2245,10 +2231,7 @@ export default function QuoteSummary() {
 
         {/* PDF Loading Modal */}
         <PDFLoadingModal isOpen={isGeneratingPDF} isComplete={isPDFComplete} />
-            </div>
-          </main>
-        </div>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }

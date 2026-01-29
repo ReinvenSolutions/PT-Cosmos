@@ -28,6 +28,9 @@ import {
   type InsertQuoteDestination,
   destinationImages,
   type DestinationImage,
+  quoteLogs,
+  type QuoteLog,
+  type InsertQuoteLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, desc } from "drizzle-orm";
@@ -38,13 +41,13 @@ export interface IStorage {
   getDestination(id: string): Promise<Destination | undefined>;
   createDestination(data: InsertDestination): Promise<Destination>;
   updateDestination(id: string, data: Partial<InsertDestination>): Promise<Destination>;
-  
+
   getItineraryDays(destinationId: string): Promise<ItineraryDay[]>;
-  
+
   getHotels(destinationId: string): Promise<Hotel[]>;
-  
+
   getInclusions(destinationId: string): Promise<Inclusion[]>;
-  
+
   getExclusions(destinationId: string): Promise<Exclusion[]>;
 
   getDestinationImages(destinationId: string): Promise<DestinationImage[]>;
@@ -64,6 +67,18 @@ export interface IStorage {
   getQuote(id: string, userId?: string): Promise<(Quote & { client: Client, destinations: (QuoteDestination & { destination: Destination })[] }) | undefined>;
   getQuoteStats(): Promise<{ userId: string, username: string, count: number }[]>;
   deleteQuote(id: string, userId: string): Promise<void>;
+
+  // New Analytics methods
+  createQuoteLog(data: InsertQuoteLog): Promise<QuoteLog>;
+  getDashboardMetrics(): Promise<{
+    totalQuotes: number;
+    totalAmountUSD: number;
+    totalClients: number;
+    totalUsers: number;
+    quotesThisMonth: number;
+  }>;
+  getQuotesByDateRange(days: number): Promise<{ date: string, count: number, amount: number }[]>;
+  getQuotesByClient(clientId: string): Promise<Quote[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -96,12 +111,12 @@ export class DatabaseStorage implements IStorage {
       .from(itineraryDays)
       .where(eq(itineraryDays.destinationId, destinationId))
       .orderBy(itineraryDays.dayNumber);
-    
+
     // Remove duplicates: keep only the first occurrence of each dayNumber
     // This prevents duplicate itinerary days from appearing in PDFs
     const seenDays = new Map<number, ItineraryDay>();
     const uniqueDays: ItineraryDay[] = [];
-    
+
     for (const day of allDays) {
       if (!seenDays.has(day.dayNumber)) {
         seenDays.set(day.dayNumber, day);
@@ -116,7 +131,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
     }
-    
+
     return uniqueDays;
   }
 
@@ -209,7 +224,7 @@ export class DatabaseStorage implements IStorage {
   async createQuote(quoteData: InsertQuote, destinationsData: InsertQuoteDestination[]): Promise<Quote> {
     return await db.transaction(async (tx) => {
       const [quote] = await tx.insert(quotes).values(quoteData).returning();
-      
+
       if (destinationsData.length > 0) {
         const destinationsWithQuoteId = destinationsData.map(d => ({
           ...d,
@@ -218,7 +233,7 @@ export class DatabaseStorage implements IStorage {
         }));
         await tx.insert(quoteDestinations).values(destinationsWithQuoteId);
       }
-      
+
       return quote;
     });
   }
@@ -230,7 +245,7 @@ export class DatabaseStorage implements IStorage {
         .from(quotes)
         .where(eq(quotes.id, id))
         .limit(1);
-      
+
       if (!existingQuote[0] || existingQuote[0].userId !== userId) {
         throw new Error("Quote not found or unauthorized");
       }
@@ -251,7 +266,7 @@ export class DatabaseStorage implements IStorage {
         }));
         await tx.insert(quoteDestinations).values(destinationsWithQuoteId);
       }
-      
+
       return updatedQuote;
     });
   }
@@ -272,7 +287,11 @@ export class DatabaseStorage implements IStorage {
         outboundHoldBaggage: quotes.outboundHoldBaggage,
         returnCabinBaggage: quotes.returnCabinBaggage,
         returnHoldBaggage: quotes.returnHoldBaggage,
+        domesticCabinBaggage: quotes.domesticCabinBaggage,
+        domesticHoldBaggage: quotes.domesticHoldBaggage,
         turkeyUpgrade: quotes.turkeyUpgrade,
+        italiaUpgrade: quotes.italiaUpgrade,
+        granTourUpgrade: quotes.granTourUpgrade,
         trm: quotes.trm,
         customFilename: quotes.customFilename,
         minPayment: quotes.minPayment,
@@ -283,13 +302,14 @@ export class DatabaseStorage implements IStorage {
         status: quotes.status,
         createdAt: quotes.createdAt,
         updatedAt: quotes.updatedAt,
+        domesticFlightImages: quotes.domesticFlightImages,
         client: clients,
       })
       .from(quotes)
       .innerJoin(clients, eq(quotes.clientId, clients.id))
       .where(eq(quotes.userId, userId))
       .orderBy(desc(quotes.createdAt));
-    
+
     return result.map(r => ({
       id: r.id,
       clientId: r.clientId,
@@ -304,7 +324,12 @@ export class DatabaseStorage implements IStorage {
       outboundHoldBaggage: r.outboundHoldBaggage,
       returnCabinBaggage: r.returnCabinBaggage,
       returnHoldBaggage: r.returnHoldBaggage,
+      domesticFlightImages: r.domesticFlightImages,
+      domesticCabinBaggage: r.domesticCabinBaggage,
+      domesticHoldBaggage: r.domesticHoldBaggage,
       turkeyUpgrade: r.turkeyUpgrade,
+      italiaUpgrade: r.italiaUpgrade,
+      granTourUpgrade: r.granTourUpgrade,
       trm: r.trm,
       customFilename: r.customFilename,
       minPayment: r.minPayment,
@@ -335,7 +360,12 @@ export class DatabaseStorage implements IStorage {
         outboundHoldBaggage: quotes.outboundHoldBaggage,
         returnCabinBaggage: quotes.returnCabinBaggage,
         returnHoldBaggage: quotes.returnHoldBaggage,
+        domesticFlightImages: quotes.domesticFlightImages,
+        domesticCabinBaggage: quotes.domesticCabinBaggage,
+        domesticHoldBaggage: quotes.domesticHoldBaggage,
         turkeyUpgrade: quotes.turkeyUpgrade,
+        italiaUpgrade: quotes.italiaUpgrade,
+        granTourUpgrade: quotes.granTourUpgrade,
         trm: quotes.trm,
         customFilename: quotes.customFilename,
         minPayment: quotes.minPayment,
@@ -353,7 +383,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(clients, eq(quotes.clientId, clients.id))
       .innerJoin(users, eq(quotes.userId, users.id))
       .orderBy(desc(quotes.createdAt));
-    
+
     return result.map(r => ({
       id: r.id,
       clientId: r.clientId,
@@ -368,7 +398,12 @@ export class DatabaseStorage implements IStorage {
       outboundHoldBaggage: r.outboundHoldBaggage,
       returnCabinBaggage: r.returnCabinBaggage,
       returnHoldBaggage: r.returnHoldBaggage,
+      domesticFlightImages: r.domesticFlightImages,
+      domesticCabinBaggage: r.domesticCabinBaggage,
+      domesticHoldBaggage: r.domesticHoldBaggage,
       turkeyUpgrade: r.turkeyUpgrade,
+      italiaUpgrade: r.italiaUpgrade,
+      granTourUpgrade: r.granTourUpgrade,
       trm: r.trm,
       customFilename: r.customFilename,
       minPayment: r.minPayment,
@@ -400,7 +435,11 @@ export class DatabaseStorage implements IStorage {
         outboundHoldBaggage: quotes.outboundHoldBaggage,
         returnCabinBaggage: quotes.returnCabinBaggage,
         returnHoldBaggage: quotes.returnHoldBaggage,
+        domesticCabinBaggage: quotes.domesticCabinBaggage,
+        domesticHoldBaggage: quotes.domesticHoldBaggage,
         turkeyUpgrade: quotes.turkeyUpgrade,
+        italiaUpgrade: quotes.italiaUpgrade,
+        granTourUpgrade: quotes.granTourUpgrade,
         trm: quotes.trm,
         customFilename: quotes.customFilename,
         minPayment: quotes.minPayment,
@@ -411,15 +450,16 @@ export class DatabaseStorage implements IStorage {
         status: quotes.status,
         createdAt: quotes.createdAt,
         updatedAt: quotes.updatedAt,
+        domesticFlightImages: quotes.domesticFlightImages,
         client: clients,
       })
       .from(quotes)
       .innerJoin(clients, eq(quotes.clientId, clients.id))
       .where(eq(quotes.id, id))
       .limit(1);
-    
+
     if (!quoteResult[0]) return undefined;
-    
+
     if (userId && quoteResult[0].userId !== userId) {
       return undefined;
     }
@@ -452,7 +492,12 @@ export class DatabaseStorage implements IStorage {
       outboundHoldBaggage: quoteResult[0].outboundHoldBaggage,
       returnCabinBaggage: quoteResult[0].returnCabinBaggage,
       returnHoldBaggage: quoteResult[0].returnHoldBaggage,
+      domesticFlightImages: quoteResult[0].domesticFlightImages,
+      domesticCabinBaggage: quoteResult[0].domesticCabinBaggage,
+      domesticHoldBaggage: quoteResult[0].domesticHoldBaggage,
       turkeyUpgrade: quoteResult[0].turkeyUpgrade,
+      italiaUpgrade: quoteResult[0].italiaUpgrade,
+      granTourUpgrade: quoteResult[0].granTourUpgrade,
       trm: quoteResult[0].trm,
       customFilename: quoteResult[0].customFilename,
       minPayment: quoteResult[0].minPayment,
@@ -488,7 +533,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.role, 'advisor'))
       .groupBy(users.id, users.username)
       .orderBy(desc(sql`count(${quotes.id})`));
-    
+
     return result;
   }
 
@@ -499,7 +544,7 @@ export class DatabaseStorage implements IStorage {
         .from(quotes)
         .where(eq(quotes.id, id))
         .limit(1);
-      
+
       if (!quoteResult[0] || quoteResult[0].userId !== userId) {
         throw new Error("Quote not found or unauthorized");
       }
@@ -507,6 +552,90 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(quoteDestinations).where(eq(quoteDestinations.quoteId, id));
       await tx.delete(quotes).where(eq(quotes.id, id));
     });
+  }
+
+  async createQuoteLog(data: InsertQuoteLog): Promise<QuoteLog> {
+    const [log] = await db.insert(quoteLogs).values(data).returning();
+    return log;
+  }
+
+  async getDashboardMetrics(): Promise<{
+    totalQuotes: number;
+    totalAmountUSD: number;
+    totalClients: number;
+    totalUsers: number;
+    quotesThisMonth: number;
+  }> {
+    const [totalQuotesResult] = await db.select({ count: sql<number>`count(*)` }).from(quoteLogs);
+    const [totalAmountResult] = await db.select({ sum: sql<string>`sum(total_price)` }).from(quoteLogs);
+    const [totalClientsResult] = await db.select({ count: sql<number>`count(*)` }).from(clients);
+    const [totalUsersResult] = await db.select({ count: sql<number>`count(*)` }).from(users);
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [quotesThisMonthResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(quoteLogs)
+      .where(sql`created_at >= ${startOfMonth}`);
+
+    return {
+      totalQuotes: Number(totalQuotesResult?.count) || 0,
+      totalAmountUSD: Number(totalAmountResult?.sum) || 0,
+      totalClients: Number(totalClientsResult?.count) || 0,
+      totalUsers: Number(totalUsersResult?.count) || 0,
+      quotesThisMonth: Number(quotesThisMonthResult?.count) || 0,
+    };
+  }
+
+  async getQuotesByDateRange(days: number): Promise<{ date: string, count: number, amount: number }[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(created_at, 'YYYY-MM-DD') as date,
+        COUNT(*) as count,
+        SUM(COALESCE(total_price, 0)) as amount
+      FROM quote_logs
+      WHERE created_at >= ${startDate}
+      GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')
+      ORDER BY date ASC
+    `);
+
+    return result.rows as any;
+  }
+
+  async getQuotesByClient(clientId: string): Promise<any[]> {
+    const quoteList = await db
+      .select()
+      .from(quotes)
+      .where(eq(quotes.clientId, clientId))
+      .orderBy(desc(quotes.createdAt));
+
+    const quotesWithDestinations = await Promise.all(
+      quoteList.map(async (quote) => {
+        const dests = await db
+          .select({
+            id: quoteDestinations.id,
+            destination: destinations,
+            startDate: quoteDestinations.startDate,
+            passengers: quoteDestinations.passengers,
+            price: quoteDestinations.price,
+          })
+          .from(quoteDestinations)
+          .innerJoin(destinations, eq(quoteDestinations.destinationId, destinations.id))
+          .where(eq(quoteDestinations.quoteId, quote.id));
+
+        return {
+          ...quote,
+          destinations: dests,
+        };
+      })
+    );
+
+    return quotesWithDestinations;
   }
 }
 

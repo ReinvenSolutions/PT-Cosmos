@@ -13,12 +13,15 @@ import QuoteDetail from "@/pages/quote-detail";
 import QuoteEdit from "@/pages/quote-edit";
 import Home from "@/pages/home";
 import QuoteSummary from "@/pages/quote-summary";
+import QuoteExpress from "@/pages/quote-express";
+import Clients from "@/pages/clients";
+import { DashboardLayout } from "@/components/dashboard-layout";
 
-function ProtectedRoute({ 
-  component: Component, 
-  allowedRoles 
-}: { 
-  component: React.ComponentType; 
+function ProtectedRoute({
+  component: Component,
+  allowedRoles
+}: {
+  component: React.ComponentType;
   allowedRoles?: string[];
 }) {
   const { user, isLoading } = useAuth();
@@ -39,7 +42,11 @@ function ProtectedRoute({
     return <Redirect to="/dashboard" />;
   }
 
-  return <Component />;
+  return (
+    <DashboardLayout>
+      <Component />
+    </DashboardLayout>
+  );
 }
 
 function DashboardRedirect() {
@@ -58,7 +65,7 @@ function DashboardRedirect() {
   }
 
   if (user.role === "super_admin") {
-    return <Redirect to="/admin" />;
+    return <Redirect to="/admin/dashboard" />;
   } else if (user.role === "advisor") {
     return <Redirect to="/advisor" />;
   }
@@ -71,8 +78,11 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      <Route path="/dashboard" component={DashboardRedirect} />
-      <Route path="/admin">
+      <Route path="/admin" component={DashboardRedirect} />
+      <Route path="/admin/clients">
+        <ProtectedRoute component={Clients} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/admin/dashboard">
         <ProtectedRoute component={AdminDashboard} allowedRoles={["super_admin"]} />
       </Route>
       <Route path="/advisor/quotes/:id/edit">
@@ -86,6 +96,9 @@ function Router() {
       </Route>
       <Route path="/cotizacion">
         <ProtectedRoute component={QuoteSummary} allowedRoles={["super_admin", "advisor"]} />
+      </Route>
+      <Route path="/cotizacion-express">
+        <ProtectedRoute component={QuoteExpress} allowedRoles={["super_admin", "advisor"]} />
       </Route>
       <Route path="/">
         <ProtectedRoute component={Home} allowedRoles={["super_admin", "advisor"]} />

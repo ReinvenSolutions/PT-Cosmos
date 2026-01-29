@@ -11,7 +11,7 @@ export interface DestinationInput {
 export interface CreateQuoteInput {
   clientId: string;
   totalPrice: number | string;
-  destinations: Array<Omit<QuoteDestination, "id" | "quoteId">>;
+  destinations: Array<Omit<QuoteDestination, "id" | "quoteId" | "passengers" | "price"> & { passengers?: number; price?: string | null }>;
   originCity?: string | null;
   flightsAndExtras?: number | string | null;
   outboundFlightImages?: string[] | null;
