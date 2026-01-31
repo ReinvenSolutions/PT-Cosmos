@@ -1,0 +1,47 @@
+# Railway ignore file - these files won't be uploaded to Railway
+
+# Git files
+.git
+.gitignore
+.github
+
+# Dependencies
+node_modules
+
+# Development files
+*.local
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+
+# Scripts de desarrollo
+scripts/seed-*.ts
+scripts/test-*.ts
+scripts/check-*.ts
+
+# Archivos adjuntos y assets
+attached_assets
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage
+.vitest
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Temporary files
+.tmp
+tmp
+temp
+sed0r2hho
