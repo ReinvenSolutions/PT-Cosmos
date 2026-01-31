@@ -1,4 +1,4 @@
-import turkeyImg from '@assets/3_1763570259885.png';
+import turkeyImg from '@assets/stock_images/hagia_sophia_mosque__ecd33474.jpg';
 import dubaiImg from '@assets/stock_images/burj_khalifa_dubai_s_0a51b3ef.jpg';
 import egyptImg from '@assets/stock_images/pyramids_of_giza_egy_4d7d81d1.jpg';
 import greeceImg from '@assets/stock_images/santorini_greece_whi_25df22f7.jpg';
