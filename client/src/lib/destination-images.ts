@@ -1,18 +1,18 @@
-// Usar rutas públicas en lugar de imports para evitar problemas con Docker
-const turkeyImg = '/images/destinations/turquia-esencial/1.jpg';
-const dubaiImg = '/images/destinations/dubai-maravilloso/1.jpg';
-const egyptImg = '/images/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/1.jpg';
-const greeceImg = '/images/destinations/gran-tour-de-europa/1.jpg';
-const thailandImg = '/images/destinations/gran-tour-de-europa/2.jpg';
-const vietnamImg = '/images/destinations/gran-tour-de-europa/3.jpg';
-const peruImg = '/images/destinations/lo-mejor-de-cusco-4-dias-3-noches/1.jpg';
-const cartagenaImg = '/images/destinations/capurgana/1.jpg';
-const medellinImg = '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/1.jpg';
-const ejeImg = '/images/destinations/puebliando-santander/1.jpg';
-const sanAndresImg = '/images/destinations/capurgana/2.jpg';
-const amazonasImg = '/images/destinations/amazonas/1.jpg';
-const guajiraImg = '/images/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/1.jpg';
-const santanderImg = '/images/destinations/santander/1.jpg';
+// Usar URLs de Cloudinary para las imágenes de destinos
+const turkeyImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732477/destinations/turquia-esencial/1.jpg';
+const dubaiImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769731947/destinations/dubai-maravilloso/1.jpg';
+const egyptImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769731960/destinations/egipto-con-crucero-emiratos-salida-especial-mayo/1.jpg';
+const greeceImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769731996/destinations/gran-tour-de-europa/1.jpg';
+const thailandImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732000/destinations/gran-tour-de-europa/2.jpg';
+const vietnamImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732002/destinations/gran-tour-de-europa/3.jpg';
+const peruImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732054/destinations/lo-mejor-de-cusco-4-dias-3-noches/1.jpg';
+const cartagenaImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769731932/destinations/capurgana/1.jpg';
+const medellinImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732017/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/1.jpg';
+const ejeImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732246/destinations/puebliando-santander/1.jpg';
+const sanAndresImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769731934/destinations/capurgana/2.jpg';
+const amazonasImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769731893/destinations/amazonas/1.jpg';
+const guajiraImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732017/destinations/guajira-cabo-de-la-vela-y-punta-gallinas/1.jpg';
+const santanderImg = 'https://res.cloudinary.com/dcutgnihl/image/upload/v1769732259/destinations/santander/1.jpg';
 
 export const countryImages: Record<string, string> = {
   'Turquía': turkeyImg,
