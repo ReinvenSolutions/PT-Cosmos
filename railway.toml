@@ -2,6 +2,12 @@
 builder = "nixpacks"
 buildCommand = "npm ci && npm run build"
 
+[build.nixpacksPlan]
+providers = ["node"]
+
+[build.nixpacksOptions]
+node.version = "20"
+
 [deploy]
 startCommand = "npm start"
 restartPolicyType = "ON_FAILURE"
