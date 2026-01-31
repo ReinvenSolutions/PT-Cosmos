@@ -1,0 +1,48 @@
+# Node modules
+node_modules
+npm-debug.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Tests
+coverage
+.vitest
+
+# Logs
+logs
+*.log
+
+# Temp files
+.tmp
+tmp
+temp
+sed0r2hho
+
+# Development files
+.github
+scripts/seed-*.ts
+scripts/test-*.ts
+scripts/check-*.ts
+
+# Attached assets (large files)
+attached_assets
+
+# Railway ignore
+.railwayignore
