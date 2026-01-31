@@ -7,32 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Upload, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { trackQuote } from "@/lib/tracking";
-
-// Logo predeterminado de COSMOS MAYORISTA
-const DEFAULT_LOGO = "/images/logo/cosmos-mayorista-logo.png";
 
 export function ExpressQuoteGenerator() {
   const { toast } = useToast();
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Estado del formulario
-  const [hotelName, setHotelName] = useState("");
-  const [duration, setDuration] = useState("4 días y 3 noches");
+  const [mainTitle, setMainTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [hotelStars, setHotelStars] = useState(4);
-  const [roomType, setRoomType] = useState("Estandar vista interna");
-  const [mealPlan, setMealPlan] = useState("Desayuno bufet");
+  const [includes, setIncludes] = useState<string[]>([]);
+  const [plan, setPlan] = useState<"solo" | "empaquetado">("empaquetado");
   const [numberOfPeople, setNumberOfPeople] = useState(2);
   const [price, setPrice] = useState("");
   const [disclaimer, setDisclaimer] = useState("");
   const [mainImage, setMainImage] = useState<string | null>(null);
-  // Logo - inicializado con la ruta del logo
-  const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_LOGO);
+  const [logoUrl, setLogoUrl] = useState<string>("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [isCustomLogo, setIsCustomLogo] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,25 +72,59 @@ export function ExpressQuoteGenerator() {
 
       const reader = new FileReader();
       reader.onloadend = () => {
-        // Establecer el nuevo logo cargado por el usuario
         setLogoUrl(reader.result as string);
-        setIsCustomLogo(true);
         toast({
-          title: "Logo actualizado",
-          description: "El logo personalizado ha sido cargado exitosamente.",
+          title: "Logo cargado",
+          description: "El logo ha sido cargado exitosamente.",
         });
       };
       reader.onerror = () => {
         toast({
           title: "Error",
-          description: "Error al cargar el logo. Se mantendrá el logo predeterminado.",
+          description: "Error al cargar el logo.",
           variant: "destructive",
         });
-        // Si falla, volver al logo predeterminado
-        setLogoUrl(DEFAULT_LOGO);
-        setIsCustomLogo(false);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleIncludesChange = (item: string, checked: boolean) => {
+    setIncludes(prev => 
+      checked 
+        ? [...prev, item]
+        : prev.filter(i => i !== item)
+    );
+  };
+
+  const formatPrice = (value: string): string => {
+    // Remover todo excepto números
+    const numbers = value.replace(/\D/g, '');
+    
+    if (!numbers) return '';
+    
+    // Convertir a número y formatear con separadores de miles
+    const formatted = parseInt(numbers).toLocaleString('es-CO');
+    
+    return formatted;
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    
+    // Si el usuario está borrando, permitir campo vacío
+    if (inputValue === '') {
+      setPrice('');
+      return;
+    }
+    
+    // Extraer solo números
+    const numbers = inputValue.replace(/\D/g, '');
+    
+    if (numbers) {
+      // Formatear y guardar
+      const formatted = formatPrice(numbers);
+      setPrice(formatted);
     }
   };
 
@@ -120,10 +151,10 @@ export function ExpressQuoteGenerator() {
         isSaved: false,
         metadata: {
           action: "express_download",
-          hotelName: hotelName,
-          duration: duration,
-          roomType: roomType,
-          mealPlan: mealPlan,
+          mainTitle: mainTitle,
+          description: description,
+          includes: includes,
+          plan: plan,
         }
       });
 
@@ -166,55 +197,20 @@ export function ExpressQuoteGenerator() {
             {/* Logo */}
             <div className="space-y-2">
               <Label htmlFor="logo">Logo (Opcional)</Label>
-              <p className="text-xs text-gray-500">
-                Por defecto se usa el logo de Cosmos Mayorista. Puedes subir un logo personalizado si lo deseas.
-              </p>
-              <div className="flex items-center gap-4">
-                <Input
-                  id="logo"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="cursor-pointer"
-                />
-                <div className="flex-shrink-0">
+              <Input
+                id="logo"
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="cursor-pointer"
+              />
+              {logoUrl && (
+                <div className="mt-2">
                   <img
-                    key={logoUrl || 'default'} // Forzar re-render cuando cambie el logo
-                    src={logoUrl || DEFAULT_LOGO}
+                    src={logoUrl}
                     alt="Vista previa del logo"
-                    className="h-12 w-auto object-contain border rounded p-1 bg-[#004e7c]"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      console.error("Error loading logo:", target.src);
-                      // Si falla, intentar con el logo predeterminado
-                      if (target.src !== `${window.location.origin}${DEFAULT_LOGO}`) {
-                        target.src = DEFAULT_LOGO;
-                      }
-                    }}
+                    className="h-12 w-auto object-contain border rounded p-2 bg-[#004e7c]"
                   />
-                </div>
-              </div>
-              {isCustomLogo && (
-                <div className="flex items-center gap-2 mt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setLogoUrl(DEFAULT_LOGO);
-                      setIsCustomLogo(false);
-                      // Limpiar el input de archivo
-                      const fileInput = document.getElementById('logo') as HTMLInputElement;
-                      if (fileInput) fileInput.value = '';
-                      toast({
-                        title: "Logo restaurado",
-                        description: "Se ha restaurado el logo predeterminado de Cosmos Mayorista.",
-                      });
-                    }}
-                    className="text-xs"
-                  >
-                    Restaurar logo predeterminado
-                  </Button>
                 </div>
               )}
             </div>
@@ -240,64 +236,85 @@ export function ExpressQuoteGenerator() {
               )}
             </div>
 
-            {/* Nombre del Hotel */}
+            {/* Título Principal */}
             <div className="space-y-2">
-              <Label htmlFor="hotelName">Nombre del Hotel *</Label>
+              <Label htmlFor="mainTitle">Título Principal *</Label>
               <Input
-                id="hotelName"
-                value={hotelName}
-                onChange={(e) => setHotelName(e.target.value)}
+                id="mainTitle"
+                value={mainTitle}
+                onChange={(e) => setMainTitle(e.target.value)}
                 placeholder="Ej: Hotel Paradise Beach"
               />
             </div>
 
-            {/* Duración */}
+            {/* Descripción */}
             <div className="space-y-2">
-              <Label htmlFor="duration">Duración *</Label>
+              <Label htmlFor="description">Descripción *</Label>
               <Input
-                id="duration"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Ej: 4 días y 3 noches"
               />
-              <p className="text-xs text-gray-500">
-                Se agregará automáticamente "Hospédate por" antes de la duración
-              </p>
             </div>
 
-            {/* Estrellas del Hotel */}
+            {/* Incluye - Selector Múltiple */}
             <div className="space-y-2">
-              <Label htmlFor="hotelStars">Estrellas del Hotel *</Label>
-              <Input
-                id="hotelStars"
-                type="number"
-                min="1"
-                max="5"
-                value={hotelStars}
-                onChange={(e) => setHotelStars(parseInt(e.target.value) || 1)}
-              />
+              <Label>Incluye</Label>
+              <div className="space-y-3 border rounded-md p-4">
+                {[
+                  { id: "vuelo", label: "Vuelo" },
+                  { id: "traslado", label: "Traslado" },
+                  { id: "hotel", label: "Hotel" },
+                  { id: "actividades", label: "Actividades" },
+                  { id: "asistencia-medica", label: "Asistencia Médica" }
+                ].map((item) => (
+                  <div key={item.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={item.id}
+                      checked={includes.includes(item.label)}
+                      onCheckedChange={(checked) => 
+                        handleIncludesChange(item.label, checked as boolean)
+                      }
+                    />
+                    <label
+                      htmlFor={item.id}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {item.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Tipo de Habitación */}
-            <div className="space-y-2">
-              <Label htmlFor="roomType">Tipo de Habitación *</Label>
-              <Input
-                id="roomType"
-                value={roomType}
-                onChange={(e) => setRoomType(e.target.value)}
-                placeholder="Ej: Estandar vista interna"
-              />
-            </div>
+            {/* Estrellas del Hotel - Solo visible si Hotel está seleccionado */}
+            {includes.includes("Hotel") && (
+              <div className="space-y-2">
+                <Label htmlFor="hotelStars">Estrellas del Hotel *</Label>
+                <Input
+                  id="hotelStars"
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={hotelStars}
+                  onChange={(e) => setHotelStars(parseInt(e.target.value) || 1)}
+                />
+              </div>
+            )}
 
-            {/* Régimen Alimenticio */}
+            {/* Plan */}
             <div className="space-y-2">
-              <Label htmlFor="mealPlan">Régimen Alimenticio *</Label>
-              <Input
-                id="mealPlan"
-                value={mealPlan}
-                onChange={(e) => setMealPlan(e.target.value)}
-                placeholder="Ej: Desayuno bufet"
-              />
+              <Label htmlFor="plan">Plan *</Label>
+              <Select value={plan} onValueChange={(value: "solo" | "empaquetado") => setPlan(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="solo">Solo</SelectItem>
+                  <SelectItem value="empaquetado">Empaquetado</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Número de Personas */}
@@ -318,11 +335,11 @@ export function ExpressQuoteGenerator() {
               <Input
                 id="price"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="Ej: $ 2.173.600 COPS"
+                onChange={handlePriceChange}
+                placeholder="Ej: 2173600"
               />
               <p className="text-xs text-gray-500">
-                Formato sugerido: $ 2.173.600 COPS o US$ 1,200
+                El precio se formateará automáticamente con separadores de miles
               </p>
             </div>
 
@@ -345,7 +362,7 @@ export function ExpressQuoteGenerator() {
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Ej: (57)314657-6500"
+                placeholder="+57 321 456 7890"
               />
             </div>
 
@@ -357,7 +374,7 @@ export function ExpressQuoteGenerator() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Ej: quierovivirviajandoo@gmail.com"
+                placeholder="info@cosmosmayorista.com"
               />
             </div>
 
@@ -366,7 +383,7 @@ export function ExpressQuoteGenerator() {
               onClick={handleDownload}
               className="w-full bg-blue-600 hover:bg-blue-700"
               size="lg"
-              disabled={!hotelName || !price || !phone || !email}
+              disabled={!mainTitle || !price || !phone || !email}
             >
               <Download className="w-5 h-5 mr-2" />
               Descargar Imagen
@@ -388,11 +405,11 @@ export function ExpressQuoteGenerator() {
         <div className="flex justify-center pb-6">
           <QuoteTemplate
             ref={cardRef}
-            hotelName={hotelName}
-            duration={duration}
+            mainTitle={mainTitle}
+            description={description}
             hotelStars={hotelStars}
-            roomType={roomType}
-            mealPlan={mealPlan}
+            includes={includes}
+            plan={plan}
             numberOfPeople={numberOfPeople}
             price={price}
             disclaimer={disclaimer}

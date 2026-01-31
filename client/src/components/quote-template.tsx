@@ -2,11 +2,11 @@ import { forwardRef } from "react";
 import { Star, PhoneCall, AtSign } from "lucide-react";
 
 interface QuoteTemplateProps {
-  hotelName: string;
-  duration: string;
+  mainTitle: string;
+  description: string;
   hotelStars: number;
-  roomType: string;
-  mealPlan: string;
+  includes: string[];
+  plan: "solo" | "empaquetado";
   numberOfPeople: number;
   price: string;
   disclaimer: string;
@@ -16,16 +16,14 @@ interface QuoteTemplateProps {
   email: string;
 }
 
-const DEFAULT_LOGO_PATH = "/images/logo/cosmos-mayorista-logo.png";
-
 export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
   (
     {
-      hotelName,
-      duration,
+      mainTitle,
+      description,
       hotelStars,
-      roomType,
-      mealPlan,
+      includes,
+      plan,
       numberOfPeople,
       price,
       disclaimer,
@@ -36,38 +34,46 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
     },
     ref
   ) => {
+    // Formatear el precio para mostrar
+    const formatPriceDisplay = (priceValue: string): string => {
+      if (!priceValue) return "$ 0";
+      
+      // Si ya tiene símbolo de peso o moneda, devolverlo tal cual
+      if (priceValue.includes("$") || priceValue.includes("COP") || priceValue.includes("USD") || priceValue.includes("US")) {
+        return priceValue;
+      }
+      
+      // Si es solo el número formateado, agregar símbolo de peso y COP
+      return `$ ${priceValue} COP`;
+    };
     return (
       <div
         ref={ref}
         className="w-[800px] bg-white shadow-2xl overflow-hidden"
         style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
       >
-        {/* Header */}
-        <div className="bg-[#004e7c] px-8 py-6 flex items-center justify-start">
-          <img
-            src={logoUrl}
-            alt="Logo COSMOS MAYORISTA"
-            className="h-16 w-auto object-contain"
-            style={{ maxWidth: '100%' }}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              // Si es un error y aún no es la ruta del fallback, intentar con el fallback
-              if (target.src.indexOf(DEFAULT_LOGO_PATH) === -1) {
-                target.src = DEFAULT_LOGO_PATH;
-              }
-            }}
-          />
-        </div>
-
-        {/* Separador gris claro */}
-        <div className="h-2 bg-[#f5f5f5]"></div>
+        {/* Header - Solo se muestra si hay logo */}
+        {logoUrl && (
+          <>
+            <div className="bg-[#004e7c] px-8 py-6 flex items-center justify-start">
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="h-16 w-auto object-contain"
+                style={{ maxWidth: '100%' }}
+              />
+            </div>
+            {/* Separador gris claro */}
+            <div className="h-2 bg-[#f5f5f5]"></div>
+          </>
+        )}
 
         {/* Imagen Principal */}
         <div className="h-[400px] w-full bg-gray-200 relative overflow-hidden">
           {mainImage ? (
             <img
               src={mainImage}
-              alt={hotelName}
+              alt={mainTitle}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -94,14 +100,14 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
 
         {/* Cuerpo */}
         <div className="px-8 py-6">
-          {/* Título del Hotel */}
+          {/* Título Principal */}
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            {hotelName || "Nombre del Hotel"}
+            {mainTitle || "Título Principal"}
           </h2>
 
-          {/* Duración */}
+          {/* Descripción */}
           <p className="text-lg text-gray-600 mb-5">
-            {duration.includes("Hospédate") ? duration : `Hospédate por ${duration || "4 días y 3 noches"}`}
+            {description || "Descripción"}
           </p>
 
           {/* Divisor */}
@@ -111,38 +117,48 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
           <div className="flex items-start justify-between mb-6">
             {/* Izquierda: Badges e información */}
             <div className="flex flex-col gap-3 flex-1">
-              {/* Badge Hotel y Estrellas */}
-              <div className="flex items-center gap-3">
-                <span className="bg-blue-400 text-white px-3 py-1.5 rounded-md text-sm font-semibold">
-                  Hotel
-                </span>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: hotelStars }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className="w-5 h-5 fill-yellow-400 text-yellow-400"
-                    />
-                  ))}
-                </div>
+              {/* Badge Hotel, Estrellas e Incluye */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Badge Hotel y Estrellas - Solo si Hotel está incluido */}
+                {includes.includes("Hotel") && (
+                  <>
+                    <span className="bg-blue-400 text-white px-3 py-1.5 rounded-md text-sm font-semibold">
+                      Hotel
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: hotelStars }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className="w-5 h-5 fill-yellow-400 text-yellow-400"
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+                {/* Etiquetas de Incluye - Filtrar Hotel ya que se muestra como badge especial */}
+                {includes.length > 0 && (
+                  <div className="flex items-center gap-2 ml-2">
+                    {includes.filter(item => item !== "Hotel").map((item, index) => (
+                      <span
+                        key={index}
+                        className="bg-green-500 text-white px-2 py-1 rounded-md text-xs font-semibold"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              
-              {/* Nombre del Hotel */}
-              <p className="text-base font-normal text-gray-800 leading-relaxed">
-                {hotelName || "Nombre del Hotel"}
+
+              {/* Plan */}
+              <p className="text-base text-gray-800 leading-relaxed">
+                <span className="font-bold">Tipo de plan:</span> <span className="font-normal">{plan === "solo" ? "Solo" : "Empaquetado"}</span>
               </p>
 
-              {/* Tipo de Habitación y Régimen */}
+              {/* Personas */}
               <p className="text-sm text-gray-700 leading-relaxed">
-                {roomType || "Habitación Estándar"}
-                {mealPlan && ` - ${mealPlan}`}
-              </p>
-
-              {/* Duración y Personas */}
-              <p className="text-sm text-gray-700 leading-relaxed">
-                {duration.includes("Hospédate") 
-                  ? duration.replace("Hospédate por ", "") 
-                  : duration || "4 días y 3 noches"} para {numberOfPeople || 2}{" "}
-                {numberOfPeople === 1 ? "adulto" : "adultos"}
+                <span className="font-semibold">Cantidad de personas:</span> {numberOfPeople || 2}{" "}
+                {numberOfPeople === 1 ? "persona" : "personas"}
               </p>
             </div>
 
@@ -150,7 +166,7 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
             <div className="text-right ml-6 flex-shrink-0">
               <p className="text-sm text-gray-500 mb-1">desde</p>
               <p className="text-4xl font-bold text-gray-900 mb-1 leading-tight">
-                {price || "$ 0"}
+                {formatPriceDisplay(price)}
               </p>
               <p className="text-xs text-gray-500">precio total</p>
             </div>
