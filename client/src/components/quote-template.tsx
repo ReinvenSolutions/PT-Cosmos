@@ -49,8 +49,8 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
     return (
       <div
         ref={ref}
-        className="w-[800px] max-w-[800px] bg-white shadow-2xl overflow-hidden"
-        style={{ fontFamily: "system-ui, -apple-system, sans-serif", width: "800px", maxWidth: "800px" }}
+            className="bg-white shadow-2xl overflow-hidden"
+            style={{ fontFamily: "system-ui, -apple-system, sans-serif", width: "800px", maxWidth: "800px", margin: 0, padding: 0 }}
       >
         {/* Header - Solo se muestra si hay logo */}
         {logoUrl && (
@@ -69,7 +69,7 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
         )}
 
         {/* Imagen Principal */}
-        <div className="h-[400px] w-full bg-gray-200 relative overflow-hidden">
+            <div className="h-[400px] w-full bg-gray-200 relative overflow-hidden" style={{ margin: 0, padding: 0 }}>
           {mainImage ? (
             <img
               src={mainImage}
@@ -99,7 +99,7 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
         </div>
 
         {/* Cuerpo */}
-        <div className="px-8 py-6">
+            <div className="px-8 py-6 w-full" style={{ margin: 0 }}>
           {/* Título Principal */}
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             {mainTitle || "Título Principal"}
@@ -113,62 +113,56 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
           {/* Divisor */}
           <hr className="border-gray-300 mb-6" />
 
-          {/* Sección de Precios */}
-          <div className="flex items-start justify-between gap-4 mb-6">
-            {/* Izquierda: Badges e información */}
-            <div className="flex flex-col gap-3 flex-1 min-w-0">
-              {/* Badge Hotel, Estrellas e Incluye */}
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Badge Hotel y Estrellas - Solo si Hotel está incluido */}
-                {includes.includes("Hotel") && (
-                  <>
-                    <span className="bg-blue-400 text-white px-3 py-1.5 rounded-md text-sm font-semibold">
-                      Hotel
-                    </span>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: hotelStars }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className="w-5 h-5 fill-yellow-400 text-yellow-400"
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-                {/* Etiquetas de Incluye - Filtrar Hotel ya que se muestra como badge especial */}
-                {includes.length > 0 && (
-                  <div className="flex items-center gap-2 ml-2">
-                    {includes.filter(item => item !== "Hotel").map((item, index) => (
-                      <span
-                        key={index}
-                        className="bg-green-500 text-white px-2 py-1 rounded-md text-xs font-semibold"
-                      >
-                        {item}
-                      </span>
+          {/* Sección de Precios - Layout horizontal */}
+          <div className="mb-6 w-full">
+            {/* Etiquetas en una sola línea encima del precio */}
+            <div className="flex items-center gap-3 flex-wrap mb-2">
+              {includes.includes("Hotel") && (
+                <>
+                  <span className="bg-blue-400 text-white px-3 py-1.5 rounded-md text-sm font-semibold">
+                    Hotel
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: hotelStars }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className="w-5 h-5 fill-yellow-400 text-yellow-400"
+                      />
                     ))}
                   </div>
-                )}
+                </>
+              )}
+              {includes.length > 0 && (
+                <>
+                  {includes.filter(item => item !== "Hotel").map((item, index) => (
+                    <span
+                      key={index}
+                      className="bg-green-500 text-white px-2 py-1 rounded-md text-xs font-semibold"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </>
+              )}
+            </div>
+            {/* Precio alineado a la derecha */}
+            <div className="flex justify-end items-baseline">
+              <div className="text-right">
+                <p className="text-xs text-gray-500 mb-1">desde</p>
+                <p className="text-4xl font-bold text-gray-900 whitespace-nowrap">
+                  {formatPriceDisplay(price)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">precio por persona</p>
               </div>
-
-              {/* Plan */}
-              <p className="text-base text-gray-800 leading-relaxed">
+            </div>
+            {/* Información adicional debajo: solo tipo de plan y cantidad de personas */}
+            <div className="flex flex-col gap-2 mt-4">
+              <p className="text-base text-gray-800">
                 <span className="font-bold">Tipo de plan:</span> <span className="font-normal">{plan === "solo" ? "Solo" : "Empaquetado"}</span>
               </p>
-
-              {/* Personas */}
-              <p className="text-sm text-gray-700 leading-relaxed">
-                <span className="font-semibold">Cantidad de personas:</span> {numberOfPeople || 2}{" "}
-                {numberOfPeople === 1 ? "persona" : "personas"}
+              <p className="text-base text-gray-800">
+                <span className="font-bold">Cantidad de personas:</span> {numberOfPeople || 2} {numberOfPeople === 1 ? "persona" : "personas"}
               </p>
-            </div>
-
-            {/* Derecha: Precio */}
-            <div className="text-right flex-shrink-0" style={{ minWidth: "200px", maxWidth: "280px" }}>
-              <p className="text-sm text-gray-500 mb-1">desde</p>
-              <p className="text-3xl font-bold text-gray-900 mb-1 leading-tight break-words">
-                {formatPriceDisplay(price)}
-              </p>
-              <p className="text-xs text-gray-500">precio por persona</p>
             </div>
           </div>
 
@@ -181,7 +175,7 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
         </div>
 
         {/* Footer */}
-        <div className="bg-[#f5f5f5] px-8 py-5">
+            <div className="bg-[#f5f5f5] w-full px-8 py-5">
           <p className="text-sm font-medium text-gray-800 mb-4">
             Para mayor información contáctanos:
           </p>

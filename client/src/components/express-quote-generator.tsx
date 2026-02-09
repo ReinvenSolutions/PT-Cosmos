@@ -393,7 +393,7 @@ export function ExpressQuoteGenerator() {
       </div>
 
       {/* Panel Derecho: Vista Previa */}
-      <div className="w-1/2 overflow-y-auto bg-gray-50 p-6">
+      <div className="w-1/2 overflow-visible bg-gray-50 p-6 flex flex-col items-center min-w-[800px]">
         <div className="sticky top-0 mb-4 bg-gray-50 pb-2 z-10">
           <h3 className="text-lg font-semibold text-gray-700 mb-2">
             Vista Previa
