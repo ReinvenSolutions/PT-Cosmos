@@ -37,20 +37,20 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
     // Formatear el precio para mostrar
     const formatPriceDisplay = (priceValue: string): string => {
       if (!priceValue) return "$ 0";
-      
+
       // Si ya tiene símbolo de peso o moneda, devolverlo tal cual
       if (priceValue.includes("$") || priceValue.includes("COP") || priceValue.includes("USD") || priceValue.includes("US")) {
         return priceValue;
       }
-      
+
       // Si es solo el número formateado, agregar símbolo de peso y COP
       return `$ ${priceValue} COP`;
     };
     return (
       <div
         ref={ref}
-        className="w-[800px] bg-white shadow-2xl overflow-hidden"
-        style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+        className="w-[800px] max-w-[800px] bg-white shadow-2xl overflow-hidden"
+        style={{ fontFamily: "system-ui, -apple-system, sans-serif", width: "800px", maxWidth: "800px" }}
       >
         {/* Header - Solo se muestra si hay logo */}
         {logoUrl && (
@@ -114,9 +114,9 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
           <hr className="border-gray-300 mb-6" />
 
           {/* Sección de Precios */}
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex items-start justify-between gap-4 mb-6">
             {/* Izquierda: Badges e información */}
-            <div className="flex flex-col gap-3 flex-1">
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
               {/* Badge Hotel, Estrellas e Incluye */}
               <div className="flex items-center gap-3 flex-wrap">
                 {/* Badge Hotel y Estrellas - Solo si Hotel está incluido */}
@@ -163,12 +163,12 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
             </div>
 
             {/* Derecha: Precio */}
-            <div className="text-right ml-6 flex-shrink-0">
+            <div className="text-right flex-shrink-0" style={{ minWidth: "200px", maxWidth: "280px" }}>
               <p className="text-sm text-gray-500 mb-1">desde</p>
-              <p className="text-4xl font-bold text-gray-900 mb-1 leading-tight">
+              <p className="text-3xl font-bold text-gray-900 mb-1 leading-tight break-words">
                 {formatPriceDisplay(price)}
               </p>
-              <p className="text-xs text-gray-500">precio total</p>
+              <p className="text-xs text-gray-500">precio por persona</p>
             </div>
           </div>
 
