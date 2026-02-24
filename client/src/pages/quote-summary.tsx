@@ -27,6 +27,7 @@ import { isTurkeyHoliday } from "@/lib/turkey-holidays";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PDFLoadingModal } from "@/components/pdf-loading-modal";
 import { trackQuote } from "@/lib/tracking";
+import { FlightImageGallery } from "@/components/flight-image-gallery";
 
 // WhatsApp Icon Component
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -176,7 +177,11 @@ export default function QuoteSummary() {
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
 
-  const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
+  const hasTurkeyDestinations = selectedDests.some(
+    (d) =>
+      d.country?.toLowerCase().includes("turquía") ||
+      d.country?.toLowerCase().includes("turquia")
+  );
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
   const hasDubaiMaravilloso = selectedDests.some((d) => d.name === "DUBAI Maravilloso");
@@ -197,8 +202,10 @@ export default function QuoteSummary() {
     d.name.toLowerCase().includes('emiratos')
   );
 
-  // Mostrar vuelo de conexión si hay combinación de Turquía + Dubai/Emiratos
-  const showConnectionFlight = hasTurkey && hasDubaiOrEmirates;
+  // Mostrar vuelo de conexión: combinación Turquía+Dubai (legacy) o cualquier multi-plan con flag
+  const showConnectionFlight =
+    (selectedDestinations.length >= 2 && selectedDests.some((d) => d.hasInternalOrConnectionFlight)) ||
+    (hasTurkey && hasDubaiOrEmirates);
 
   const hasItaliaTuristica = selectedDests.some((d) => d.name === "Italia Turística - Euro Express");
   const italiaDestination = selectedDests.find((d) => d.name === "Italia Turística - Euro Express");
@@ -487,171 +494,82 @@ export default function QuoteSummary() {
     setMinPayment(formattedValue);
   };
 
-  const handleOutboundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const uploadFlightImages = async (
+    files: File[],
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    successMsg: string
+  ) => {
     if (files.length === 0) return;
+    const uploadedUrls: string[] = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!response.ok) throw new Error("Upload failed");
+      const { url } = await response.json();
+      uploadedUrls.push(url);
+    }
+    setter((prev) => [...prev, ...uploadedUrls]);
+    toast({ title: "Imágenes subidas", description: successMsg });
+  };
 
+  const processOutboundFiles = async (files: File[]) => {
     setUploadingOutbound(true);
     try {
-      const uploadedUrls: string[] = [];
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Upload failed");
-        }
-
-        const { url } = await response.json();
-        uploadedUrls.push(url);
-      }
-
-      setOutboundImages([...outboundImages, ...uploadedUrls]);
-
-      toast({
-        title: "Imágenes subidas",
-        description: `${files.length} imagen(es) del vuelo de ida guardadas`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron subir algunas imágenes.",
-        variant: "destructive",
-      });
+      await uploadFlightImages(
+        files,
+        setOutboundImages,
+        `${files.length} imagen(es) del vuelo de ida guardadas`
+      );
+    } catch {
+      toast({ title: "Error", description: "No se pudieron subir algunas imágenes.", variant: "destructive" });
     } finally {
       setUploadingOutbound(false);
-      e.target.value = "";
     }
   };
 
-  const handleReturnUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
+  const processReturnFiles = async (files: File[]) => {
     setUploadingReturn(true);
     try {
-      const uploadedUrls: string[] = [];
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Upload failed");
-        }
-
-        const { url } = await response.json();
-        uploadedUrls.push(url);
-      }
-
-      setReturnImages([...returnImages, ...uploadedUrls]);
-
-      toast({
-        title: "Imágenes subidas",
-        description: `${files.length} imagen(es) del vuelo de regreso guardadas`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron subir algunas imágenes.",
-        variant: "destructive",
-      });
+      await uploadFlightImages(
+        files,
+        setReturnImages,
+        `${files.length} imagen(es) del vuelo de regreso guardadas`
+      );
+    } catch {
+      toast({ title: "Error", description: "No se pudieron subir algunas imágenes.", variant: "destructive" });
     } finally {
       setUploadingReturn(false);
-      e.target.value = "";
     }
   };
 
-  const handleDomesticFlightUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
+  const processDomesticFlightFiles = async (files: File[]) => {
     setUploadingDomesticFlight(true);
     try {
-      const uploadedUrls: string[] = [];
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Upload failed");
-        }
-
-        const { url } = await response.json();
-        uploadedUrls.push(url);
-      }
-
-      setDomesticFlightImages([...domesticFlightImages, ...uploadedUrls]);
-
-      toast({
-        title: "Imágenes subidas",
-        description: `${files.length} imagen(es) del vuelo interno guardadas`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron subir algunas imágenes.",
-        variant: "destructive",
-      });
+      await uploadFlightImages(
+        files,
+        setDomesticFlightImages,
+        `${files.length} imagen(es) del vuelo interno guardadas`
+      );
+    } catch {
+      toast({ title: "Error", description: "No se pudieron subir algunas imágenes.", variant: "destructive" });
     } finally {
       setUploadingDomesticFlight(false);
-      e.target.value = "";
     }
   };
 
-  const handleConnectionFlightUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
+  const processConnectionFlightFiles = async (files: File[]) => {
     setUploadingConnectionFlight(true);
     try {
-      const uploadedUrls: string[] = [];
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Upload failed");
-        }
-
-        const { url } = await response.json();
-        uploadedUrls.push(url);
-      }
-
-      setConnectionFlightImages([...connectionFlightImages, ...uploadedUrls]);
-
-      toast({
-        title: "Imágenes subidas",
-        description: `${files.length} imagen(es) del vuelo de conexión guardadas`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron subir algunas imágenes.",
-        variant: "destructive",
-      });
+      await uploadFlightImages(
+        files,
+        setConnectionFlightImages,
+        `${files.length} imagen(es) del vuelo de conexión guardadas`
+      );
+    } catch {
+      toast({ title: "Error", description: "No se pudieron subir algunas imágenes.", variant: "destructive" });
     } finally {
       setUploadingConnectionFlight(false);
-      e.target.value = "";
     }
   };
 
@@ -1032,8 +950,8 @@ export default function QuoteSummary() {
 
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <div className="text-center mb-8">
-          <h2 className="text-4xl font-extrabold text-gray-800 mb-2">Resumen de tu Cotización</h2>
-          <p className="text-gray-600">Revisa los detalles y agrega la información de tus vuelos</p>
+          <h2 className="text-4xl font-extrabold text-foreground mb-2">Resumen de tu Cotización</h2>
+          <p className="text-muted-foreground">Revisa los detalles y agrega la información de tus vuelos</p>
         </div>
 
         <Card className="mb-6">
@@ -1050,7 +968,7 @@ export default function QuoteSummary() {
                 const imageUrl = getDestinationImage(dest);
 
                 return (
-                  <div key={dest.id} className="flex gap-4 p-3 bg-gradient-to-r from-blue-50 to-white rounded-lg border border-blue-100">
+                  <div key={dest.id} className="flex gap-4 p-3 bg-accent/50 rounded-lg border border-border">
                     {imageUrl && (
                       <div className="w-32 h-24 flex-shrink-0 rounded-md overflow-hidden">
                         <img
@@ -1062,37 +980,37 @@ export default function QuoteSummary() {
                     )}
                     <div className="flex-1 flex justify-between items-center">
                       <div>
-                        <h3 className="font-semibold text-gray-800">{dest.name}</h3>
-                        <p className="text-sm text-gray-600">{dest.country}</p>
+                        <h3 className="font-semibold text-foreground">{dest.name}</h3>
+                        <p className="text-sm text-muted-foreground">{dest.country}</p>
                         <Badge variant="secondary" className="mt-1">
                           {dest.duration} Días / {dest.nights} Noches
                         </Badge>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-extrabold text-blue-600">
+                        <div className="text-2xl font-extrabold text-price-accent">
                           US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </div>
                         {effectiveTrm > 0 && (
-                          <div className="text-sm font-bold text-green-600">
+                          <div className="text-sm font-bold text-chart-3">
                             $ {(basePrice * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                           </div>
                         )}
-                        <div className="text-xs text-gray-500">Porción terrestre</div>
+                        <div className="text-xs font-medium text-muted-foreground">Porción terrestre</div>
                       </div>
                     </div>
                   </div>
                 );
               })}
 
-              <div className="border-t border-blue-200 pt-3 mt-3">
+              <div className="border-t border-border pt-3 mt-3">
                 <div className="flex justify-between items-center text-lg font-semibold">
-                  <span className="text-gray-700">Subtotal Porciones Terrestres:</span>
+                  <span className="text-foreground">Subtotal Porciones Terrestres:</span>
                   <div className="text-right">
-                    <span className="text-blue-600 block">
+                    <span className="text-price-accent block font-bold">
                       US$ {landPortionTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     {effectiveTrm > 0 && (
-                      <span className="text-green-600 text-sm block">
+                      <span className="text-chart-3 text-sm block font-medium">
                         $ {(landPortionTotal * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                       </span>
                     )}
@@ -1113,7 +1031,7 @@ export default function QuoteSummary() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                   Fecha de Inicio
                   {hasTurkeyEsencial && <Badge variant="secondary">Martes o Miércoles</Badge>}
                   {hasGranTourEuropa && <Badge variant="secondary" className="bg-purple-100 text-purple-800">Domingo o Lunes</Badge>}
@@ -1153,8 +1071,8 @@ export default function QuoteSummary() {
                 {selectedDestinations.length > 0 && selectedDests.some(d => d.priceTiers && d.priceTiers.length > 0) && (
                   <div className="mt-2 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
                     <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" />
-                      <div className="text-xs text-emerald-800 space-y-1">
+                      <Info className="w-4 h-4 text-chart-3 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-chart-3 space-y-1 opacity-95">
                         <p className="font-semibold">Información del Calendario:</p>
                         <ul className="list-disc list-inside space-y-0.5 ml-1">
                           <li>Las fechas con <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[0.65rem] font-medium">precio</span> están disponibles</li>
@@ -1179,14 +1097,14 @@ export default function QuoteSummary() {
                 )}
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-1">Fecha de Finalización (Calculada)</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Fecha de Finalización (Calculada)</p>
                 <p className="font-semibold text-lg" data-testid="text-end-date-summary">
                   {endDate ? formatDate(new Date(endDate + "T00:00:00")) : "Por definir"}
                 </p>
                 {endDate && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Duración total: {displayDuration} días de viaje
-                    {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
+                    {hasTurkeyDestinations && <span className="text-price-accent"> (incluye día de vuelo a Turquía)</span>}
                   </p>
                 )}
               </div>
@@ -1197,7 +1115,7 @@ export default function QuoteSummary() {
         {hasTurkeyEsencial && (
           <Card className="mb-6 border-orange-200">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-600">
+              <CardTitle className="flex items-center gap-2 text-price-accent">
                 <Star className="w-5 h-5" />
                 Mejora tu Plan Turquía Esencial
               </CardTitle>
@@ -1264,9 +1182,9 @@ export default function QuoteSummary() {
         )}
 
         {hasItaliaTuristica && italiaUpgrades.length > 0 && (
-          <Card className="mb-6 border-blue-200">
+          <Card className="mb-6 border-primary/30">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-600">
+              <CardTitle className="flex items-center gap-2 text-primary">
                 <Star className="w-5 h-5" />
                 Mejora tu Plan Italia Turística
               </CardTitle>
@@ -1296,8 +1214,8 @@ export default function QuoteSummary() {
                 ))}
               </div>
               {italiaUpgrade && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm font-semibold text-blue-700">
+                <div className="mt-4 p-3 bg-accent rounded-lg border border-border">
+                  <p className="text-sm font-semibold text-accent-foreground">
                     Mejora seleccionada: +US$ {formatUSD(italiaUpgradeCost)}
                   </p>
                 </div>
@@ -1376,66 +1294,15 @@ export default function QuoteSummary() {
             <CardTitle>Vuelos de Ida</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
-              Sube capturas de los detalles del vuelo de ida (puedes subir múltiples imágenes)
-            </p>
-            {outboundImages.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                {outboundImages.map((url, idx) => (
-                  <div key={idx} className="relative border rounded-md overflow-hidden">
-                    <img
-                      src={url}
-                      alt={`Vuelo ida ${idx + 1}`}
-                      className="w-full h-32 object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => setOutboundImages(outboundImages.filter((_, i) => i !== idx))}
-                      data-testid={`button-remove-outbound-${idx}`}
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div>
-              <input
-                type="file"
-                id="outbound-flight-images"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleOutboundUpload}
-                data-testid="input-outbound-images"
-              />
-              <label htmlFor="outbound-flight-images">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  disabled={uploadingOutbound}
-                  asChild
-                >
-                  <span>
-                    {uploadingOutbound ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                        Subiendo...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Subir Imágenes de Vuelo de Ida
-                      </>
-                    )}
-                  </span>
-                </Button>
-              </label>
-            </div>
+            <FlightImageGallery
+              images={outboundImages}
+              setImages={setOutboundImages}
+              onFilesUpload={processOutboundFiles}
+              isUploading={uploadingOutbound}
+              label="vuelo de ida"
+              description="Sube capturas de los detalles del vuelo de ida. Puedes arrastrar imágenes aquí o hacer clic para seleccionar. El orden definido se usará en el PDF."
+              inputId="outbound-flight-images"
+            />
 
             <div className="mt-4 pt-4 border-t">
               <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
@@ -1468,8 +1335,8 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        {/* Domestic Flight Card - Only for "Lo Mejor de Cusco + Lima" */}
-        {selectedDestinations.includes('df3a7358-b65f-4849-a16d-bcf0f29cecc8') && (
+        {/* Domestic Flight Card - For single plan with internal/connection flight flag */}
+        {selectedDestinations.length === 1 && selectedDests[0]?.hasInternalOrConnectionFlight && (
           <Card className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1478,65 +1345,15 @@ export default function QuoteSummary() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-3">
-                Sube las imágenes del vuelo interno (máximo 10 imágenes)
-              </p>
-
-              {domesticFlightImages.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                  {domesticFlightImages.map((url, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={url}
-                        alt={`Vuelo interno ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
-                      />
-                      <button
-                        onClick={() => setDomesticFlightImages(domesticFlightImages.filter((_, i) => i !== index))}
-                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        type="button"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <input
-                  type="file"
-                  id="domestic-flight-images"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleDomesticFlightUpload}
-                  data-testid="input-domestic-images"
-                />
-                <label htmlFor="domestic-flight-images">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={uploadingDomesticFlight}
-                    asChild
-                  >
-                    <span>
-                      {uploadingDomesticFlight ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                          Subiendo...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Subir Imágenes de Vuelo Interno
-                        </>
-                      )}
-                    </span>
-                  </Button>
-                </label>
-              </div>
+              <FlightImageGallery
+                images={domesticFlightImages}
+                setImages={setDomesticFlightImages}
+                onFilesUpload={processDomesticFlightFiles}
+                isUploading={uploadingDomesticFlight}
+                label="vuelo interno"
+                description="Sube las imágenes del vuelo interno (máximo 10). Arrastra aquí o haz clic para seleccionar. El orden definido se usará en el PDF."
+                inputId="domestic-flight-images"
+              />
 
               <div className="mt-4 pt-4 border-t">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
@@ -1580,65 +1397,15 @@ export default function QuoteSummary() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-3">
-                Sube las imágenes del vuelo de conexión entre destinos (máximo 10 imágenes)
-              </p>
-
-              {connectionFlightImages.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                  {connectionFlightImages.map((url, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={url}
-                        alt={`Vuelo conexión ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
-                      />
-                      <button
-                        onClick={() => setConnectionFlightImages(connectionFlightImages.filter((_, i) => i !== index))}
-                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        type="button"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <input
-                  type="file"
-                  id="connection-flight-images"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleConnectionFlightUpload}
-                  data-testid="input-connection-images"
-                />
-                <label htmlFor="connection-flight-images">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={uploadingConnectionFlight}
-                    asChild
-                  >
-                    <span>
-                      {uploadingConnectionFlight ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                          Subiendo...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Subir Imágenes de Vuelo de Conexión
-                        </>
-                      )}
-                    </span>
-                  </Button>
-                </label>
-              </div>
+              <FlightImageGallery
+                images={connectionFlightImages}
+                setImages={setConnectionFlightImages}
+                onFilesUpload={processConnectionFlightFiles}
+                isUploading={uploadingConnectionFlight}
+                label="vuelo de conexión entre destinos"
+                description="Sube las imágenes del vuelo de conexión (máximo 10). Arrastra aquí o haz clic para seleccionar. El orden definido se usará en el PDF."
+                inputId="connection-flight-images"
+              />
 
               <div className="mt-4 pt-4 border-t border-orange-200">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
@@ -1677,66 +1444,15 @@ export default function QuoteSummary() {
             <CardTitle>Vuelos de Regreso</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
-              Sube capturas de los detalles del vuelo de regreso (puedes subir múltiples imágenes)
-            </p>
-            {returnImages.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                {returnImages.map((url, idx) => (
-                  <div key={idx} className="relative border rounded-md overflow-hidden">
-                    <img
-                      src={url}
-                      alt={`Vuelo regreso ${idx + 1}`}
-                      className="w-full h-32 object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => setReturnImages(returnImages.filter((_, i) => i !== idx))}
-                      data-testid={`button-remove-return-${idx}`}
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div>
-              <input
-                type="file"
-                id="return-flight-images"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleReturnUpload}
-                data-testid="input-return-images"
-              />
-              <label htmlFor="return-flight-images">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  disabled={uploadingReturn}
-                  asChild
-                >
-                  <span>
-                    {uploadingReturn ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                        Subiendo...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Subir Imágenes de Vuelo de Regreso
-                      </>
-                    )}
-                  </span>
-                </Button>
-              </label>
-            </div>
+            <FlightImageGallery
+              images={returnImages}
+              setImages={setReturnImages}
+              onFilesUpload={processReturnFiles}
+              isUploading={uploadingReturn}
+              label="vuelo de regreso"
+              description="Sube capturas de los detalles del vuelo de regreso. Puedes arrastrar imágenes aquí o hacer clic para seleccionar. El orden definido se usará en el PDF."
+              inputId="return-flight-images"
+            />
 
             <div className="mt-4 pt-4 border-t">
               <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>

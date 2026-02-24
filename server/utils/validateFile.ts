@@ -17,55 +17,57 @@ export interface FileValidationResult {
 }
 
 /**
- * Validate file using magic bytes (file signature) to prevent MIME type spoofing
+ * Validate file using magic bytes (file signature) to prevent MIME type spoofing.
+ * @param relaxForAvatar - If true, be more lenient (skip extension match, accept any detected image)
  */
 export async function validateFile(
   buffer: Buffer,
   originalName: string,
-  reportedMimeType: string
+  reportedMimeType: string,
+  relaxForAvatar = false
 ): Promise<FileValidationResult> {
-  // Validate extension
   const ext = originalName.split('.').pop()?.toLowerCase();
   if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
     return {
       valid: false,
-      error: "Invalid file extension. Only image files are allowed.",
+      error: "Extensión no válida. Usa JPG, PNG, GIF o WebP.",
     };
   }
 
-  // Validate reported MIME type
   if (!ALLOWED_MIME_TYPES.includes(reportedMimeType)) {
     return {
       valid: false,
-      error: "Invalid file type. Only images are allowed.",
+      error: "Tipo de archivo no válido. Solo imágenes.",
     };
   }
 
-  // Validate actual file type using magic bytes
   try {
     const fileType = await fileTypeFromBuffer(buffer);
-    
+
     if (!fileType) {
+      if (relaxForAvatar && buffer.length > 0 && buffer.length < 15 * 1024 * 1024) {
+        // Para avatar: si magic bytes fallan pero es pequeño y el tipo reportado es imagen, permitir
+        return { valid: true, mimeType: reportedMimeType };
+      }
       return {
         valid: false,
-        error: "Unable to determine file type. File may be corrupted.",
+        error: "No se pudo verificar el tipo de archivo. Prueba con otra imagen.",
       };
     }
 
-    // Check if detected MIME type matches reported MIME type
     if (!ALLOWED_MIME_TYPES.includes(fileType.mime)) {
       return {
         valid: false,
-        error: `File type mismatch. Detected: ${fileType.mime}, but expected image file.`,
+        error: `Tipo detectado: ${fileType.mime}. Solo JPEG, PNG, GIF o WebP.`,
       };
     }
 
-    // Additional check: ensure extension matches detected type
     const detectedExt = fileType.ext;
-    if (detectedExt !== ext && !(detectedExt === 'jpg' && ext === 'jpeg') && !(detectedExt === 'jpeg' && ext === 'jpg')) {
+    const extMatch = detectedExt === ext || (detectedExt === 'jpg' && ext === 'jpeg') || (detectedExt === 'jpeg' && ext === 'jpg');
+    if (!extMatch && !relaxForAvatar) {
       return {
         valid: false,
-        error: `File extension (${ext}) does not match actual file type (${detectedExt}).`,
+        error: `Extensión (.${ext}) no coincide con el archivo real (.${detectedExt}).`,
       };
     }
 
@@ -76,7 +78,7 @@ export async function validateFile(
   } catch (error) {
     return {
       valid: false,
-      error: "Error validating file type.",
+      error: "Error al validar el archivo.",
     };
   }
 }

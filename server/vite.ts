@@ -20,28 +20,40 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  const port = parseInt(process.env.PORT || "5001", 10);
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server },
+    hmr: {
+      server,
+      clientPort: port,
+      host: "localhost",
+    },
     allowedHosts: true as const,
   };
 
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
+    server: {
+      ...viteConfig.server,
+      ...serverOptions,
+      proxy: undefined, // Express maneja /api; el proxy no debe interferir
+    },
     customLogger: {
       ...viteLogger,
+      // No matar el servidor en errores de Vite; solo registrar (evita desconexión al cargar módulos lazy)
       error: (msg, options) => {
         viteLogger.error(msg, options);
-        process.exit(1);
       },
     },
-    server: serverOptions,
     appType: "custom",
   });
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({ message: "Endpoint no encontrado", path: req.path });
+    }
     const url = req.originalUrl;
 
     try {

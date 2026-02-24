@@ -11,12 +11,10 @@ async function checkConnection() {
   const maskedUrl = dbUrl.replace(/:[^:@]+@/, ":****@");
   console.log(`Connected to: ${maskedUrl}`);
 
-  // Extract Endpoint ID from URL
-  const match = dbUrl.match(/ep-[a-z0-9-]+/);
-  if (match) {
-    console.log(`Neon Endpoint ID: ${match[0]}`);
-  } else {
-    console.log("Could not extract Endpoint ID from URL");
+  // Extraer host de la URL
+  const hostMatch = dbUrl.match(/@([^:/]+)/);
+  if (hostMatch) {
+    console.log(`Host: ${hostMatch[1]}`);
   }
 
   // Check specific data point we recently changed
@@ -28,7 +26,6 @@ async function checkConnection() {
     console.log("\nData Verification:");
     console.log(`Destination: ${peruDest.name}`);
     console.log(`isPromotion: ${peruDest.isPromotion}`);
-    console.log(`Last updated (approx): The script 'disable-peru-promotion.ts' set this to false.`);
   } else {
     console.log("\nCould not find 'Perú 7D - 6N / Lima y Cusco' in this database.");
   }

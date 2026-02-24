@@ -3,7 +3,14 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let message = text;
+    try {
+      const json = JSON.parse(text);
+      message = json?.message || json?.error || text;
+    } catch {
+      // no es JSON, usar text tal cual
+    }
+    throw new Error(message || `Error ${res.status}`);
   }
 }
 
@@ -12,7 +19,9 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  const fullUrl = url.startsWith("http") ? url : `${base}${url}`;
+  const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -20,6 +29,11 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text();
+    throw new Error(`El servidor devolvió HTML en lugar de JSON. ¿Estás usando npm run dev? Verifica la consola del servidor.`);
+  }
   return res;
 }
 
@@ -29,7 +43,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const path = (queryKey as string[]).join("/");
+    const url = path.startsWith("/") ? path : `/${path}`;
+    const res = await fetch(url, {
       credentials: "include",
     });
 
@@ -38,6 +54,10 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      throw new Error("El servidor devolvió HTML. Usa npm run dev y verifica que DATABASE_URL en .env apunte a Supabase.");
+    }
     return await res.json();
   };
 

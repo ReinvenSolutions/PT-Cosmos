@@ -1,21 +1,29 @@
-import { Switch, Route, Redirect } from "wouter";
+import { lazy, Suspense } from "react";
+import { Router, Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import NotFound from "@/pages/not-found";
-import Login from "@/pages/login";
-import Register from "@/pages/register";
-import AdminDashboard from "@/pages/admin-dashboard";
-import AdvisorDashboard from "@/pages/advisor-dashboard";
-import QuoteDetail from "@/pages/quote-detail";
-import QuoteEdit from "@/pages/quote-edit";
-import Home from "@/pages/home";
-import QuoteSummary from "@/pages/quote-summary";
-import QuoteExpress from "@/pages/quote-express";
-import Clients from "@/pages/clients";
 import { DashboardLayout } from "@/components/dashboard-layout";
+
+const Login = lazy(() => import("@/pages/login"));
+const Register = lazy(() => import("@/pages/register"));
+const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const AdminDashboard = lazy(() => import("@/pages/admin-dashboard"));
+const AdvisorDashboard = lazy(() => import("@/pages/advisor-dashboard"));
+const QuoteDetail = lazy(() => import("@/pages/quote-detail"));
+const QuoteEdit = lazy(() => import("@/pages/quote-edit"));
+const Home = lazy(() => import("@/pages/home"));
+const QuoteSummary = lazy(() => import("@/pages/quote-summary"));
+const QuoteExpress = lazy(() => import("@/pages/quote-express"));
+const Clients = lazy(() => import("@/pages/clients"));
+const AdminPlans = lazy(() => import("@/pages/admin-plans"));
+const AdminPlanForm = lazy(() => import("@/pages/admin-plan-form"));
+const AdminUsers = lazy(() => import("@/pages/admin-users"));
 
 function ProtectedRoute({
   component: Component,
@@ -44,7 +52,9 @@ function ProtectedRoute({
 
   return (
     <DashboardLayout>
-      <Component />
+      <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>}>
+        <Component />
+      </Suspense>
     </DashboardLayout>
   );
 }
@@ -73,17 +83,33 @@ function DashboardRedirect() {
   return <Redirect to="/login" />;
 }
 
-function Router() {
+function AppRoutes() {
   return (
+    <Router>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>}>
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/admin" component={DashboardRedirect} />
       <Route path="/admin/clients">
         <ProtectedRoute component={Clients} allowedRoles={["super_admin"]} />
       </Route>
+      <Route path="/admin/users">
+        <ProtectedRoute component={AdminUsers} allowedRoles={["super_admin"]} />
+      </Route>
       <Route path="/admin/dashboard">
         <ProtectedRoute component={AdminDashboard} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/admin/plans/new">
+        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/admin/plans/:id/edit">
+        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/admin/plans">
+        <ProtectedRoute component={AdminPlans} allowedRoles={["super_admin"]} />
       </Route>
       <Route path="/advisor/quotes/:id/edit">
         <ProtectedRoute component={QuoteEdit} allowedRoles={["advisor", "super_admin"]} />
@@ -105,18 +131,22 @@ function Router() {
       </Route>
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
+    </Router>
   );
 }
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <Router />
-          <Toaster />
-        </AuthProvider>
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <AuthProvider>
+            <AppRoutes />
+            <Toaster />
+          </AuthProvider>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

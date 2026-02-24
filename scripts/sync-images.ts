@@ -1,9 +1,16 @@
-
+/**
+ * Sincroniza imágenes desde public/images/destinations a la BD.
+ * NOTA: Si usas Supabase Storage, ejecuta en su lugar: npm run db:upload-images-to-supabase
+ */
 import { db } from "../server/db";
 import { destinations, destinationImages } from "../shared/schema";
 import fs from "fs";
 import path from "path";
 import { eq } from "drizzle-orm";
+
+if (process.env.SUPABASE_URL) {
+  console.warn("⚠️  Supabase está configurado. Para imágenes en Supabase usa: npm run db:upload-images-to-supabase");
+}
 
 function sanitizeFolderName(name: string): string {
   return name

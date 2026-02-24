@@ -14,10 +14,10 @@ import { setupVite, serveStatic, log } from "./vite";
 import passport from "./auth";
 import { seedDatabaseIfEmpty } from "./seed";
 import { syncCanonicalData } from "./sync-canonical-data";
-
+import { isEmailConfigured } from "./email";
 const app = express();
 
-// Trust proxy - required for secure cookies behind Replit's load balancer
+// Trust proxy - required for secure cookies behind reverse proxy (Railway, etc.)
 app.set("trust proxy", 1);
 
 // Security headers with Helmet
@@ -27,7 +27,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Needed for inline styles and Google Fonts
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for Vite in dev
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"], // Allow Google Fonts
     },
@@ -35,10 +35,11 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Disable for compatibility
 }));
 
-// Compression middleware
+// Compression middleware - deshabilitar para streaming (extract-plan) para que el progreso llegue de inmediato
 app.use(compression({
   filter: (req, res) => {
-    if (req.headers['x-no-compression']) return false;
+    if (req.headers["x-no-compression"]) return false;
+    if (req.path === "/api/admin/extract-plan") return false; // streaming NDJSON no debe comprimirse
     return compression.filter(req, res);
   },
   level: 3,
@@ -46,8 +47,8 @@ app.use(compression({
 }));
 
 // Limit request body size to prevent DoS attacks
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '5mb' }));
 
 const PgSession = ConnectPgSimple(session);
 const pool = new Pool({ connectionString: env.DATABASE_URL });
@@ -68,7 +69,7 @@ app.use(
       sameSite: env.NODE_ENV === "production" ? "lax" : "strict",
       maxAge: 24 * 60 * 60 * 1000,
       // Domain should not be set - let the browser handle it automatically
-      // This ensures cookies work on both replit.app and custom domains
+      // This ensures cookies work on custom domains
     },
     // Ensure session is saved on every response
     proxy: env.NODE_ENV === "production",
@@ -112,10 +113,10 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
 
   // Error handler middleware (must be last)
-  app.use(errorHandler);
+    app.use(errorHandler);
 
-  // En producción: ejecutar seeding y sincronización en background después de iniciar el servidor
-  if (env.NODE_ENV === "production" || env.REPLIT_DEPLOYMENT === "1") {
+    // En producción: ejecutar seeding y sincronización en background después de iniciar el servidor
+    if (env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
     // Ejecutar en background para no bloquear el inicio del servidor
     (async () => {
       try {
@@ -146,6 +147,9 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   server.listen(env.PORT, "0.0.0.0", () => {
-    logger.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
+    const dbUrl = process.env.DATABASE_URL || "";
+    const dbSource = dbUrl.includes("supabase.co") ? "Supabase" : dbUrl.includes("neon.tech") ? "Neon" : "PostgreSQL";
+    const emailStatus = isEmailConfigured() ? "Email: ✓" : "Email: ✗ (SMTP_USER/SMTP_PASS en .env)";
+    logger.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode | BD: ${dbSource} | ${emailStatus}`);
   });
 })();

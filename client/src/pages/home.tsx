@@ -37,44 +37,54 @@ export default function Home() {
   const [destinationDetails, setDestinationDetails] = useState<Record<string, DestinationDetail>>({});
 
   useEffect(() => {
-    const loadDestinationDetails = async () => {
-      for (const dest of destinations) {
-        if (!destinationDetails[dest.id]) {
-          try {
-            const response = await fetch(`/api/destinations/${dest.id}`);
-            if (response.ok) {
-              const data = await response.json();
-              setDestinationDetails(prev => ({
-                ...prev,
-                [dest.id]: {
-                  destination: dest,
-                  hotels: data.hotels || [],
-                  itinerary: data.itinerary || [],
-                }
-              }));
-            }
-          } catch (error) {
-            console.error(`Error loading details for ${dest.id}:`, error);
-          }
+    if (destinations.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      destinations.map(async (dest) => {
+        try {
+          const res = await fetch(`/api/destinations/${dest.id}`, { credentials: "include" });
+          if (!res.ok || cancelled) return null;
+          const data = await res.json();
+          return { id: dest.id, dest, hotels: data.hotels || [], itinerary: data.itinerary || [] };
+        } catch {
+          return null;
         }
-      }
-    };
-
-    if (destinations.length > 0) {
-      loadDestinationDetails();
-    }
+      })
+    ).then((results) => {
+      if (cancelled) return;
+      setDestinationDetails((prev) => {
+        const next = { ...prev };
+        for (const r of results) {
+          if (r) next[r.id] = { destination: r.dest, hotels: r.hotels, itinerary: r.itinerary };
+        }
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
   }, [destinations]);
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
 
-  const hasTurkeyDestinations = selectedDests.some((d) => d.requiresTuesday);
+  const hasTurkeyDestinations = selectedDests.some(
+    (d) =>
+      d.country?.toLowerCase().includes("turquía") ||
+      d.country?.toLowerCase().includes("turquia")
+  );
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
   const hasAllowedDaysRestriction = selectedDests.some((d) => d.allowedDays && d.allowedDays.length > 0);
   const allowedDaysDestination = selectedDests.find((d) => d.allowedDays && d.allowedDays.length > 0);
 
-  const turkeyDestinations = selectedDests.filter((d) => d.requiresTuesday);
-  const otherDestinations = selectedDests.filter((d) => !d.requiresTuesday);
+  const turkeyDestinations = selectedDests.filter(
+    (d) =>
+      d.country?.toLowerCase().includes("turquía") ||
+      d.country?.toLowerCase().includes("turquia")
+  );
+  const otherDestinations = selectedDests.filter(
+    (d) =>
+      !d.country?.toLowerCase().includes("turquía") &&
+      !d.country?.toLowerCase().includes("turquia")
+  );
 
   useEffect(() => {
     if (hasTurkeyDestinations && selectedDestinations.length > 0) {
@@ -393,7 +403,10 @@ export default function Home() {
       return "Salidas todos los miércoles del año. Sabados entre marzo a nov 2026. Si vendes con vuelo, debes cotizar salida los martes y viernes desde Colombia. Programa terrestre con acompañamiento de guía habla hispana en destino. No incluye impuestos.";
     }
 
-    if (dest.requiresTuesday) {
+    if (
+      dest.country?.toLowerCase().includes("turquía") ||
+      dest.country?.toLowerCase().includes("turquia")
+    ) {
       const otherCountries = Array.from(new Set(
         destinations
           .filter(d => d.category === "internacional" && d.country !== dest.country && d.country !== "Colombia")
@@ -473,24 +486,6 @@ export default function Home() {
         return;
       }
 
-      if (dest?.requiresTuesday && startDate && !isTuesday(startDate)) {
-        const dateStr = startDate.toLocaleDateString("es-CO", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-
-        toast({
-          title: "Planes de Turquía solo los Martes",
-          description: `La fecha seleccionada (${dateStr}) no es un martes. Los vuelos desde Colombia salen martes y llegan miércoles a Turquía debido al cambio horario (+1 día adicional). Por favor, selecciona una fecha que sea martes para poder incluir destinos de Turquía.`,
-          variant: "destructive",
-        });
-
-        setStartDate(undefined);
-        return;
-      }
-
       setSelectedDestinations([...selectedDestinations, destId]);
     }
   };
@@ -499,13 +494,13 @@ export default function Home() {
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       <GroupDiscountBanner />
 
-      <main className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50 to-white">
+      <main className="flex-1 overflow-y-auto bg-gradient-to-b from-accent/50 to-background">
         <div className="container mx-auto px-4 py-12 lg:py-16">
-          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="glass-card rounded-xl p-6 mb-8">
             {hasTurkeyEsencial && (
-              <Alert className="mb-4 border-blue-200 bg-blue-50">
-                <Info className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800">
+              <Alert className="mb-4 border-primary/30 bg-accent">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-accent-foreground">
                   <strong>Turquía Esencial:</strong> Puedes seleccionar <strong>martes</strong> (vuelo desde Colombia, 11 días) o <strong>miércoles</strong> (llegada directa, 10 días).
                   {otherDestinations.length > 0 && (
                     <span className="block mt-1">Los destinos de Turquía se han movido al inicio del itinerario automáticamente.</span>
@@ -525,8 +520,8 @@ export default function Home() {
 
             {hasTurkeyDestinations && !hasTurkeyEsencial && (
               <Alert className="mb-4 border-orange-200 bg-orange-50">
-                <Info className="h-4 w-4 text-orange-600" />
-                <AlertDescription className="text-orange-800">
+                <Info className="h-4 w-4 text-price-accent" />
+                <AlertDescription className="text-accent-foreground">
                   <strong>Planes de Turquía seleccionados:</strong> Solo puedes seleccionar días <strong>martes</strong> como fecha de inicio.
                   Los vuelos desde Colombia salen martes y llegan miércoles a Turquía debido al cambio horario (+1 día adicional).
                   {otherDestinations.length > 0 && (
@@ -538,7 +533,7 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+                <label className="block text-sm font-medium text-foreground flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   Fecha de Inicio del Viaje
                   {hasTurkeyEsencial && <Badge variant="secondary" className="ml-2">Martes o Miércoles</Badge>}
@@ -604,11 +599,11 @@ export default function Home() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+                <label className="block text-sm font-medium text-foreground flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   Fecha de Finalización (Calculada Automáticamente)
                 </label>
-                <div className="w-full px-3 py-2 border rounded-md bg-gray-50 text-gray-700 flex items-center" data-testid="text-end-date">
+                <div className="w-full px-3 py-2 border rounded-md bg-muted/50 text-foreground flex items-center" data-testid="text-end-date">
                   {endDate ? (
                     <span className="font-medium">
                       {new Date(endDate + "T00:00:00").toLocaleDateString("es-CO", {
@@ -618,21 +613,21 @@ export default function Home() {
                       })}
                     </span>
                   ) : (
-                    <span className="text-gray-400 italic">Selecciona fecha de inicio y destinos</span>
+                    <span className="text-muted-foreground italic">Selecciona fecha de inicio y destinos</span>
                   )}
                 </div>
                 {endDate && selectedDestinations.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Basado en {calculateTotalDuration()} días de viaje
-                    {hasTurkeyDestinations && <span className="text-orange-600"> (incluye día de vuelo a Turquía)</span>}
+                    {hasTurkeyDestinations && <span className="text-price-accent"> (incluye día de vuelo a Turquía)</span>}
                   </p>
                 )}
               </div>
             </div>
 
             {selectedDestinations.length > 0 && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-700 mb-2">Destinos Seleccionados:</p>
+              <div className="mt-4 p-4 bg-accent rounded-lg border border-border">
+                <p className="text-sm font-medium text-foreground mb-2">Destinos Seleccionados:</p>
                 <div className="flex flex-wrap gap-2">
                   {selectedDestinations.map((destId) => {
                     const dest = destinations.find((d) => d.id === destId);
@@ -654,15 +649,15 @@ export default function Home() {
                 placeholder="Buscar destinos por nombre o país..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-3 pl-12 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+                className="w-full px-4 py-3 pl-12 border-2 border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent shadow-sm"
                 data-testid="input-search-destinations"
               />
-              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             </div>
           </div>
 
-          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
+          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full tabs-category">
+            <TabsList className="grid w-full grid-cols-3 mb-8 h-12">
               <TabsTrigger value="nacional" data-testid="tab-nacional">
                 Colombia
               </TabsTrigger>
@@ -686,16 +681,19 @@ export default function Home() {
                   const tooltipText = getTooltipContent(dest);
 
                   return (
-                    <Card
+                    <div
                       key={dest.id}
-                      className={`transition-all hover:shadow-xl overflow-hidden cursor-pointer ${isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""
-                        }`}
+                      className={`rounded-xl transition-all cursor-pointer ${isSelected ? "ring-4 ring-price-accent ring-offset-2 ring-offset-background" : ""}`}
+                      onClick={() => toggleDestination(dest.id)}
+                    >
+                    <Card
+                      variant="glass"
+                      className={`transition-all hover:shadow-glow overflow-hidden ${isSelected ? "bg-accent/40 shadow-glow" : ""}`}
                       onMouseEnter={() => setExpandedCard(dest.id)}
                       onMouseLeave={() => setExpandedCard(null)}
-                      onClick={() => toggleDestination(dest.id)}
                       data-testid={`destination-card-${dest.id}`}
                     >
-                      <div className="aspect-video w-full bg-gray-200 relative overflow-hidden">
+                      <div className="aspect-video w-full bg-muted relative overflow-hidden">
                         {imageUrl && (
                           <img
                             src={imageUrl}
@@ -704,19 +702,19 @@ export default function Home() {
                           />
                         )}
 
-                        <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md flex items-center gap-1">
-                          <Building2 className="w-3 h-3 text-blue-600" />
+                        <div className="absolute top-2 left-2 bg-background/90 dark:bg-background/85 backdrop-blur-sm px-2 py-1 rounded-md border border-border/50 flex items-center gap-1 shadow-sm">
+                          <Building2 className="w-3 h-3 text-primary" />
                           <div className="flex">
                             {Array.from({ length: hotelStars }).map((_, i) => (
-                              <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                              <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
                             ))}
                           </div>
                         </div>
 
-                        <div className="absolute bottom-2 left-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md">
+                        <div className="absolute bottom-2 left-2 right-2 bg-background/90 dark:bg-background/85 backdrop-blur-sm px-2 py-1 rounded-md border border-border/50 shadow-sm">
                           <div className="flex items-center gap-1 text-xs">
-                            <UtensilsCrossed className="w-3 h-3 text-orange-600" />
-                            <span className="font-medium text-gray-700">
+                            <UtensilsCrossed className="w-3 h-3 text-price-accent" />
+                            <span className="font-medium text-foreground">
                               {(() => {
                                 const parts = [];
                                 if (mealsInfo.breakfasts > 0) parts.push(`${mealsInfo.breakfasts} desayuno${mealsInfo.breakfasts > 1 ? 's' : ''}`);
@@ -730,35 +728,35 @@ export default function Home() {
                         </div>
 
                         {isSelected && (
-                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shadow-lg z-10">
+                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg z-10">
                             <span className="text-white text-xs font-bold">✓</span>
                           </div>
                         )}
                       </div>
                       <CardContent className="p-4">
-                        <div className="text-xs font-medium text-gray-500 uppercase mb-1">{dest.country}</div>
-                        <h4 className="font-bold text-lg mb-2 text-gray-800">{dest.name}</h4>
+                        <div className="text-xs font-medium text-muted-foreground uppercase mb-1">{dest.country}</div>
+                        <h4 className="font-bold text-lg mb-2 text-foreground">{dest.name}</h4>
 
-                        <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-gray-200 py-3">
-                          <div className="text-xs text-gray-500 uppercase">
+                        <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-border py-3">
+                          <div className="text-xs font-medium text-muted-foreground uppercase">
                             Precio desde
                           </div>
                           <div className="text-right">
-                            <span className="text-2xl font-extrabold text-orange-500">
+                            <span className="text-2xl font-extrabold text-price-accent">
                               US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </span>
-                            <div className="text-xs text-gray-500">Porción terrestre</div>
+                            <div className="text-xs font-medium text-muted-foreground mt-0.5">Porción terrestre</div>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                             <Clock className="w-4 h-4" />
                             <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
                           </div>
 
                           {dest.priceTiers && dest.priceTiers.length > 0 && dest.name !== "Turquía Esencial" && dest.name !== "Tour Cusco Aventura" && (
-                            <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs">
+                            <Badge className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs">
                               PRECIO DINÁMICO
                             </Badge>
                           )}
@@ -772,18 +770,19 @@ export default function Home() {
                       </CardContent>
 
                       {isExpanded && (
-                        <div className="bg-blue-50 border-t border-blue-100 p-4">
-                          <p className="text-sm text-gray-700">{tooltipText}</p>
+                        <div className="bg-accent border-t border-border p-4">
+                          <p className="text-sm text-foreground">{tooltipText}</p>
                         </div>
                       )}
                     </Card>
+                    </div>
                   );
                 })}
               </div>
 
               {filteredDestinations.length === 0 && (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">
+                  <p className="text-muted-foreground text-lg">
                     No hay {selectedCategory === "promociones" ? "promociones" : "destinos"} disponibles en este momento.
                   </p>
                 </div>
@@ -795,7 +794,7 @@ export default function Home() {
             <div className="fixed bottom-6 right-6 z-50">
               <Button
                 size="lg"
-                className="bg-blue-600 hover:bg-blue-700 text-white shadow-xl"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl"
                 onClick={() => {
                   // Formatear fecha en zona horaria local para evitar problemas de UTC
                   const formatLocalDate = (date: Date) => {
@@ -821,7 +820,7 @@ export default function Home() {
           )}
         </div>
 
-        <footer className="bg-gray-800 text-white mt-12">
+        <footer className="bg-foreground text-background mt-12">
           <div className="container mx-auto px-4 py-8 text-center">
             <p className="text-sm">&copy; 2025 Cosmos Mayorista. Todos los derechos reservados.</p>
           </div>

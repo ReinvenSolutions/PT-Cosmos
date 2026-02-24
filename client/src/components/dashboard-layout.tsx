@@ -30,32 +30,39 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <SidebarProvider>
             <div className="flex min-h-screen w-full">
                 <AppSidebar />
-                <main className="flex-1 overflow-auto bg-slate-50/50 dark:bg-slate-950/50">
-                    <header className="bg-white shadow-md border-b sticky top-0 z-10 hidden md:block">
-                        <div className="container mx-auto px-4 py-4">
-                            <div className="flex items-center gap-4">
-                                <SidebarTrigger className="h-7 w-7" />
+                <main className="flex-1 overflow-auto">
+                    <header className="header-glass header-warm sticky top-0 z-10 hidden md:block overflow-hidden">
+                        <div className="container mx-auto px-6 py-4 relative">
+                            <div className="flex items-center gap-3">
                                 {isQuoteExpress ? (
-                                    <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
-                                        Cotización <span className="text-blue-400 font-light">Express</span>
+                                    <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+                                        <span className="bg-gradient-to-r from-primary via-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cotización</span>
+                                        <span className="font-medium text-muted-foreground ml-1.5">Express</span>
                                     </h1>
                                 ) : (
-                                    <h1 className="text-2xl md:text-3xl font-extrabold text-blue-600 tracking-tight">
-                                        Cosmos <span className="text-blue-400 font-light">Mayorista</span>
+                                    <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+                                        <span className="bg-gradient-to-r from-primary via-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cosmos</span>
+                                        <span className="font-medium text-muted-foreground ml-1.5">Mayorista</span>
                                     </h1>
                                 )}
                             </div>
                         </div>
                     </header>
 
-                    {/* Mobile Header (simplified) */}
-                    <div className="md:hidden sticky top-0 z-10 flex h-16 items-center border-b bg-background/95 px-4 backdrop-blur">
-                        <SidebarTrigger className="mr-2" />
-                        <div className="flex-1">
+                    {/* Mobile Header */}
+                    <div className="md:hidden sticky top-0 z-10 flex h-14 items-center header-glass header-warm px-4 overflow-hidden">
+                        <SidebarTrigger className="mr-3 h-8 w-8 rounded-lg shrink-0" />
+                        <div className="flex-1 min-w-0">
                             {isQuoteExpress ? (
-                                <h2 className="text-lg font-semibold tracking-tight text-blue-600">Cotización Express</h2>
+                                <h2 className="text-base font-bold tracking-tight">
+                                    <span className="bg-gradient-to-r from-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cotización</span>
+                                    <span className="font-medium text-muted-foreground"> Express</span>
+                                </h2>
                             ) : (
-                                <h2 className="text-lg font-semibold tracking-tight text-blue-600">Cosmos Mayorista</h2>
+                                <h2 className="text-base font-bold tracking-tight">
+                                    <span className="bg-gradient-to-r from-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cosmos</span>
+                                    <span className="font-medium text-muted-foreground"> Mayorista</span>
+                                </h2>
                             )}
                         </div>
                     </div>

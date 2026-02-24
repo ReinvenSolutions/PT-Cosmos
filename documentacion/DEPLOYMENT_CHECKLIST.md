@@ -83,7 +83,7 @@ Asegúrate que estas variables estén configuradas:
 
 Si algo sale mal y no sabes cómo solucionarlo, **NO ejecutes `sync-data.ts`**. 
 
-Consulta `scripts/LEER_PRIMERO_SCRIPTS.md` para más información.
+Consulta `SCRIPTS.md` para más información sobre scripts.
 
 ---
 
