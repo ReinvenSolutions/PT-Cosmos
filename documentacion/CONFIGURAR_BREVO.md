@@ -40,3 +40,13 @@ Al iniciar el servidor verás en consola:
 ## Si usaste la API Key por error
 
 La API Key de Brevo no sirve para SMTP. Debes generar la clave SMTP en la sección indicada.
+
+## Probar que funciona
+
+1. Inicia sesión como super_admin
+2. Ve a **Admin → Dashboard**
+3. En "Acciones Rápidas", haz clic en **Probar correo**
+4. Ingresa tu email y envía
+5. Revisa tu bandeja (y carpeta de spam)
+
+Si el correo llega, Brevo está bien configurado y el 2FA funcionará.

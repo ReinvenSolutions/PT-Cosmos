@@ -2,8 +2,7 @@ import "dotenv/config"; // Must be first to load environment variables
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
-import pkg from 'pg';
-const { Pool } = pkg;
+import type { Pool } from "pg";
 import fs from "fs";
 import path from "path";
 import helmet from "helmet";
@@ -14,6 +13,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import passport from "./auth";
+import { pool } from "./db";
 import { seedDatabaseIfEmpty } from "./seed";
 import { syncCanonicalData } from "./sync-canonical-data";
 import { isEmailConfigured } from "./email";
@@ -71,7 +71,6 @@ app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: false, limit: '5mb' }));
 
 const PgSession = ConnectPgSimple(session);
-const pool = new Pool({ connectionString: env.DATABASE_URL });
 
 app.use(
   session({
@@ -143,14 +142,12 @@ app.use((req, res, next) => {
 
     // En producción: ejecutar seeding y sincronización en background después de iniciar el servidor
     if (env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
-    // Ejecutar en background para no bloquear el inicio del servidor
+    // Ejecutar en background con retraso: no competir con login/requests iniciales
     (async () => {
+      await new Promise((r) => setTimeout(r, 30_000)); // 30s: no competir con login inicial
       try {
         logger.info("🌱 Iniciando sincronización de datos en background...");
-        // Paso 1: Seed inicial (solo si BD está vacía)
         await seedDatabaseIfEmpty();
-
-        // Paso 2: Sincronizar datos canónicos (SIEMPRE en producción/deployment)
         await syncCanonicalData();
         logger.info("✅ Sincronización completada exitosamente");
       } catch (error) {

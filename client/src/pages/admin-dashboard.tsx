@@ -21,7 +21,7 @@ import {
 import {
   TrendingUp, TrendingDown, Minus, DollarSign, Briefcase, Activity,
   BarChart3, LineChart as LineChartIcon, MapPinned,
-  Zap, Plane, LayoutDashboard, UserPlus as UserPlusIcon, Clock
+  Zap, Plane, LayoutDashboard, UserPlus as UserPlusIcon, Clock, Mail
 } from "lucide-react";
 import {
   Select,
@@ -181,6 +181,9 @@ export default function AdminDashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [isTestEmailOpen, setIsTestEmailOpen] = useState(false);
+  const [testEmailTo, setTestEmailTo] = useState("");
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
   const [chartDays, setChartDays] = useState("30");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -240,6 +243,25 @@ export default function AdminDashboard() {
       email: clientEmail,
       phone: clientPhone || undefined,
     });
+  };
+
+  const handleTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTestEmailLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/test-email", { to: testEmailTo });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Correo enviado", description: `Revisa ${testEmailTo} (y spam)` });
+        setIsTestEmailOpen(false);
+      } else {
+        toast({ title: "Error", description: data.message || "Revisa logs en Railway", variant: "destructive" });
+      }
+    } catch (err: unknown) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setTestEmailLoading(false);
+    }
   };
 
   const formatChartDate = (dateStr: string) => {
@@ -734,6 +756,39 @@ export default function AdminDashboard() {
                     <span className="text-xs sm:text-sm font-medium">{action.label}</span>
                   </Button>
                 ))}
+                <Dialog open={isTestEmailOpen} onOpenChange={setIsTestEmailOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-20 sm:h-24 flex flex-col items-center justify-center gap-2 hover:bg-accent hover:text-chart-1 hover:border-chart-1/20 transition-all"
+                    >
+                      <Mail className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden />
+                      <span className="text-xs sm:text-sm font-medium">Probar correo</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Probar Brevo SMTP</DialogTitle>
+                      <DialogDescription>Envía un correo de prueba para verificar que 2FA y notificaciones funcionen.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleTestEmail} className="space-y-4">
+                      <div>
+                        <Label htmlFor="test-email">Email destino</Label>
+                        <Input
+                          id="test-email"
+                          type="email"
+                          value={testEmailTo}
+                          onChange={(e) => setTestEmailTo(e.target.value)}
+                          placeholder="tu@correo.com"
+                          required
+                        />
+                      </div>
+                      <Button type="submit" disabled={testEmailLoading}>
+                        {testEmailLoading ? "Enviando…" : "Enviar correo de prueba"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
                 <Dialog open={isClientDialogOpen} onOpenChange={setIsClientDialogOpen}>
                   <DialogTrigger asChild>
                     <Button

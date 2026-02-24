@@ -162,6 +162,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/extract-plan", requireRole("super_admin"), extractPlanUpload.single("file"), asyncHandler(handleExtractPlanFromDocument));
   logger.info("Route POST /api/admin/extract-plan registered (first in API stack)");
 
+  // Test email (super_admin): verificar Brevo SMTP
+  app.post("/api/admin/test-email", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const schema = z.object({ to: z.string().email() });
+    const { to } = schema.parse(req.body);
+    if (!isEmailConfigured()) {
+      return res.status(400).json({ message: "SMTP no configurado. Define SMTP_USER y SMTP_PASS en Railway." });
+    }
+    const ok = await sendEmail({
+      to,
+      subject: "Prueba de correo - Cosmos Viajes",
+      html: `<p>Si recibes este correo, Brevo SMTP está configurado correctamente.</p><p>Enviado desde Cosmos Viajes.</p>`,
+    });
+    return res.json({ success: ok, message: ok ? "Correo enviado. Revisa en " + to : "Error al enviar. Revisa logs en Railway." });
+  }));
+
   // Apply general API rate limiting
   app.use("/api", apiLimiter);
 
@@ -189,9 +204,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
       const tempToken = await storage.createTwoFactorSession(user.id, code, expiresAt);
 
+      // Email en background: no bloquear respuesta (evita 2 min de espera)
       if (isEmailConfigured()) {
         const emailTo = user.email || user.username;
-        await sendEmail({
+        sendEmail({
           to: emailTo,
           subject: "Código de verificación - Cosmos Viajes",
           html: generate2FACodeEmailHtml(code, user.name ?? undefined),
