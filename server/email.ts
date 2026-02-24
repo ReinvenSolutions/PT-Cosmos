@@ -36,6 +36,9 @@ function getTransporter() {
     port,
     secure: port === 465,
     auth: { user, pass },
+    connectionTimeout: 10_000,
+    greetingTimeout: 5_000,
+    ...(port === 587 && { requireTLS: true }),
   });
 }
 

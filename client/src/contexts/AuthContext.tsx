@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 
 export interface User {
   id: string;
@@ -29,8 +29,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   
-  const { data, isLoading } = useQuery<{ user: User }>({
+  const { data, isLoading } = useQuery<{ user: User } | null>({
     queryKey: ["/api/auth/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
@@ -40,10 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await apiRequest("POST", "/api/auth/login", { username, password });
       return response.json();
     },
-    onSuccess: async (data: LoginResult) => {
+    onSuccess: (data: LoginResult) => {
       if ("user" in data) {
         queryClient.setQueryData(["/api/auth/me"], data);
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        // No invalidate: ya tenemos el user; evita refetch que puede colgar
       }
     },
   });
@@ -53,9 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await apiRequest("POST", "/api/auth/2fa/verify", { tempToken, code });
       return response.json();
     },
-    onSuccess: async (data: { user: User }) => {
+    onSuccess: (data: { user: User }) => {
       queryClient.setQueryData(["/api/auth/me"], data);
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });
 
