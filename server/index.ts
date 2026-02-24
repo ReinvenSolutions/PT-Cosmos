@@ -6,7 +6,6 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import helmet from "helmet";
 import compression from "compression";
 import { env } from "./config/env";
@@ -19,24 +18,21 @@ import { seedDatabaseIfEmpty } from "./seed";
 import { syncCanonicalData } from "./sync-canonical-data";
 import { isEmailConfigured } from "./email";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/** Aplica migración 0008 (auth tokens, 2FA) si no existe. Necesaria para login. */
-async function runAuthMigration(pool: InstanceType<typeof Pool>) {
-  const sqlPath = path.join(__dirname, "..", "migrations", "0008_auth_tokens_2fa.sql");
-  if (!fs.existsSync(sqlPath)) return;
-  const sql = fs.readFileSync(sqlPath, "utf-8");
-  try {
-    await pool.query(sql);
-    logger.info("✅ Migración auth (0008) aplicada");
-  } catch (err: unknown) {
-    const e = err as { code?: string };
-    if (e?.code === "42701") {
-      logger.info("ℹ️ Migración auth ya aplicada");
-    } else {
-      logger.warn("⚠️ Migración auth:", e);
-    }
+/** Aplica migración 0008 (auth tokens, 2FA) si no existe. No bloquea el arranque. */
+function runAuthMigrationInBackground(pool: InstanceType<typeof Pool>) {
+  const sqlPath = path.join(process.cwd(), "migrations", "0008_auth_tokens_2fa.sql");
+  if (!fs.existsSync(sqlPath)) {
+    logger.warn("⚠️ migrations/0008_auth_tokens_2fa.sql no encontrado");
+    return;
   }
+  const sql = fs.readFileSync(sqlPath, "utf-8");
+  pool.query(sql).then(() => {
+    logger.info("✅ Migración auth (0008) aplicada");
+  }).catch((err: unknown) => {
+    const e = err as { code?: string };
+    if (e?.code === "42701") logger.info("ℹ️ Migración auth ya aplicada");
+    else logger.warn("⚠️ Migración auth:", e);
+  });
 }
 
 const app = express();
@@ -134,12 +130,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // En producción: asegurar que tablas de auth existan antes de aceptar logins
-  if (env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
-    await runAuthMigration(pool);
-  }
+  try {
+    // Migración en background (no bloquea arranque; evita 502 si la BD tarda)
+    if (env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
+      runAuthMigrationInBackground(pool);
+    }
 
-  const server = await registerRoutes(app);
+    const server = await registerRoutes(app);
 
   // Error handler middleware (must be last)
     app.use(errorHandler);
@@ -181,4 +178,8 @@ app.use((req, res, next) => {
     const emailStatus = isEmailConfigured() ? "Email: ✓" : "Email: ✗ (SMTP_USER/SMTP_PASS en .env)";
     logger.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode | BD: ${dbSource} | ${emailStatus}`);
   });
+  } catch (err) {
+    logger.error("❌ Error fatal al iniciar el servidor", { err });
+    process.exit(1);
+  }
 })();
