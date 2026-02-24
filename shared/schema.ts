@@ -22,6 +22,14 @@ export const destinations = pgTable(
     allowedDays: text("allowed_days").array(),
     priceTiers: json("price_tiers").$type<Array<{ startDate?: string; endDate: string; price: string; isFlightDay?: boolean; flightLabel?: string }>>(),
     upgrades: json("upgrades").$type<Array<{ code: string; name: string; description?: string; price: number }>>(),
+    hasInternalOrConnectionFlight: boolean("has_internal_or_connection_flight").default(false),
+    internalFlights: json("internal_flights").$type<Array<{ imageUrl: string; label?: string; cabinBaggage?: boolean; holdBaggage?: boolean }>>(),
+    medicalAssistanceInfo: text("medical_assistance_info"),
+    medicalAssistanceImageUrl: text("medical_assistance_image_url"),
+    firstPageComments: text("first_page_comments"),
+    itineraryMapImageUrl: text("itinerary_map_image_url"),
+    flightTerms: text("flight_terms"),
+    termsConditions: text("terms_conditions"),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [uniqueIndex("destinations_name_country_unique").on(table.name, table.country)],
@@ -114,8 +122,27 @@ export const users = pgTable("users", {
   name: text("name"),
   username: text("username").notNull().unique(),
   email: text("email").unique(),
+  avatarUrl: text("avatar_url"),
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  twoFactorEnabled: boolean("two_factor_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token").notNull().unique(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const twoFactorSessions = pgTable("two_factor_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 6 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -226,6 +253,23 @@ export const sessions = pgTable("sessions", {
   sess: json("sess").notNull(),
   expire: timestamp("expire").notNull(),
 });
+
+export const termsConditions = pgTable("terms_conditions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  scope: text("scope").notNull().default("plan"),
+  destinationId: varchar("destination_id").references(() => destinations.id, { onDelete: "cascade" }),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTermsConditionsSchema = createInsertSchema(termsConditions).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTermsConditions = z.infer<typeof insertTermsConditionsSchema>;
+export type TermsConditions = typeof termsConditions.$inferSelect;
 
 export function formatUSD(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;

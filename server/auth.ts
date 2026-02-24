@@ -13,6 +13,10 @@ passport.use(
         return done(null, false, { message: "Usuario o contraseña incorrectos" });
       }
 
+      if (!user.isActive) {
+        return done(null, false, { message: "Tu cuenta ha sido desactivada. Contacta al administrador." });
+      }
+
       const isValidPassword = await bcrypt.compare(password, user.passwordHash);
       
       if (!isValidPassword) {

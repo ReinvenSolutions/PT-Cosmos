@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { toJpeg } from "html-to-image";
 import { saveAs } from "file-saver";
 import { QuoteTemplate } from "./quote-template";
@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Upload, Image as ImageIcon } from "lucide-react";
+import { Download, Upload, Image as ImageIcon, ImagePlus, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { trackQuote } from "@/lib/tracking";
+import { cn } from "@/lib/utils";
 
 export function ExpressQuoteGenerator() {
   const { toast } = useToast();
@@ -30,63 +31,41 @@ export function ExpressQuoteGenerator() {
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [dragMain, setDragMain] = useState(false);
+  const [dragLogo, setDragLogo] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "Error",
-          description: "La imagen es demasiado grande. Máximo 5MB.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMainImage(reader.result as string);
-      };
-      reader.onerror = () => {
-        toast({
-          title: "Error",
-          description: "Error al cargar la imagen.",
-          variant: "destructive",
-        });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) processMainImageFile(file);
+    e.target.value = "";
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast({
-          title: "Error",
-          description: "El logo es demasiado grande. Máximo 2MB.",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (file) processLogoFile(file);
+    e.target.value = "";
+  };
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoUrl(reader.result as string);
-        toast({
-          title: "Logo cargado",
-          description: "El logo ha sido cargado exitosamente.",
-        });
-      };
-      reader.onerror = () => {
-        toast({
-          title: "Error",
-          description: "Error al cargar el logo.",
-          variant: "destructive",
-        });
-      };
-      reader.readAsDataURL(file);
+  const processLogoFile = (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "Error", description: "El logo es demasiado grande. Máximo 2MB.", variant: "destructive" });
+      return;
     }
+    const reader = new FileReader();
+    reader.onloadend = () => setLogoUrl(reader.result as string);
+    reader.onerror = () => toast({ title: "Error", description: "Error al cargar el logo.", variant: "destructive" });
+    reader.readAsDataURL(file);
+  };
+
+  const processMainImageFile = (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Error", description: "La imagen es demasiado grande. Máximo 5MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => setMainImage(reader.result as string);
+    reader.onerror = () => toast({ title: "Error", description: "Error al cargar la imagen.", variant: "destructive" });
+    reader.readAsDataURL(file);
   };
 
   const handleIncludesChange = (item: string, checked: boolean) => {
@@ -182,242 +161,295 @@ export function ExpressQuoteGenerator() {
     }
   };
 
+  const includeOptions = [
+    { id: "vuelo", label: "Vuelo" },
+    { id: "traslado", label: "Traslado" },
+    { id: "hotel", label: "Hotel" },
+    { id: "actividades", label: "Actividades" },
+    { id: "asistencia-medica", label: "Asistencia Médica" },
+  ];
+
   return (
-    <div className="flex gap-6 h-[calc(100vh-180px)]">
-      {/* Panel Izquierdo: Formulario */}
-      <div className="w-1/2 overflow-y-auto pr-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ImageIcon className="w-5 h-5" />
+    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-7rem)] min-h-[500px]">
+      {/* Panel Izquierdo: Formulario compacto */}
+      <div className="lg:w-1/2 overflow-y-auto pr-0 lg:pr-4 flex-shrink-0">
+        <Card className="glass-card overflow-hidden">
+          <CardHeader className="py-3 px-5">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ImageIcon className="w-4 h-4 text-primary" />
               Formulario de Cotización
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Logo */}
-            <div className="space-y-2">
-              <Label htmlFor="logo">Logo (Opcional)</Label>
-              <Input
-                id="logo"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                className="cursor-pointer"
-              />
-              {logoUrl && (
-                <div className="mt-2">
-                  <img
-                    src={logoUrl}
-                    alt="Vista previa del logo"
-                    className="h-12 w-auto object-contain border rounded p-2 bg-[#004e7c]"
-                  />
-                </div>
-              )}
+          <CardContent className="px-5 pb-5 space-y-4">
+            {/* Imagen Principal (100% ancho) - zona de carga moderna */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Imagen Principal *</Label>
+              <label
+                htmlFor="mainImage"
+                onDragOver={(e) => { e.preventDefault(); setDragMain(true); }}
+                onDragLeave={() => setDragMain(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragMain(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file?.type.startsWith("image/")) processMainImageFile(file);
+                }}
+                className={cn(
+                  "block w-full cursor-pointer rounded-xl border-2 border-dashed transition-all",
+                  mainImage
+                    ? "border-primary/40 bg-primary/5 overflow-hidden"
+                    : "border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/50",
+                  dragMain && !mainImage && "border-primary bg-primary/10"
+                )}
+              >
+                <input
+                  id="mainImage"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="sr-only"
+                />
+                {mainImage ? (
+                  <div className="relative aspect-video w-full group">
+                    <img src={mainImage} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <ImagePlus className="w-6 h-6 text-white" />
+                      <span className="text-sm font-medium text-white">Cambiar imagen</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 px-4">
+                    <Upload className="w-10 h-10 text-muted-foreground mb-2" />
+                    <span className="text-sm font-medium text-foreground">Arrastra una imagen o haz clic para subir</span>
+                    <span className="text-xs text-muted-foreground mt-0.5">PNG, JPG o WebP · Máx. 5MB</span>
+                  </div>
+                )}
+              </label>
             </div>
 
-            {/* Imagen Principal */}
-            <div className="space-y-2">
-              <Label htmlFor="mainImage">Imagen Principal *</Label>
-              <Input
-                id="mainImage"
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="cursor-pointer"
-              />
-              {mainImage && (
-                <div className="mt-2">
-                  <img
-                    src={mainImage}
-                    alt="Preview"
-                    className="w-full h-48 object-cover rounded border"
-                  />
-                </div>
-              )}
+            {/* Logo (100% ancho) - zona de carga moderna */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Logo (Opcional)</Label>
+              <label
+                htmlFor="logo"
+                onDragOver={(e) => { e.preventDefault(); setDragLogo(true); }}
+                onDragLeave={() => setDragLogo(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragLogo(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file?.type.startsWith("image/")) processLogoFile(file);
+                }}
+                className={cn(
+                  "block w-full cursor-pointer rounded-xl border-2 border-dashed transition-all",
+                  logoUrl
+                    ? "border-primary/40 bg-primary/5 p-3"
+                    : "border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/50 py-6",
+                  dragLogo && !logoUrl && "border-primary bg-primary/10"
+                )}
+              >
+                <input
+                  id="logo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="sr-only"
+                />
+                {logoUrl ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <img src={logoUrl} alt="Logo" className="h-12 w-auto max-w-[200px] object-contain" />
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <ImagePlus className="w-3.5 h-3.5" />
+                      Cambiar
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-muted-foreground mb-1.5" />
+                    <span className="text-xs font-medium text-foreground">Arrastra el logo o haz clic para subir</span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">Máx. 2MB</span>
+                  </div>
+                )}
+              </label>
             </div>
 
-            {/* Título Principal */}
-            <div className="space-y-2">
-              <Label htmlFor="mainTitle">Título Principal *</Label>
+            {/* Título (ancho completo) */}
+            <div className="space-y-1.5">
+              <Label htmlFor="mainTitle" className="text-xs">Título Principal *</Label>
               <Input
                 id="mainTitle"
                 value={mainTitle}
                 onChange={(e) => setMainTitle(e.target.value)}
                 placeholder="Ej: Hotel Paradise Beach"
+                className="h-9"
               />
             </div>
 
-            {/* Descripción */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Descripción *</Label>
-              <Input
+            {/* Descripción (ancho completo) - más espacio para texto largo */}
+            <div className="space-y-1.5">
+              <Label htmlFor="description" className="text-xs">Descripción *</Label>
+              <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ej: 4 días y 3 noches"
+                placeholder="Ej: 4 días y 3 noches, vuelo incluido, hoteles 4 estrellas..."
+                rows={2}
+                className="min-h-[60px] resize-none text-sm"
               />
             </div>
 
-            {/* Incluye - Selector Múltiple */}
-            <div className="space-y-2">
-              <Label>Incluye</Label>
-              <div className="space-y-3 border rounded-md p-4">
-                {[
-                  { id: "vuelo", label: "Vuelo" },
-                  { id: "traslado", label: "Traslado" },
-                  { id: "hotel", label: "Hotel" },
-                  { id: "actividades", label: "Actividades" },
-                  { id: "asistencia-medica", label: "Asistencia Médica" }
-                ].map((item) => (
-                  <div key={item.id} className="flex items-center space-x-2">
+            {/* Fila 3: Incluye (horizontal compacto) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Incluye</Label>
+              <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
+                {includeOptions.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex items-center gap-1.5 cursor-pointer text-xs font-medium px-2.5 py-1.5 rounded-md hover:bg-background/50 transition-colors"
+                  >
                     <Checkbox
                       id={item.id}
                       checked={includes.includes(item.label)}
-                      onCheckedChange={(checked) => 
-                        handleIncludesChange(item.label, checked as boolean)
-                      }
+                      onCheckedChange={(checked) => handleIncludesChange(item.label, checked as boolean)}
                     />
-                    <label
-                      htmlFor={item.id}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      {item.label}
-                    </label>
-                  </div>
+                    {item.label}
+                  </label>
                 ))}
               </div>
             </div>
 
-            {/* Estrellas del Hotel - Solo visible si Hotel está seleccionado */}
-            {includes.includes("Hotel") && (
-              <div className="space-y-2">
-                <Label htmlFor="hotelStars">Estrellas del Hotel *</Label>
+            {/* Fila 4: Plan + Personas + Precio (+ Estrellas si Hotel) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {includes.includes("Hotel") && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="hotelStars" className="text-xs">Estrellas *</Label>
+                  <Input
+                    id="hotelStars"
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={hotelStars}
+                    onChange={(e) => setHotelStars(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
+                    className="h-9"
+                  />
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="plan" className="text-xs">Plan *</Label>
+                <Select value={plan} onValueChange={(v: "solo" | "empaquetado") => setPlan(v)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="solo">Solo</SelectItem>
+                    <SelectItem value="empaquetado">Empaquetado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="numberOfPeople" className="text-xs">Personas *</Label>
                 <Input
-                  id="hotelStars"
+                  id="numberOfPeople"
                   type="number"
-                  min="1"
-                  max="5"
-                  value={hotelStars}
-                  onChange={(e) => setHotelStars(parseInt(e.target.value) || 1)}
+                  min={1}
+                  value={numberOfPeople}
+                  onChange={(e) => setNumberOfPeople(parseInt(e.target.value) || 1)}
+                  className="h-9"
                 />
               </div>
-            )}
-
-            {/* Plan */}
-            <div className="space-y-2">
-              <Label htmlFor="plan">Plan *</Label>
-              <Select value={plan} onValueChange={(value: "solo" | "empaquetado") => setPlan(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un plan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="solo">Solo</SelectItem>
-                  <SelectItem value="empaquetado">Empaquetado</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-1.5">
+                <Label htmlFor="price" className="text-xs">Precio *</Label>
+                <Input
+                  id="price"
+                  value={price}
+                  onChange={handlePriceChange}
+                  placeholder="Ej: 2173600"
+                  className="h-9"
+                />
+              </div>
             </div>
 
-            {/* Número de Personas */}
-            <div className="space-y-2">
-              <Label htmlFor="numberOfPeople">Número de Personas *</Label>
-              <Input
-                id="numberOfPeople"
-                type="number"
-                min="1"
-                value={numberOfPeople}
-                onChange={(e) => setNumberOfPeople(parseInt(e.target.value) || 1)}
-              />
-            </div>
-
-            {/* Precio */}
-            <div className="space-y-2">
-              <Label htmlFor="price">Precio *</Label>
-              <Input
-                id="price"
-                value={price}
-                onChange={handlePriceChange}
-                placeholder="Ej: 2173600"
-              />
-              <p className="text-xs text-gray-500">
-                El precio se formateará automáticamente con separadores de miles
-              </p>
-            </div>
-
-            {/* Disclaimer */}
-            <div className="space-y-2">
-              <Label htmlFor="disclaimer">Términos y Condiciones / Disclaimer</Label>
+            {/* Fila 5: Disclaimer (compacto) */}
+            <div className="space-y-1.5">
+              <Label htmlFor="disclaimer" className="text-xs">Términos / Disclaimer</Label>
               <Textarea
                 id="disclaimer"
                 value={disclaimer}
                 onChange={(e) => setDisclaimer(e.target.value)}
-                placeholder="Ej: Consulta términos y condiciones. Promoción sujeta a disponibilidad y cambio sin previo aviso. Viaja del 18 feb. 2026 a 21 feb. 2026. Impuestos incluidos."
-                rows={4}
+                placeholder="Términos, vigencia, impuestos..."
+                rows={2}
+                className="resize-none text-sm min-h-[52px]"
               />
             </div>
 
-            {/* Teléfono */}
-            <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono de Contacto *</Label>
-              <Input
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+57 321 456 7890"
-              />
+            {/* Fila 6: Teléfono + Email + Botón */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="text-xs">Teléfono *</Label>
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+57 321 456 7890"
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="info@cosmosmayorista.com"
+                  className="h-9"
+                />
+              </div>
             </div>
 
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email de Contacto *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="info@cosmosmayorista.com"
-              />
-            </div>
-
-            {/* Botón de Descarga */}
             <Button
               onClick={handleDownload}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              size="lg"
+              className="w-full h-10"
               disabled={!mainTitle || !price || !phone || !email}
             >
-              <Download className="w-5 h-5 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               Descargar Imagen
             </Button>
           </CardContent>
         </Card>
       </div>
 
-      {/* Panel Derecho: Vista Previa */}
-      <div className="w-1/2 overflow-visible bg-gray-50 p-6 flex flex-col items-center min-w-[800px]">
-        <div className="sticky top-0 mb-4 bg-gray-50 pb-2 z-10">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">
-            Vista Previa
-          </h3>
-          <p className="text-sm text-gray-500">
-            Esta es la vista previa de cómo se verá tu cotización
-          </p>
+      {/* Panel Derecho: Vista Previa — presentación profesional */}
+      <div className="preview-showcase lg:w-1/2 flex flex-col min-h-0 flex-1 overflow-hidden">
+        <div className="preview-showcase-header flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="preview-showcase-icon">
+              <Eye className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Vista Previa</h3>
+              <p className="text-xs text-muted-foreground">Así se verá tu cotización al descargar</p>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-center pb-6">
-          <QuoteTemplate
-            ref={cardRef}
-            mainTitle={mainTitle}
-            description={description}
-            hotelStars={hotelStars}
-            includes={includes}
-            plan={plan}
-            numberOfPeople={numberOfPeople}
-            price={price}
-            disclaimer={disclaimer}
-            mainImage={mainImage}
-            logoUrl={logoUrl}
-            phone={phone}
-            email={email}
-          />
+        <div className="preview-showcase-stage flex-1 min-h-0 overflow-auto flex justify-center items-start p-6">
+          <div className="preview-showcase-frame">
+            <QuoteTemplate
+              ref={cardRef}
+              mainTitle={mainTitle}
+              description={description}
+              hotelStars={hotelStars}
+              includes={includes}
+              plan={plan}
+              numberOfPeople={numberOfPeople}
+              price={price}
+              disclaimer={disclaimer}
+              mainImage={mainImage}
+              logoUrl={logoUrl}
+              phone={phone}
+              email={email}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -15,12 +15,15 @@ const envSchema = z.object({
   // Logging
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).optional(),
   
-  // Optional
-  REPLIT_DEPLOYMENT: z.string().optional(),
-  DEFAULT_OBJECT_STORAGE_BUCKET_ID: z.string().optional(),
+  // Optional (Railway sets RAILWAY_ENVIRONMENT in production)
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().regex(/^\d+$/).optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().email().optional(),
+  SMTP_FROM_NAME: z.string().optional(),
 });
 
 function validateEnv() {
@@ -41,7 +44,8 @@ function validateEnv() {
 export const env = validateEnv();
 
 // Validate SESSION_SECRET in production
-if (env.NODE_ENV === "production" || env.REPLIT_DEPLOYMENT === "1") {
+const isProduction = env.NODE_ENV === "production" || !!process.env.RAILWAY_ENVIRONMENT;
+if (isProduction) {
   if (env.SESSION_SECRET.length < 32 || env.SESSION_SECRET === "dev-secret-change-in-production") {
     console.error(
       "❌ SESSION_SECRET must be set to a secure random value in production.\n" +

@@ -33,7 +33,7 @@ import { eq } from 'drizzle-orm';
 
 const env = process.env.NODE_ENV || 'development';
 const allowProdSync = process.env.ALLOW_PROD_DATA_SYNC === 'true';
-const isDeployment = process.env.REPLIT_DEPLOYMENT === '1' || !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_STATIC_URL || !!process.env.RAILWAY_GIT_COMMIT_SHA;
+const isDeployment = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_STATIC_URL || !!process.env.RAILWAY_GIT_COMMIT_SHA;
 
 async function syncData() {
   console.log('\n========================================');
@@ -44,18 +44,18 @@ async function syncData() {
   console.log('========================================\n');
 
   // Validación de seguridad para producción
-  // Si está en deployment de Replit, permitir sincronización automáticamente
+  // Si está en deployment (Railway), permitir sincronización automáticamente
   if (env === 'production' && !allowProdSync && !isDeployment) {
     console.error('❌ ERROR: Intento de sincronización en producción sin autorización');
     console.error('Para sincronizar en producción manualmente, ejecuta:');
     console.error('ALLOW_PROD_DATA_SYNC=true npm run db:seed');
     console.error('');
-    console.error('Nota: En deployment automático de Replit, esto se ejecuta automáticamente.');
+    console.error('Nota: En deployment automático (Railway), esto se ejecuta automáticamente.');
     process.exit(1);
   }
 
   if (isDeployment) {
-    console.log('🚀 Ejecutando en Replit Deployment - sincronización automática habilitada\n');
+    console.log('🚀 Ejecutando en deployment (Railway) - sincronización automática habilitada\n');
   }
 
   try {

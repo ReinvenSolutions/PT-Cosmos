@@ -29,7 +29,7 @@ import {
 } from "../shared/seed-data";
 import { eq } from "drizzle-orm";
 
-const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
+const isDeployment = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_STATIC_URL;
 const isProduction = process.env.NODE_ENV === 'production';
 
 export async function syncCanonicalData() {
@@ -81,7 +81,8 @@ export async function syncCanonicalData() {
         .limit(1);
 
       if (existing.length > 0) {
-        // Actualizar destino existente
+        // Actualizar destino existente - NO sobrescribir isActive ni displayOrder
+        // (esos se gestionan desde el panel de admin)
         await db
           .update(destinations)
           .set({
@@ -90,7 +91,6 @@ export async function syncCanonicalData() {
             duration: dest.duration,
             nights: dest.nights,
             basePrice: dest.basePrice,
-            isActive: dest.isActive,
             requiresTuesday: dest.requiresTuesday,
           })
           .where(eq(destinations.id, dest.id));

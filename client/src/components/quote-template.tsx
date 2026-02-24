@@ -49,152 +49,146 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
     return (
       <div
         ref={ref}
-            className="bg-white shadow-2xl overflow-hidden"
-            style={{ fontFamily: "system-ui, -apple-system, sans-serif", width: "800px", maxWidth: "800px", margin: 0, padding: 0 }}
+        className="bg-white overflow-hidden quote-template-card"
+        style={{ fontFamily: "system-ui, -apple-system, sans-serif", width: "800px", maxWidth: "800px", margin: 0, padding: 0 }}
       >
         {/* Header - Solo se muestra si hay logo */}
         {logoUrl && (
           <>
-            <div className="bg-[#004e7c] px-8 py-6 flex items-center justify-start">
+            <div className="quote-template-logo-bar px-8 py-6 flex items-center justify-start">
               <img
                 src={logoUrl}
                 alt="Logo"
                 className="h-16 w-auto object-contain"
-                style={{ maxWidth: '100%' }}
+                style={{ maxWidth: "100%" }}
               />
             </div>
-            {/* Separador gris claro */}
-            <div className="h-2 bg-[#f5f5f5]"></div>
+            <div className="h-1.5 bg-neutral-100" />
           </>
         )}
 
         {/* Imagen Principal */}
-            <div className="h-[400px] w-full bg-gray-200 relative overflow-hidden" style={{ margin: 0, padding: 0 }}>
+        <div className="h-[400px] w-full bg-neutral-100 relative overflow-hidden">
           {mainImage ? (
-            <img
-              src={mainImage}
-              alt={mainTitle}
-              className="w-full h-full object-cover"
-            />
+            <img src={mainImage} alt={mainTitle} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
-              <div className="text-center text-gray-400">
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-neutral-100 to-neutral-200">
+              <div className="text-center text-neutral-400">
                 <svg
-                  className="w-24 h-24 mx-auto mb-4"
+                  className="w-20 h-20 mx-auto mb-3"
                   fill="none"
                   stroke="currentColor"
+                  strokeWidth={1.5}
                   viewBox="0 0 24 24"
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
                   />
                 </svg>
-                <p className="text-lg font-medium">Imagen del destino</p>
+                <p className="text-sm font-medium text-neutral-500">Imagen del destino</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Cuerpo */}
-            <div className="px-8 py-6 w-full" style={{ margin: 0 }}>
-          {/* Título Principal */}
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+        <div className="px-8 py-6 w-full">
+          <h2 className="text-2xl font-bold text-neutral-900 mb-2 tracking-tight">
             {mainTitle || "Título Principal"}
           </h2>
-
-          {/* Descripción */}
-          <p className="text-lg text-gray-600 mb-5">
+          <p className="text-base text-neutral-600 mb-5 leading-relaxed">
             {description || "Descripción"}
           </p>
 
-          {/* Divisor */}
-          <hr className="border-gray-300 mb-6" />
+          <hr className="border-neutral-200 mb-6" />
 
-          {/* Sección de Precios - Layout horizontal */}
           <div className="mb-6 w-full">
-            {/* Etiquetas en una sola línea encima del precio */}
-            <div className="flex items-center gap-3 flex-wrap mb-2">
+            <div className="flex items-center gap-2.5 flex-wrap mb-3">
               {includes.includes("Hotel") && (
                 <>
-                  <span className="bg-blue-400 text-white px-3 py-1.5 rounded-md text-sm font-semibold">
+                  <span
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                    style={{ background: "hsl(197 53% 36%)" }}
+                  >
                     Hotel
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     {Array.from({ length: hotelStars }).map((_, i) => (
                       <Star
                         key={i}
-                        className="w-5 h-5 fill-yellow-400 text-yellow-400"
+                        className="w-4 h-4 fill-amber-400 text-amber-400"
                       />
                     ))}
                   </div>
                 </>
               )}
-              {includes.length > 0 && (
-                <>
-                  {includes.filter(item => item !== "Hotel").map((item, index) => (
-                    <span
-                      key={index}
-                      className="bg-green-500 text-white px-2 py-1 rounded-md text-xs font-semibold"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </>
-              )}
+              {includes.filter((item) => item !== "Hotel").map((item, index) => (
+                <span
+                  key={index}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold text-white"
+                  style={{ background: "hsl(142 45% 45%)" }}
+                >
+                  {item}
+                </span>
+              ))}
             </div>
-            {/* Precio alineado a la derecha */}
+
             <div className="flex justify-end items-baseline">
               <div className="text-right">
-                <p className="text-xs text-gray-500 mb-1">desde</p>
-                <p className="text-4xl font-bold text-gray-900 whitespace-nowrap">
+                <p className="text-[11px] text-neutral-500 mb-0.5 uppercase tracking-wider">desde</p>
+                <p
+                  className="text-3xl font-bold whitespace-nowrap"
+                  style={{ color: "hsl(44 54% 45%)" }}
+                >
                   {formatPriceDisplay(price)}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">precio por persona</p>
+                <p className="text-[11px] text-neutral-500 mt-0.5">precio por persona</p>
               </div>
             </div>
-            {/* Información adicional debajo: solo tipo de plan y cantidad de personas */}
-            <div className="flex flex-col gap-2 mt-4">
-              <p className="text-base text-gray-800">
-                <span className="font-bold">Tipo de plan:</span> <span className="font-normal">{plan === "solo" ? "Solo" : "Empaquetado"}</span>
+
+            <div className="flex flex-col gap-1.5 mt-4 text-sm">
+              <p className="text-neutral-700">
+                <span className="font-semibold">Tipo de plan:</span> {plan === "solo" ? "Solo" : "Empaquetado"}
               </p>
-              <p className="text-base text-gray-800">
-                <span className="font-bold">Cantidad de personas:</span> {numberOfPeople || 2} {numberOfPeople === 1 ? "persona" : "personas"}
+              <p className="text-neutral-700">
+                <span className="font-semibold">Cantidad de personas:</span> {numberOfPeople || 2}{" "}
+                {numberOfPeople === 1 ? "persona" : "personas"}
               </p>
             </div>
           </div>
 
-          {/* Disclaimer */}
           {disclaimer && (
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-500 leading-relaxed">{disclaimer}</p>
+            <div className="mt-6 pt-4 border-t border-neutral-200">
+              <p className="text-xs text-neutral-500 leading-relaxed">{disclaimer}</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-            <div className="bg-[#f5f5f5] w-full px-8 py-5">
-          <p className="text-sm font-medium text-gray-800 mb-4">
-            Para mayor información contáctanos:
+        <div className="bg-neutral-50 w-full px-8 py-5 border-t border-neutral-200">
+          <p className="text-xs font-semibold text-neutral-600 mb-3 uppercase tracking-wider">
+            Para mayor información contáctanos
           </p>
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center">
-                <PhoneCall className="w-5 h-5 text-white" strokeWidth={2.5} />
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white"
+                style={{ background: "hsl(197 53% 36%)" }}
+              >
+                <PhoneCall className="w-4 h-4" strokeWidth={2.5} />
               </div>
-              <span className="text-sm font-medium text-gray-800">
-                {phone || "Teléfono"}
-              </span>
+              <span className="text-sm font-medium text-neutral-800">{phone || "Teléfono"}</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center">
-                <AtSign className="w-5 h-5 text-white" strokeWidth={2.5} />
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white"
+                style={{ background: "hsl(197 53% 36%)" }}
+              >
+                <AtSign className="w-4 h-4" strokeWidth={2.5} />
               </div>
-              <span className="text-sm font-medium text-gray-800">
-                {email || "Email"}
-              </span>
+              <span className="text-sm font-medium text-neutral-800">{email || "Email"}</span>
             </div>
           </div>
         </div>

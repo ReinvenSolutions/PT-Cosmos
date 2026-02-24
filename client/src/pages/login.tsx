@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plane, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
+import { Plane, Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, ShieldCheck } from "lucide-react";
+import { ThemeToggleCompact } from "@/components/theme-toggle";
+import { TwoFactorInput } from "@/components/two-factor-input";
 
 // Componente de Bandera Estilizada "Shiny"
 // Usamos flagsapi.com con el estilo 'shiny' que da ese efecto 3D/Ondeado premium
@@ -24,21 +26,32 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const [step, setStep] = useState<"credentials" | "2fa">("credentials");
+  const [tempToken, setTempToken] = useState("");
+  const [code2FA, setCode2FA] = useState("");
+  const [codeError, setCodeError] = useState(false);
+  const { login, verify2FA } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setCodeError(false);
 
     try {
-      await login(username, password);
-      toast({
-        title: "¡Bienvenido de nuevo!",
-        description: "Has iniciado sesión correctamente.",
-      });
-      navigate("/");
+      const result = await login(username, password);
+      if ("needs2FA" in result && result.needs2FA) {
+        setTempToken(result.tempToken);
+        setStep("2fa");
+        toast({
+          title: "Código enviado",
+          description: result.message || "Revisa tu correo para el código de verificación.",
+        });
+      } else if ("user" in result) {
+        toast({ title: "¡Bienvenido de nuevo!", description: "Has iniciado sesión correctamente." });
+        navigate("/");
+      }
     } catch (error: any) {
       toast({
         title: "Error al iniciar sesión",
@@ -50,8 +63,38 @@ export default function Login() {
     }
   };
 
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code2FA.length !== 6) return;
+    setIsLoading(true);
+    setCodeError(false);
+
+    try {
+      await verify2FA(tempToken, code2FA);
+      toast({ title: "¡Bienvenido!", description: "Has iniciado sesión correctamente." });
+      navigate("/");
+    } catch (error: any) {
+      setCodeError(true);
+      toast({
+        title: "Código inválido",
+        description: error.message || "El código es incorrecto o ha expirado. Intenta iniciar sesión de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackToCredentials = () => {
+    setStep("credentials");
+    setTempToken("");
+    setCode2FA("");
+    setCodeError(false);
+  };
+
   return (
-    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden">
+    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden relative">
+      <ThemeToggleCompact />
       {/* Left Side - Image & Branding */}
       <div className="hidden lg:flex relative h-full flex-col bg-muted text-white dark:border-r">
         <div className="absolute inset-0 bg-zinc-900">
@@ -78,10 +121,10 @@ export default function Login() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background min-h-screen">
+      <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 min-h-screen bg-background/95 backdrop-blur-sm">
         {/* Destinations Banner */}
         <div className="text-center space-y-6 mb-10 w-full max-w-[600px]">
-          <h2 className="text-3xl font-bold text-gray-800">
+          <h2 className="text-3xl font-bold text-foreground">
             Descubre el Mundo con Cosmos
           </h2>
           
@@ -98,7 +141,7 @@ export default function Login() {
             <FlagIcon code="IT" title="Italia" />
           </div>
           
-          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
         </div>
 
         <div className="mx-auto w-full max-w-[400px] space-y-6">
@@ -114,6 +157,41 @@ export default function Login() {
             </p>
           </div>
 
+          {step === "2fa" ? (
+            <form onSubmit={handle2FASubmit} className="space-y-6">
+              <div className="flex flex-col items-center gap-4">
+                <div className="rounded-full bg-primary/10 p-3">
+                  <ShieldCheck className="h-8 w-8 text-primary" />
+                </div>
+                <div className="text-center space-y-1">
+                  <h2 className="text-xl font-semibold">Verificación en dos pasos</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Ingresa el código de 6 dígitos que enviamos a tu correo
+                  </p>
+                </div>
+                <TwoFactorInput
+                  value={code2FA}
+                  onChange={(v) => { setCode2FA(v); setCodeError(false); }}
+                  disabled={isLoading}
+                  error={codeError}
+                />
+                <Button className="w-full h-11" type="submit" disabled={isLoading || code2FA.length !== 6}>
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Verificando...
+                    </div>
+                  ) : (
+                    "Verificar"
+                  )}
+                </Button>
+                <Button variant="ghost" type="button" onClick={handleBackToCredentials} className="text-muted-foreground">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver
+                </Button>
+              </div>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Usuario o Correo</Label>
@@ -137,6 +215,11 @@ export default function Login() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Contraseña</Label>
+                <Link href="/forgot-password">
+                  <button type="button" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -178,25 +261,29 @@ export default function Login() {
               )}
             </Button>
           </form>
+          )}
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                ¿No tienes una cuenta?
-              </span>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Link href="/register">
-              <Button variant="outline" className="w-full h-11" type="button">
-                Crear una cuenta
-              </Button>
-            </Link>
-          </div>
+          {step === "credentials" && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    ¿No tienes una cuenta?
+                  </span>
+                </div>
+              </div>
+              <div className="text-center">
+                <Link href="/register">
+                  <Button variant="outline" className="w-full h-11" type="button">
+                    Crear una cuenta
+                  </Button>
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

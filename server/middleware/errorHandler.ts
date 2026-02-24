@@ -18,6 +18,17 @@ export function errorHandler(
     })));
   }
 
+  // Multer: errores de subida de archivo → mensaje claro y JSON
+  const multerErr = err as { code?: string; field?: string };
+  if (multerErr?.code === "LIMIT_FILE_SIZE") {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    return res.status(400).json({ message: "Archivo muy grande. Supera el límite permitido." });
+  }
+  if (multerErr?.code === "LIMIT_UNEXPECTED_FILE") {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    return res.status(400).json({ message: "Campo de archivo incorrecto. Usa el campo 'file'." });
+  }
+
   // Log error
   if (err instanceof AppError) {
     logger.warn("Application error", {

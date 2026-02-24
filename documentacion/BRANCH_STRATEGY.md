@@ -3,7 +3,7 @@
 ## Configuración de Ramas
 
 ### Rama `main` (Producción)
-- **Base de Datos**: Neon Production (`ep-late-union-ae03ir4o`)
+- **Base de Datos**: Supabase (`db.himyxbrdsnxryetlogzk.supabase.co`)
 - **Workflow**: `.github/workflows/deploy-production.yml`
 - **Trigger**: Push a `main`
 - **Acciones**:
@@ -22,7 +22,7 @@
 
 ## Configuración de Railway (Producción)
 
-Railway debe estar conectado a la base de datos de **PRODUCCIÓN**.
+Railway debe estar conectado a la base de datos de **PRODUCCIÓN** (Supabase).
 
 ### Variables de Entorno en Railway
 1. Ve a tu proyecto en Railway
@@ -31,9 +31,9 @@ Railway debe estar conectado a la base de datos de **PRODUCCIÓN**.
 
 #### `DATABASE_URL`
 ```
-postgresql://neondb_owner:npg_rQ7QPZuPww0K@ep-late-union-ae03ir4o-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
+postgresql://postgres:[YOUR-PASSWORD]@db.himyxbrdsnxryetlogzk.supabase.co:5432/postgres
 ```
-**⚠️ IMPORTANTE**: Debe ser la URL de PRODUCCIÓN (ep-late-union), NO la de desarrollo (ep-blue-credit)
+**⚠️ IMPORTANTE**: URL de Supabase Producción (sustituye `[YOUR-PASSWORD]` por la contraseña de la BD)
 
 #### `NODE_ENV`
 ```
@@ -60,9 +60,9 @@ Debes configurar los siguientes secrets en GitHub:
 
 #### `DATABASE_URL_PRODUCTION`
 ```
-postgresql://neondb_owner:npg_rQ7QPZuPww0K@ep-late-union-ae03ir4o-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
+postgresql://postgres:[YOUR-PASSWORD]@db.himyxbrdsnxryetlogzk.supabase.co:5432/postgres
 ```
-- **Descripción**: URL de conexión a Neon Production
+- **Descripción**: URL de conexión a Supabase Producción
 - **Usado por**: `.github/workflows/deploy-production.yml`
 
 #### `DATABASE_URL_DEVELOPMENT`
@@ -83,18 +83,16 @@ postgresql://neondb_owner:npg_mFCT5oPH6Ovr@ep-blue-credit-aekag6rz-pooler.c-2.us
 
 ### Producción
 1. Trabajar en la rama `main`
-2. Mantener `.env` apuntando a la base de datos de producción
+2. Mantener `.env` apuntando a la base de datos de producción (Supabase)
 3. Al hacer push, GitHub Actions automáticamente:
-   - Aplica cambios de schema a Neon Production
+   - Aplica cambios de schema a Supabase Production
    - Pobla datos actualizados
 
 ## Sincronización Manual
 
-### Sincronizar Local → Neon (ambas bases de datos)
-```bash
-npx tsx scripts/sync-local-to-neon.ts
-```
-Este script sincroniza tu base de datos local con **ambas** bases de datos en Neon (Development y Production).
+### Sincronizar Local → Development
+Si usas Neon para desarrollo, el script `sync-local-to-neon.ts` está archivado en `Files_old/scripts/`.
+**Producción** usa Supabase (ver `MIGRACION_NEON_A_SUPABASE.md`).
 
 ### Listar Usuarios
 ```bash
@@ -108,10 +106,10 @@ npx tsx scripts/list-all-destinations.ts
 
 ## Estructura de .env
 
-### En rama `main`:
+### En rama `main` (Producción):
 ```env
-# Neon Database - PRODUCTION
-DATABASE_URL="postgresql://neondb_owner:npg_rQ7QPZuPww0K@ep-late-union-ae03ir4o-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+# Supabase Database - PRODUCTION
+DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.himyxbrdsnxryetlogzk.supabase.co:5432/postgres"
 
 NODE_ENV=production
 SESSION_SECRET=dev-secret-key-change-in-production
@@ -190,5 +188,5 @@ Sincroniza base de datos local completa a Neon:
 - **NUNCA** commitear el archivo `.env`
 - Siempre verificar en qué rama estás antes de hacer push
 - Los workflows se ejecutan automáticamente al hacer push
-- Para sincronización manual usar `sync-local-to-neon.ts`
+- Para migración de Neon a Supabase usar `scripts/migrate-neon-to-supabase.ts`
 - Las imágenes están en Git (`public/images/destinations/`) - 211 archivos commiteados

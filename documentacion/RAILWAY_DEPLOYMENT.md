@@ -13,8 +13,8 @@ Este proyecto está configurado para desplegarse automáticamente en Railway cua
 En Railway, configura las siguientes variables de entorno:
 
 ```bash
-# Base de datos (OBLIGATORIO)
-DATABASE_URL=postgresql://usuario:password@host.neon.tech/database?sslmode=require
+# Base de datos (OBLIGATORIO) - Supabase Producción
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.himyxbrdsnxryetlogzk.supabase.co:5432/postgres
 
 # Seguridad (OBLIGATORIO)
 SESSION_SECRET=<genera-uno-con-comando-abajo>
@@ -36,14 +36,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 Copia el resultado y úsalo como valor para `SESSION_SECRET`.
 
-### 2. Configuración de Cloudinary (Opcional)
+### 2. Configuración de Supabase Storage (Opcional)
 
-Si usas Cloudinary para imágenes, agrega estas variables:
+Para imágenes en Supabase Storage, agrega estas variables:
 
 ```bash
-CLOUDINARY_CLOUD_NAME=tu-cloud-name
-CLOUDINARY_API_KEY=tu-api-key
-CLOUDINARY_API_SECRET=tu-api-secret
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
 ```
 
 ---
@@ -189,7 +188,7 @@ DATABASE_URL='<TU_URL>' npx tsx scripts/check-dubai-status.ts
    - `NODE_ENV=production`
 
 3. Verifica la conexión a la base de datos:
-   - Asegúrate que la IP de Railway está permitida en Neon
+   - Supabase acepta conexiones por defecto (no requiere whitelist de IP)
    - Verifica que el connection string es correcto
 
 ### Destinos no aparecen
@@ -260,7 +259,7 @@ Si encuentras problemas:
 1. Revisa los logs de Railway
 2. Consulta este documento
 3. Revisa `DEPLOYMENT_CHECKLIST.md`
-4. Consulta `scripts/LEER_PRIMERO_SCRIPTS.md`
+4. Consulta `SCRIPTS.md` para scripts disponibles
 
 ---
 
@@ -273,7 +272,7 @@ Si encuentras problemas:
 
 ### Base de Datos
 
-- Usa Neon PostgreSQL (serverless)
+- Usa Supabase PostgreSQL (producción)
 - Las migraciones se ejecutan automáticamente al iniciar
 - Los datos se mantienen entre deployments
 

@@ -29,72 +29,101 @@ interface CachedImage {
 
 const imageCache = new Map<string, CachedImage>();
 
+const TURKEY_MAPA_CACHE_KEY = "mapa-itinerario.png";
+
 // Preload static images (logos, banners, etc.) that are used in every PDF
 async function preloadStaticImages(): Promise<void> {
-  const staticImages = [
-    path.join(process.cwd(), "server", "assets", "special-offer-banner.png"),
-    path.join(process.cwd(), "server", "assets", "plane-logo.png"),
-    path.join(process.cwd(), "server", "assets", "medical-assistance.png"),
-    path.join(process.cwd(), "attached_assets", "mapa itinerario turquia_1763577662908.png"),
-  ];
+  const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, "");
 
-  const loadPromises = staticImages.map(async (imagePath) => {
-    const filename = path.basename(imagePath);
-    if (imageCache.has(filename)) return;
+  const loadPromises: Promise<void>[] = [];
 
-    try {
-      if (fs.existsSync(imagePath)) {
-        const buffer = await fsPromises.readFile(imagePath);
-        const dimensions = sizeOf(buffer);
+  // Logos y banners locales (server/assets)
+  for (const filename of ["special-offer-banner.png", "plane-logo.png", "medical-assistance.png"]) {
+    const imagePath = path.join(process.cwd(), "server", "assets", filename);
+    loadPromises.push(
+      (async () => {
+        if (imageCache.has(filename)) return;
+        try {
+          if (fs.existsSync(imagePath)) {
+            const buffer = await fsPromises.readFile(imagePath);
+            const dimensions = sizeOf(buffer);
+            imageCache.set(filename, { path: imagePath, buffer, width: dimensions?.width || 0, height: dimensions?.height || 0 });
+          }
+        } catch (error) {
+          console.error(`[PDF Generator] Error preloading static ${filename}:`, error);
+        }
+      })()
+    );
+  }
 
-        imageCache.set(filename, {
-          path: imagePath,
-          buffer,
-          width: dimensions.width || 0,
-          height: dimensions.height || 0,
-        });
-      }
-    } catch (error) {
-      console.error(`[PDF Generator] Error preloading static ${filename}:`, error);
-    }
-  });
+  // Mapa de Turquía desde Supabase (plan-turquia-esencial/mapa-itinerario.png)
+  if (supabaseUrl) {
+    const mapaUrl = `${supabaseUrl}/storage/v1/object/public/plan-turquia-esencial/mapa-itinerario.png`;
+    loadPromises.push(
+      (async () => {
+        if (imageCache.has(TURKEY_MAPA_CACHE_KEY)) return;
+        try {
+          const res = await fetch(mapaUrl);
+          if (res.ok) {
+            const buffer = Buffer.from(await res.arrayBuffer());
+            const dimensions = sizeOf(buffer);
+            imageCache.set(TURKEY_MAPA_CACHE_KEY, { path: mapaUrl, buffer, width: dimensions?.width || 0, height: dimensions?.height || 0 });
+          }
+        } catch (error) {
+          console.error(`[PDF Generator] Error preloading mapa itinerario from Supabase:`, error);
+        }
+      })()
+    );
+  }
 
   await Promise.all(loadPromises);
 }
 
-// Preload destination images
+/** Convierte /images/destinations/{slug}/{file} a URL Supabase */
+function localPathToSupabaseUrl(imageUrl: string): string | null {
+  const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, "");
+  if (!supabaseUrl) return null;
+  const match = imageUrl.match(/^\/images\/destinations\/([^/]+)\/([^/]+)$/);
+  if (!match) return null;
+  return `${supabaseUrl}/storage/v1/object/public/plan-${match[1]}/${match[2]}`;
+}
+
+// Preload destination images (Supabase URLs o rutas locales legacy /images/)
 async function preloadDestinationImages(imageUrls: string[]): Promise<void> {
   if (!imageUrls || imageUrls.length === 0) return;
 
   const loadPromises = imageUrls.map(async (imageUrl) => {
-    // Use the full imageUrl as the cache key to avoid conflicts
     const cacheKey = imageUrl;
     if (imageCache.has(cacheKey)) return;
 
     try {
-      let fullPath: string;
-      
-      if (imageUrl.startsWith('/images/')) {
-         fullPath = path.join(process.cwd(), 'public', imageUrl.slice(1));
-      } else if (imageUrl.startsWith('/attached_assets/')) {
-         fullPath = path.join(process.cwd(), imageUrl.slice(1));
-      } else {
-         // Try standard resolution
-         fullPath = path.join(process.cwd(), imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl);
+      let fetchUrl = imageUrl;
+      if (imageUrl.startsWith("/images/destinations/")) {
+        const supabaseUrl = localPathToSupabaseUrl(imageUrl);
+        if (supabaseUrl) fetchUrl = supabaseUrl;
       }
 
-      if (fs.existsSync(fullPath)) {
-        const buffer = await fsPromises.readFile(fullPath);
-        const dimensions = sizeOf(buffer);
+      // URLs remotas (Supabase, etc.)
+      if (fetchUrl.startsWith("https://")) {
+        const res = await fetch(fetchUrl);
+        if (res.ok) {
+          const buffer = Buffer.from(await res.arrayBuffer());
+          const dimensions = sizeOf(buffer);
+          imageCache.set(cacheKey, { path: fetchUrl, buffer, width: dimensions?.width || 0, height: dimensions?.height || 0 });
+        } else {
+          console.error(`[PDF Generator] Failed to fetch remote image: ${fetchUrl}`);
+        }
+        return;
+      }
 
-        imageCache.set(cacheKey, {
-          path: fullPath,
-          buffer,
-          width: dimensions.width || 0,
-          height: dimensions.height || 0,
-        });
-      } else {
-        console.error(`[PDF Generator] Image not found: ${fullPath}`);
+      // Fallback: solo /images/ en public (legacy)
+      if (imageUrl.startsWith("/images/")) {
+        const fullPath = path.join(process.cwd(), "public", imageUrl.slice(1));
+        if (fs.existsSync(fullPath)) {
+          const buffer = await fsPromises.readFile(fullPath);
+          const dimensions = sizeOf(buffer);
+          imageCache.set(cacheKey, { path: fullPath, buffer, width: dimensions?.width || 0, height: dimensions?.height || 0 });
+        }
       }
     } catch (error) {
       console.error(`[PDF Generator] Error preloading destination ${imageUrl}:`, error);
@@ -107,29 +136,28 @@ async function preloadDestinationImages(imageUrls: string[]): Promise<void> {
 // Preload all flight images in parallel for better performance
 async function preloadFlightImages(imageUrls: string[]): Promise<void> {
   if (imageUrls.length === 0) return;
-  
+
   const loadPromises = imageUrls.map(async (imageUrl) => {
-    const filename = imageUrl.split("/").pop();
-    if (!filename || imageCache.has(filename)) return;
-    
+    const cacheKey = imageUrl.includes("/") ? imageUrl.split("/").pop()! : imageUrl;
+    if (!cacheKey || imageCache.has(cacheKey)) return;
+
     try {
-      const fullPath = await getImagePathForPDF(filename);
+      const fullPath = await getImagePathForPDF(imageUrl);
       if (fs.existsSync(fullPath)) {
         const buffer = await fsPromises.readFile(fullPath);
         const dimensions = sizeOf(buffer);
-        
-        imageCache.set(filename, {
+        imageCache.set(cacheKey, {
           path: fullPath,
           buffer,
-          width: dimensions.width || 0,
-          height: dimensions.height || 0,
+          width: dimensions?.width || 0,
+          height: dimensions?.height || 0,
         });
       }
     } catch (error) {
-      console.error(`[PDF Generator] Error preloading flight ${filename}:`, error);
+      console.error(`[PDF Generator] Error preloading flight ${cacheKey}:`, error);
     }
   });
-  
+
   await Promise.all(loadPromises);
 }
 
@@ -240,20 +268,25 @@ export async function generatePublicQuotePDF(
   const allDestImages: string[] = [];
   data.destinations.forEach(d => {
     if (d.images && d.images.length > 0) {
-      // Add all images from this destination, not just the first one
       d.images.forEach(img => {
         allDestImages.push(img.imageUrl);
       });
     } else {
-      // Fallback logic to ensure images are preloaded for old/national destinations
       const fallbackImages = getDestinationImageSet({ name: d.name, country: d.country });
       fallbackImages.forEach(img => allDestImages.push(img));
+    }
+    // Add plan-specific medical assistance and map images
+    const dest = d.destination as { medicalAssistanceImageUrl?: string | null; itineraryMapImageUrl?: string | null; internalFlights?: Array<{ imageUrl: string }> } | undefined;
+    if (dest?.medicalAssistanceImageUrl) allDestImages.push(dest.medicalAssistanceImageUrl);
+    if (dest?.itineraryMapImageUrl) allDestImages.push(dest.itineraryMapImageUrl);
+    if (dest?.internalFlights?.length) {
+      dest.internalFlights.forEach((f) => f.imageUrl && allDestImages.push(f.imageUrl));
     }
   });
 
   console.log(`[PDF Generator] Collected ${allDestImages.length} destination images to preload`);
 
-  // Preload ALL images in parallel for maximum performance
+  // Preload ALL images in parallel (Supabase CDN + local)
   await Promise.all([
     preloadStaticImages(),
     preloadDestinationImages(allDestImages),
@@ -345,36 +378,45 @@ export async function generatePublicQuotePDF(
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
   // Store both relative (for cache lookup) and absolute (for fallback) paths
+  // Prioridad: dest.imageUrl (imagen principal elegida en Basic) > images[0]
   const imageInfo: Array<{ relativePath: string; absolutePath: string }> = [];
+  const addImageEntry = (relativePath: string) => {
+    let absolutePath: string;
+    if (relativePath.startsWith('https://')) {
+      absolutePath = relativePath;
+    } else if (relativePath.startsWith('/images/')) {
+      absolutePath = path.join(process.cwd(), 'public', relativePath.slice(1));
+    } else {
+      absolutePath = path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+    }
+    imageInfo.push({ relativePath, absolutePath });
+  };
+
   data.destinations.forEach((dest) => {
+    const mainImageUrl = (dest.destination as { imageUrl?: string | null })?.imageUrl;
     if (dest.images && dest.images.length > 0) {
-      // Add ALL images from this destination to ensure we have enough for the first page (needs 3)
-      dest.images.forEach(img => {
-        const relativePath = img.imageUrl;
-        let absolutePath: string;
-        
-        if (relativePath.startsWith('/images/')) {
-           absolutePath = path.join(process.cwd(), 'public', relativePath.slice(1));
-        } else if (relativePath.startsWith('/attached_assets/')) {
-           absolutePath = path.join(process.cwd(), relativePath.slice(1));
-        } else {
-           absolutePath = path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
-        }
-        
-        imageInfo.push({ relativePath, absolutePath });
-      });
+      // Primera imagen = la elegida en Basic (imageUrl) si existe, sino images[0]
+      const coverUrl = mainImageUrl || dest.images[0].imageUrl;
+      addImageEntry(coverUrl);
+      // Resto de imágenes (excluyendo la ya usada como portada si está en el array)
+      dest.images
+        .filter(img => img.imageUrl !== coverUrl)
+        .forEach(img => addImageEntry(img.imageUrl));
+    } else if (mainImageUrl) {
+      addImageEntry(mainImageUrl);
     } else {
       // Fallback to old logic - get ALL old images
       const oldImages = getDestinationImageSet({ name: dest.name, country: dest.country });
       oldImages.forEach(img => {
         let absolutePath = img;
         
-        if (img.startsWith('/images/')) {
+        if (img.startsWith('https://')) {
+           absolutePath = img;
+        } else if (img.startsWith('/images/')) {
            absolutePath = path.join(process.cwd(), 'public', img.slice(1));
-        } else if (img.startsWith('/attached_assets/')) {
-           absolutePath = path.join(process.cwd(), img.slice(1));
+        } else {
+           absolutePath = img;
         }
-        
         imageInfo.push({ relativePath: img, absolutePath });
       });
     }
@@ -753,53 +795,79 @@ export async function generatePublicQuotePDF(
   const commentsStartY = commentsY + 15;
   doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
 
-  // Check if this is Turquía Esencial - using simple name check
-  const isTurkeyEsencialComments = data.destinations.some(
-    (d) =>
-      d.name?.toLowerCase().includes("turquía esencial") ||
-      d.name?.toLowerCase().includes("turquia esencial"),
-  );
+  // Use plan-specific firstPageComments if set, else fallback to legacy logic
+  const customComments = data.destinations.find(
+    (d) => (d.destination as { firstPageComments?: string | null })?.firstPageComments?.trim()
+  )?.destination as { firstPageComments?: string } | undefined;
+  const commentsText = customComments?.firstPageComments?.trim();
 
-  if (isTurkeyEsencialComments) {
-    // Text for Turquía Esencial (keep original)
-    doc.text(
-      "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. ",
-      leftMargin,
-      commentsStartY,
-      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-    );
-
-    doc.font("Helvetica-Bold");
-    doc.text(
-      "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
-      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-    );
-
-    doc.font("Helvetica");
-    doc.text(
-      "NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
-      { width: contentWidth, align: "justify", lineGap: 2 },
-    );
+  if (commentsText) {
+    // Parse **bold** and render mixed formatting
+    const parts = commentsText.split(/(\*\*[^*]+\*\*)/g);
+    let isFirst = true;
+    for (const part of parts) {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        doc.font("Helvetica-Bold");
+        const text = part.slice(2, -2);
+        if (isFirst) {
+          doc.text(text, leftMargin, commentsStartY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+          isFirst = false;
+        } else {
+          doc.text(text, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+        }
+      } else if (part) {
+        doc.font("Helvetica");
+        if (isFirst) {
+          doc.text(part, leftMargin, commentsStartY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+          isFirst = false;
+        } else {
+          doc.text(part, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+        }
+      }
+    }
   } else {
-    // New text for all other programs
-    doc.text(
-      "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guia de habla hispana.  Recuerda consultar los servicios no incluidos. ",
-      leftMargin,
-      commentsStartY,
-      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+    // Legacy: Check if this is Turquía Esencial - using simple name check
+    const isTurkeyEsencialComments = data.destinations.some(
+      (d) =>
+        d.name?.toLowerCase().includes("turquía esencial") ||
+        d.name?.toLowerCase().includes("turquia esencial"),
     );
 
-    doc.font("Helvetica-Bold");
-    doc.text(
-      "Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
-      { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-    );
-
-    doc.font("Helvetica");
-    doc.text(
-      "NOCHE ADICIONAL APLICA SUPLEMENTO A TRANSFER",
-      { width: contentWidth, align: "justify", lineGap: 2 },
-    );
+    if (isTurkeyEsencialComments) {
+      doc.text(
+        "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. ",
+        leftMargin,
+        commentsStartY,
+        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+      );
+      doc.font("Helvetica-Bold");
+      doc.text(
+        "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
+        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+      );
+      doc.font("Helvetica");
+      doc.text(
+        "NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
+        { width: contentWidth, align: "justify", lineGap: 2 },
+      );
+    } else {
+      doc.text(
+        "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guia de habla hispana.  Recuerda consultar los servicios no incluidos. ",
+        leftMargin,
+        commentsStartY,
+        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+      );
+      doc.font("Helvetica-Bold");
+      doc.text(
+        "Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
+        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
+      );
+      doc.font("Helvetica");
+      doc.text(
+        "NOCHE ADICIONAL APLICA SUPLEMENTO A TRANSFER",
+        { width: contentWidth, align: "justify", lineGap: 2 },
+      );
+    }
   }
 
   doc.addPage();
@@ -1004,76 +1072,61 @@ export async function generatePublicQuotePDF(
     align: "right",
   });
 
-  // Add Turkey route map for Turkey destinations
-  if (isTurkey) {
-    console.log("[PDF Generator] Adding Turkey route map to itinerary page...");
+  // Add map image: use plan-specific itineraryMapImageUrl if set, else Turkey map for Turkey destinations
+  const customMapUrl = data.destinations.find(
+    (d) => (d.destination as { itineraryMapImageUrl?: string | null })?.itineraryMapImageUrl?.trim()
+  )?.destination as { itineraryMapImageUrl?: string } | undefined;
+  const mapImageUrl = customMapUrl?.itineraryMapImageUrl?.trim();
+  const mapCacheKey = mapImageUrl || (isTurkey ? TURKEY_MAPA_CACHE_KEY : null);
 
+  if (mapCacheKey) {
     try {
-      const cached = getCachedImageOrPath("mapa itinerario turquia_1763577662908.png");
-      
-      if (typeof cached === 'object') {
+      const cached = getCachedImageOrPath(mapCacheKey);
+      if (typeof cached === "object") {
         const mapY = doc.y + 20;
         const maxMapWidth = contentWidth;
         const maxMapHeight = 240;
-
-        console.log(
-          `[PDF Generator] Adding map image at Y=${mapY}, maxWidth=${maxMapWidth}`,
-        );
-
-        // Use fit to maintain aspect ratio without stretching
         doc.image(cached.buffer, leftMargin, mapY, {
           fit: [maxMapWidth, maxMapHeight],
           align: "center",
         });
-
-        // Update Y position after image (estimate based on max height)
         doc.y = mapY + maxMapHeight + 20;
-        console.log("[PDF Generator] ✓ Turkey route map added successfully");
       }
     } catch (error) {
-      console.error(
-        "[PDF Generator] ✗ Error loading Turkey route map:",
-        error,
-      );
+      console.error("[PDF Generator] Error loading map image:", error);
     }
   }
 
-  // Helper function to calculate flight terms height (WITHOUT Tarifa Light section)
+  // Get flight terms from first destination that has them, or use default
+  const defaultFlightTerms = [
+    "Los boletos de avión no son reembolsables.",
+    "",
+    "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
+    "",
+    "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
+    "",
+    "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
+  ];
+  const customFlightTerms = data.destinations.find(
+    (d) => (d.destination as { flightTerms?: string | null })?.flightTerms?.trim()
+  )?.destination as { flightTerms?: string } | undefined;
+  const flightTermsText = customFlightTerms?.flightTerms?.trim();
+  const flightTermsLines = flightTermsText
+    ? flightTermsText.split(/\r?\n/).map((l) => l.trim())
+    : defaultFlightTerms;
+
   const calculateFlightTermsHeight = (): number => {
-    // Calculate actual height by measuring all text elements
     let totalHeight = 0;
-
-    // Title "Términos y condiciones" - 11pt bold + 0.5 line spacing
-    totalHeight += doc.heightOfString("Términos y condiciones", {
-      width: contentWidth,
-      lineGap: 6,
-    });
-    totalHeight += 10; // moveDown(0.5) spacing
-
-    // Terms text - 9pt (ONLY the main terms, NO Tarifa Light)
-    const termsText = [
-      "Los boletos de avión no son reembolsables.",
-      "",
-      "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
-      "",
-      "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
-      "",
-      "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
-    ];
-
-    termsText.forEach((line) => {
+    totalHeight += doc.heightOfString("Términos y condiciones", { width: contentWidth, lineGap: 6 });
+    totalHeight += 10;
+    flightTermsLines.forEach((line) => {
       if (line === "") {
-        totalHeight += 4; // moveDown(0.3)
+        totalHeight += 4;
       } else {
-        totalHeight += doc.heightOfString(line, {
-          width: contentWidth,
-          lineGap: 3,
-        });
-        totalHeight += 4; // moveDown(0.3)
+        totalHeight += doc.heightOfString(line, { width: contentWidth, lineGap: 3 });
+        totalHeight += 4;
       }
     });
-
-    // Add some buffer for safety
     return Math.ceil(totalHeight) + 20;
   };
 
@@ -1267,17 +1320,7 @@ export async function generatePublicQuotePDF(
 
       doc.font("Helvetica").fontSize(9).fillColor(textColor);
 
-      const termsText = [
-        "Los boletos de avión no son reembolsables.",
-        "",
-        "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
-        "",
-        "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
-        "",
-        "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
-      ];
-
-      termsText.forEach((line) => {
+      flightTermsLines.forEach((line) => {
         if (line === "") {
           doc.moveDown(0.3);
         } else {
@@ -1439,17 +1482,7 @@ export async function generatePublicQuotePDF(
 
       doc.font("Helvetica").fontSize(9).fillColor(textColor);
 
-      const termsText = [
-        "Los boletos de avión no son reembolsables.",
-        "",
-        "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
-        "",
-        "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
-        "",
-        "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
-      ];
-
-      termsText.forEach((line) => {
+      flightTermsLines.forEach((line) => {
         if (line === "") {
           doc.moveDown(0.3);
         } else {
@@ -1487,68 +1520,36 @@ export async function generatePublicQuotePDF(
 
     let destImages: string[] = [];
     if (dest.images && dest.images.length > 0) {
-      destImages = dest.images.map(img => {
-        const relativePath = img.imageUrl;
-        if (relativePath.startsWith('/images/')) {
-           return path.join(process.cwd(), 'public', relativePath.slice(1));
-        } else if (relativePath.startsWith('/attached_assets/')) {
-           return path.join(process.cwd(), relativePath.slice(1));
-        } else {
-           return path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
-        }
-      });
+      destImages = dest.images.map(img => img.imageUrl);
     } else {
-      // Fallback: get images from destination-images.ts and convert to absolute paths
-      const fallbackImages = getDestinationImageSet({
-        name: dest.name || "",
-        country: dest.country || "",
-      });
-      destImages = fallbackImages.map(img => {
-        if (img.startsWith('/images/')) {
-           return path.join(process.cwd(), 'public', img.slice(1));
-        } else if (img.startsWith('/attached_assets/')) {
-           return path.join(process.cwd(), img.slice(1));
-        } else {
-           return img; // Already absolute path
-        }
-      });
+      destImages = getDestinationImageSet({ name: dest.name || "", country: dest.country || "" });
     }
     if (destImages.length > 0) {
       const imageWidth = (contentWidth - 20) / 3;
       const imageHeight = 100;
       const currentY = doc.y;
 
-      // For itinerary page, use images 4-6 (indices 3-5) if available to avoid cover image (index 0)
-      // If not enough images, try to use 2-4 (indices 1-3)
       let imagesToShow: string[] = [];
-      if (destImages.length >= 6) {
-        imagesToShow = destImages.slice(3, 6);
-      } else if (destImages.length >= 4) {
-        imagesToShow = destImages.slice(1, 4);
-      } else {
-        imagesToShow = destImages.slice(0, 3);
-      }
+      if (destImages.length >= 6) imagesToShow = destImages.slice(3, 6);
+      else if (destImages.length >= 4) imagesToShow = destImages.slice(1, 4);
+      else imagesToShow = destImages.slice(0, 3);
 
-      imagesToShow.forEach((imagePath, index) => {
-        if (fs.existsSync(imagePath)) {
-          try {
-            const xPos = leftMargin + index * (imageWidth + 10);
-            doc.image(imagePath, xPos, currentY, {
-              width: imageWidth,
-              height: imageHeight,
-              align: "center",
-              valign: "center",
-            });
-
-            doc
-              .rect(xPos, currentY, imageWidth, imageHeight)
-              .stroke(borderColor);
-          } catch (error) {
-            console.error(
-              `Error loading destination image ${index + 1}:`,
-              error,
-            );
+      imagesToShow.forEach((imageRef, index) => {
+        try {
+          const cached = getCachedImageOrPath(imageRef);
+          let imageSource: Buffer | string | null = null;
+          if (typeof cached === 'object') imageSource = cached.buffer;
+          else if (imageRef.startsWith('/images/')) {
+            const localPath = path.join(process.cwd(), 'public', imageRef.slice(1));
+            if (fs.existsSync(localPath)) imageSource = localPath;
           }
+          if (imageSource) {
+            const xPos = leftMargin + index * (imageWidth + 10);
+            doc.image(imageSource, xPos, currentY, { width: imageWidth, height: imageHeight, align: "center", valign: "center" });
+            doc.rect(xPos, currentY, imageWidth, imageHeight).stroke(borderColor);
+          }
+        } catch (error) {
+          console.error(`Error loading destination image ${index + 1}:`, error);
         }
       });
 
@@ -1899,17 +1900,7 @@ export async function generatePublicQuotePDF(
 
         doc.font("Helvetica").fontSize(9).fillColor(textColor);
 
-        const termsText = [
-          "Los boletos de avión no son reembolsables.",
-          "",
-          "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
-          "",
-          "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
-          "",
-          "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
-        ];
-
-        termsText.forEach((line) => {
+        flightTermsLines.forEach((line) => {
           if (line === "") {
             doc.moveDown(0.3);
           } else {
@@ -2575,8 +2566,12 @@ export async function generatePublicQuotePDF(
   doc.moveDown(0.5);
 
   doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
-  const terms = `Servicios: Cambios en el itinerario posibles según condiciones y disponibilidad del guía. Hotelería: Alojamiento en hoteles de primera entre 4 y 5 estrellas similares a los planificados. Excursiones: No reembolsos por inasistencias. Traslados: Recogida y salida sin acceso al aeropuerto. Espera máxima de 2 horas tras aterrizaje. Documentación: Colombianos exentos de visado. Pasaporte con mínimo 6 meses de validez. Consultar requerimientos para otras nacionalidades.`;
-  doc.text(terms, leftMargin, doc.y, { width: contentWidth, align: "justify" });
+  const customTermsText = data.destinations.find(
+    (d) => (d.destination as { termsConditions?: string | null })?.termsConditions?.trim()
+  )?.destination as { termsConditions?: string } | undefined;
+  const generalTerms = customTermsText?.termsConditions?.trim() ||
+    `Servicios: Cambios en el itinerario posibles según condiciones y disponibilidad del guía. Hotelería: Alojamiento en hoteles de primera entre 4 y 5 estrellas similares a los planificados. Excursiones: No reembolsos por inasistencias. Traslados: Recogida y salida sin acceso al aeropuerto. Espera máxima de 2 horas tras aterrizaje. Documentación: Colombianos exentos de visado. Pasaporte con mínimo 6 meses de validez. Consultar requerimientos para otras nacionalidades.`;
+  doc.text(generalTerms, leftMargin, doc.y, { width: contentWidth, align: "justify" });
 
   doc.moveDown(2);
 
@@ -2769,17 +2764,7 @@ export async function generatePublicQuotePDF(
 
       doc.font("Helvetica").fontSize(9).fillColor(textColor);
 
-      const termsText = [
-        "Los boletos de avión no son reembolsables.",
-        "",
-        "Una vez emitido el boleto no puede ser asignado a una persona o aerolínea diferente.",
-        "",
-        "Los cambios en los boletos pueden ocasionar cargos extra, están sujetos a disponibilidad, clase tarifaria y políticas de cada aerolínea al momento de solicitar el cambio.",
-        "",
-        "Para vuelos nacionales presentarse 2 horas antes de la salida del vuelo. Para vuelos internacionales presentarse 3 horas antes de la salida del vuelo.",
-      ];
-
-      termsText.forEach((line) => {
+      flightTermsLines.forEach((line) => {
         if (line === "") {
           doc.moveDown(0.3);
         } else {
@@ -2827,11 +2812,15 @@ export async function generatePublicQuotePDF(
 
   doc.moveDown(2);
 
-  // Primero: Agregar imagen de asistencia médica
+  // Primero: Agregar imagen de asistencia médica (plan-specific or default)
   const medicalImageHeight = hasTurkeyDestinations ? 180 : 400;
+  const customMedicalUrl = data.destinations.find(
+    (d) => (d.destination as { medicalAssistanceImageUrl?: string | null })?.medicalAssistanceImageUrl?.trim()
+  )?.destination as { medicalAssistanceImageUrl?: string } | undefined;
+  const medicalImageKey = customMedicalUrl?.medicalAssistanceImageUrl?.trim() || "medical-assistance.png";
 
   try {
-    const cached = getCachedImageOrPath("medical-assistance.png");
+    const cached = getCachedImageOrPath(medicalImageKey);
     
     if (typeof cached === 'object') {
       const imageY = topMargin + 60;

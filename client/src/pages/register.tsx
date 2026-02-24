@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plane, Eye, EyeOff, Check, X, User, Mail, Lock, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { ThemeToggleCompact } from "@/components/theme-toggle";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -103,7 +104,8 @@ export default function Register() {
   };
 
   return (
-    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden">
+    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden relative">
+      <ThemeToggleCompact />
       {/* Left Side - Image & Branding */}
       <div className="hidden lg:flex relative h-full flex-col bg-muted text-white dark:border-r">
         <div className="absolute inset-0 bg-zinc-900">

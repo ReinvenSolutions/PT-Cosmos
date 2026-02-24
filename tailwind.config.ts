@@ -52,6 +52,7 @@ export default {
           border: "var(--destructive-border)",
         },
         ring: "hsl(var(--ring) / <alpha-value>)",
+        "price-accent": "hsl(var(--price-accent) / <alpha-value>)",
         chart: {
           "1": "hsl(var(--chart-1) / <alpha-value>)",
           "2": "hsl(var(--chart-2) / <alpha-value>)",
@@ -100,6 +101,10 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+      },
+      boxShadow: {
+        glow: "0 0 24px -4px hsl(var(--primary) / 0.25)",
+        "glow-lg": "0 0 32px -4px hsl(var(--primary) / 0.2)",
       },
     },
   },

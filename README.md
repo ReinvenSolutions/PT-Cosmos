@@ -2,7 +2,7 @@
 
 Sistema integral para gestionar cotizaciones de paquetes turísticos con generación automática de PDFs profesionales.
 
-**Base de datos:** Neon PostgreSQL (cloud-native, serverless)
+**Base de datos:** PostgreSQL (Supabase)
 
 ## 🚀 Características
 
@@ -38,7 +38,7 @@ Sistema integral para gestionar cotizaciones de paquetes turísticos con generac
    
    Crea un archivo `.env` en la raíz del proyecto basándote en `.env.example`:
    ```env
-   DATABASE_URL="postgresql://neondb_owner:npg_mFCT5oPH6Ovr@ep-blue-credit-aekag6rz-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require"
+   DATABASE_URL="postgresql://..."  # Supabase u otro PostgreSQL
    NODE_ENV=development
    SESSION_SECRET=tu-secret-key-muy-segura-aqui
    PORT=5001
@@ -90,12 +90,12 @@ Sistema integral para gestionar cotizaciones de paquetes turísticos con generac
    En el servicio web, ve a "Variables" y agrega:
    
    ```env
-   DATABASE_URL=postgresql://neondb_owner:npg_mFCT5oPH6Ovr@ep-blue-credit-aekag6rz-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require
+   DATABASE_URL=postgresql://postgres:[PASSWORD]@db.himyxbrdsnxryetlogzk.supabase.co:5432/postgres
    NODE_ENV=production
    SESSION_SECRET=genera-una-clave-segura-aleatoria-aqui
    ```
    
-   **Nota:** La base de datos Neon ya está configurada y poblada con datos.
+   **Nota:** Producción usa Supabase. Ver `documentacion/MIGRACION_NEON_A_SUPABASE.md` para la migración de datos.
 
 4. **Configurar Build y Start Commands** (opcional, ya están en package.json)
    
@@ -114,7 +114,7 @@ Sistema integral para gestionar cotizaciones de paquetes turísticos con generac
 2. El sistema automáticamente:
    - ✅ Ejecutará las migraciones de base de datos
    - ✅ Sincronizará datos canónicos (destinos, itinerarios, etc.)
-   - ✅ La base de datos Neon ya contiene todos los datos necesarios
+   - ✅ La base de datos Supabase contiene los datos migrados desde Neon
 
 **Usuarios por defecto:**
 - **Super Admin:** usuario: `admin` / contraseña: `admin123`
@@ -152,6 +152,8 @@ npm run check        # Verificar tipos TypeScript
 
 ```
 ViajeRapido/
+├── documentacion/       # Guías y documentación (.md)
+├── backups sql/         # Backups de base de datos (.sql)
 ├── client/              # Frontend React
 │   └── src/
 │       ├── components/  # Componentes reutilizables
@@ -183,9 +185,9 @@ ViajeRapido/
 
 ## 🆘 Soporte
 
-Para problemas o preguntas, revisa:
-- `DEPLOYMENT.md` - Guía detallada de deployment
-- `INSTRUCCIONES_DEPLOYMENT.md` - Solución de problemas específicos
+Para problemas o preguntas, revisa la carpeta `documentacion/`:
+- `documentacion/RAILWAY_DEPLOYMENT.md` - Guía de deployment en Railway
+- `documentacion/DEPLOYMENT_CHECKLIST.md` - Checklist de deploy
 
 ## 📄 Licencia
 
