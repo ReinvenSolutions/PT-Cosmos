@@ -208,7 +208,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     req.logIn(user, (err: unknown) => {
-      if (err) return res.status(500).json({ message: "Error al iniciar sesión" });
+      if (err) {
+        logger.error("Login req.logIn error", { err, path: "/api/auth/login" });
+        return res.status(500).json({ message: "Error al iniciar sesión" });
+      }
       const { passwordHash, ...userWithoutPassword } = user;
       return res.json({ user: userWithoutPassword });
     });
@@ -224,7 +227,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     req.logIn(user, (err: unknown) => {
-      if (err) return res.status(500).json({ message: "Error al iniciar sesión" });
+      if (err) {
+        logger.error("2FA verify req.logIn error", { err, path: "/api/auth/2fa/verify" });
+        return res.status(500).json({ message: "Error al iniciar sesión" });
+      }
       const { passwordHash, ...userWithoutPassword } = user;
       return res.json({ user: userWithoutPassword });
     });
