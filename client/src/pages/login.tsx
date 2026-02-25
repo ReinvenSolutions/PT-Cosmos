@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,17 @@ export default function Login() {
   const [tempToken, setTempToken] = useState("");
   const [code2FA, setCode2FA] = useState("");
   const [codeError, setCodeError] = useState(false);
-  const { login, verify2FA } = useAuth();
+  const { user, login, verify2FA } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+
+  // Redirigir cuando el usuario esté autenticado tras 2FA (evita race: sesión lista antes de navegar)
+  useEffect(() => {
+    if (user && step === "2fa") {
+      toast({ title: "¡Bienvenido!", description: "Has iniciado sesión correctamente." });
+      navigate("/");
+    }
+  }, [user, step, navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,8 +76,7 @@ export default function Login() {
 
     try {
       await verify2FA(tempToken, code2FA);
-      toast({ title: "¡Bienvenido!", description: "Has iniciado sesión correctamente." });
-      navigate("/");
+      // La redirección la hace el useEffect cuando user esté en el contexto
     } catch (error: any) {
       setCodeError(true);
       toast({

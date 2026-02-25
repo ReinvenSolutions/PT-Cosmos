@@ -268,7 +268,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Error al iniciar sesión" });
       }
       const { passwordHash, ...userWithoutPassword } = user;
-      return res.json({ user: userWithoutPassword });
+      // Guardar sesión en BD antes de responder (evita que el cliente llegue antes de que la sesión exista)
+      req.session.save((saveErr: unknown) => {
+        if (saveErr) {
+          logger.error("2FA verify session.save error", { err: saveErr });
+          return res.status(500).json({ message: "Error al iniciar sesión" });
+        }
+        return res.json({ user: userWithoutPassword });
+      });
     });
   }));
 
