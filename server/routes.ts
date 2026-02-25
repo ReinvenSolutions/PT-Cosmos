@@ -221,21 +221,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
       const tempToken = await storage.createTwoFactorSession(user.id, code, expiresAt);
 
+      logger.info("[2FA] Código para " + emailTo + ": " + code);
+
       if (emailConfigured) {
-        logger.info("[2FA] Enviando código a " + emailTo);
         sendEmail({
           to: emailTo,
           subject: "Código de verificación - Cosmos Viajes",
           html: generate2FACodeEmailHtml(code, user.name ?? undefined),
         }).then((ok) => {
-          if (ok) logger.info("[2FA] Correo enviado correctamente a " + emailTo);
-          else {
-            logger.warn("[2FA] Falló envío a " + emailTo + " - revisa SMTP en Railway");
-            logger.warn("[2FA] Código temporal (solo para completar login): " + code);
-          }
+          if (ok) logger.info("[2FA] Correo enviado OK a " + emailTo);
+          else logger.warn("[2FA] Falló envío de correo a " + emailTo);
+        }).catch((err) => {
+          logger.error("[2FA] Error inesperado enviando correo", { error: (err as Error).message });
         });
-      } else if (process.env.NODE_ENV === "development") {
-        logger.info("[2FA] Código (SMTP no configurado): " + code);
       }
 
       return res.json({
