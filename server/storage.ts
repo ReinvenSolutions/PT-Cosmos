@@ -357,6 +357,8 @@ export class DatabaseStorage implements IStorage {
     if (quoteCount > 0) {
       throw new Error(`No se puede eliminar: el usuario tiene ${quoteCount} cotización(es) asociada(s). Desactívalo en su lugar.`);
     }
+    // Eliminar quote_logs primero (FK sin cascade bloqueaba el delete)
+    await db.delete(quoteLogs).where(eq(quoteLogs.userId, id));
     await db.delete(users).where(eq(users.id, id));
   }
 
