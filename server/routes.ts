@@ -184,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const schema = z.object({ username: z.string(), password: z.string() });
     const { username, password } = schema.parse(req.body);
 
-    const user = await storage.findUserByUsername(username);
+    const user = await storage.findUserByUsernameOrEmail(username);
     if (!user) {
       return res.status(401).json({ message: "Usuario o contraseña incorrectos" });
     }
@@ -200,17 +200,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // 2FA: activado por defecto. Solo se salta si el admin lo desactivó explícitamente (twoFactorEnabled === false)
     const twoFactorEnabled = (user as User & { twoFactorEnabled?: boolean }).twoFactorEnabled !== false;
     if (twoFactorEnabled) {
+      const emailTo = user.email || user.username;
+      const isEmailToValid = validator.isEmail(emailTo);
+      const emailConfigured = isEmailConfigured();
+
+      // Sin email válido no podemos enviar el código 2FA
+      if (!isEmailToValid) {
+        return res.status(400).json({
+          message: "Tu cuenta no tiene un correo electrónico válido configurado. Contacta al administrador para añadir tu correo y poder recibir el código de verificación.",
+        });
+      }
+
+      if (!emailConfigured && process.env.NODE_ENV === "production") {
+        return res.status(503).json({
+          message: "El envío de correos no está configurado. Contacta al administrador.",
+        });
+      }
+
       const code = String(crypto.randomInt(100000, 999999));
       const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
       const tempToken = await storage.createTwoFactorSession(user.id, code, expiresAt);
 
-      // Email en background: no bloquear respuesta (evita 2 min de espera)
-      if (isEmailConfigured()) {
-        const emailTo = user.email || user.username;
+      if (emailConfigured) {
+        logger.info("[2FA] Enviando código a " + emailTo);
         sendEmail({
           to: emailTo,
           subject: "Código de verificación - Cosmos Viajes",
           html: generate2FACodeEmailHtml(code, user.name ?? undefined),
+        }).then((ok) => {
+          if (ok) logger.info("[2FA] Correo enviado correctamente a " + emailTo);
+          else {
+            logger.warn("[2FA] Falló envío a " + emailTo + " - revisa SMTP en Railway");
+            logger.warn("[2FA] Código temporal (solo para completar login): " + code);
+          }
         });
       } else if (process.env.NODE_ENV === "development") {
         logger.info("[2FA] Código (SMTP no configurado): " + code);

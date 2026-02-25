@@ -41,6 +41,12 @@ Al iniciar el servidor verás en consola:
 
 La API Key de Brevo no sirve para SMTP. Debes generar la clave SMTP en la sección indicada.
 
+## Si el correo no llega (Railway, etc.)
+
+1. **Prueba puerto 465**: En Railway, cambia `SMTP_PORT=465`. Algunos entornos tienen problemas con 587.
+2. **Revisa logs**: Railway → Logs. Busca `[Email]` o `[2FA]`. Si ves "Error al enviar" con `code` o `response`, eso indica el fallo.
+3. **Spam**: Revisa carpeta de spam y filtros.
+
 ## Probar que funciona
 
 1. Inicia sesión como super_admin

@@ -73,10 +73,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     });
     return true;
   } catch (error) {
+    const err = error as Error & { response?: string; responseCode?: number; code?: string };
     logger.error("[Email] Error al enviar", {
       to: options.to,
       subject: options.subject,
-      error: (error as Error).message,
+      message: err.message,
+      code: err.code,
+      response: err.response,
+      responseCode: err.responseCode,
     });
     return false;
   }
