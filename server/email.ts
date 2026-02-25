@@ -60,6 +60,21 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const fromEmail = process.env.SMTP_FROM || DEFAULT_FROM;
   const fromName = process.env.SMTP_FROM_NAME || DEFAULT_FROM_NAME;
 
+  // Verificar conexión SMTP antes de enviar (diagnóstico)
+  try {
+    await transporter.verify();
+    logger.info("[Email] Conexión SMTP verificada OK");
+  } catch (verifyError) {
+    const err = verifyError as Error & { code?: string };
+    logger.error("[Email] Fallo verificación SMTP", {
+      message: err.message,
+      code: err.code,
+      host: process.env.SMTP_HOST || BREVO_SMTP_HOST,
+      port: process.env.SMTP_PORT || BREVO_SMTP_PORT,
+    });
+    return false;
+  }
+
   try {
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
