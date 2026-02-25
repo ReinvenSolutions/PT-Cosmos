@@ -28,23 +28,21 @@ export const logger = winston.createLogger({
   ],
 });
 
-// If we're not in production, log to the console with a simple format
-if (process.env.NODE_ENV !== "production") {
-  logger.add(
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.printf(({ timestamp, level, message, ...meta }) => {
-          let msg = `${timestamp} [${level}]: ${message}`;
-          if (Object.keys(meta).length > 0) {
-            msg += ` ${JSON.stringify(meta)}`;
-          }
-          return msg;
-        })
-      ),
-    })
-  );
-}
+// Always log to console (Railway/cloud providers capture stdout)
+logger.add(
+  new winston.transports.Console({
+    format: winston.format.combine(
+      winston.format.colorize(),
+      winston.format.printf(({ timestamp, level, message, ...meta }) => {
+        let msg = `${timestamp} [${level}]: ${message}`;
+        if (Object.keys(meta).length > 0) {
+          msg += ` ${JSON.stringify(meta)}`;
+        }
+        return msg;
+      })
+    ),
+  })
+);
 
 // Create logs directory if it doesn't exist
 import { existsSync, mkdirSync } from "fs";
