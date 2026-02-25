@@ -822,7 +822,7 @@ export default function Home() {
 
         <footer className="bg-foreground text-background mt-12">
           <div className="container mx-auto px-4 py-8 text-center">
-            <p className="text-sm">&copy; 2025 Cosmos Mayorista. Todos los derechos reservados.</p>
+            <p className="text-sm">&copy; 2026 Cosmos Mayorista. Todos los derechos reservados.</p>
           </div>
         </footer>
       </main>
