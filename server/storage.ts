@@ -35,7 +35,7 @@ import {
   type InsertQuoteLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, count } from "drizzle-orm";
+import { eq, or, sql, desc, count } from "drizzle-orm";
 import { logger } from "./logger";
 
 export interface IStorage {
@@ -68,6 +68,7 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   countQuotesByUser(userId: string): Promise<number>;
   findUserByUsername(username: string): Promise<User | undefined>;
+  findUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined>;
   findUserById(id: string): Promise<User | undefined>;
   findSuperAdmins(): Promise<Pick<User, "email" | "username">[]>;
 
@@ -364,6 +365,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.username, username))
+      .limit(1);
+    return result[0];
+  }
+
+  async findUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(or(eq(users.username, usernameOrEmail), eq(users.email, usernameOrEmail)))
       .limit(1);
     return result[0];
   }

@@ -21,6 +21,7 @@ export const TwoFactorInput = React.forwardRef<HTMLInputElement, TwoFactorInputP
     return (
       <InputOTP
         ref={ref}
+        id="code2fa"
         maxLength={length}
         value={value}
         onChange={onChange}

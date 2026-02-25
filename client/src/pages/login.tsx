@@ -9,9 +9,6 @@ import { Plane, Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, ShieldCheck } fr
 import { ThemeToggleCompact } from "@/components/theme-toggle";
 import { TwoFactorInput } from "@/components/two-factor-input";
 
-// Componente de Bandera Estilizada "Shiny"
-// Usamos flagsapi.com con el estilo 'shiny' que da ese efecto 3D/Ondeado premium
-// compatible con Windows y todos los navegadores.
 const FlagIcon = ({ code, title }: { code: string, title: string }) => (
   <img 
     src={`https://flagsapi.com/${code.toUpperCase()}/shiny/64.png`}
