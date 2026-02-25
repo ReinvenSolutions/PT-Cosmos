@@ -1,6 +1,7 @@
 /**
- * Servicio de email con Brevo (SMTP)
- * Configuración: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+ * Servicio de email con Brevo (SMTP + API fallback)
+ * SMTP: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+ * API: BREVO_API_KEY (fallback si SMTP falla en Railway)
  * Remitente por defecto: info@cosmosviajes.com
  */
 
@@ -47,35 +48,81 @@ function getTransporter() {
 }
 
 export function isEmailConfigured(): boolean {
-  return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+  return !!(process.env.SMTP_USER && process.env.SMTP_PASS) || !!process.env.BREVO_API_KEY;
 }
 
-export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  const transporter = getTransporter();
-  if (!transporter) {
-    logger.warn("[Email] SMTP no configurado. Define SMTP_USER y SMTP_PASS para enviar correos.");
+async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    logger.warn("[Email] Brevo API key no configurada");
     return false;
   }
 
   const fromEmail = process.env.SMTP_FROM || DEFAULT_FROM;
   const fromName = process.env.SMTP_FROM_NAME || DEFAULT_FROM_NAME;
 
-  // Verificar conexión SMTP antes de enviar (diagnóstico)
   try {
-    await transporter.verify();
-    logger.info("[Email] Conexión SMTP verificada OK");
-  } catch (verifyError) {
-    const err = verifyError as Error & { code?: string };
-    logger.error("[Email] Fallo verificación SMTP", {
-      message: err.message,
-      code: err.code,
-      host: process.env.SMTP_HOST || BREVO_SMTP_HOST,
-      port: process.env.SMTP_PORT || BREVO_SMTP_PORT,
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": apiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: options.to }],
+        subject: options.subject,
+        htmlContent: options.html,
+        textContent: options.text,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error("[Email] Brevo API error", {
+        status: response.status,
+        error: errorText,
+      });
+      return false;
+    }
+
+    const result = await response.json();
+    logger.info("[Email] Enviado vía Brevo API", {
+      to: options.to,
+      messageId: result.messageId,
+    });
+    return true;
+  } catch (error) {
+    logger.error("[Email] Error llamando Brevo API", {
+      error: (error as Error).message,
     });
     return false;
   }
+}
 
-  try {
+export async function sendEmail(options: EmailOptions): Promise<boolean> {
+  // Intentar SMTP primero (más rápido), si falla usar API
+  const transporter = getTransporter();
+  
+  if (transporter) {
+    const fromEmail = process.env.SMTP_FROM || DEFAULT_FROM;
+    const fromName = process.env.SMTP_FROM_NAME || DEFAULT_FROM_NAME;
+
+    // Verificar conexión SMTP antes de enviar (diagnóstico)
+    try {
+      await transporter.verify();
+      logger.info("[Email] Conexión SMTP verificada OK");
+    } catch (verifyError) {
+      const err = verifyError as Error & { code?: string };
+      logger.warn("[Email] SMTP no disponible, usando API Brevo", {
+        message: err.message,
+        code: err.code,
+      });
+      return sendViaBrevoAPI(options);
+    }
+
+    try {
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: options.to,
@@ -90,19 +137,25 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       subject: options.subject,
       messageId: info.messageId,
     });
-    return true;
-  } catch (error) {
-    const err = error as Error & { response?: string; responseCode?: number; code?: string };
-    logger.error("[Email] Error al enviar", {
-      to: options.to,
-      subject: options.subject,
-      message: err.message,
-      code: err.code,
-      response: err.response,
-      responseCode: err.responseCode,
-    });
-    return false;
+      return true;
+    } catch (error) {
+      const err = error as Error & { response?: string; responseCode?: number; code?: string };
+      logger.warn("[Email] Error SMTP, intentando API Brevo", {
+        message: err.message,
+        code: err.code,
+      });
+      return sendViaBrevoAPI(options);
+    }
   }
+
+  // Si no hay SMTP configurado, usar API directamente
+  if (process.env.BREVO_API_KEY) {
+    logger.info("[Email] Usando API Brevo (SMTP no configurado)");
+    return sendViaBrevoAPI(options);
+  }
+
+  logger.warn("[Email] Ni SMTP ni API configurados. Define SMTP_USER/SMTP_PASS o BREVO_API_KEY.");
+  return false;
 }
 
 /* Identidad visual Cosmos Viajes: teal #205567, oro #C6A242, aqua #8CC7D5 */
