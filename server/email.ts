@@ -102,59 +102,49 @@ async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  // Intentar SMTP primero (más rápido), si falla usar API
-  const transporter = getTransporter();
-  
-  if (transporter) {
-    const fromEmail = process.env.SMTP_FROM || DEFAULT_FROM;
-    const fromName = process.env.SMTP_FROM_NAME || DEFAULT_FROM_NAME;
+  // En producción (Railway): usar solo API Brevo (SMTP suele dar timeout)
+  if (process.env.NODE_ENV === "production" && process.env.BREVO_API_KEY) {
+    logger.info("[Email] Producción: usando API Brevo directamente");
+    return sendViaBrevoAPI(options);
+  }
 
-    // Verificar conexión SMTP antes de enviar (diagnóstico)
+  // En desarrollo: intentar SMTP primero, fallback a API
+  const transporter = getTransporter();
+  if (transporter) {
     try {
       await transporter.verify();
       logger.info("[Email] Conexión SMTP verificada OK");
     } catch (verifyError) {
       const err = verifyError as Error & { code?: string };
-      logger.warn("[Email] SMTP no disponible, usando API Brevo", {
-        message: err.message,
-        code: err.code,
-      });
+      logger.warn("[Email] SMTP no disponible, usando API Brevo", { message: err.message, code: err.code });
       return sendViaBrevoAPI(options);
     }
 
     try {
-    const info = await transporter.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-      replyTo: options.replyTo || fromEmail,
-    });
-
-    logger.info("[Email] Enviado correctamente", {
-      to: options.to,
-      subject: options.subject,
-      messageId: info.messageId,
-    });
+      const fromEmail = process.env.SMTP_FROM || DEFAULT_FROM;
+      const fromName = process.env.SMTP_FROM_NAME || DEFAULT_FROM_NAME;
+      const info = await transporter.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        replyTo: options.replyTo || fromEmail,
+      });
+      logger.info("[Email] Enviado correctamente", { to: options.to, messageId: info.messageId });
       return true;
     } catch (error) {
-      const err = error as Error & { response?: string; responseCode?: number; code?: string };
-      logger.warn("[Email] Error SMTP, intentando API Brevo", {
-        message: err.message,
-        code: err.code,
-      });
+      const err = error as Error & { code?: string };
+      logger.warn("[Email] Error SMTP, intentando API Brevo", { message: err.message, code: err.code });
       return sendViaBrevoAPI(options);
     }
   }
 
-  // Si no hay SMTP configurado, usar API directamente
   if (process.env.BREVO_API_KEY) {
-    logger.info("[Email] Usando API Brevo (SMTP no configurado)");
     return sendViaBrevoAPI(options);
   }
 
-  logger.warn("[Email] Ni SMTP ni API configurados. Define SMTP_USER/SMTP_PASS o BREVO_API_KEY.");
+  logger.warn("[Email] Ni SMTP ni API configurados. Define BREVO_API_KEY (producción) o SMTP_USER/SMTP_PASS.");
   return false;
 }
 
