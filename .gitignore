@@ -14,6 +14,9 @@ vite.config.ts.*
 # Uploads (imágenes de usuarios)
 uploads/
 
+# Imágenes de planes (se usan desde Supabase Storage, no locales)
+public/images/destinations/
+
 # Cache
 .cache
 .vite
