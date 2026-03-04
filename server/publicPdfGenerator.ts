@@ -1211,8 +1211,9 @@ export async function generatePublicQuotePDF(
                 );
 
                 // If available space is too small (less than 200px), move to new page WITH section header
+                // Skip for first image (index === 0) to avoid empty page - we're already on a fresh page
                 const minimumImageHeight = 200;
-                if (maxAvailableHeight < minimumImageHeight) {
+                if (index > 0 && maxAvailableHeight < minimumImageHeight) {
                   console.log(
                     `[PDF Generator] Insufficient space for outbound image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
                   );
@@ -1411,8 +1412,9 @@ export async function generatePublicQuotePDF(
                 );
 
                 // If available space is too small (less than 200px), move to new page WITH section header
+                // Skip for first image (index === 0) to avoid empty page - we're already on a fresh page
                 const minimumImageHeight = 200;
-                if (maxAvailableHeight < minimumImageHeight) {
+                if (index > 0 && maxAvailableHeight < minimumImageHeight) {
                   console.log(
                     `[PDF Generator] Insufficient space for domestic image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
                   );
@@ -1829,8 +1831,9 @@ export async function generatePublicQuotePDF(
                 );
 
                 // If available space is too small (less than 200px), move to new page WITH section header
+                // Skip for first image (index === 0) to avoid empty page - we're already on a fresh page
                 const minimumImageHeight = 200;
-                if (maxAvailableHeight < minimumImageHeight) {
+                if (index > 0 && maxAvailableHeight < minimumImageHeight) {
                   console.log(
                     `[PDF Generator] Insufficient space for connection image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
                   );
@@ -2655,8 +2658,9 @@ export async function generatePublicQuotePDF(
                 );
 
                 // If available space is too small (less than 200px), move to new page WITH section header
+                // Skip for first image (index === 0) to avoid empty page - we're already on a fresh page
                 const minimumImageHeight = 200;
-                if (maxAvailableHeight < minimumImageHeight) {
+                if (index > 0 && maxAvailableHeight < minimumImageHeight) {
                   console.log(
                     `[PDF Generator] Insufficient space for return image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
                   );
