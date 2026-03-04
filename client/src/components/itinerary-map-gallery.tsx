@@ -165,11 +165,15 @@ export function ItineraryMapGallery({
                       </div>
                     </div>
                   )}
-                  <Button
+                  <button
                     type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-1 right-1 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className={cn(
+                      "absolute top-1 right-1 h-7 w-7 p-0 rounded-md inline-flex items-center justify-center",
+                      "bg-destructive text-destructive-foreground border border-destructive-border",
+                      "opacity-0 group-hover:opacity-100 transition-opacity",
+                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                      "disabled:pointer-events-none disabled:opacity-50"
+                    )}
                     onClick={(e) => handleDelete(img.path, e)}
                     disabled={isDeleting}
                   >
@@ -178,7 +182,7 @@ export function ItineraryMapGallery({
                     ) : (
                       <X className="h-4 w-4" />
                     )}
-                  </Button>
+                  </button>
                 </div>
               );
             })
