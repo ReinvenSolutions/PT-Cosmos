@@ -140,16 +140,23 @@ app.use((req, res, next) => {
   // Error handler middleware (must be last)
     app.use(errorHandler);
 
-    // En producción: ejecutar seeding y sincronización en background después de iniciar el servidor
+    // En producción: solo seed si BD está vacía. NUNCA sincronizar datos canónicos
+    // para no sobrescribir los planes que ya están en la base de datos.
+    // Regla: los planes en producción son la fuente de verdad.
     if (env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
-    // Ejecutar en background con retraso: no competir con login/requests iniciales
     (async () => {
-      await new Promise((r) => setTimeout(r, 30_000)); // 30s: no competir con login inicial
+      await new Promise((r) => setTimeout(r, 30_000));
       try {
-        logger.info("🌱 Iniciando sincronización de datos en background...");
-        await seedDatabaseIfEmpty();
-        await syncCanonicalData();
-        logger.info("✅ Sincronización completada exitosamente");
+        const allowSync = process.env.ALLOW_DATA_SYNC === "true";
+        if (allowSync) {
+          logger.info("🌱 ALLOW_DATA_SYNC=true: ejecutando sincronización...");
+          await seedDatabaseIfEmpty();
+          await syncCanonicalData();
+          logger.info("✅ Sincronización completada");
+        } else {
+          await seedDatabaseIfEmpty(); // Solo seed si BD vacía (usuarios + SQL si existe)
+          logger.info("ℹ️ Sincronización de planes deshabilitada (protege planes en producción)");
+        }
       } catch (error) {
         logger.error("❌ Error durante la sincronización", { error });
       }

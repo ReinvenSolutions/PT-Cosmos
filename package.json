@@ -21,6 +21,10 @@
     "db:upload-images-to-supabase": "tsx scripts/upload-local-images-to-supabase.ts",
     "db:upload-turquia-assets": "tsx scripts/upload-turquia-assets-to-supabase.ts",
     "db:populate-plan-pdf-fields": "tsx scripts/populate-plan-pdf-fields.ts",
+    "db:apply-rls": "tsx scripts/apply-rls-migration.ts",
+    "db:apply-pending": "tsx scripts/apply-pending-migrations.ts",
+    "db:cleanup-orphan-buckets": "tsx scripts/cleanup-orphan-buckets.ts",
+    "db:delete-plans-without-bucket": "tsx scripts/delete-plans-without-bucket.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"

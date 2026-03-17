@@ -14,6 +14,8 @@ import { isTuesday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { isTurkeyHoliday, getTurkeyHolidayDescription } from "@/lib/turkey-holidays";
 import { GroupDiscountBanner } from "@/components/group-discount-banner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { OptimizedImage } from "@/components/optimized-image";
 
 interface DestinationDetail {
   destination: Destination;
@@ -30,38 +32,18 @@ export default function Home() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const { data: destinations = [] } = useQuery<Destination[]>({
-    queryKey: ["/api/destinations?isActive=true"],
+  type DestinationWithPreviews = Destination & { hotels: any[]; itinerary: any[] };
+  const { data: destinationsWithPreviews = [], isLoading: destinationsLoading } = useQuery<DestinationWithPreviews[]>({
+    queryKey: ["/api/destinations-previews?isActive=true"],
   });
 
-  const [destinationDetails, setDestinationDetails] = useState<Record<string, DestinationDetail>>({});
-
-  useEffect(() => {
-    if (destinations.length === 0) return;
-    let cancelled = false;
-    Promise.all(
-      destinations.map(async (dest) => {
-        try {
-          const res = await fetch(`/api/destinations/${dest.id}`, { credentials: "include" });
-          if (!res.ok || cancelled) return null;
-          const data = await res.json();
-          return { id: dest.id, dest, hotels: data.hotels || [], itinerary: data.itinerary || [] };
-        } catch {
-          return null;
-        }
-      })
-    ).then((results) => {
-      if (cancelled) return;
-      setDestinationDetails((prev) => {
-        const next = { ...prev };
-        for (const r of results) {
-          if (r) next[r.id] = { destination: r.dest, hotels: r.hotels, itinerary: r.itinerary };
-        }
-        return next;
-      });
-    });
-    return () => { cancelled = true; };
-  }, [destinations]);
+  const destinations = destinationsWithPreviews;
+  const destinationDetails: Record<string, DestinationDetail> = Object.fromEntries(
+    destinationsWithPreviews.map((d) => [
+      d.id,
+      { destination: d, hotels: d.hotels ?? [], itinerary: d.itinerary ?? [] },
+    ])
+  );
 
   const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
 
@@ -102,26 +84,19 @@ export default function Home() {
   const calculateTotalDuration = (): number => {
     if (!startDate || selectedDestinations.length === 0) return 0;
 
-    // Sumar todas las duraciones base
-    let totalDuration = selectedDestinations.reduce((sum, destId) => {
+    let total = selectedDestinations.reduce((sum, destId) => {
       const dest = destinations.find((d) => d.id === destId);
       return sum + (dest?.duration || 0);
     }, 0);
 
-    // Verificar si hay destinos internacionales que requieren día extra
-    // Perú NO requiere día extra (vuelo corto desde Colombia)
-    const requiresExtraDay = selectedDestinations.some(destId => {
+    // +1 día si algún plan tiene requiresExtraDay activo (configurable en admin)
+    const hasExtraDay = selectedDestinations.some((destId) => {
       const dest = destinations.find((d) => d.id === destId);
-      const country = dest?.country?.toLowerCase() || "";
-      return country !== "colombia" && country !== "perú" && country !== "peru";
+      return (dest as { requiresExtraDay?: boolean })?.requiresExtraDay === true;
     });
+    if (hasExtraDay) total += 1;
 
-    // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
-    if (requiresExtraDay) {
-      totalDuration += 1;
-    }
-
-    return totalDuration;
+    return total;
   };
 
   const calculateEndDate = (): string => {
@@ -253,39 +228,32 @@ export default function Home() {
     }
   }, [startDate, hasTurkeyEsencial, toast]);
 
+  /** Parsea la categoría del hotel para obtener las estrellas. Soporta: "5*", "4 estrellas", "3*", etc. */
+  const parseHotelCategoryToStars = (category: string | null | undefined): number | null => {
+    if (!category?.trim()) return null;
+    const s = category.trim().toLowerCase();
+    // Formato "5*", "4*", "3*"
+    const asteriskMatch = s.match(/^(\d)\s*\*?$/);
+    if (asteriskMatch) return Math.min(5, Math.max(1, parseInt(asteriskMatch[1])));
+    // Formato "5 estrellas", "4 estrellas", "3 stars"
+    const wordMatch = s.match(/(\d)\s*(?:estrellas?|stars?)/);
+    if (wordMatch) return Math.min(5, Math.max(1, parseInt(wordMatch[1])));
+    // Formato "X*" dentro del texto
+    const inlineMatch = s.match(/(\d)\s*\*/);
+    if (inlineMatch) return Math.min(5, Math.max(1, parseInt(inlineMatch[1])));
+    return null;
+  };
+
   const getHotelStars = (destId: string): number => {
-    const dest = destinations.find(d => d.id === destId);
-    if (dest?.name === "Turquía Esencial") {
-      return 4;
-    }
-
-    // Planes con hoteles 3 estrellas
-    const threeStarPlans = [
-      "Lo Mejor de Cusco",
-      "Tour Cusco Básico + Huacachina",
-      "Tour Cusco Básico + Paracas - Huacachina - Nazca",
-      "Lo Mejor de Cusco + Lima",
-      "Tour Cusco Completo + Lima, Paracas, Nazca, Huacachina",
-      "Tour Cusco Aventura",
-      "Gran Tour de Europa",
-      "Italia Turística - Euro Express",
-      "España e Italia Turística - Euro Express"
-    ];
-
-    if (dest && threeStarPlans.includes(dest.name)) {
-      return 3;
-    }
-
     const details = destinationDetails[destId];
-    if (!details || !details.hotels || details.hotels.length === 0) return 4;
+    if (!details?.hotels?.length) return 4;
 
-    const starCounts = details.hotels.map(hotel => {
-      if (!hotel.category) return 4;
-      const match = hotel.category.match(/(\d+)\s*\*/);
-      return match ? parseInt(match[1]) : 4;
-    });
+    const starCounts = details.hotels
+      .map((hotel) => parseHotelCategoryToStars(hotel.category))
+      .filter((n): n is number => n !== null);
+    if (starCounts.length === 0) return 4;
 
-    return Math.max(...starCounts, 4);
+    return Math.max(...starCounts, 1);
   };
 
   const formatAllowedDays = (days: string[]): string => {
@@ -350,7 +318,14 @@ export default function Home() {
     return { breakfasts, lunches, dinners, total: breakfasts + lunches + dinners };
   };
 
-  const getTooltipContent = (dest: Destination): string => {
+  /** Prioridad: el texto de tooltip configurado en la edición o creación de planes (admin) es el oficial. Solo si está vacío se usa el fallback por defecto. */
+  const getTooltipForCard = (dest: Destination): string => {
+    const custom = (dest as { cardTooltip?: string | null }).cardTooltip?.trim();
+    if (custom) return custom;
+    return getTooltipContentFallback(dest);
+  };
+
+  const getTooltipContentFallback = (dest: Destination): string => {
     // Tooltip específico para Lo Mejor de Cusco + Lima
     if (dest.name === "Lo Mejor de Cusco + Lima") {
       return "Salidas diarias, programa incluye todas las actividades de interes para los dias de viaje. Cualquier cambio, bajo solicitud. Incluye impuestos. Acompañamiento de guia, solo en actividades. Requiere vuelos internos para el 4to dia; se recomienda sea antes de las 07:00am, tienen incluida actividad el primer dia de llegada a CUZ.";
@@ -671,14 +646,26 @@ export default function Home() {
 
             <TabsContent value={selectedCategory} className="mt-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredDestinations.map((dest) => {
+                {destinationsLoading ? (
+                  Array.from({ length: 9 }).map((i) => (
+                    <Card key={i} variant="glass" className="overflow-hidden">
+                      <Skeleton className="aspect-video w-full rounded-none" />
+                      <CardContent className="p-4">
+                        <Skeleton className="h-3 w-16 mb-2" />
+                        <Skeleton className="h-6 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3 mt-2" />
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : filteredDestinations.map((dest, idx) => {
                   const isSelected = selectedDestinations.includes(dest.id);
                   const isExpanded = expandedCard === dest.id;
                   const imageUrl = getDestinationImage(dest);
                   const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
                   const hotelStars = getHotelStars(dest.id);
                   const mealsInfo = getMealsInfo(dest.id);
-                  const tooltipText = getTooltipContent(dest);
+                  const tooltipText = getTooltipForCard(dest);
 
                   return (
                     <div
@@ -695,10 +682,12 @@ export default function Home() {
                     >
                       <div className="aspect-video w-full bg-muted relative overflow-hidden">
                         {imageUrl && (
-                          <img
+                          <OptimizedImage
                             src={imageUrl}
                             alt={dest.name}
-                            className="w-full h-full object-cover"
+                            priority={idx < 6}
+                            containerClassName="aspect-video w-full"
+                            imageClassName="object-cover"
                           />
                         )}
 

@@ -14,6 +14,7 @@ import {
   getDestinationImageSet,
 } from "./destination-images";
 import { getImagePathForPDF } from "./upload";
+import { parseSupabaseStorageUrl, downloadFromBucket } from "./supabaseStorage";
 import fs from "fs";
 import { promises as fsPromises } from "fs";
 import path from "path";
@@ -105,13 +106,27 @@ async function preloadDestinationImages(imageUrls: string[]): Promise<void> {
 
       // URLs remotas (Supabase, etc.)
       if (fetchUrl.startsWith("https://")) {
-        const res = await fetch(fetchUrl);
-        if (res.ok) {
-          const buffer = Buffer.from(await res.arrayBuffer());
+        let buffer: Buffer | null = null;
+        for (let attempt = 0; attempt < 2 && !buffer; attempt++) {
+          try {
+            const res = await fetch(fetchUrl, { cache: "no-store" });
+            if (res.ok) {
+              buffer = Buffer.from(await res.arrayBuffer());
+              break;
+            }
+          } catch {
+            if (attempt === 0) await new Promise((r) => setTimeout(r, 500));
+          }
+        }
+        if (!buffer) {
+          const parsed = parseSupabaseStorageUrl(fetchUrl);
+          if (parsed) buffer = await downloadFromBucket(parsed.bucket, parsed.path);
+        }
+        if (buffer) {
           const dimensions = sizeOf(buffer);
           imageCache.set(cacheKey, { path: fetchUrl, buffer, width: dimensions?.width || 0, height: dimensions?.height || 0 });
         } else {
-          console.error(`[PDF Generator] Failed to fetch remote image: ${fetchUrl}`);
+          console.error(`[PDF Generator] Failed to fetch remote image: ${fetchUrl.slice(0, 80)}...`);
         }
         return;
       }
@@ -126,7 +141,7 @@ async function preloadDestinationImages(imageUrls: string[]): Promise<void> {
         }
       }
     } catch (error) {
-      console.error(`[PDF Generator] Error preloading destination ${imageUrl}:`, error);
+      console.error(`[PDF Generator] Error preloading destination ${imageUrl.slice(0, 80)}:`, error);
     }
   });
 
@@ -220,6 +235,7 @@ interface PublicQuoteData {
   turkeyUpgrade?: string | null;
   italiaUpgrade?: string | null;
   granTourUpgrade?: string | null;
+  selectedUpgrades?: Record<string, string> | null;
   trm?: number | null;
   grandTotalCOP?: number | null;
   finalPrice?: number | null;
@@ -350,21 +366,9 @@ export async function generatePublicQuotePDF(
 
   const destinationNames = data.destinations.map((d) => d.name).join(" + ");
   
-  // Calculate total duration - suma las duraciones base
   let totalDuration = data.destinations.reduce((sum, d) => sum + (d.duration || 0), 0);
-  
-  // Verificar si hay destinos internacionales que requieren día extra
-  // Perú NO requiere día extra (vuelo corto desde Colombia)
-  const requiresExtraDay = data.destinations.some(d => {
-    const country = d.country?.toLowerCase() || "";
-    return country !== "colombia" && country !== "perú" && country !== "peru";
-  });
-  
-  // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
-  if (requiresExtraDay) {
-    totalDuration += 1;
-  }
-  
+  if (data.destinations.some((d) => (d.destination as { requiresExtraDay?: boolean })?.requiresExtraDay === true)) totalDuration += 1;
+
   // Mantener referencias para otras partes del código
   const hasTurkeyEsencial = data.destinations.some(d => 
     d.name?.toLowerCase().includes("turquía esencial") || 
@@ -508,20 +512,18 @@ export async function generatePublicQuotePDF(
 
   if (imageInfo.length > 0) {
     try {
-      // Try cache with relative path first, then absolute path as fallback
       const cached = getCachedImageOrPath(imageInfo[0].relativePath);
       const imageSource = typeof cached === 'object' ? cached.buffer : imageInfo[0].absolutePath;
-      
-      doc.image(imageSource, leftMargin, mainImageY, {
-        width: contentWidth,
-        height: mainImageHeight,
-        align: "center",
-        valign: "center",
-      });
-
-      doc
-        .rect(leftMargin, mainImageY, contentWidth, mainImageHeight)
-        .stroke(borderColor);
+      const canRender = typeof imageSource === 'object' || (typeof imageSource === 'string' && !imageSource.startsWith('http'));
+      if (canRender && imageSource) {
+        doc.image(imageSource, leftMargin, mainImageY, {
+          width: contentWidth,
+          height: mainImageHeight,
+          align: "center",
+          valign: "center",
+        });
+        doc.rect(leftMargin, mainImageY, contentWidth, mainImageHeight).stroke(borderColor);
+      }
     } catch (error) {
       console.error("Error loading main image:", error);
     }
@@ -536,57 +538,20 @@ export async function generatePublicQuotePDF(
     budgetY,
   );
 
-  // Format dates without slashes
-  console.log("[PDF Generator] Received dates:", { startDate: data.startDate, endDate: data.endDate });
-  
-  const startDateFormatted = data.startDate
-    ? (() => {
-        // Parse date string as YYYY-MM-DD to avoid timezone issues
-        const [year, month, day] = data.startDate.split('-').map(Number);
-        console.log("[PDF Generator] Start date parsed:", { year, month, day });
-        const months = [
-          "Enero",
-          "Febrero",
-          "Marzo",
-          "Abril",
-          "Mayo",
-          "Junio",
-          "Julio",
-          "Agosto",
-          "Septiembre",
-          "Octubre",
-          "Noviembre",
-          "Diciembre",
-        ];
-        const formatted = `${day} ${months[month - 1]} ${year}`;
-        console.log("[PDF Generator] Start date formatted:", formatted);
-        return formatted;
-      })()
-    : "Por definir";
-  const endDateFormatted = data.endDate
-    ? (() => {
-        // Parse date string as YYYY-MM-DD to avoid timezone issues
-        const [year, month, day] = data.endDate.split('-').map(Number);
-        console.log("[PDF Generator] End date parsed:", { year, month, day });
-        const months = [
-          "Enero",
-          "Febrero",
-          "Marzo",
-          "Abril",
-          "Mayo",
-          "Junio",
-          "Julio",
-          "Agosto",
-          "Septiembre",
-          "Octubre",
-          "Noviembre",
-          "Diciembre",
-        ];
-        const formatted = `${day} ${months[month - 1]} ${year}`;
-        console.log("[PDF Generator] End date formatted:", formatted);
-        return formatted;
-      })()
-    : "Por definir";
+  // Format dates without slashes (soporta ISO "2026-03-07T00:00:00.000Z" y "YYYY-MM-DD")
+  const parseDateForDisplay = (dateStr: string): string => {
+    if (!dateStr) return "Por definir";
+    const datePart = dateStr.split("T")[0];
+    const [year, month, day] = datePart.split("-").map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return "Por definir";
+    const months = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+    ];
+    return `${day} ${months[month - 1]} ${year}`;
+  };
+  const startDateFormatted = parseDateForDisplay(data.startDate);
+  const endDateFormatted = parseDateForDisplay(data.endDate);
 
   // Determine currency and price to display
   let showInCOP = false;
@@ -736,17 +701,16 @@ export async function generatePublicQuotePDF(
     try {
       const cached = getCachedImageOrPath(imageInfo[1].relativePath);
       const imageSource = typeof cached === 'object' ? cached.buffer : imageInfo[1].absolutePath;
-      
-      doc.image(imageSource, leftMargin, smallImagesY, {
-        width: smallImageWidth,
-        height: smallImageHeight,
-        align: "center",
-        valign: "center",
-      });
-
-      doc
-        .rect(leftMargin, smallImagesY, smallImageWidth, smallImageHeight)
-        .stroke(borderColor);
+      const canRender = typeof imageSource === 'object' || (typeof imageSource === 'string' && !imageSource.startsWith('http'));
+      if (canRender && imageSource) {
+        doc.image(imageSource, leftMargin, smallImagesY, {
+          width: smallImageWidth,
+          height: smallImageHeight,
+          align: "center",
+          valign: "center",
+        });
+        doc.rect(leftMargin, smallImagesY, smallImageWidth, smallImageHeight).stroke(borderColor);
+      }
     } catch (error) {
       console.error("Error loading second image:", error);
     }
@@ -756,27 +720,28 @@ export async function generatePublicQuotePDF(
     try {
       const cached = getCachedImageOrPath(imageInfo[2].relativePath);
       const imageSource = typeof cached === 'object' ? cached.buffer : imageInfo[2].absolutePath;
-      
-      doc.image(
-        imageSource,
-        leftMargin + smallImageWidth + 20,
-        smallImagesY,
-        {
-          width: smallImageWidth,
-          height: smallImageHeight,
-          align: "center",
-          valign: "center",
-        },
-      );
-
-      doc
-        .rect(
+      const canRender = typeof imageSource === 'object' || (typeof imageSource === 'string' && !imageSource.startsWith('http'));
+      if (canRender && imageSource) {
+        doc.image(
+          imageSource,
           leftMargin + smallImageWidth + 20,
           smallImagesY,
-          smallImageWidth,
-          smallImageHeight,
-        )
-        .stroke(borderColor);
+          {
+            width: smallImageWidth,
+            height: smallImageHeight,
+            align: "center",
+            valign: "center",
+          },
+        );
+        doc
+          .rect(
+            leftMargin + smallImageWidth + 20,
+            smallImagesY,
+            smallImageWidth,
+            smallImageHeight,
+          )
+          .stroke(borderColor);
+      }
     } catch (error) {
       console.error("Error loading third image:", error);
     }
@@ -802,26 +767,38 @@ export async function generatePublicQuotePDF(
   const commentsText = customComments?.firstPageComments?.trim();
 
   if (commentsText) {
-    // Parse **bold** and render mixed formatting
-    const parts = commentsText.split(/(\*\*[^*]+\*\*)/g);
-    let isFirst = true;
-    for (const part of parts) {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        doc.font("Helvetica-Bold");
-        const text = part.slice(2, -2);
-        if (isFirst) {
-          doc.text(text, leftMargin, commentsStartY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-          isFirst = false;
-        } else {
-          doc.text(text, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-        }
-      } else if (part) {
-        doc.font("Helvetica");
-        if (isFirst) {
-          doc.text(part, leftMargin, commentsStartY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-          isFirst = false;
-        } else {
-          doc.text(part, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+    // Split by line breaks to support multi-paragraph comments
+    const paragraphs = commentsText.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+    let currentY = commentsStartY;
+
+    for (let paraIndex = 0; paraIndex < paragraphs.length; paraIndex++) {
+      const para = paragraphs[paraIndex];
+      if (paraIndex > 0) {
+        doc.moveDown(0.5);
+        currentY = doc.y;
+      }
+
+      // Parse **bold** and render mixed formatting within each paragraph
+      const parts = para.split(/(\*\*[^*]+\*\*)/g);
+      let isFirst = true;
+      for (const part of parts) {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          doc.font("Helvetica-Bold");
+          const text = part.slice(2, -2);
+          if (isFirst) {
+            doc.text(text, leftMargin, currentY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+            isFirst = false;
+          } else {
+            doc.text(text, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+          }
+        } else if (part) {
+          doc.font("Helvetica");
+          if (isFirst) {
+            doc.text(part, leftMargin, currentY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+            isFirst = false;
+          } else {
+            doc.text(part, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+          }
         }
       }
     }
@@ -1569,6 +1546,21 @@ export async function generatePublicQuotePDF(
       doc.text(`Día ${day.dayNumber} | ${day.title}`, leftMargin, doc.y);
       doc.moveDown(0.3);
 
+      // Location, meals, accommodation (if present)
+      const dayExtras: string[] = [];
+      if (day.location?.trim()) dayExtras.push(`Ciudad: ${day.location.trim()}`);
+      if (day.meals && Array.isArray(day.meals) && day.meals.length > 0) {
+        dayExtras.push(`Alimentación: ${day.meals.filter(Boolean).join(", ")}`);
+      } else if (typeof day.meals === "string" && day.meals.trim()) {
+        dayExtras.push(`Alimentación: ${day.meals.trim()}`);
+      }
+      if (day.accommodation?.trim()) dayExtras.push(`Alojamiento: ${day.accommodation.trim()}`);
+      if (dayExtras.length > 0) {
+        doc.font("Helvetica").fontSize(7.5).fillColor("#555555");
+        doc.text(dayExtras.join("  |  "), leftMargin, doc.y, { width: contentWidth });
+        doc.moveDown(0.2);
+      }
+
       // Process text with bold markdown and line break support
       doc.fontSize(8).fillColor(textColor);
       
@@ -1921,12 +1913,26 @@ export async function generatePublicQuotePDF(
     }
   });
 
-  // For Turkey Esencial, show upgrade options or selected upgrade in blue box
-  // Place after itinerary, before hotels section
-  if (isTurkeyEsencial) {
-    doc.moveDown(1);
+  // Generic upgrades: show section for each destination that has upgrades defined in the plan
+  // Uses plan's upgrades (destinations.upgrades), selected from selectedUpgrades or legacy fields
+  const destsWithUpgrades = data.destinations.filter((d) => {
+    const upgrades = (d.destination as { upgrades?: Array<{ code: string; name: string; description?: string; price: number }> })?.upgrades;
+    return Array.isArray(upgrades) && upgrades.length > 0;
+  });
 
-    // Check if we need space for the upgrade section
+  for (const dest of destsWithUpgrades) {
+    const planUpgrades = (dest.destination as { upgrades: Array<{ code: string; name: string; description?: string; price: number }> }).upgrades;
+    const selectedCode =
+      data.selectedUpgrades?.[dest.id] ??
+      (dest.name?.toLowerCase().includes("turquía esencial") || dest.name?.toLowerCase().includes("turquia esencial")
+        ? data.turkeyUpgrade ?? null
+        : dest.name?.toLowerCase().includes("italia turística") || dest.name?.toLowerCase().includes("italia turistica")
+          ? data.italiaUpgrade ?? null
+          : dest.name === "Gran Tour de Europa"
+            ? data.granTourUpgrade ?? null
+            : data.selectedUpgrades?.[dest.id] ?? null);
+
+    doc.moveDown(1);
     if (doc.y > 620) {
       doc.addPage();
       addPageBackground();
@@ -1936,169 +1942,22 @@ export async function generatePublicQuotePDF(
 
     const boxY = doc.y;
     const boxPadding = 15;
-    const boxColor = "#d4edfc"; // Lighter blue background with higher contrast
-    const borderColor = "#0891b2"; // Vibrant cyan border
-    const boxTextColor = "#0c4a6e"; // Darker blue text for better readability
+    const boxColor = "#d4edfc";
+    const borderColor = "#0891b2";
+    const boxTextColor = "#0c4a6e";
 
-    if (!data.turkeyUpgrade) {
-      // No upgrade selected - show available upgrade options
-      const boxHeight = 140; // Estimated height for the upgrade options
+    const selectedUpgrade = selectedCode ? planUpgrades.find((u) => u.code === selectedCode) : null;
 
-      // Draw blue background box with thicker border
-      doc
-        .rect(leftMargin, boxY, contentWidth, boxHeight)
-        .lineWidth(3) // Thicker border for more prominence
-        .fillAndStroke(boxColor, borderColor);
+    if (!selectedUpgrade) {
+      // No upgrade selected - show available options from plan
+      const lineHeight = 22;
+      const boxHeight = Math.min(400, boxPadding + 25 + planUpgrades.length * lineHeight);
 
-      // Title
-      doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
-      doc.text(
-        "MEJORA TU PLAN, GASTA MENOS EN DESTINO (VALOR POR PERSONA):",
-        leftMargin + boxPadding,
-        boxY + boxPadding,
-        { width: contentWidth - boxPadding * 2 },
-      );
-
-      let optionY = boxY + boxPadding + 25;
-      doc.font("Helvetica").fontSize(9).fillColor(boxTextColor);
-
-      // Option 1
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text("+ 500 USD:", leftMargin + boxPadding, optionY, {
-          continued: true,
-        });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .text(" 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico", {
-          width: contentWidth - boxPadding * 2,
-        });
-      optionY += 25;
-
-      // Option 2
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text("+ 770 USD:", leftMargin + boxPadding, optionY, {
-          continued: true,
-        });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .text(
-          " Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
-          { width: contentWidth - boxPadding * 2 },
-        );
-      optionY += 25;
-
-      // Option 3
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text("+1,100 USD:", leftMargin + boxPadding, optionY, {
-          continued: true,
-        });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .text(
-          " Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
-          { width: contentWidth - boxPadding * 2 },
-        );
-
-      doc.y = boxY + boxHeight + 10;
-    } else {
-      // Upgrade selected - show which upgrade was included
-      const upgradeOptions: {
-        [key: string]: { description: string; price: string };
-      } = {
-        option1: {
-          description: "8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
-          price: "500 USD",
-        },
-        option2: {
-          description:
-            "Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
-          price: "770 USD",
-        },
-        option3: {
-          description:
-            "Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico",
-          price: "1,100 USD",
-        },
-      };
-
-      const selectedUpgrade = data.turkeyUpgrade
-        ? upgradeOptions[data.turkeyUpgrade]
-        : undefined;
-
-      if (selectedUpgrade) {
-        const boxHeight = 80;
-
-        // Draw blue background box with thicker border
-        doc
-          .rect(leftMargin, boxY, contentWidth, boxHeight)
-          .lineWidth(3) // Thicker border for more prominence
-          .fillAndStroke(boxColor, borderColor);
-
-        // Title
-        doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
-        doc.text(
-          "MEJORA INCLUIDA EN ESTA COTIZACIÓN:",
-          leftMargin + boxPadding,
-          boxY + boxPadding,
-          { width: contentWidth - boxPadding * 2 },
-        );
-
-        doc.moveDown(0.5);
-
-        // Description
-        doc.font("Helvetica").fontSize(10).fillColor(boxTextColor);
-        doc.text(
-          `• ${selectedUpgrade.description}`,
-          leftMargin + boxPadding,
-          doc.y,
-          { width: contentWidth - boxPadding * 2 },
-        );
-
-        doc.y = boxY + boxHeight + 10;
-      }
-    }
-
-    doc.moveDown(1);
-  }
-
-  // For Italia Turística - Euro Express, show upgrade options or selected upgrade in blue box
-  if (isItaliaTuristica) {
-    doc.moveDown(1);
-
-    // Check if we need space for the upgrade section
-    if (doc.y > 620) {
-      doc.addPage();
-      addPageBackground();
-      addPlaneLogoBottom();
-      doc.y = 80;
-    }
-
-    const boxY = doc.y;
-    const boxPadding = 15;
-    const boxColor = "#dbeafe"; // Light blue background
-    const borderColor = "#2563eb"; // Blue border
-    const boxTextColor = "#1e40af"; // Dark blue text
-
-    if (!data.italiaUpgrade) {
-      // No upgrade selected - show available upgrade options
-      const boxHeight = 90; // Estimated height for the upgrade options
-
-      // Draw blue background box with thicker border
       doc
         .rect(leftMargin, boxY, contentWidth, boxHeight)
         .lineWidth(3)
         .fillAndStroke(boxColor, borderColor);
 
-      // Title
       doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
       doc.text(
         "MEJORA TU PLAN (VALOR POR PERSONA):",
@@ -2110,213 +1969,46 @@ export async function generatePublicQuotePDF(
       let optionY = boxY + boxPadding + 25;
       doc.font("Helvetica").fontSize(9).fillColor(boxTextColor);
 
-      // Option VI
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text("+ 120 USD (VI):", leftMargin + boxPadding, optionY, {
-          continued: true,
-        });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .text(" Visitas incluidas", {
-          width: contentWidth - boxPadding * 2,
-        });
-      optionY += 20;
-
-      // Option SI
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text("+ 230 USD (SI):", leftMargin + boxPadding, optionY, {
-          continued: true,
-        });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .text(" Special Incluido - Visitas + Comidas", {
-          width: contentWidth - boxPadding * 2,
-        });
+      for (const opt of planUpgrades) {
+        const priceStr = typeof opt.price === "number" ? `+ ${opt.price} USD` : `+ ${opt.price}`;
+        const label = opt.code ? ` (${opt.code})` : "";
+        const desc = opt.description || opt.name;
+        doc.font("Helvetica-Bold").fontSize(10);
+        doc.text(`${priceStr}${label}:`, leftMargin + boxPadding, optionY, { continued: true });
+        doc.font("Helvetica").fontSize(9);
+        doc.text(` ${desc}`, { width: contentWidth - boxPadding * 2 });
+        optionY += lineHeight;
+      }
 
       doc.y = boxY + boxHeight + 10;
     } else {
       // Upgrade selected - show which upgrade was included
-      const upgradeOptions: {
-        [key: string]: { description: string; price: string };
-      } = {
-        VI: {
-          description: "Visitas incluidas",
-          price: "120 USD",
-        },
-        SI: {
-          description: "Special Incluido - Visitas + Comidas",
-          price: "230 USD",
-        },
-      };
+      const boxHeight = 80;
 
-      const selectedUpgrade = data.italiaUpgrade
-        ? upgradeOptions[data.italiaUpgrade]
-        : undefined;
-
-      if (selectedUpgrade) {
-        const boxHeight = 70;
-
-        // Draw blue background box with thicker border
-        doc
-          .rect(leftMargin, boxY, contentWidth, boxHeight)
-          .lineWidth(3)
-          .fillAndStroke(boxColor, borderColor);
-
-        // Title
-        doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
-        doc.text(
-          "MEJORA INCLUIDA EN ESTA COTIZACIÓN:",
-          leftMargin + boxPadding,
-          boxY + boxPadding,
-          { width: contentWidth - boxPadding * 2 },
-        );
-
-        doc.moveDown(0.5);
-
-        // Description
-        doc.font("Helvetica").fontSize(10).fillColor(boxTextColor);
-        doc.text(
-          `• ${selectedUpgrade.description}`,
-          leftMargin + boxPadding,
-          doc.y,
-          { width: contentWidth - boxPadding * 2 },
-        );
-
-        doc.y = boxY + boxHeight + 10;
-      }
-    }
-
-    doc.moveDown(1);
-  }
-
-  // Gran Tour de Europa Upgrade Section
-  const hasGranTourEuropa = data.destinations.some(
-    (d) => d.name === "Gran Tour de Europa"
-  );
-
-  if (hasGranTourEuropa) {
-    let boxY = doc.y;
-
-    if (boxY > 650) {
-      doc.addPage();
-      addPageBackground();
-      addPlaneLogoBottom();
-      boxY = 90;
-    }
-
-    const boxPadding = 15;
-    const boxColor = "#f3e8ff"; // Light purple background
-    const borderColor = "#9333ea"; // Purple border
-    const boxTextColor = "#6b21a8"; // Dark purple text
-
-    if (!data.granTourUpgrade) {
-      // No upgrade selected - show available upgrade options
-      const boxHeight = 90; // Estimated height for the upgrade options
-
-      // Draw purple background box with thicker border
       doc
         .rect(leftMargin, boxY, contentWidth, boxHeight)
         .lineWidth(3)
         .fillAndStroke(boxColor, borderColor);
 
-      // Title
       doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
       doc.text(
-        "MEJORA TU PLAN GRAN TOUR (VALOR POR PERSONA):",
+        "MEJORA INCLUIDA EN ESTA COTIZACIÓN:",
         leftMargin + boxPadding,
         boxY + boxPadding,
         { width: contentWidth - boxPadding * 2 },
       );
 
-      let optionY = boxY + boxPadding + 25;
-      doc.font("Helvetica").fontSize(9).fillColor(boxTextColor);
+      doc.moveDown(0.5);
 
-      // Option VI
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text("+ 595 USD (VI):", leftMargin + boxPadding, optionY, {
-          continued: true,
-        });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .text(" Visitas incluidas", {
-          width: contentWidth - boxPadding * 2,
-        });
-      optionY += 20;
-
-      // Option SI
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text("+ 670 USD (SI):", leftMargin + boxPadding, optionY, {
-          continued: true,
-        });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .text(" Special Incluido - Visitas + Comidas", {
-          width: contentWidth - boxPadding * 2,
-        });
+      doc.font("Helvetica").fontSize(10).fillColor(boxTextColor);
+      doc.text(
+        `• ${selectedUpgrade.description || selectedUpgrade.name}`,
+        leftMargin + boxPadding,
+        doc.y,
+        { width: contentWidth - boxPadding * 2 },
+      );
 
       doc.y = boxY + boxHeight + 10;
-    } else {
-      // Upgrade selected - show which upgrade was included
-      const upgradeOptions: {
-        [key: string]: { description: string; price: string };
-      } = {
-        VI: {
-          description: "Visitas incluidas",
-          price: "595 USD",
-        },
-        SI: {
-          description: "Special Incluido - Visitas + Comidas",
-          price: "670 USD",
-        },
-      };
-
-      const selectedUpgrade = data.granTourUpgrade
-        ? upgradeOptions[data.granTourUpgrade]
-        : undefined;
-
-      if (selectedUpgrade) {
-        const boxHeight = 70;
-
-        // Draw purple background box with thicker border
-        doc
-          .rect(leftMargin, boxY, contentWidth, boxHeight)
-          .lineWidth(3)
-          .fillAndStroke(boxColor, borderColor);
-
-        // Title
-        doc.font("Helvetica-Bold").fontSize(12).fillColor(boxTextColor);
-        doc.text(
-          "MEJORA GRAN TOUR INCLUIDA EN ESTA COTIZACIÓN:",
-          leftMargin + boxPadding,
-          boxY + boxPadding,
-          { width: contentWidth - boxPadding * 2 },
-        );
-
-        doc.moveDown(0.5);
-
-        // Description
-        doc.font("Helvetica").fontSize(10).fillColor(boxTextColor);
-        doc.text(
-          `• ${selectedUpgrade.description}`,
-          leftMargin + boxPadding,
-          doc.y,
-          { width: contentWidth - boxPadding * 2 },
-        );
-
-        doc.y = boxY + boxHeight + 10;
-      }
     }
 
     doc.moveDown(1);

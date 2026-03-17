@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
+import { prefetchRoute } from "@/lib/route-prefetch";
 import {
   Sidebar,
   SidebarCollapseArrow,
@@ -261,6 +262,14 @@ export function AppSidebar() {
   const [location, navigate] = useLocation();
   const { state, isMobile } = useSidebar();
 
+  // Prefetch rutas en segundo plano tras cargar (no compite con la carga inicial)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      ["/", "/admin/dashboard", "/admin/plans", "/admin/clients", "/admin/users", "/advisor", "/cotizacion", "/cotizacion-express"].forEach(prefetchRoute);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, []);
+
   const handleLogout = async () => {
     await logout();
     navigate("/login");
@@ -307,7 +316,7 @@ export function AppSidebar() {
           data-testid={`sidebar-${item.title.toLowerCase().replace(/ /g, "-")}`}
           className="rounded-lg px-3 py-2.5 text-[13px] data-[active=true]:font-medium [&>svg]:opacity-70 [&>svg]:size-[18px] [&>svg]:shrink-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&_span]:hidden"
         >
-          <Link href={item.url} className="flex items-center gap-3 [&>svg]:transition-all [&>svg]:duration-300 group-data-[collapsible=icon]:gap-0">
+          <Link href={item.url} className="flex items-center gap-3 [&>svg]:transition-all [&>svg]:duration-300 group-data-[collapsible=icon]:gap-0" onMouseEnter={() => prefetchRoute(item.url)}>
             <item.icon />
             <span>{item.title}</span>
           </Link>

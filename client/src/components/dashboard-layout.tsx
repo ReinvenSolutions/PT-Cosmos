@@ -1,27 +1,14 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useAuth } from "@/contexts/AuthContext";
-import { Redirect, useLocation } from "wouter";
+import { useLocation } from "wouter";
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
 }
 
+/** Solo se usa dentro de ProtectedRoute, que ya verificó auth. */
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-    const { user, isLoading } = useAuth();
     const [location] = useLocation();
-
-    if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <p>Cargando...</p>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return <Redirect to="/login" />;
-    }
 
     const isQuoteExpress = location === "/cotizacion-express";
     const isFullWidthPage = location === "/" || location === "/cotizacion" || location === "/cotizacion-express";

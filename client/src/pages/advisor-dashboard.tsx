@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { prefetchRoute } from "@/lib/route-prefetch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Plus, FileText, Trash2, Search, Edit } from "lucide-react";
@@ -21,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Quote {
   id: string;
@@ -119,7 +121,28 @@ export default function AdvisorDashboard() {
             )}
 
             {isLoading ? (
-              <p>Cargando cotizaciones...</p>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((i) => (
+                  <Card key={i}>
+                    <CardHeader>
+                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-4 w-1/2 mt-2" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3" />
+                        <Skeleton className="h-4 w-1/2" />
+                        <div className="flex gap-2 mt-4">
+                          <Skeleton className="h-9 flex-1" />
+                          <Skeleton className="h-9 w-9" />
+                          <Skeleton className="h-9 w-9" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             ) : filteredQuotes.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredQuotes.map((quote) => (
@@ -147,7 +170,7 @@ export default function AdvisorDashboard() {
                           </span>
                         </div>
                         <div className="flex gap-2 mt-2">
-                          <Link href={`/advisor/quotes/${quote.id}`} className="flex-1">
+                          <Link href={`/advisor/quotes/${quote.id}`} className="flex-1" onMouseEnter={() => prefetchRoute(`/advisor/quotes/${quote.id}`)}>
                             <Button
                               variant="outline"
                               size="sm"
@@ -158,7 +181,7 @@ export default function AdvisorDashboard() {
                               Ver Detalles
                             </Button>
                           </Link>
-                          <Link href={`/advisor/quotes/${quote.id}/edit`}>
+                          <Link href={`/advisor/quotes/${quote.id}/edit`} onMouseEnter={() => prefetchRoute(`/advisor/quotes/${quote.id}/edit`)}>
                             <Button
                               variant="outline"
                               size="sm"

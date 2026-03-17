@@ -27,6 +27,7 @@ export interface CreateQuoteInput {
   turkeyUpgrade?: string | null;
   italiaUpgrade?: string | null;
   granTourUpgrade?: string | null;
+  selectedUpgrades?: Record<string, string> | null;
   trm?: number | string | null;
   customFilename?: string | null;
   minPayment?: number | string | null;

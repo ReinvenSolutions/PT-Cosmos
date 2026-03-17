@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Router, Switch, Route, Redirect } from "wouter";
+import { Loader2 } from "lucide-react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +8,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/dashboard-layout";
+
+const RouteLoadingFallback = () => (
+  <div className="min-h-[40vh] flex items-center justify-center" aria-label="Cargando sección">
+    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+  </div>
+);
 
 const Login = lazy(() => import("@/pages/login"));
 const Register = lazy(() => import("@/pages/register"));
@@ -36,8 +43,8 @@ function ProtectedRoute({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Cargando...</p>
+      <div className="min-h-screen flex items-center justify-center" aria-label="Verificando sesión">
+        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -52,7 +59,7 @@ function ProtectedRoute({
 
   return (
     <DashboardLayout>
-      <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>}>
+      <Suspense fallback={<RouteLoadingFallback />}>
         <Component />
       </Suspense>
     </DashboardLayout>
@@ -64,8 +71,8 @@ function DashboardRedirect() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Cargando...</p>
+      <div className="min-h-screen flex items-center justify-center" aria-label="Verificando sesión">
+        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -86,7 +93,7 @@ function DashboardRedirect() {
 function AppRoutes() {
   return (
     <Router>
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" aria-label="Cargando"><Loader2 className="h-10 w-10 animate-spin text-muted-foreground" /></div>}>
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />

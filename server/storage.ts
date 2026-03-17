@@ -35,12 +35,13 @@ import {
   type InsertQuoteLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, or, sql, desc, count } from "drizzle-orm";
+import { eq, or, sql, desc, count, inArray } from "drizzle-orm";
 import { logger } from "./logger";
 
 export interface IStorage {
   getDestinations(params?: { isActive?: boolean }): Promise<Destination[]>;
   getDestination(id: string): Promise<Destination | undefined>;
+  getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<Array<Destination & { hotels: Hotel[]; itinerary: ItineraryDay[] }>>;
   createDestination(data: InsertDestination): Promise<Destination>;
   updateDestination(id: string, data: Partial<InsertDestination>): Promise<Destination>;
   deleteDestination(id: string): Promise<void>;
@@ -140,6 +141,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(destinations.id, id))
       .limit(1);
     return result[0];
+  }
+
+  /** Destinos activos con hoteles e itinerario en una sola operación (evita N+1 requests) */
+  async getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<
+    Array<Destination & { hotels: Hotel[]; itinerary: ItineraryDay[] }>
+  > {
+    const dests = await this.getDestinations(params ?? { isActive: true });
+    if (dests.length === 0) return [];
+
+    const ids = dests.map((d) => d.id);
+    const [allHotels, allItinerary] = await Promise.all([
+      db.select().from(hotels).where(inArray(hotels.destinationId, ids)),
+      db.select().from(itineraryDays).where(inArray(itineraryDays.destinationId, ids)).orderBy(itineraryDays.dayNumber),
+    ]);
+
+    const hotelsByDest = new Map<string, Hotel[]>();
+    for (const h of allHotels) {
+      const list = hotelsByDest.get(h.destinationId) ?? [];
+      list.push(h);
+      hotelsByDest.set(h.destinationId, list);
+    }
+
+    const itineraryByDest = new Map<string, ItineraryDay[]>();
+    for (const d of allItinerary) {
+      const list = itineraryByDest.get(d.destinationId) ?? [];
+      list.push(d);
+      itineraryByDest.set(d.destinationId, list);
+    }
+
+    return dests.map((dest) => ({
+      ...dest,
+      hotels: hotelsByDest.get(dest.id) ?? [],
+      itinerary: itineraryByDest.get(dest.id) ?? [],
+    }));
   }
 
   async getItineraryDays(destinationId: string): Promise<ItineraryDay[]> {
@@ -680,6 +715,7 @@ export class DatabaseStorage implements IStorage {
         turkeyUpgrade: quotes.turkeyUpgrade,
         italiaUpgrade: quotes.italiaUpgrade,
         granTourUpgrade: quotes.granTourUpgrade,
+        selectedUpgrades: quotes.selectedUpgrades,
         trm: quotes.trm,
         customFilename: quotes.customFilename,
         minPayment: quotes.minPayment,
@@ -738,6 +774,7 @@ export class DatabaseStorage implements IStorage {
       turkeyUpgrade: quoteResult[0].turkeyUpgrade,
       italiaUpgrade: quoteResult[0].italiaUpgrade,
       granTourUpgrade: quoteResult[0].granTourUpgrade,
+      selectedUpgrades: quoteResult[0].selectedUpgrades as Record<string, string> | null,
       trm: quoteResult[0].trm,
       customFilename: quoteResult[0].customFilename,
       minPayment: quoteResult[0].minPayment,

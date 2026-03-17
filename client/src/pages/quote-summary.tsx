@@ -20,6 +20,8 @@ import {
 import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane, MessageCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
+import { OptimizedImage } from "@/components/optimized-image";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { DatePicker } from "@/components/ui/date-picker";
 import { isTuesday } from "date-fns";
@@ -82,6 +84,7 @@ export default function QuoteSummary() {
   const [turkeyUpgrade, setTurkeyUpgrade] = useState<string>("");
   const [italiaUpgrade, setItaliaUpgrade] = useState<string>("");
   const [granTourUpgrade, setGranTourUpgrade] = useState<string>("");
+  const [otherDestUpgrades, setOtherDestUpgrades] = useState<Record<string, string>>({});
   const [trm, setTrm] = useState("");
   const [finalPrice, setFinalPrice] = useState("");
   const [minPayment, setMinPayment] = useState("");
@@ -96,11 +99,11 @@ export default function QuoteSummary() {
   const [newClientEmail, setNewClientEmail] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
 
-  const { data: destinations = [] } = useQuery<Destination[]>({
+  const { data: destinations = [], isLoading: destinationsLoading } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
   });
 
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/admin/clients"],
   });
 
@@ -207,12 +210,23 @@ export default function QuoteSummary() {
     (selectedDestinations.length >= 2 && selectedDests.some((d) => d.hasInternalOrConnectionFlight)) ||
     (hasTurkey && hasDubaiOrEmirates);
 
+  const turkeyDestination = selectedDests.find((d) => d.name === "Turquía Esencial");
+  const turkeyUpgrades = turkeyDestination?.upgrades || [];
+
   const hasItaliaTuristica = selectedDests.some((d) => d.name === "Italia Turística - Euro Express");
   const italiaDestination = selectedDests.find((d) => d.name === "Italia Turística - Euro Express");
   const italiaUpgrades = italiaDestination?.upgrades || [];
 
   const granTourDestination = selectedDests.find((d) => d.name === "Gran Tour de Europa");
   const granTourUpgrades = granTourDestination?.upgrades || [];
+
+  const destsWithUpgradesOther = selectedDests.filter(
+    (d) =>
+      (d.upgrades?.length || 0) > 0 &&
+      d.name !== "Turquía Esencial" &&
+      d.name !== "Italia Turística - Euro Express" &&
+      d.name !== "Gran Tour de Europa"
+  );
 
   const hasAllowedDaysRestriction = selectedDests.some((d) => d.allowedDays && d.allowedDays.length > 0);
   const allowedDaysDestination = selectedDests.find((d) => d.allowedDays && d.allowedDays.length > 0);
@@ -283,21 +297,8 @@ export default function QuoteSummary() {
   const calculateEndDate = (): string => {
     if (!startDate || selectedDests.length === 0) return "";
 
-    // Sumar todas las duraciones base
     let totalDuration = selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0);
-
-    // Verificar si hay destinos internacionales que requieren día extra
-    // Perú NO requiere día extra (vuelo corto desde Colombia)
-    const requiresExtraDay = selectedDests.some(dest => {
-      const country = dest.country?.toLowerCase() || "";
-      return country !== "colombia" && country !== "perú" && country !== "peru";
-    });
-
-    // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
-    if (requiresExtraDay) {
-      totalDuration += 1;
-    }
-
+    if (selectedDests.some((d) => (d as { requiresExtraDay?: boolean }).requiresExtraDay === true)) totalDuration += 1;
     if (totalDuration === 0) return "";
 
     // Convert startDate to YYYY-MM-DD string to avoid timezone issues
@@ -319,26 +320,11 @@ export default function QuoteSummary() {
 
   const endDate = calculateEndDate();
 
-  // Calculate display duration (same logic as calculateEndDate but returning number)
   const calculateDisplayDuration = (): number => {
     if (!startDate || selectedDests.length === 0) return 0;
-
-    // Sumar todas las duraciones base
-    let totalDuration = selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0);
-
-    // Verificar si hay destinos internacionales que requieren día extra
-    // Perú NO requiere día extra (vuelo corto desde Colombia)
-    const requiresExtraDay = selectedDests.some(dest => {
-      const country = dest.country?.toLowerCase() || "";
-      return country !== "colombia" && country !== "perú" && country !== "peru";
-    });
-
-    // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
-    if (requiresExtraDay) {
-      totalDuration += 1;
-    }
-
-    return totalDuration;
+    let total = selectedDests.reduce((sum, dest) => sum + (dest.duration || 0), 0);
+    if (selectedDests.some((d) => (d as { requiresExtraDay?: boolean }).requiresExtraDay === true)) total += 1;
+    return total;
   };
 
   const displayDuration = calculateDisplayDuration();
@@ -437,6 +423,10 @@ export default function QuoteSummary() {
 
   const getTurkeyUpgradeCost = () => {
     if (!hasTurkeyEsencial || !turkeyUpgrade) return 0;
+    if (turkeyUpgrades.length > 0) {
+      const upgrade = turkeyUpgrades.find((u) => u.code === turkeyUpgrade);
+      return upgrade ? Number(upgrade.price) : 0;
+    }
     if (turkeyUpgrade === "option1") return 500;
     if (turkeyUpgrade === "option2") return 770;
     if (turkeyUpgrade === "option3") return 1100;
@@ -455,10 +445,19 @@ export default function QuoteSummary() {
     return upgrade ? Number(upgrade.price) : 0;
   };
 
+  const getOtherUpgradesCost = () =>
+    destsWithUpgradesOther.reduce((sum, d) => {
+      const code = otherDestUpgrades[d.id];
+      if (!code) return sum;
+      const u = d.upgrades?.find((x) => x.code === code);
+      return sum + (u ? Number(u.price) : 0);
+    }, 0);
+
   const turkeyUpgradeCost = getTurkeyUpgradeCost();
   const italiaUpgradeCost = getItaliaUpgradeCost();
   const granTourUpgradeCost = getGranTourUpgradeCost();
-  const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost;
+  const otherUpgradesCost = getOtherUpgradesCost();
+  const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost + otherUpgradesCost;
 
   const grandTotalCOP = effectiveTrm > 0 ? grandTotal * effectiveTrm : 0;
 
@@ -469,7 +468,7 @@ export default function QuoteSummary() {
   // Calculate default minimum payment
   // Formula: (Flights + Assistance) + (30% of (Land Portion + Upgrade)) + 200 USD
   const calculateDefaultMinPayment = () => {
-    const landPortionWithUpgrade = landPortionTotal + turkeyUpgradeCost;
+    const landPortionWithUpgrade = landPortionTotal + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost + otherUpgradesCost;
     const thirtyPercentLand = landPortionWithUpgrade * 0.30;
     const baseMinPaymentUSD = flightsAndExtrasValue + thirtyPercentLand + 200;
 
@@ -706,6 +705,13 @@ export default function QuoteSummary() {
       turkeyUpgrade: turkeyUpgrade || null,
       italiaUpgrade: italiaUpgrade || null,
       granTourUpgrade: granTourUpgrade || null,
+      selectedUpgrades: (() => {
+        const map: Record<string, string> = { ...otherDestUpgrades };
+        if (turkeyDestination && turkeyUpgrade) map[turkeyDestination.id] = turkeyUpgrade;
+        if (italiaDestination && italiaUpgrade) map[italiaDestination.id] = italiaUpgrade;
+        if (granTourDestination && granTourUpgrade) map[granTourDestination.id] = granTourUpgrade;
+        return Object.keys(map).length > 0 ? map : undefined;
+      })(),
       trm: effectiveTrm > 0 ? effectiveTrm : null,
       customFilename: customFilename.trim() || null,
       minPayment: payloadMinPayment,
@@ -863,6 +869,13 @@ export default function QuoteSummary() {
           turkeyUpgrade: turkeyUpgrade || null,
           italiaUpgrade: italiaUpgrade || null,
           granTourUpgrade: granTourUpgrade || null,
+          selectedUpgrades: (() => {
+            const map: Record<string, string> = { ...otherDestUpgrades };
+            if (turkeyDestination && turkeyUpgrade) map[turkeyDestination.id] = turkeyUpgrade;
+            if (italiaDestination && italiaUpgrade) map[italiaDestination.id] = italiaUpgrade;
+            if (granTourDestination && granTourUpgrade) map[granTourDestination.id] = granTourUpgrade;
+            return Object.keys(map).length > 0 ? map : undefined;
+          })(),
           trm: effectiveTrm > 0 ? effectiveTrm : null,
           grandTotalCOP: effectiveTrm > 0 ? grandTotalCOP : null,
           finalPrice: payloadFinalPrice,
@@ -963,7 +976,19 @@ export default function QuoteSummary() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {selectedDests.map((dest) => {
+              {destinationsLoading ? (
+                Array.from({ length: Math.min(selectedDestinations.length || 1, 3) }).map((_, i) => (
+                  <div key={i} className="flex gap-4 p-3 bg-accent/50 rounded-lg border border-border">
+                    <Skeleton className="w-32 h-24 flex-shrink-0 rounded-md" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-6 w-20 mt-2" />
+                    </div>
+                  </div>
+                ))
+              ) : (
+              selectedDests.map((dest) => {
                 const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
                 const imageUrl = getDestinationImage(dest);
 
@@ -971,10 +996,11 @@ export default function QuoteSummary() {
                   <div key={dest.id} className="flex gap-4 p-3 bg-accent/50 rounded-lg border border-border">
                     {imageUrl && (
                       <div className="w-32 h-24 flex-shrink-0 rounded-md overflow-hidden">
-                        <img
+                        <OptimizedImage
                           src={imageUrl}
                           alt={dest.name}
-                          className="w-full h-full object-cover"
+                          containerClassName="w-full h-full"
+                          imageClassName="object-cover"
                         />
                       </div>
                     )}
@@ -1000,7 +1026,8 @@ export default function QuoteSummary() {
                     </div>
                   </div>
                 );
-              })}
+              })
+              )}
 
               <div className="border-t border-border pt-3 mt-3">
                 <div className="flex justify-between items-center text-lg font-semibold">
@@ -1112,7 +1139,7 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        {hasTurkeyEsencial && (
+        {hasTurkeyEsencial && (turkeyUpgrades.length > 0 ? (
           <Card className="mb-6 border-orange-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-price-accent">
@@ -1121,7 +1148,49 @@ export default function QuoteSummary() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Selecciona una opción para mejorar tu experiencia en Turquía:
+              </p>
+              <div className="space-y-3">
+                {turkeyUpgrades.map((upgrade) => (
+                  <div key={upgrade.code} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                    <Checkbox
+                      id={`upgrade-${upgrade.code}`}
+                      checked={turkeyUpgrade === upgrade.code}
+                      onCheckedChange={(checked) => setTurkeyUpgrade(checked ? upgrade.code : "")}
+                      data-testid={`checkbox-upgrade-${upgrade.code}`}
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`upgrade-${upgrade.code}`} className="font-semibold cursor-pointer">
+                        + {formatUSD(Number(upgrade.price))} USD
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium">{upgrade.name}</span>
+                        {upgrade.description && ` - ${upgrade.description}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {turkeyUpgrade && (
+                <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-950/40 rounded-lg border border-orange-200 dark:border-orange-700/50">
+                  <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">
+                    Mejora seleccionada: +US$ {formatUSD(turkeyUpgradeCost)}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="mb-6 border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-price-accent">
+                <Star className="w-5 h-5" />
+                Mejora tu Plan Turquía Esencial
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
                 Selecciona una opción para mejorar tu experiencia en Turquía:
               </p>
               <div className="space-y-3">
@@ -1133,13 +1202,10 @@ export default function QuoteSummary() {
                     data-testid="checkbox-upgrade-option1"
                   />
                   <div className="flex-1">
-                    <label htmlFor="upgrade-option1" className="font-semibold cursor-pointer">
-                      + 500 USD
-                    </label>
-                    <p className="text-sm text-gray-600">8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
+                    <label htmlFor="upgrade-option1" className="font-semibold cursor-pointer">+ 500 USD</label>
+                    <p className="text-sm text-muted-foreground">8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                   </div>
                 </div>
-
                 <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
                   <Checkbox
                     id="upgrade-option2"
@@ -1148,13 +1214,10 @@ export default function QuoteSummary() {
                     data-testid="checkbox-upgrade-option2"
                   />
                   <div className="flex-1">
-                    <label htmlFor="upgrade-option2" className="font-semibold cursor-pointer">
-                      + 770 USD
-                    </label>
-                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
+                    <label htmlFor="upgrade-option2" className="font-semibold cursor-pointer">+ 770 USD</label>
+                    <p className="text-sm text-muted-foreground">Hotel céntrico Estambul + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                   </div>
                 </div>
-
                 <div className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
                   <Checkbox
                     id="upgrade-option3"
@@ -1163,23 +1226,21 @@ export default function QuoteSummary() {
                     data-testid="checkbox-upgrade-option3"
                   />
                   <div className="flex-1">
-                    <label htmlFor="upgrade-option3" className="font-semibold cursor-pointer">
-                      + 1,100 USD
-                    </label>
-                    <p className="text-sm text-gray-600">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
+                    <label htmlFor="upgrade-option3" className="font-semibold cursor-pointer">+ 1,100 USD</label>
+                    <p className="text-sm text-muted-foreground">Hotel céntrico Estambul + Hotel cueva Capadocia + 8 almuerzos + Tour por el Bósforo + Tour Estambul Clásico</p>
                   </div>
                 </div>
               </div>
               {turkeyUpgrade && (
-                <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm font-semibold text-orange-700">
+                <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-950/40 rounded-lg border border-orange-200 dark:border-orange-700/50">
+                  <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">
                     Mejora seleccionada: +US$ {formatUSD(turkeyUpgradeCost)}
                   </p>
                 </div>
               )}
             </CardContent>
           </Card>
-        )}
+        ))}
 
         {hasItaliaTuristica && italiaUpgrades.length > 0 && (
           <Card className="mb-6 border-primary/30">
@@ -1190,7 +1251,7 @@ export default function QuoteSummary() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Selecciona una opción para mejorar tu experiencia en Italia:
               </p>
               <div className="space-y-3">
@@ -1205,7 +1266,7 @@ export default function QuoteSummary() {
                       <label htmlFor={`upgrade-${upgrade.code}`} className="font-semibold cursor-pointer">
                         + {formatUSD(Number(upgrade.price))} USD
                       </label>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         <span className="font-medium">{upgrade.name}</span>
                         {upgrade.description && ` - ${upgrade.description}`}
                       </p>
@@ -1224,6 +1285,54 @@ export default function QuoteSummary() {
           </Card>
         )}
 
+        {destsWithUpgradesOther.map((dest) => (
+          <Card key={dest.id} className="mb-6 border-primary/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <Star className="w-5 h-5" />
+                Mejora tu Plan {dest.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Selecciona una opción para mejorar tu experiencia:
+              </p>
+              <div className="space-y-3">
+                {dest.upgrades?.map((upgrade) => (
+                  <div key={upgrade.code} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover-elevate">
+                    <Checkbox
+                      id={`upgrade-${dest.id}-${upgrade.code}`}
+                      checked={otherDestUpgrades[dest.id] === upgrade.code}
+                      onCheckedChange={(checked) =>
+                        setOtherDestUpgrades((prev) => ({
+                          ...prev,
+                          [dest.id]: checked ? upgrade.code : "",
+                        }))
+                      }
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`upgrade-${dest.id}-${upgrade.code}`} className="font-semibold cursor-pointer">
+                        + {formatUSD(Number(upgrade.price))} USD
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium">{upgrade.name}</span>
+                        {upgrade.description && ` - ${upgrade.description}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {otherDestUpgrades[dest.id] && (
+                <div className="mt-4 p-3 bg-accent rounded-lg border border-border">
+                  <p className="text-sm font-semibold text-accent-foreground">
+                    Mejora seleccionada: +US$ {formatUSD(Number(dest.upgrades?.find((u) => u.code === otherDestUpgrades[dest.id])?.price) || 0)}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+
         {hasGranTourEuropa && granTourUpgrades.length > 0 && (
           <Card className="mb-6 border-purple-200">
             <CardHeader>
@@ -1233,7 +1342,7 @@ export default function QuoteSummary() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Selecciona una opción para mejorar tu experiencia en Europa:
               </p>
               <div className="space-y-3">
@@ -1248,7 +1357,7 @@ export default function QuoteSummary() {
                       <label htmlFor={`grantour-upgrade-${upgrade.code}`} className="font-semibold cursor-pointer">
                         + {formatUSD(Number(upgrade.price))} USD
                       </label>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         <span className="font-medium">{upgrade.name}</span>
                         {upgrade.description && ` - ${upgrade.description}`}
                       </p>
@@ -1257,8 +1366,8 @@ export default function QuoteSummary() {
                 ))}
               </div>
               {granTourUpgrade && (
-                <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <p className="text-sm font-semibold text-purple-700">
+                <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-950/40 rounded-lg border border-purple-200 dark:border-purple-700/50">
+                  <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">
                     Mejora seleccionada: +US$ {formatUSD(granTourUpgradeCost)}
                   </p>
                 </div>
@@ -1275,7 +1384,7 @@ export default function QuoteSummary() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Ingresa las ciudades de origen y retorno (ejemplo: MED - BOG - PEI)
             </p>
             <Input
@@ -1305,7 +1414,7 @@ export default function QuoteSummary() {
             />
 
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+              <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -1325,11 +1434,11 @@ export default function QuoteSummary() {
                     onCheckedChange={(checked) => setOutboundHoldBaggage(checked as boolean)}
                     data-testid="checkbox-outbound-hold"
                   />
-                  <Label htmlFor="outbound-hold" className="cursor-pointer">
-                    Equipaje de bodega 23kg
-                  </Label>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+                    <Label htmlFor="outbound-hold" className="cursor-pointer">
+                      Equipaje de bodega 23kg
+                    </Label>
+                  </div>
+                <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
               </div>
             </div>
           </CardContent>
@@ -1337,9 +1446,9 @@ export default function QuoteSummary() {
 
         {/* Domestic Flight Card - For single plan with internal/connection flight flag */}
         {selectedDestinations.length === 1 && selectedDests[0]?.hasInternalOrConnectionFlight && (
-          <Card className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+          <Card className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 dark:from-purple-950/50 dark:to-indigo-950/50 dark:border-purple-700/60">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 <Plane className="w-5 h-5" />
                 Vuelo Interno
               </CardTitle>
@@ -1355,8 +1464,8 @@ export default function QuoteSummary() {
                 inputId="domestic-flight-images"
               />
 
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+              <div className="mt-4 pt-4 border-t border-purple-200/60 dark:border-purple-700/40">
+                <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -1380,7 +1489,7 @@ export default function QuoteSummary() {
                       Equipaje de bodega 23kg
                     </Label>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+                  <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
                 </div>
               </div>
             </CardContent>
@@ -1389,9 +1498,9 @@ export default function QuoteSummary() {
 
         {/* Connection Flight Card - For Turkey + Dubai/Emirates combinations */}
         {showConnectionFlight && (
-          <Card className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
+          <Card className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200 dark:from-orange-950/50 dark:to-amber-950/50 dark:border-orange-700/60">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 <Plane className="w-5 h-5" />
                 Vuelo de Conexión entre Destinos
               </CardTitle>
@@ -1407,8 +1516,8 @@ export default function QuoteSummary() {
                 inputId="connection-flight-images"
               />
 
-              <div className="mt-4 pt-4 border-t border-orange-200">
-                <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+              <div className="mt-4 pt-4 border-t border-orange-200/60 dark:border-orange-700/40">
+                <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -1432,7 +1541,7 @@ export default function QuoteSummary() {
                       Equipaje de bodega 23kg
                     </Label>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+                  <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
                 </div>
               </div>
             </CardContent>
@@ -1455,7 +1564,7 @@ export default function QuoteSummary() {
             />
 
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Equipajes Incluidos:</p>
+              <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -1475,29 +1584,29 @@ export default function QuoteSummary() {
                     onCheckedChange={(checked) => setReturnHoldBaggage(checked as boolean)}
                     data-testid="checkbox-return-hold"
                   />
-                  <Label htmlFor="return-hold" className="cursor-pointer">
-                    Equipaje de bodega 23kg
-                  </Label>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">* Personal 8kg siempre está incluido</p>
+                    <Label htmlFor="return-hold" className="cursor-pointer">
+                      Equipaje de bodega 23kg
+                    </Label>
+                  </div>
+                <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+        <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-950/50 dark:to-emerald-950/50 dark:border-green-700/60">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <DollarSign className="w-5 h-5" />
               TRM - Tasa Representativa del Mercado + 30 COP
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Ingresa la TRM para convertir el total de USD a COP (Pesos Colombianos) el sistema sumara 30 COP automaticamente.
             </p>
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg font-semibold text-gray-700">$</span>
+              <span className="text-lg font-semibold text-foreground">$</span>
               <Input
                 type="text"
                 placeholder="0.00"
@@ -1510,9 +1619,9 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+        <Card className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200 dark:from-orange-950/50 dark:to-amber-950/50 dark:border-orange-700/60">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between text-foreground">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5" />
                 Vuelos y Asistencia
@@ -1520,7 +1629,7 @@ export default function QuoteSummary() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Ingresa los valores. El sistema calculará el total.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1530,7 +1639,7 @@ export default function QuoteSummary() {
                   {trmValue > 0 ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-gray-700 hover:bg-gray-100">
+                        <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
                           {inputCurrencyFlights === "USD" ? "US$" : "COP$"}
                           <ChevronDown className="w-4 h-4 ml-1 opacity-50" />
                         </Button>
@@ -1541,7 +1650,7 @@ export default function QuoteSummary() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
-                    <span className="text-lg font-semibold text-gray-700 px-2">US$</span>
+                    <span className="text-lg font-semibold text-foreground px-2">US$</span>
                   )}
                   <Input
                     type="text"
@@ -1552,7 +1661,7 @@ export default function QuoteSummary() {
                   />
                 </div>
                 {effectiveTrm > 0 && (
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-muted-foreground">
                     {inputCurrencyFlights === "USD"
                       ? `$ ${(getUSDValue(flightsCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
                       : `US$ ${getUSDValue(flightsCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -1566,7 +1675,7 @@ export default function QuoteSummary() {
                   {trmValue > 0 ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-gray-700 hover:bg-gray-100">
+                        <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
                           {inputCurrencyAssistance === "USD" ? "US$" : "COP$"}
                           <ChevronDown className="w-4 h-4 ml-1 opacity-50" />
                         </Button>
@@ -1577,7 +1686,7 @@ export default function QuoteSummary() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
-                    <span className="text-lg font-semibold text-gray-700 px-2">US$</span>
+                    <span className="text-lg font-semibold text-foreground px-2">US$</span>
                   )}
                   <Input
                     type="text"
@@ -1588,7 +1697,7 @@ export default function QuoteSummary() {
                   />
                 </div>
                 {effectiveTrm > 0 && (
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-muted-foreground">
                     {inputCurrencyAssistance === "USD"
                       ? `$ ${(getUSDValue(assistanceCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
                       : `US$ ${getUSDValue(assistanceCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -1598,12 +1707,12 @@ export default function QuoteSummary() {
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-orange-200 flex justify-between items-center">
-              <span className="font-semibold text-gray-700">Total Vuelos y Asistencia:</span>
+            <div className="mt-4 pt-4 border-t border-orange-200/60 dark:border-orange-700/40 flex justify-between items-center">
+              <span className="font-semibold text-foreground">Total Vuelos y Asistencia:</span>
               <div className="text-right">
-                <span className="text-xl font-bold text-orange-700 block">US$ {formatUSD(flightsAndExtrasValue)}</span>
+                <span className="text-xl font-bold text-orange-700 dark:text-orange-400 block">US$ {formatUSD(flightsAndExtrasValue)}</span>
                 {effectiveTrm > 0 && (
-                  <span className="text-sm font-semibold text-orange-600 block">
+                  <span className="text-sm font-semibold text-orange-600 dark:text-orange-300 block">
                     $ {(flightsAndExtrasValue * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                   </span>
                 )}
@@ -1612,14 +1721,14 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-8 bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0">
+        <Card className="mb-8 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-800 dark:to-blue-900 text-white border-0">
           <CardContent className="p-6">
             <div className="flex justify-between items-center">
               <div>
                 <div className="text-sm opacity-90 mb-1">Subtotal o costo Neto</div>
                 {effectiveTrm > 0 ? (
                   <>
-                    <div className="text-4xl font-extrabold text-green-100">
+                    <div className="text-4xl font-extrabold text-green-100 dark:text-green-200">
                       $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                     </div>
                     <div className="text-xl font-bold opacity-75 mt-1">
@@ -1634,9 +1743,10 @@ export default function QuoteSummary() {
               </div>
               <div className="text-right text-sm opacity-90">
                 <div>Porciones Terrestres: US$ {formatUSD(landPortionTotal)}</div>
-                {turkeyUpgradeCost > 0 && (
-                  <div>Mejora Turquía: US$ {formatUSD(turkeyUpgradeCost)}</div>
-                )}
+                {turkeyUpgradeCost > 0 && <div>Mejora Turquía: US$ {formatUSD(turkeyUpgradeCost)}</div>}
+                {italiaUpgradeCost > 0 && <div>Mejora Italia: US$ {formatUSD(italiaUpgradeCost)}</div>}
+                {granTourUpgradeCost > 0 && <div>Mejora Gran Tour: US$ {formatUSD(granTourUpgradeCost)}</div>}
+                {otherUpgradesCost > 0 && <div>Otras mejoras: US$ {formatUSD(otherUpgradesCost)}</div>}
                 <div>Vuelos y Asistencia: US$ {formatUSD(flightsAndExtrasValue)}</div>
                 {effectiveTrm > 0 && (
                   <div className="text-xs mt-1 opacity-75">
@@ -1648,9 +1758,9 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+        <Card className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 dark:from-purple-950/50 dark:to-pink-950/50 dark:border-purple-700/60">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between text-foreground">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5" />
                 Precio Final de Venta PVP
@@ -1658,14 +1768,14 @@ export default function QuoteSummary() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Ingresa el precio final que verá el cliente en el PDF.
             </p>
             <div className="flex items-center gap-2 mb-4">
               {trmValue > 0 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-gray-700 hover:bg-gray-100">
+                    <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
                       {inputCurrencyFinal === "USD" ? "US$" : "COP$"}
                       <ChevronDown className="w-4 h-4 ml-1 opacity-50" />
                     </Button>
@@ -1676,7 +1786,7 @@ export default function QuoteSummary() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <span className="text-lg font-semibold text-gray-700 px-2">US$</span>
+                <span className="text-lg font-semibold text-foreground px-2">US$</span>
               )}
               <Input
                 type="text"
@@ -1688,7 +1798,7 @@ export default function QuoteSummary() {
               />
             </div>
             {effectiveTrm > 0 && (
-              <div className="mb-4 text-lg font-bold text-purple-700">
+              <div className="mb-4 text-lg font-bold text-purple-700 dark:text-purple-300">
                 {inputCurrencyFinal === "USD"
                   ? `$ ${finalPriceCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
                   : `US$ ${finalPriceValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -1697,26 +1807,26 @@ export default function QuoteSummary() {
             )}
 
             {finalPriceValue > 0 && (
-              <div className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm">
+              <div className="p-4 bg-muted/30 dark:bg-muted/20 rounded-lg border border-purple-200/60 dark:border-purple-700/40 shadow-sm">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600">Costo Total (Neto):</span>
+                  <span className="text-muted-foreground">Costo Total (Neto):</span>
                   <div className="text-right">
-                    <span className="font-semibold block">US$ {formatUSD(grandTotal)}</span>
+                    <span className="font-semibold block text-foreground">US$ {formatUSD(grandTotal)}</span>
                     {effectiveTrm > 0 && (
-                      <span className="text-xs text-gray-500 block">
+                      <span className="text-xs text-muted-foreground block">
                         $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                  <span className="text-purple-700 font-bold">Cargo por Servicio:</span>
+                <div className="flex justify-between items-center pt-2 border-t border-border">
+                  <span className="text-purple-700 dark:text-purple-300 font-bold">Cargo por Servicio:</span>
                   <div className="text-right">
-                    <span className={`font-bold text-xl block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`font-bold text-xl block ${profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       US$ {formatUSD(profit)}
                     </span>
                     {effectiveTrm > 0 && (
-                      <span className={`text-sm font-semibold block ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`text-sm font-semibold block ${profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                         $ {(profit * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                       </span>
                     )}
@@ -1727,18 +1837,18 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
+        <Card className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200 dark:from-indigo-950/50 dark:to-blue-950/50 dark:border-indigo-700/60">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <DollarSign className="w-5 h-5" />
               Pago Mínimo para Separar
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Ingresa el valor mínimo para separar. Si se deja vacío, el sistema calculará automáticamente:
               <br />
-              <span className="text-xs italic">(Vuelos + Asistencia + 30% Porción Terrestre + 200 USD)</span>
+              <span className="text-xs italic text-muted-foreground">(Vuelos + Asistencia + 30% Porción Terrestre + 200 USD)</span>
             </p>
 
             <div className="flex flex-wrap gap-2 mb-3">
@@ -1746,7 +1856,7 @@ export default function QuoteSummary() {
                 variant="outline"
                 size="sm"
                 onClick={() => handlePercentageClick(60)}
-                className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+                className="bg-background hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/60"
               >
                 60% del PVP
               </Button>
@@ -1754,7 +1864,7 @@ export default function QuoteSummary() {
                 variant="outline"
                 size="sm"
                 onClick={() => handlePercentageClick(70)}
-                className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+                className="bg-background hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/60"
               >
                 70% del PVP
               </Button>
@@ -1762,14 +1872,14 @@ export default function QuoteSummary() {
                 variant="outline"
                 size="sm"
                 onClick={() => handlePercentageClick(100)}
-                className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+                className="bg-background hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/60"
               >
                 100% del PVP
               </Button>
             </div>
 
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg font-semibold text-gray-700 px-2">
+              <span className="text-lg font-semibold text-foreground px-2">
                 {inputCurrencyFinal === "USD" ? "US$" : "COP$"}
               </span>
               <Input
@@ -1786,7 +1896,7 @@ export default function QuoteSummary() {
             </div>
 
             {effectiveTrm > 0 && (
-              <div className="text-sm text-indigo-700 font-medium">
+              <div className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
                 {minPayment ? (
                   // Show conversion of manual input
                   inputCurrencyFinal === "USD"
@@ -1803,15 +1913,15 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200">
+        <Card className="mb-6 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 dark:from-slate-900/50 dark:to-slate-800/50 dark:border-slate-600/60">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <FileText className="w-5 h-5" />
               Nombre del Archivo
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Ingresa un nombre personalizado para el archivo PDF. Si se deja vacío, se usará el nombre por defecto.
             </p>
             <Input
