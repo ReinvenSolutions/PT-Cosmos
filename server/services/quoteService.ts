@@ -48,6 +48,7 @@ export class QuoteService {
       turkeyUpgrade: data.turkeyUpgrade || null,
       italiaUpgrade: data.italiaUpgrade || null,
       granTourUpgrade: data.granTourUpgrade || null,
+      selectedUpgrades: data.selectedUpgrades || null,
       trm: data.trm
         ? (typeof data.trm === "number" ? data.trm.toString() : data.trm)
         : null,
@@ -166,6 +167,9 @@ export class QuoteService {
     }
     if (data.granTourUpgrade !== undefined) {
       quoteData.granTourUpgrade = data.granTourUpgrade || null;
+    }
+    if (data.selectedUpgrades !== undefined) {
+      quoteData.selectedUpgrades = data.selectedUpgrades || null;
     }
     if (data.trm !== undefined) {
       quoteData.trm = data.trm

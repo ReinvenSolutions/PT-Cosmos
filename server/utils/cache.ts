@@ -14,6 +14,7 @@ export const cache = new NodeCache(cacheConfig);
 const CacheKeys = {
   destination: (id: string) => `destination:${id}`,
   destinations: (isActive?: boolean) => `destinations:${isActive ?? "all"}`,
+  destinationsPreviews: (isActive?: boolean) => `destinations-previews:${isActive ?? "all"}`,
   itinerary: (destinationId: string) => `itinerary:${destinationId}`,
   hotels: (destinationId: string) => `hotels:${destinationId}`,
   inclusions: (destinationId: string) => `inclusions:${destinationId}`,
@@ -50,4 +51,7 @@ export function clearDestinationCache(destinationId: string) {
   cache.del(CacheKeys.destinations(true));
   cache.del(CacheKeys.destinations(false));
   cache.del(CacheKeys.destinations());
+  cache.del(CacheKeys.destinationsPreviews(true));
+  cache.del(CacheKeys.destinationsPreviews(false));
+  cache.del(CacheKeys.destinationsPreviews());
 }

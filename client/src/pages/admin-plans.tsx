@@ -3,9 +3,10 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, Pencil, Trash2, Search, GripVertical } from "lucide-react";
+import { MapPin, Plus, Pencil, Trash2, Search, GripVertical, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useCallback } from "react";
+import { prefetchRoute } from "@/lib/route-prefetch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,11 +18,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { formatUSD } from "@shared/schema";
 import { getDestinationImage } from "@/lib/destination-images";
+import { OptimizedImage } from "@/components/optimized-image";
 import {
   DndContext,
   closestCenter,
@@ -69,12 +72,14 @@ function SortableRow({
   onDelete,
   onToggleActive,
   isSortable,
+  isToggling,
 }: {
   dest: Destination;
   onEdit: (id: string) => void;
   onDelete: (dest: Destination) => void;
   onToggleActive: (id: string, isActive: boolean) => void;
   isSortable: boolean;
+  isToggling: boolean;
 }) {
   const {
     attributes,
@@ -120,10 +125,11 @@ function SortableRow({
       </TableCell>
       <TableCell>
         {img ? (
-          <img
+          <OptimizedImage
             src={img}
             alt={dest.name}
-            className="h-12 w-12 object-cover rounded"
+            containerClassName="h-12 w-12 rounded overflow-hidden"
+            imageClassName="object-cover"
           />
         ) : (
           <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
@@ -138,16 +144,21 @@ function SortableRow({
         {dest.basePrice ? formatUSD(dest.basePrice) : "—"}
       </TableCell>
       <TableCell>
-        <Switch
-          checked={dest.isActive}
-          onCheckedChange={(checked) => onToggleActive(dest.id, checked)}
-        />
+        {isToggling ? (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Guardando..." />
+        ) : (
+          <Switch
+            checked={dest.isActive}
+            onCheckedChange={(checked) => onToggleActive(dest.id, checked)}
+          />
+        )}
       </TableCell>
       <TableCell className="text-right space-x-2">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => onEdit(dest.id)}
+          onMouseEnter={() => prefetchRoute(`/admin/plans/${dest.id}/edit`)}
         >
           <Pencil className="h-4 w-4 mr-1" />
           Editar
@@ -329,7 +340,7 @@ export default function AdminPlans() {
             Crea, edita y elimina planes turísticos. Los cambios se reflejan en el catálogo de cotizaciones.
           </p>
         </div>
-        <Button onClick={() => setLocation("/admin/plans/new")}>
+        <Button onClick={() => setLocation("/admin/plans/new")} onMouseEnter={() => prefetchRoute("/admin/plans/new")}>
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Plan
         </Button>
@@ -382,11 +393,20 @@ export default function AdminPlans() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      Cargando planes...
-                    </TableCell>
-                  </TableRow>
+                  <>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                        <TableCell><Skeleton className="h-12 w-12 rounded" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </>
                 ) : filteredPlans.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
@@ -406,6 +426,7 @@ export default function AdminPlans() {
                         onDelete={handleOpenDelete}
                         onToggleActive={(id, isActive) => toggleActiveMutation.mutate({ id, isActive })}
                         isSortable={canReorder}
+                        isToggling={!!(toggleActiveMutation.isPending && toggleActiveMutation.variables && toggleActiveMutation.variables.id === dest.id)}
                       />
                     ))}
                   </SortableContext>

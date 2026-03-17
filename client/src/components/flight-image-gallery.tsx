@@ -95,6 +95,8 @@ interface FlightImageGalleryProps {
   description?: string;
   /** id único para el input (para tests) */
   inputId?: string;
+  /** Si se proporciona, se llama al eliminar una imagen (para borrar del bucket) */
+  onRemoveImage?: (url: string) => Promise<void>;
 }
 
 export function FlightImageGallery({
@@ -105,6 +107,7 @@ export function FlightImageGallery({
   label,
   description,
   inputId,
+  onRemoveImage,
 }: FlightImageGalleryProps) {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -138,6 +141,18 @@ export function FlightImageGallery({
       f.type.startsWith("image/")
     );
     if (files.length > 0) onFilesUpload(files);
+  };
+
+  const handleRemove = async (index: number) => {
+    const url = images[index];
+    if (onRemoveImage && url?.startsWith("https://")) {
+      try {
+        await onRemoveImage(url);
+      } catch {
+        // Error manejado por el padre
+      }
+    }
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -212,7 +227,7 @@ export function FlightImageGallery({
                     key={url}
                     url={url}
                     index={index}
-                    onRemove={() => setImages((prev) => prev.filter((_, i) => i !== index))}
+                    onRemove={() => handleRemove(index)}
                   />
                 ))}
               </div>

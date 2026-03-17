@@ -22,7 +22,7 @@ import validator from "validator";
 import multer from "multer";
 import { handleFileUpload, getImageBuffer } from "./upload";
 import { handleExtractPlanFromDocument } from "./handlers/extractPlanFromDocument";
-import { reorderPlanImages, deletePlanBucket, listBucketFiles, getPublicUrl, removeFromBucket, getMedicalAssistanceBucketName, getItineraryMapsBucketName } from "./supabaseStorage";
+import { reorderPlanImages, deletePlanBucket, deleteOrphanPlanBuckets, listBucketFiles, getPublicUrl, removeFromBucket, getMedicalAssistanceBucketName, getItineraryMapsBucketName, parseSupabaseStorageUrl, ensureBucketExists, getPlanBucketName } from "./supabaseStorage";
 import { useSupabaseStorage, localToSupabaseUrl } from "./utils/imageUrls";
 import path from "path";
 import fs from "fs";
@@ -78,6 +78,7 @@ const publicQuotePdfSchema = z.object({
   turkeyUpgrade: z.string().nullable().optional(),
   italiaUpgrade: z.string().nullable().optional(),
   granTourUpgrade: z.string().nullable().optional(),
+  selectedUpgrades: z.record(z.string(), z.string()).nullable().optional(),
   trm: z.union([z.number(), z.string()]).nullable().optional(),
   grandTotalCOP: z.union([z.number(), z.string()]).nullable().optional(),
   finalPrice: z.union([z.number(), z.string()]).nullable().optional(),
@@ -107,6 +108,7 @@ const createQuoteSchema = z.object({
   turkeyUpgrade: z.string().nullable().optional(),
   italiaUpgrade: z.string().nullable().optional(),
   granTourUpgrade: z.string().nullable().optional(),
+  selectedUpgrades: z.record(z.string(), z.string()).nullable().optional(),
   trm: z.union([z.number(), z.string()]).nullable().optional(),
   customFilename: z.string().nullable().optional(),
   minPayment: z.union([z.number(), z.string()]).nullable().optional(),
@@ -483,6 +485,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   }));
 
+  /** Elimina una imagen del bucket de un plan (galería o vuelos internos). Solo buckets plan-* */
+  app.delete("/api/admin/plan-image", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const url = (req.query.url ?? req.body?.url) as string | undefined;
+    if (!url || typeof url !== "string" || !url.startsWith("https://")) {
+      return res.status(400).json({ message: "url requerido (query o body, debe ser URL Supabase)" });
+    }
+    const parsed = parseSupabaseStorageUrl(url);
+    if (!parsed || !parsed.bucket.startsWith("plan-")) {
+      return res.status(400).json({ message: "Solo se pueden eliminar imágenes de buckets de planes (plan-*)" });
+    }
+    const ok = await removeFromBucket(parsed.bucket, [parsed.path]);
+    if (!ok) return res.status(500).json({ message: "Error al eliminar la imagen del bucket" });
+    res.json({ success: true });
+  }));
+
   // Imágenes de destinos: redirigir a Supabase CDN (rápido) o servir local como fallback
   app.get("/images/destinations/:folder/:filename", async (req, res) => {
     const { folder, filename } = req.params;
@@ -577,7 +594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage,
       domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
       connectionFlightImages, connectionCabinBaggage, connectionHoldBaggage,
-      turkeyUpgrade, italiaUpgrade, granTourUpgrade, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
+      turkeyUpgrade, italiaUpgrade, granTourUpgrade, selectedUpgrades: reqSelectedUpgrades, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
       customFilename, minPayment, minPaymentCOP
     } = validatedData;
 
@@ -675,6 +692,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       turkeyUpgrade: turkeyUpgrade || null,
       italiaUpgrade: italiaUpgrade || null,
       granTourUpgrade: granTourUpgrade || null,
+      selectedUpgrades: (() => {
+        const map: Record<string, string> = { ...(reqSelectedUpgrades || {}) };
+        for (const d of destinationDetails) {
+          if (!map[d.id] && d.name) {
+            const n = d.name.toLowerCase();
+            if ((n.includes("turquía esencial") || n.includes("turquia esencial")) && turkeyUpgrade) map[d.id] = turkeyUpgrade;
+            else if ((n.includes("italia turística") || n.includes("italia turistica")) && italiaUpgrade) map[d.id] = italiaUpgrade;
+            else if (d.name === "Gran Tour de Europa" && granTourUpgrade) map[d.id] = granTourUpgrade;
+          }
+        }
+        return Object.keys(map).length > 0 ? map : null;
+      })(),
       trm: trmValue > 0 ? trmValue : null,
       grandTotalCOP: calculatedGrandTotalCOP,
       finalPrice: (finalPrice !== undefined && finalPrice !== null) ? Number(finalPrice) : null,
@@ -715,6 +744,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const cacheKey = CacheKeys.destinations(isActive);
     const destinations = await getOrSetCache(cacheKey, () => storage.getDestinations({ isActive }));
     res.json(destinations);
+  }));
+
+  app.get("/api/destinations-previews", asyncHandler(async (req, res) => {
+    const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
+    const cacheKey = CacheKeys.destinationsPreviews(isActive);
+    const data = await getOrSetCache(cacheKey, () => storage.getDestinationsWithPreviews({ isActive }));
+    res.json(data);
   }));
 
   app.get("/api/destinations/:id", asyncHandler(async (req, res) => {
@@ -912,6 +948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     displayOrder: z.number().optional(),
     isActive: z.boolean().optional(),
     requiresTuesday: z.boolean().optional(),
+    requiresExtraDay: z.boolean().optional(),
     allowedDays: z.array(z.string()).nullable().optional(),
     priceTiers: z.array(priceTierSchema).nullable().optional(),
     upgrades: z.array(upgradeSchema).nullable().optional(),
@@ -943,6 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     medicalAssistanceInfo: z.string().nullable().optional(),
     medicalAssistanceImageUrl: z.string().nullable().optional(),
     firstPageComments: z.string().nullable().optional(),
+    cardTooltip: z.string().nullable().optional(),
     itineraryMapImageUrl: z.string().nullable().optional(),
     flightTerms: z.string().nullable().optional(),
     termsConditions: z.string().nullable().optional(),
@@ -982,6 +1020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       displayOrder: validated.displayOrder ?? 999,
       isActive: validated.isActive ?? true,
       requiresTuesday: validated.requiresTuesday ?? false,
+      requiresExtraDay: validated.requiresExtraDay ?? false,
       allowedDays: validated.allowedDays ?? null,
       priceTiers: validated.priceTiers ?? null,
       upgrades: validated.upgrades ?? null,
@@ -990,6 +1029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       medicalAssistanceInfo: validated.medicalAssistanceInfo ?? null,
       medicalAssistanceImageUrl: validated.medicalAssistanceImageUrl ?? null,
       firstPageComments: validated.firstPageComments ?? null,
+      cardTooltip: validated.cardTooltip ?? null,
       itineraryMapImageUrl: validated.itineraryMapImageUrl ?? null,
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
@@ -1000,6 +1040,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Filtrar imágenes con URL válida (evitar errores de BD por URLs vacías)
       const validImages = validated.images?.filter((img) => img?.imageUrl && String(img.imageUrl).trim().length > 0) ?? [];
+
+      // Asegurar que el bucket del plan existe (crítico para planes nuevos: las imágenes se subieron antes de guardar)
+      if (validImages.length > 0 && useSupabaseStorage()) {
+        await ensureBucketExists(getPlanBucketName(validated.name));
+      }
 
       // Ejecutar todas las operaciones de reemplazo en paralelo para mayor velocidad
       await Promise.all([
@@ -1040,6 +1085,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!existing) throw new NotFoundError("Destination");
 
     const validated = fullDestinationSchema.parse(req.body);
+    const validImages = validated.images?.filter((img) => img?.imageUrl && String(img.imageUrl).trim().length > 0) ?? [];
+
+    // Asegurar que el bucket del plan existe antes de guardar imágenes
+    if (validImages.length > 0 && useSupabaseStorage()) {
+      await ensureBucketExists(getPlanBucketName(validated.name));
+    }
+
+    // Obtener URLs antiguas para eliminar del bucket las que ya no se usan
+    const [oldImages, oldInternalFlights] = await Promise.all([
+      storage.getDestinationImages(id),
+      Promise.resolve((existing as { internalFlights?: Array<{ imageUrl?: string }> }).internalFlights ?? []),
+    ]);
+    const oldImageUrls = new Set((oldImages ?? []).map((img) => img.imageUrl));
+    const newImageUrls = new Set(validImages.map((img) => img.imageUrl));
+    const oldInternalUrls = new Set(
+      (Array.isArray(oldInternalFlights) ? oldInternalFlights : []).flatMap((f) => (f?.imageUrl ? [f.imageUrl] : []))
+    );
+    const newInternalUrls = new Set(
+      (validated.internalFlights ?? []).flatMap((f: { imageUrl?: string }) => (f?.imageUrl ? [f.imageUrl] : []))
+    );
+    const removedUrls = [
+      ...oldImageUrls.values(),
+      ...oldInternalUrls.values(),
+    ].filter((url) => !newImageUrls.has(url) && !newInternalUrls.has(url));
+
+    // Eliminar del bucket Supabase las imágenes que ya no están en el plan (solo buckets plan-*)
+    const toDeleteByBucket = new Map<string, string[]>();
+    for (const url of removedUrls) {
+      if (!url || typeof url !== "string" || !url.startsWith("https://")) continue;
+      const parsed = parseSupabaseStorageUrl(url);
+      if (parsed && parsed.bucket.startsWith("plan-")) {
+        const list = toDeleteByBucket.get(parsed.bucket) ?? [];
+        list.push(parsed.path);
+        toDeleteByBucket.set(parsed.bucket, list);
+      }
+    }
+    for (const [bucket, paths] of toDeleteByBucket) {
+      const ok = await removeFromBucket(bucket, paths);
+      if (ok) logger.info("Removed orphan images from bucket", { bucket, count: paths.length });
+    }
+
     const destData = {
       name: validated.name,
       country: validated.country,
@@ -1053,6 +1139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       displayOrder: validated.displayOrder ?? 999,
       isActive: validated.isActive ?? true,
       requiresTuesday: validated.requiresTuesday ?? false,
+      requiresExtraDay: validated.requiresExtraDay ?? false,
       allowedDays: validated.allowedDays ?? null,
       priceTiers: validated.priceTiers ?? null,
       upgrades: validated.upgrades ?? null,
@@ -1061,13 +1148,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       medicalAssistanceInfo: validated.medicalAssistanceInfo ?? null,
       medicalAssistanceImageUrl: validated.medicalAssistanceImageUrl ?? null,
       firstPageComments: validated.firstPageComments ?? null,
+      cardTooltip: validated.cardTooltip ?? null,
       itineraryMapImageUrl: validated.itineraryMapImageUrl ?? null,
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
     };
     await storage.updateDestination(id, destData);
-
-    const validImages = validated.images?.filter((img) => img?.imageUrl && String(img.imageUrl).trim().length > 0) ?? [];
 
     // Ejecutar reemplazos en paralelo
     await Promise.all([
@@ -1142,6 +1228,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     clearDestinationCache(id);
     logger.info("Destination deleted", { destinationId: id, name: existing.name });
     res.json({ message: "Plan eliminado correctamente" });
+  }));
+
+  app.post("/api/admin/cleanup-orphan-buckets", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const dests = await storage.getDestinations();
+    const destinationNames = dests.map((d) => d.name);
+    const result = await deleteOrphanPlanBuckets(destinationNames);
+    logger.info("Orphan buckets cleanup", { deleted: result.deleted.length, errors: result.errors.length });
+    res.json({ deleted: result.deleted, errors: result.errors });
   }));
 
   app.get("/api/admin/quotes", requireRole("super_admin"), asyncHandler(async (req, res) => {
@@ -1250,21 +1344,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const startDate = destinationsWithDetails[0]?.startDate || new Date().toISOString();
 
-    // Calculate total duration - suma las duraciones base
     let totalDuration = destinationsWithDetails.reduce((sum, d) => sum + (d.duration || 0), 0);
-
-    // Verificar si hay destinos internacionales que requieren día extra
-    // Perú NO requiere día extra (vuelo corto desde Colombia)
-    const requiresExtraDay = destinationsWithDetails.some(d => {
-      const country = d.country?.toLowerCase() || "";
-      return country !== "colombia" && country !== "perú" && country !== "peru";
-    });
-
-    // Para destinos internacionales (excepto Perú), agregar 1 día extra por vuelo desde Colombia
-    if (requiresExtraDay) {
-      totalDuration += 1;
-    }
-
+    if (destinationsWithDetails.some((d) => (d.destination as { requiresExtraDay?: boolean })?.requiresExtraDay === true)) totalDuration += 1;
     const start = new Date(startDate);
     const end = new Date(start);
     end.setDate(end.getDate() + totalDuration - 1);
@@ -1299,6 +1380,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       turkeyUpgrade: quote.turkeyUpgrade || null,
       italiaUpgrade: quote.italiaUpgrade || null,
       granTourUpgrade: quote.granTourUpgrade || null,
+      selectedUpgrades: (() => {
+        const map: Record<string, string> = { ...(quote.selectedUpgrades as Record<string, string> || {}) };
+        for (const d of destinationsWithDetails) {
+          if (!map[d.id] && d.name) {
+            const n = d.name.toLowerCase();
+            if ((n.includes("turquía esencial") || n.includes("turquia esencial")) && quote.turkeyUpgrade) map[d.id] = quote.turkeyUpgrade;
+            else if ((n.includes("italia turística") || n.includes("italia turistica")) && quote.italiaUpgrade) map[d.id] = quote.italiaUpgrade;
+            else if (d.name === "Gran Tour de Europa" && quote.granTourUpgrade) map[d.id] = quote.granTourUpgrade;
+          }
+        }
+        return Object.keys(map).length > 0 ? map : null;
+      })(),
       trm: trmValue > 0 ? trmValue : null,
       grandTotalCOP: calculatedGrandTotalCOP,
       minPayment: quote.minPayment ? Number(quote.minPayment) : undefined,

@@ -228,13 +228,83 @@ async function listBucketFilesRecursive(bucketName: string, prefix = ""): Promis
   }
 }
 
-/** Vacía un bucket eliminando todos sus archivos */
+/** Buckets compartidos que NUNCA deben eliminarse (no son de planes) */
+const SHARED_BUCKETS = new Set(["images", "medical-assistance", "itinerary-maps"]);
+
+/** Vacía un bucket eliminando todos sus archivos. Usa lotes de 100 por límites de API. */
 async function emptyBucket(bucketName: string): Promise<boolean> {
   const client = getSupabaseClient();
   if (!client) return false;
   const files = await listBucketFilesRecursive(bucketName);
   if (files.length === 0) return true;
-  return removeFromBucket(bucketName, files);
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE);
+    const ok = await removeFromBucket(bucketName, batch);
+    if (!ok) return false;
+  }
+  return true;
+}
+
+/** Lista todos los buckets en Supabase */
+export async function listAllBuckets(): Promise<string[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  try {
+    const { data, error } = await client.storage.listBuckets();
+    if (error) {
+      logger.error("[SupabaseStorage] listAllBuckets error", { error: error.message });
+      return [];
+    }
+    return (data || []).map((b) => b.name);
+  } catch (err) {
+    logger.error("[SupabaseStorage] listAllBuckets error", { err });
+    return [];
+  }
+}
+
+/** Elimina buckets de planes que no tienen un plan asociado. Retorna { deleted: string[], errors: string[] } */
+export async function deleteOrphanPlanBuckets(
+  destinationNames: string[]
+): Promise<{ deleted: string[]; errors: { bucket: string; error: string }[] }> {
+  const client = getSupabaseClient();
+  const result = { deleted: [] as string[], errors: [] as { bucket: string; error: string }[] };
+  if (!client) {
+    result.errors.push({ bucket: "(all)", error: "Supabase no configurado" });
+    return result;
+  }
+
+  const validPlanBucketNames = new Set(
+    destinationNames.map((name) => getPlanBucketName(name))
+  );
+  const allBuckets = await listAllBuckets();
+  const planBucketPrefix = "plan-";
+  const orphanBuckets = allBuckets.filter(
+    (b) =>
+      b.startsWith(planBucketPrefix) &&
+      !SHARED_BUCKETS.has(b) &&
+      !validPlanBucketNames.has(b)
+  );
+
+  for (const bucketName of orphanBuckets) {
+    try {
+      const emptied = await emptyBucket(bucketName);
+      if (!emptied) {
+        result.errors.push({ bucket: bucketName, error: "No se pudieron eliminar los archivos" });
+        continue;
+      }
+      const { error } = await client.storage.deleteBucket(bucketName);
+      if (error) {
+        result.errors.push({ bucket: bucketName, error: error.message });
+        continue;
+      }
+      result.deleted.push(bucketName);
+      logger.info("[SupabaseStorage] Bucket huérfano eliminado", { bucketName });
+    } catch (err) {
+      result.errors.push({ bucket: bucketName, error: (err as Error).message });
+    }
+  }
+  return result;
 }
 
 /** Elimina el bucket de un plan y todos sus archivos. No falla si el bucket no existe o Supabase no está configurado. */

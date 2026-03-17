@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles, Loader2, ImageOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { CosmoProcessingDialog } from "@/components/cosmo-processing-dialog";
@@ -87,6 +87,8 @@ function SortableImageCard({
   onRemove: () => void;
   isReordering: boolean;
 }) {
+  const [loadError, setLoadError] = useState(false);
+  useEffect(() => setLoadError(false), [img.imageUrl]);
   const {
     attributes,
     listeners,
@@ -111,11 +113,20 @@ function SortableImageCard({
       )}
     >
       <div className="aspect-[4/3] flex items-center justify-center bg-muted/30 p-2 relative">
-        <img
-          src={img.imageUrl}
-          alt={`Imagen ${index + 1}`}
-          className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg pointer-events-none"
-        />
+        {loadError ? (
+          <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <ImageOff className="h-12 w-12" />
+            <span className="text-xs text-center">Imagen {index + 1}</span>
+            <span className="text-xs text-destructive">Error al cargar</span>
+          </div>
+        ) : (
+          <img
+            src={img.imageUrl}
+            alt={`Imagen ${index + 1}`}
+            className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg pointer-events-none"
+            onError={() => setLoadError(true)}
+          />
+        )}
         {!isReordering && (
           <button
             type="button"
@@ -157,6 +168,7 @@ function AdminPlanForm() {
   const [duration, setDuration] = useState(1);
   const [nights, setNights] = useState(0);
   const [description, setDescription] = useState("");
+  const [cardTooltip, setCardTooltip] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [category, setCategory] = useState("internacional");
@@ -179,6 +191,7 @@ function AdminPlanForm() {
   const [flightTerms, setFlightTerms] = useState("");
   const [termsConditions, setTermsConditions] = useState("");
   const [hasInternalOrConnectionFlight, setHasInternalOrConnectionFlight] = useState(false);
+  const [requiresExtraDay, setRequiresExtraDay] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingInternalFlight, setUploadingInternalFlight] = useState(false);
   const [uploadingMainImage, setUploadingMainImage] = useState(false);
@@ -203,6 +216,7 @@ function AdminPlanForm() {
     duration?: number;
     nights?: number;
     description?: string | null;
+    cardTooltip?: string | null;
     imageUrl?: string | null;
     basePrice?: string | null;
     category?: string;
@@ -225,6 +239,7 @@ function AdminPlanForm() {
     flightTerms?: string | null;
     termsConditions?: string | null;
     hasInternalOrConnectionFlight?: boolean;
+    requiresExtraDay?: boolean;
   }>({
     queryKey: [`/api/admin/destinations/${id}`],
     enabled: isEditing && !!id,
@@ -237,6 +252,7 @@ function AdminPlanForm() {
       setDuration(existing.duration ?? 1);
       setNights(existing.nights ?? 0);
       setDescription(existing.description ?? "");
+      setCardTooltip(existing.cardTooltip ?? "");
       setImageUrl(existing.imageUrl ?? "");
       setBasePrice(existing.basePrice ?? "");
       setCategory(existing.category ?? "internacional");
@@ -265,6 +281,7 @@ function AdminPlanForm() {
       setFlightTerms(existing.flightTerms ?? "");
       setTermsConditions(existing.termsConditions ?? "");
       setHasInternalOrConnectionFlight(existing.hasInternalOrConnectionFlight ?? false);
+      setRequiresExtraDay(existing.requiresExtraDay ?? false);
     }
   }, [existing]);
 
@@ -295,6 +312,7 @@ function AdminPlanForm() {
       duration,
       nights,
       description: description || null,
+      cardTooltip: cardTooltip?.trim() || null,
       imageUrl: imageUrl || null,
       basePrice: basePrice ? String(basePrice) : null,
       category,
@@ -302,6 +320,7 @@ function AdminPlanForm() {
       displayOrder,
       isActive,
       requiresTuesday: allowedDays.length === 1 && allowedDays[0] === "tuesday",
+      requiresExtraDay,
       allowedDays: allowedDays.length ? allowedDays : null,
       priceTiers: priceTiers.length ? priceTiers : null,
       upgrades: upgrades.length ? upgrades : null,
@@ -425,7 +444,17 @@ function AdminPlanForm() {
     e.target.value = "";
   };
 
-  const removeImage = (i: number) => setImages((prev) => prev.filter((_, j) => j !== i));
+  const removeImage = async (i: number) => {
+    const img = images[i];
+    if (img?.imageUrl?.startsWith("https://")) {
+      try {
+        await apiRequest("DELETE", `/api/admin/plan-image?url=${encodeURIComponent(img.imageUrl)}`);
+      } catch {
+        toast({ title: "Error", description: "No se pudo eliminar la imagen del almacenamiento.", variant: "destructive" });
+      }
+    }
+    setImages((prev) => prev.filter((_, j) => j !== i));
+  };
 
   const applyPlanToForm = (plan: Record<string, unknown>) => {
     if (plan.name) setName(String(plan.name));
@@ -433,6 +462,7 @@ function AdminPlanForm() {
     if (plan.duration) setDuration(Number(plan.duration));
     if (plan.nights !== undefined) setNights(Number(plan.nights));
     if (plan.description) setDescription(String(plan.description));
+    if (plan.cardTooltip) setCardTooltip(String(plan.cardTooltip));
     if (plan.basePrice) setBasePrice(String(plan.basePrice));
     if (Array.isArray(plan.itinerary) && plan.itinerary.length) {
       setItinerary((plan.itinerary as ItineraryDay[]).map((d, i) => ({ ...d, dayNumber: d.dayNumber ?? i + 1 })));
@@ -632,7 +662,11 @@ function AdminPlanForm() {
           Volver
         </Button>
         <Button onClick={handleSave} disabled={saveMutation.isPending}>
-          <Save className="mr-2 h-4 w-4" />
+          {saveMutation.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="mr-2 h-4 w-4" />
+          )}
           {saveMutation.isPending ? "Guardando..." : "Guardar"}
         </Button>
       </div>
@@ -747,6 +781,21 @@ function AdminPlanForm() {
               <div>
                 <Label>Descripción</Label>
                 <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Descripción breve del plan..." />
+              </div>
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  Tooltip de la tarjeta
+                </Label>
+                <Textarea
+                  value={cardTooltip}
+                  onChange={(e) => setCardTooltip(e.target.value)}
+                  rows={3}
+                  placeholder="Texto que aparece al pasar el cursor sobre la tarjeta del plan en la página principal. Ej: Salidas diarias desde 2 pax. Impuestos no incluidos..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Si no se completa, se usará un texto por defecto según el plan.
+                </p>
               </div>
 
               {/* Fila: Bloque Imagen principal (50%) + Bloque Categoría (50%, más centrado) */}
@@ -895,8 +944,8 @@ function AdminPlanForm() {
                 </div>
               </div>
 
-              {/* Activo y Es promoción - debajo del bloque imagen */}
-              <div className="flex items-center gap-6">
+              {/* Activo, Es promoción y Día adicional transatlántico */}
+              <div className="flex flex-wrap items-center gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Switch checked={isActive} onCheckedChange={(c) => setIsActive(!!c)} />
                   <span>Activo en catálogo</span>
@@ -904,6 +953,10 @@ function AdminPlanForm() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={isPromotion} onCheckedChange={(c) => setIsPromotion(!!c)} />
                   Es promoción
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer" title="Viajes transatlánticos (Turquía, Dubái, Europa) suman +1 día al total por vuelo desde Colombia. En LATAM no aplica.">
+                  <Switch checked={requiresExtraDay} onCheckedChange={(c) => setRequiresExtraDay(!!c)} />
+                  <span>Día adicional (transatlántico)</span>
                 </label>
               </div>
 
@@ -1198,6 +1251,13 @@ Puedes usar **texto** para resaltar.`}
                             return existing ?? { imageUrl: url, cabinBaggage: false, holdBaggage: false };
                           })
                         );
+                      }}
+                      onRemoveImage={async (url) => {
+                        try {
+                          await apiRequest("DELETE", `/api/admin/plan-image?url=${encodeURIComponent(url)}`);
+                        } catch {
+                          toast({ title: "Error", description: "No se pudo eliminar la imagen del almacenamiento.", variant: "destructive" });
+                        }
                       }}
                       onFilesUpload={async (files) => {
                         if (!name.trim()) {
