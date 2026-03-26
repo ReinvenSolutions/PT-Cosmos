@@ -24,6 +24,10 @@ export interface CreateQuoteInput {
   returnHoldBaggage?: boolean;
   domesticCabinBaggage?: boolean;
   domesticHoldBaggage?: boolean;
+  connectionFlightImages?: string[] | null;
+  connectionCabinBaggage?: boolean;
+  connectionHoldBaggage?: boolean;
+  connectionFlightSegments?: Array<{ images: string[] }> | null;
   turkeyUpgrade?: string | null;
   italiaUpgrade?: string | null;
   granTourUpgrade?: string | null;
@@ -56,6 +60,7 @@ export interface PublicQuotePdfInput {
   domesticCabinBaggage?: boolean;
   domesticHoldBaggage?: boolean;
   connectionFlightImages?: string[];
+  connectionFlightSegments?: Array<{ images: string[] }>;
   connectionCabinBaggage?: boolean;
   connectionHoldBaggage?: boolean;
   turkeyUpgrade?: string | null;

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Upload, X, Check } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -12,37 +12,94 @@ interface ItineraryMapGalleryProps {
   planName?: string;
 }
 
+type MapGalleryItem = { path: string; url: string; isOrphanSelection?: boolean };
+
+/** Coincide con las reglas de DELETE /api/admin/itinerary-map-images (mapa legado o carpeta mapa-itinerario del plan). */
+function canDeleteItineraryMapStorageUrl(url: string): boolean {
+  if (!url.startsWith("https://")) return false;
+  try {
+    const pathname = new URL(url).pathname;
+    const m = pathname.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
+    if (!m) return false;
+    const bucket = m[1];
+    const storagePath = decodeURIComponent(m[2]);
+    if (storagePath.includes("..")) return false;
+    const fileName = storagePath.split("/").pop() || "";
+    if (!/\.(jpe?g|png|gif|webp)$/i.test(fileName)) return false;
+    if (bucket === "itinerary-maps" && !storagePath.includes("/")) return true;
+    if (bucket.startsWith("plan-") && /^mapa-itinerario\/[^/]+$/.test(storagePath)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function ItineraryMapGallery({
   selectedUrl,
   onSelect,
-  allowUploadWithoutPlan = true,
+  allowUploadWithoutPlan = false,
   planName = "",
 }: ItineraryMapGalleryProps) {
   const [uploading, setUploading] = useState(false);
-  const [deletingPath, setDeletingPath] = useState<string | null>(null);
+  const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<{ images: { path: string; url: string }[] }>({
-    queryKey: ["/api/admin/itinerary-map-images"],
-  });
+  const planNameTrimmed = planName.trim();
+  const canQueryMaps = !!planNameTrimmed;
 
-  const deleteMutation = useMutation({
-    mutationFn: async (path: string) => {
-      const res = await apiRequest("DELETE", `/api/admin/itinerary-map-images?path=${encodeURIComponent(path)}`);
+  const { data, isLoading } = useQuery<{ images: { path: string; url: string }[] }>({
+    queryKey: ["/api/admin/itinerary-map-images", planNameTrimmed],
+    queryFn: async () => {
+      const q = new URLSearchParams({ planName: planNameTrimmed });
+      const res = await fetch(`/api/admin/itinerary-map-images?${q}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        let message = text;
+        try {
+          const j = JSON.parse(text);
+          message = j?.message || j?.error || text;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(message || `Error ${res.status}`);
+      }
       return res.json();
     },
-    onSuccess: (_, deletedPath) => {
-      const wasSelected = data?.images?.find((i) => i.path === deletedPath)?.url === selectedUrl;
-      if (wasSelected) onSelect("");
+    enabled: canQueryMaps,
+  });
+
+  const galleryItems = useMemo((): MapGalleryItem[] => {
+    const fromApi = data?.images ?? [];
+    const selectedInApi = selectedUrl && fromApi.some((i) => i.url === selectedUrl);
+    if (selectedUrl && !selectedInApi) {
+      return [
+        {
+          path: "__orphan__",
+          url: selectedUrl,
+          isOrphanSelection: true,
+        },
+        ...fromApi,
+      ];
+    }
+    return fromApi;
+  }, [data?.images, selectedUrl]);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (imageUrl: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/itinerary-map-images?url=${encodeURIComponent(imageUrl)}`);
+      return res.json();
+    },
+    onSuccess: (_, deletedUrl) => {
+      if (deletedUrl === selectedUrl) onSelect("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/itinerary-map-images"] });
-      toast({ title: "Mapa eliminado", description: "El mapa se eliminó del catálogo." });
+      toast({ title: "Mapa eliminado", description: "El mapa se eliminó del almacenamiento de este plan." });
     },
     onError: (e: Error) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
-    onSettled: () => setDeletingPath(null),
+    onSettled: () => setDeletingUrl(null),
   });
 
   const isEmptySelected = !selectedUrl;
@@ -50,7 +107,7 @@ export function ItineraryMapGallery({
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
-    if (!allowUploadWithoutPlan && !planName.trim()) {
+    if (!allowUploadWithoutPlan && !planNameTrimmed) {
       toast({ title: "Nombre requerido", description: "Ingresa el nombre del plan antes de subir.", variant: "destructive" });
       return;
     }
@@ -59,7 +116,7 @@ export function ItineraryMapGallery({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("galleryIndex", "mapa-itinerario");
-      if (planName.trim()) formData.append("planName", planName.trim());
+      formData.append("planName", planNameTrimmed);
       const res = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -68,7 +125,7 @@ export function ItineraryMapGallery({
       const { url } = await res.json();
       onSelect(url);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/itinerary-map-images"] });
-      toast({ title: "Mapa subido", description: "Se agregó al catálogo de mapas." });
+      toast({ title: "Mapa subido", description: "Se guardó en la galería de mapas de este plan." });
     } catch (err) {
       toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -77,17 +134,22 @@ export function ItineraryMapGallery({
     }
   };
 
-  const handleDelete = (path: string, e: React.MouseEvent) => {
+  const handleDelete = (imageUrl: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setDeletingPath(path);
-    deleteMutation.mutate(path);
+    setDeletingUrl(imageUrl);
+    deleteMutation.mutate(imageUrl);
   };
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Selecciona un mapa del catálogo o sube uno nuevo. Si no seleccionas ninguno, los planes de Turquía usarán el mapa por defecto.
+        Solo se listan mapas subidos para este plan (mismo nombre de plan que en la pestaña básica). Si no eliges ninguno, los planes de Turquía pueden usar el mapa por defecto del sistema.
       </p>
+      {!canQueryMaps && (
+        <p className="text-xs text-amber-700 dark:text-amber-500">
+          Escribe el nombre del plan en «Información básica» para ver la galería y subir mapas.
+        </p>
+      )}
 
       {/* Imagen seleccionada actual */}
       <div>
@@ -112,7 +174,7 @@ export function ItineraryMapGallery({
 
       {/* Galería: opción vacía + imágenes del bucket */}
       <div>
-        <p className="text-xs font-medium text-muted-foreground mb-2">Catálogo de mapas</p>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Galería de mapas de este plan</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {/* Opción sin mapa */}
           <button
@@ -135,28 +197,39 @@ export function ItineraryMapGallery({
           </button>
 
           {/* Imágenes del bucket */}
-          {isLoading ? (
+          {!canQueryMaps ? (
+            <div className="col-span-2 flex items-center justify-center py-6 text-muted-foreground text-sm text-center px-2">
+              Sin nombre de plan no hay galería que mostrar.
+            </div>
+          ) : isLoading ? (
             <div className="col-span-2 flex items-center justify-center py-8 text-muted-foreground text-sm">
               Cargando...
             </div>
           ) : (
-            data?.images?.map((img) => {
+            galleryItems.map((img) => {
               const isSelected = selectedUrl === img.url;
-              const isDeleting = deletingPath === img.path;
+              const isDeleting = deletingUrl === img.url;
+              const canDeleteFromHere = canDeleteItineraryMapStorageUrl(img.url);
               return (
                 <div
-                  key={img.path}
+                  key={img.isOrphanSelection ? `orphan-${img.url}` : img.path}
                   className={cn(
                     "relative rounded-lg border-2 overflow-hidden transition-all group aspect-[4/3]",
-                    isSelected ? "border-primary ring-2 ring-primary/30 shadow-md" : "border-transparent hover:border-muted-foreground/40"
+                    isSelected ? "border-primary ring-2 ring-primary/30 shadow-md" : "border-transparent hover:border-muted-foreground/40",
+                    img.isOrphanSelection && "ring-1 ring-amber-500/40"
                   )}
                 >
                   <button
                     type="button"
                     onClick={() => onSelect(img.url)}
-                    className="w-full h-full flex items-center justify-center bg-muted/30 p-1"
+                    className="w-full h-full flex flex-col items-center justify-center bg-muted/30 p-1 gap-0.5"
                   >
                     <img src={img.url} alt="" className="max-w-full max-h-full object-contain rounded" />
+                    {img.isOrphanSelection && (
+                      <span className="text-[9px] text-amber-700 dark:text-amber-400 px-1 text-center leading-tight">
+                        Mapa guardado (otra ubicación); puedes eliminarlo o sustituirlo
+                      </span>
+                    )}
                   </button>
                   {isSelected && (
                     <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
@@ -165,24 +238,26 @@ export function ItineraryMapGallery({
                       </div>
                     </div>
                   )}
-                  <button
-                    type="button"
-                    className={cn(
-                      "absolute top-1 right-1 h-7 w-7 p-0 rounded-md inline-flex items-center justify-center",
-                      "bg-destructive text-destructive-foreground border border-destructive-border",
-                      "opacity-0 group-hover:opacity-100 transition-opacity",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                      "disabled:pointer-events-none disabled:opacity-50"
-                    )}
-                    onClick={(e) => handleDelete(img.path, e)}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? (
-                      <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    ) : (
-                      <X className="h-4 w-4" />
-                    )}
-                  </button>
+                  {canDeleteFromHere && (
+                    <button
+                      type="button"
+                      className={cn(
+                        "absolute top-1 right-1 h-7 w-7 p-0 rounded-md inline-flex items-center justify-center",
+                        "bg-destructive text-destructive-foreground border border-destructive-border",
+                        "opacity-0 group-hover:opacity-100 transition-opacity",
+                        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                        "disabled:pointer-events-none disabled:opacity-50"
+                      )}
+                      onClick={(e) => handleDelete(img.url, e)}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
                 </div>
               );
             })
@@ -193,11 +268,22 @@ export function ItineraryMapGallery({
       {/* Zona de subir nueva */}
       <div
         className={cn(
-          "rounded-xl border-2 border-dashed transition-all cursor-pointer",
-          "border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30",
-          uploading && "opacity-70 pointer-events-none"
+          "rounded-xl border-2 border-dashed transition-all",
+          canQueryMaps && !uploading && "cursor-pointer border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30",
+          (!canQueryMaps || uploading) && "cursor-not-allowed opacity-60 border-muted-foreground/20",
+          uploading && "pointer-events-none"
         )}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => {
+          if (!canQueryMaps) {
+            toast({
+              title: "Nombre requerido",
+              description: "Indica el nombre del plan en «Información básica» antes de subir el mapa.",
+              variant: "destructive",
+            });
+            return;
+          }
+          if (!uploading) fileInputRef.current?.click();
+        }}
       >
         <input
           ref={fileInputRef}
@@ -205,7 +291,7 @@ export function ItineraryMapGallery({
           accept="image/*"
           className="hidden"
           onChange={handleUpload}
-          disabled={uploading}
+          disabled={uploading || !canQueryMaps}
         />
         <div className="flex flex-col items-center justify-center py-6 px-4">
           {uploading ? (
@@ -216,7 +302,7 @@ export function ItineraryMapGallery({
           ) : (
             <>
               <Upload className="w-10 h-10 text-muted-foreground mb-2" />
-              <span className="text-sm font-medium">Subir nuevo mapa al catálogo</span>
+              <span className="text-sm font-medium">Subir mapa para este plan</span>
               <span className="text-xs text-muted-foreground mt-0.5">PNG, JPG o WebP</span>
             </>
           )}

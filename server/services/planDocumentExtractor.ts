@@ -297,6 +297,19 @@ HOTELES - Categoría:
 }
 
 /** Normaliza categoría de hotel: "three stars" → "3*", "3 estrellas" → "3*" */
+function normalizeMealsField(raw: unknown): string[] | undefined {
+  if (raw == null) return undefined;
+  if (Array.isArray(raw)) {
+    const out = raw.map((x) => String(x ?? "").trim()).filter(Boolean);
+    return out.length ? out : undefined;
+  }
+  if (typeof raw === "string") {
+    const out = raw.split(/[,;\n]/).map((m) => m.trim()).filter(Boolean);
+    return out.length ? out : undefined;
+  }
+  return undefined;
+}
+
 function normalizeHotelCategory(raw: string | undefined): string | undefined {
   if (!raw?.trim()) return undefined;
   const s = raw.trim().toLowerCase();
@@ -331,7 +344,7 @@ function normalizeExtractedPlan(p: Partial<ExtractedPlan>): ExtractedPlan {
             location: d.location ? String(d.location).slice(0, 100) : undefined,
             description: finalDesc.slice(0, 3000),
             activities,
-            meals: Array.isArray(d.meals) ? d.meals : undefined,
+            meals: normalizeMealsField(d.meals),
             accommodation: d.accommodation ? String(d.accommodation).slice(0, 200) : undefined,
           };
         })

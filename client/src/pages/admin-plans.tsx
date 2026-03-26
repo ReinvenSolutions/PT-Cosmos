@@ -1,9 +1,10 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, Pencil, Trash2, Search, GripVertical, Loader2 } from "lucide-react";
+import { MapPin, Plus, Pencil, Trash2, Search, GripVertical, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useCallback } from "react";
 import { prefetchRoute } from "@/lib/route-prefetch";
@@ -20,8 +21,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidatePublicDestinationQueries } from "@/lib/queryClient";
 import { formatUSD } from "@shared/schema";
 import { getDestinationImage } from "@/lib/destination-images";
 import { OptimizedImage } from "@/components/optimized-image";
@@ -185,7 +185,7 @@ export default function AdminPlans() {
   const [confirmWord, setConfirmWord] = useState("");
   const [randomWord, setRandomWord] = useState("");
 
-  const { data: destinations = [], isLoading } = useQuery<Destination[]>({
+  const { data: destinations = [], isLoading, isError, error } = useQuery<Destination[]>({
     queryKey: ["/api/admin/destinations"],
   });
 
@@ -204,8 +204,7 @@ export default function AdminPlans() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/destinations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/destinations?isActive=true"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/destinations?isActive=false"] });
+      invalidatePublicDestinationQueries(queryClient);
       toast({ title: "Plan eliminado", description: "El plan ha sido eliminado correctamente." });
       setDeleteTarget(null);
       setConfirmWord("");
@@ -244,8 +243,7 @@ export default function AdminPlans() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/destinations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/destinations?isActive=true"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/destinations?isActive=false"] });
+      invalidatePublicDestinationQueries(queryClient);
     },
     onSuccess: () => {
       toast({ title: "Estado actualizado", description: "El plan se ha activado o desactivado correctamente." });
@@ -291,6 +289,7 @@ export default function AdminPlans() {
       queryClient.setQueryData(["/api/destinations?isActive=false"], updatedDestinations.filter((d) => !d.isActive));
       await queryClient.refetchQueries({ queryKey: ["/api/admin/destinations"], type: "active" });
       await queryClient.refetchQueries({ queryKey: ["/api/destinations"], type: "active" });
+      invalidatePublicDestinationQueries(queryClient);
       toast({ title: "Orden actualizado", description: "El orden de los planes se ha guardado correctamente." });
     },
   });
@@ -373,6 +372,21 @@ export default function AdminPlans() {
           </div>
         </CardHeader>
         <CardContent>
+          {isError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="space-y-2">
+                <span className="block font-medium">No se pudo cargar el listado de planes.</span>
+                <span className="block text-sm opacity-95">{(error as Error)?.message || "Error desconocido"}</span>
+                <span className="block text-sm opacity-90">
+                  Si ves 401 o «No autenticado», inicia sesión como super admin. Si menciona una columna SQL faltante,
+                  aplica <code className="rounded bg-background/80 px-1">npm run db:apply-pending</code> (incluye{" "}
+                  <code className="rounded bg-background/80 px-1">0014</code>,{" "}
+                  <code className="rounded bg-background/80 px-1">0015</code>, etc.) o las migraciones SQL a mano.
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -407,6 +421,12 @@ export default function AdminPlans() {
                       </TableRow>
                     ))}
                   </>
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                      Corrige el error indicado arriba y recarga la página.
+                    </TableCell>
+                  </TableRow>
                 ) : filteredPlans.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">

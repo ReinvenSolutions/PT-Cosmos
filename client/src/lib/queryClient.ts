@@ -1,5 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+/**
+ * Invalida listas y previews públicos de destinos (cotizador, home).
+ * Tras guardar/editar planes en admin hay que llamarla además de /api/admin/destinations:
+ * la home usa `/api/destinations-previews`, no `/api/destinations`.
+ */
+export function invalidatePublicDestinationQueries(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["/api/destinations?isActive=true"] });
+  qc.invalidateQueries({ queryKey: ["/api/destinations?isActive=false"] });
+  qc.invalidateQueries({ queryKey: ["/api/destinations-previews?isActive=true"] });
+  qc.invalidateQueries({ queryKey: ["/api/destinations-previews?isActive=false"] });
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

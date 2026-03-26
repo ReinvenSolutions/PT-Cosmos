@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Menu, Building2, UtensilsCrossed, Star } from "lucide-react";
+import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Menu, Building2, UtensilsCrossed, Star, Stethoscope, Landmark, ExternalLink } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
 import { DatePicker } from "@/components/ui/date-picker";
 import { isTuesday } from "date-fns";
@@ -33,7 +33,12 @@ export default function Home() {
   const { toast } = useToast();
 
   type DestinationWithPreviews = Destination & { hotels: any[]; itinerary: any[] };
-  const { data: destinationsWithPreviews = [], isLoading: destinationsLoading } = useQuery<DestinationWithPreviews[]>({
+  const {
+    data: destinationsWithPreviews = [],
+    isLoading: destinationsLoading,
+    isError: destinationsQueryError,
+    error: destinationsQueryErr,
+  } = useQuery<DestinationWithPreviews[]>({
     queryKey: ["/api/destinations-previews?isActive=true"],
   });
 
@@ -45,7 +50,9 @@ export default function Home() {
     ])
   );
 
-  const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
+  const selectedDests = selectedDestinations
+    .map((id) => destinations.find((d) => d.id === id))
+    .filter((d): d is Destination => !!d);
 
   const hasTurkeyDestinations = selectedDests.some(
     (d) =>
@@ -67,19 +74,6 @@ export default function Home() {
       !d.country?.toLowerCase().includes("turquía") &&
       !d.country?.toLowerCase().includes("turquia")
   );
-
-  useEffect(() => {
-    if (hasTurkeyDestinations && selectedDestinations.length > 0) {
-      const reorderedIds = [
-        ...turkeyDestinations.map((d) => d.id),
-        ...otherDestinations.map((d) => d.id),
-      ];
-
-      if (JSON.stringify(reorderedIds) !== JSON.stringify(selectedDestinations)) {
-        setSelectedDestinations(reorderedIds);
-      }
-    }
-  }, [selectedDestinations, hasTurkeyDestinations, turkeyDestinations, otherDestinations]);
 
   const calculateTotalDuration = (): number => {
     if (!startDate || selectedDestinations.length === 0) return 0;
@@ -285,11 +279,6 @@ export default function Home() {
   const getMealsInfo = (destId: string): { breakfasts: number; lunches: number; dinners: number; total: number } => {
     const dest = destinations.find(d => d.id === destId);
 
-    // Para Turquía Esencial, usar valores específicos del plan
-    if (dest?.name === "Turquía Esencial") {
-      return { breakfasts: 9, lunches: 0, dinners: 5, total: 14 };
-    }
-
     const details = destinationDetails[destId];
     if (!details || !details.itinerary || details.itinerary.length === 0) {
       const nights = dest?.nights || 0;
@@ -305,7 +294,8 @@ export default function Home() {
         day.meals.forEach((meal: string) => {
           const lowerMeal = meal.toLowerCase();
           if (lowerMeal.includes('desayuno') || lowerMeal.includes('breakfast')) breakfasts++;
-          if (lowerMeal.includes('almuerzo') || lowerMeal.includes('lunch') || lowerMeal.includes('comida')) lunches++;
+          // No usar "comida" suelto: coincide con "sin comidas", "bebidas en comidas", etc.
+          if (lowerMeal.includes('almuerzo') || lowerMeal.includes('lunch')) lunches++;
           if (lowerMeal.includes('cena') || lowerMeal.includes('dinner')) dinners++;
         });
       }
@@ -413,23 +403,6 @@ export default function Home() {
       // Deseleccionar el destino actual
       setSelectedDestinations(selectedDestinations.filter((id) => id !== destId));
     } else {
-      // Verificar si ya hay un destino del mismo país seleccionado (excepto Colombia para destinos nacionales)
-      if (dest?.category === "internacional" && dest?.country !== "Colombia") {
-        const sameCountrySelected = selectedDests.find((d) => d.country === dest.country && d.id !== destId);
-        if (sameCountrySelected) {
-          // Deseleccionar el destino anterior del mismo país y seleccionar el nuevo
-          const updatedSelections = selectedDestinations.filter((id) => id !== sameCountrySelected.id);
-
-          toast({
-            title: "Destino reemplazado",
-            description: `Se ha deseleccionado "${sameCountrySelected.name}" y seleccionado "${dest.name}" de ${dest.country}.`,
-          });
-
-          setSelectedDestinations([...updatedSelections, destId]);
-          return;
-        }
-      }
-
       if (dest?.allowedDays && dest.allowedDays.length > 0 && startDate && !isAllowedDay(startDate, dest.allowedDays)) {
         const dateStr = startDate.toLocaleDateString("es-CO", {
           weekday: "long",
@@ -471,6 +444,62 @@ export default function Home() {
 
       <main className="flex-1 overflow-y-auto bg-gradient-to-b from-accent/50 to-background">
         <div className="container mx-auto px-4 py-12 lg:py-16">
+          <section
+            className="mb-5 md:mb-7 rounded-2xl border-2 border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card/90 to-background shadow-md ring-1 ring-primary/10 p-4 sm:p-5"
+            aria-label="Enlaces a servicios externos"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-4">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">
+                  Servicios externos
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Accesos directos a asistencia médica y pagos
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <a
+                href="https://www.emisiones48hd.com/user/login/?next=/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-start gap-4 rounded-xl border-2 border-emerald-500/25 bg-emerald-500/[0.08] p-4 text-left transition-all hover:border-emerald-500/45 hover:bg-emerald-500/[0.14] hover:shadow-lg hover:shadow-emerald-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-inner ring-2 ring-emerald-500/30 group-hover:scale-105 transition-transform">
+                  <Stethoscope className="h-5 w-5" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1 pt-0.5">
+                  <span className="flex items-center gap-2 font-semibold text-foreground text-base">
+                    Asistencia médica
+                    <ExternalLink className="h-4 w-4 shrink-0 text-emerald-600 opacity-80 group-hover:opacity-100" aria-hidden />
+                  </span>
+                  <span className="mt-1 block text-sm text-muted-foreground leading-snug">
+                    Emisión y consulta 48 horas
+                  </span>
+                </span>
+              </a>
+              <a
+                href="https://portalpagos.davivienda.com/#/comercio/11060/COSMOS%20INDUSTRIA%20DE%20VIAJES"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-start gap-4 rounded-xl border-2 border-sky-600/25 bg-sky-600/[0.08] p-4 text-left transition-all hover:border-sky-600/45 hover:bg-sky-600/[0.14] hover:shadow-lg hover:shadow-sky-600/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-700 text-white shadow-inner ring-2 ring-sky-500/30 group-hover:scale-105 transition-transform">
+                  <Landmark className="h-5 w-5" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1 pt-0.5">
+                  <span className="flex items-center gap-2 font-semibold text-foreground text-base">
+                    Portal de pagos
+                    <ExternalLink className="h-4 w-4 shrink-0 text-sky-700 opacity-80 group-hover:opacity-100" aria-hidden />
+                  </span>
+                  <span className="mt-1 block text-sm text-muted-foreground leading-snug">
+                    Davivienda · Cosmos Industria de Viajes
+                  </span>
+                </span>
+              </a>
+            </div>
+          </section>
+
           <div className="glass-card rounded-xl p-6 mb-8">
             {hasTurkeyEsencial && (
               <Alert className="mb-4 border-primary/30 bg-accent">
@@ -631,6 +660,24 @@ export default function Home() {
             </div>
           </div>
 
+          {destinationsQueryError && (
+            <Alert variant="destructive" className="mb-8 max-w-3xl mx-auto">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="space-y-2">
+                <span className="block font-medium">No se pudieron cargar los planes desde el servidor.</span>
+                <span className="block text-sm opacity-95">
+                  {(destinationsQueryErr as Error)?.message || "Error desconocido"}
+                </span>
+                <span className="block text-sm opacity-90">
+                  Si aparece una columna faltante (por ejemplo <code className="rounded bg-background/80 px-1">hotel_gallery_image_urls</code>),
+                  aplica la migración <code className="rounded bg-background/80 px-1">0014_destination_hotel_gallery.sql</code> en tu base
+                  o ejecuta <code className="rounded bg-background/80 px-1">npm run db:apply-pending</code>. Revisa también la consola del
+                  servidor (<code className="rounded bg-background/80 px-1">npm run dev</code>).
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full tabs-category">
             <TabsList className="grid w-full grid-cols-3 mb-8 h-12">
               <TabsTrigger value="nacional" data-testid="tab-nacional">
@@ -707,8 +754,7 @@ export default function Home() {
                               {(() => {
                                 const parts = [];
                                 if (mealsInfo.breakfasts > 0) parts.push(`${mealsInfo.breakfasts} desayuno${mealsInfo.breakfasts > 1 ? 's' : ''}`);
-                                // Skip lunches for Turquía Esencial plan
-                                if (mealsInfo.lunches > 0 && dest.name !== 'Turquía Esencial') parts.push(`${mealsInfo.lunches} almuerzo${mealsInfo.lunches > 1 ? 's' : ''}`);
+                                if (mealsInfo.lunches > 0) parts.push(`${mealsInfo.lunches} almuerzo${mealsInfo.lunches > 1 ? 's' : ''}`);
                                 if (mealsInfo.dinners > 0) parts.push(`${mealsInfo.dinners} cena${mealsInfo.dinners > 1 ? 's' : ''}`);
                                 return parts.length > 0 ? parts.join(' + ') : `${mealsInfo.total} comida${mealsInfo.total > 1 ? 's' : ''}`;
                               })()}
@@ -769,10 +815,12 @@ export default function Home() {
                 })}
               </div>
 
-              {filteredDestinations.length === 0 && (
+              {filteredDestinations.length === 0 && !destinationsQueryError && (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground text-lg">
-                    No hay {selectedCategory === "promociones" ? "promociones" : "destinos"} disponibles en este momento.
+                    {destinations.length === 0
+                      ? "No hay planes activos en el catálogo. En admin, activa los planes (interruptor «activo») o revisa la base de datos."
+                      : `No hay ${selectedCategory === "promociones" ? "promociones" : "destinos"} en esta pestaña con el filtro actual.`}
                   </p>
                 </div>
               )}
@@ -808,12 +856,6 @@ export default function Home() {
             </div>
           )}
         </div>
-
-        <footer className="bg-foreground text-background mt-12">
-          <div className="container mx-auto px-4 py-8 text-center">
-            <p className="text-sm">&copy; 2026 Cosmos Mayorista. Todos los derechos reservados.</p>
-          </div>
-        </footer>
       </main>
     </div>
   );

@@ -12,8 +12,7 @@ import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { CosmoProcessingDialog } from "@/components/cosmo-processing-dialog";
-import { apiRequest } from "@/lib/queryClient";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidatePublicDestinationQueries } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -53,7 +52,19 @@ type ItineraryDay = {
   activities?: string[];
   meals?: string[];
   accommodation?: string;
+  /** Borrador de UI al editar comidas; no se envía al API */
+  _mealsText?: string;
 };
+
+function parseMealsInput(raw: string): string[] {
+  return raw.split(/[,;\n]/).map((m) => m.trim()).filter(Boolean);
+}
+
+function itineraryDayToPayload(d: ItineraryDay): Omit<ItineraryDay, "_mealsText"> {
+  const { _mealsText, ...rest } = d;
+  const meals = _mealsText !== undefined ? parseMealsInput(_mealsText) : (rest.meals ?? []);
+  return { ...rest, meals };
+}
 
 type Hotel = { name: string; category?: string; location?: string; imageUrl?: string; nights?: number };
 type Inclusion = { item: string; displayOrder?: number };
@@ -183,6 +194,8 @@ function AdminPlanForm() {
   const [inclusions, setInclusions] = useState<Inclusion[]>([]);
   const [exclusions, setExclusions] = useState<Exclusion[]>([]);
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [hotelGalleryImages, setHotelGalleryImages] = useState<ImageItem[]>([]);
+  const [adicionalesGalleryImages, setAdicionalesGalleryImages] = useState<ImageItem[]>([]);
   const [internalFlights, setInternalFlights] = useState<InternalFlightItem[]>([]);
   const [medicalAssistanceInfo, setMedicalAssistanceInfo] = useState("");
   const [medicalAssistanceImageUrl, setMedicalAssistanceImageUrl] = useState("");
@@ -193,11 +206,15 @@ function AdminPlanForm() {
   const [hasInternalOrConnectionFlight, setHasInternalOrConnectionFlight] = useState(false);
   const [requiresExtraDay, setRequiresExtraDay] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingHotelGallery, setUploadingHotelGallery] = useState(false);
+  const [uploadingAdicionalesGallery, setUploadingAdicionalesGallery] = useState(false);
   const [uploadingInternalFlight, setUploadingInternalFlight] = useState(false);
   const [uploadingMainImage, setUploadingMainImage] = useState(false);
   const [galleryDialogOpen, setGalleryDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("basico");
   const [dragGallery, setDragGallery] = useState(false);
+  const [dragHotelGallery, setDragHotelGallery] = useState(false);
+  const [dragAdicionalesGallery, setDragAdicionalesGallery] = useState(false);
   const [extractingPlan, setExtractingPlan] = useState(false);
   const [cosmoSuccess, setCosmoSuccess] = useState(false);
   const [cosmoDialogOpen, setCosmoDialogOpen] = useState(false);
@@ -207,6 +224,8 @@ function AdminPlanForm() {
   const [dragMainImageOver, setDragMainImageOver] = useState(false);
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hotelGalleryFileInputRef = useRef<HTMLInputElement>(null);
+  const adicionalesGalleryFileInputRef = useRef<HTMLInputElement>(null);
   const mainImageFileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
@@ -240,6 +259,8 @@ function AdminPlanForm() {
     termsConditions?: string | null;
     hasInternalOrConnectionFlight?: boolean;
     requiresExtraDay?: boolean;
+    hotelGalleryImageUrls?: string[] | null;
+    adicionalesGalleryImageUrls?: string[] | null;
   }>({
     queryKey: [`/api/admin/destinations/${id}`],
     enabled: isEditing && !!id,
@@ -282,6 +303,18 @@ function AdminPlanForm() {
       setTermsConditions(existing.termsConditions ?? "");
       setHasInternalOrConnectionFlight(existing.hasInternalOrConnectionFlight ?? false);
       setRequiresExtraDay(existing.requiresExtraDay ?? false);
+      const hg = existing.hotelGalleryImageUrls;
+      setHotelGalleryImages(
+        Array.isArray(hg) && hg.length
+          ? hg.filter(Boolean).map((url, i) => ({ imageUrl: url, displayOrder: i }))
+          : []
+      );
+      const ag = existing.adicionalesGalleryImageUrls;
+      setAdicionalesGalleryImages(
+        Array.isArray(ag) && ag.length
+          ? ag.filter(Boolean).map((url, i) => ({ imageUrl: url, displayOrder: i }))
+          : []
+      );
     }
   }, [existing]);
 
@@ -296,7 +329,7 @@ function AdminPlanForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/destinations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/destinations?isActive=true"] });
+      invalidatePublicDestinationQueries(queryClient);
       toast({ title: isEditing ? "Plan actualizado" : "Plan creado", description: "Los cambios se han guardado correctamente." });
       setLocation("/admin/plans");
     },
@@ -324,7 +357,7 @@ function AdminPlanForm() {
       allowedDays: allowedDays.length ? allowedDays : null,
       priceTiers: priceTiers.length ? priceTiers : null,
       upgrades: upgrades.length ? upgrades : null,
-      itinerary,
+      itinerary: itinerary.map(itineraryDayToPayload),
       hotels,
       inclusions,
       exclusions,
@@ -337,6 +370,12 @@ function AdminPlanForm() {
       itineraryMapImageUrl: itineraryMapImageUrl || null,
       flightTerms: flightTerms || null,
       termsConditions: termsConditions || null,
+      hotelGalleryImageUrls:
+        hotelGalleryImages.length > 0 ? hotelGalleryImages.map((x) => x.imageUrl) : null,
+      adicionalesGalleryImageUrls:
+        adicionalesGalleryImages.length > 0
+          ? adicionalesGalleryImages.map((x) => x.imageUrl)
+          : null,
     };
     saveMutation.mutate(payload);
   };
@@ -634,6 +673,193 @@ function AdminPlanForm() {
       reorderMutation.mutate(reordered.map((img) => img.imageUrl));
     },
     [images, reorderMutation]
+  );
+
+  const processHotelGalleryFiles = async (files: File[]) => {
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    if (!imageFiles.length) return;
+    if (!name.trim()) {
+      toast({
+        title: "Nombre requerido",
+        description: "Ingresa el nombre del plan antes de subir imágenes de hoteles.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setUploadingHotelGallery(true);
+    try {
+      const startIndex = hotelGalleryImages.length;
+      for (let i = 0; i < imageFiles.length; i++) {
+        const formData = new FormData();
+        formData.append("file", imageFiles[i]);
+        formData.append("planName", name.trim());
+        formData.append("galleryIndex", `hotel-${startIndex + i + 1}`);
+        const res = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" });
+        if (!res.ok) throw new Error("Upload failed");
+        const { url } = await res.json();
+        setHotelGalleryImages((prev) => [...prev, { imageUrl: url, displayOrder: prev.length }]);
+      }
+      toast({ title: "Imágenes de hoteles subidas", description: `${imageFiles.length} imagen(es) en la galería del plan.` });
+    } catch {
+      toast({ title: "Error", description: "No se pudieron subir las imágenes de hoteles.", variant: "destructive" });
+    } finally {
+      setUploadingHotelGallery(false);
+    }
+  };
+
+  const handleHotelGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    processHotelGalleryFiles(files);
+    e.target.value = "";
+  };
+
+  const removeHotelGalleryImage = async (i: number) => {
+    const img = hotelGalleryImages[i];
+    if (img?.imageUrl?.startsWith("https://")) {
+      try {
+        await apiRequest("DELETE", `/api/admin/plan-image?url=${encodeURIComponent(img.imageUrl)}`);
+      } catch {
+        toast({ title: "Error", description: "No se pudo eliminar la imagen del almacenamiento.", variant: "destructive" });
+      }
+    }
+    setHotelGalleryImages((prev) => prev.filter((_, j) => j !== i));
+  };
+
+  const reorderHotelGalleryMutation = useMutation({
+    mutationFn: async (orderedUrls: string[]) => {
+      const res = await apiRequest("POST", "/api/admin/reorder-plan-hotel-images", {
+        planName: name.trim(),
+        imageUrls: orderedUrls,
+      });
+      const data = await res.json();
+      if (!data.urls) throw new Error("Respuesta inválida");
+      return data.urls as string[];
+    },
+    onSuccess: (newUrls) => {
+      setHotelGalleryImages(newUrls.map((url, i) => ({ imageUrl: url, displayOrder: i })));
+      toast({
+        title: "Orden actualizado",
+        description: "Las imágenes de hoteles se reordenaron en Supabase.",
+      });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error al reordenar", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const hotelGallerySensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleHotelGalleryReorder = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const oldIndex = hotelGalleryImages.findIndex((img) => img.imageUrl === active.id);
+      const newIndex = hotelGalleryImages.findIndex((img) => img.imageUrl === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+      const reordered = arrayMove(hotelGalleryImages, oldIndex, newIndex);
+      reorderHotelGalleryMutation.mutate(reordered.map((img) => img.imageUrl));
+    },
+    [hotelGalleryImages, reorderHotelGalleryMutation]
+  );
+
+  const processAdicionalesGalleryFiles = async (files: File[]) => {
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    if (!imageFiles.length) return;
+    if (!name.trim()) {
+      toast({
+        title: "Nombre requerido",
+        description: "Ingresa el nombre del plan antes de subir imágenes de Adicionales.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setUploadingAdicionalesGallery(true);
+    try {
+      const startIndex = adicionalesGalleryImages.length;
+      for (let i = 0; i < imageFiles.length; i++) {
+        const formData = new FormData();
+        formData.append("file", imageFiles[i]);
+        formData.append("planName", name.trim());
+        formData.append("galleryIndex", `adicional-${startIndex + i + 1}`);
+        const res = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" });
+        if (!res.ok) throw new Error("Upload failed");
+        const { url } = await res.json();
+        setAdicionalesGalleryImages((prev) => [...prev, { imageUrl: url, displayOrder: prev.length }]);
+      }
+      toast({
+        title: "Imágenes de Adicionales subidas",
+        description: `${imageFiles.length} imagen(es) en el bucket del plan.`,
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se pudieron subir las imágenes de Adicionales.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingAdicionalesGallery(false);
+    }
+  };
+
+  const handleAdicionalesGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    processAdicionalesGalleryFiles(files);
+    e.target.value = "";
+  };
+
+  const removeAdicionalesGalleryImage = async (i: number) => {
+    const img = adicionalesGalleryImages[i];
+    if (img?.imageUrl?.startsWith("https://")) {
+      try {
+        await apiRequest("DELETE", `/api/admin/plan-image?url=${encodeURIComponent(img.imageUrl)}`);
+      } catch {
+        toast({ title: "Error", description: "No se pudo eliminar la imagen del almacenamiento.", variant: "destructive" });
+      }
+    }
+    setAdicionalesGalleryImages((prev) => prev.filter((_, j) => j !== i));
+  };
+
+  const reorderAdicionalesGalleryMutation = useMutation({
+    mutationFn: async (orderedUrls: string[]) => {
+      const res = await apiRequest("POST", "/api/admin/reorder-plan-adicionales-images", {
+        planName: name.trim(),
+        imageUrls: orderedUrls,
+      });
+      const data = await res.json();
+      if (!data.urls) throw new Error("Respuesta inválida");
+      return data.urls as string[];
+    },
+    onSuccess: (newUrls) => {
+      setAdicionalesGalleryImages(newUrls.map((url, i) => ({ imageUrl: url, displayOrder: i })));
+      toast({
+        title: "Orden actualizado",
+        description: "Las imágenes de Adicionales se reordenaron en Supabase.",
+      });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error al reordenar", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const adicionalesGallerySensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleAdicionalesGalleryReorder = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const oldIndex = adicionalesGalleryImages.findIndex((img) => img.imageUrl === active.id);
+      const newIndex = adicionalesGalleryImages.findIndex((img) => img.imageUrl === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+      const reordered = arrayMove(adicionalesGalleryImages, oldIndex, newIndex);
+      reorderAdicionalesGalleryMutation.mutate(reordered.map((img) => img.imageUrl));
+    },
+    [adicionalesGalleryImages, reorderAdicionalesGalleryMutation]
   );
 
   if (isEditing && isLoading) {
@@ -1181,15 +1407,29 @@ Puedes usar **texto** para resaltar.`}
                               <div>
                                 <Label className="text-xs">Comidas</Label>
                                 <Input
-                                  value={(day.meals ?? []).join(", ")}
-                                  onChange={(e) => updateItineraryDay(i, {
-                                    meals: e.target.value.split(/[,;\n]/).map((m) => m.trim()).filter(Boolean),
-                                  })}
+                                  value={
+                                    day._mealsText !== undefined
+                                      ? day._mealsText
+                                      : (day.meals ?? []).join(", ")
+                                  }
+                                  onChange={(e) =>
+                                    updateItineraryDay(i, { _mealsText: e.target.value })
+                                  }
+                                  onBlur={() => {
+                                    const raw =
+                                      day._mealsText !== undefined
+                                        ? day._mealsText
+                                        : (day.meals ?? []).join(", ");
+                                    updateItineraryDay(i, {
+                                      meals: parseMealsInput(raw),
+                                      _mealsText: undefined,
+                                    });
+                                  }}
                                   placeholder="Desayuno, Almuerzo, Cena"
                                   className="h-9"
                                 />
                                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                                  Separa con comas. Se usa para el conteo en cotizaciones.
+                                  Separa con comas o punto y coma. El conteo en cotizaciones se actualiza al salir del campo o al guardar.
                                 </p>
                               </div>
                               <div>
@@ -1296,7 +1536,6 @@ Puedes usar **texto** para resaltar.`}
                   <ItineraryMapGallery
                     selectedUrl={itineraryMapImageUrl}
                     onSelect={setItineraryMapImageUrl}
-                    allowUploadWithoutPlan
                     planName={name}
                   />
                 </div>
@@ -1436,6 +1675,102 @@ Puedes usar **texto** para resaltar.`}
               )}
             </CardContent>
           </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-base">Galería de imágenes de hoteles</CardTitle>
+              <CardDescription>
+                Fotos extra solo de este plan: bucket propio en Supabase y PDF «Adicionales». Arrastra archivos al área de
+                abajo o haz clic; en la rejilla, arrastra las miniaturas para ordenar. Eliminar quita el archivo del bucket
+                al instante o al guardar si quedó huérfana.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <label
+                htmlFor="hotel-gallery-upload"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!uploadingHotelGallery && name.trim()) setDragHotelGallery(true);
+                }}
+                onDragLeave={() => setDragHotelGallery(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragHotelGallery(false);
+                  if (!name.trim() || uploadingHotelGallery) return;
+                  const files = Array.from(e.dataTransfer.files || []);
+                  processHotelGalleryFiles(files);
+                }}
+                className={cn(
+                  "block w-full rounded-xl border-2 border-dashed transition-all",
+                  name.trim()
+                    ? "cursor-pointer border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30"
+                    : "cursor-not-allowed opacity-60 border-muted-foreground/20",
+                  dragHotelGallery && name.trim() && "border-primary bg-primary/10"
+                )}
+              >
+                <input
+                  id="hotel-gallery-upload"
+                  ref={hotelGalleryFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={handleHotelGalleryUpload}
+                  disabled={uploadingHotelGallery || !name.trim()}
+                />
+                <div className="flex flex-col items-center justify-center py-10 px-6">
+                  {uploadingHotelGallery ? (
+                    <>
+                      <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mb-3" />
+                      <span className="text-sm font-medium text-foreground">Subiendo imágenes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ImagePlus className="w-12 h-12 text-muted-foreground mb-3" />
+                      <span className="text-sm font-medium text-foreground">
+                        Arrastra imágenes de hoteles o haz clic para subir
+                      </span>
+                      <span className="text-xs text-muted-foreground mt-1">PNG, JPG o WebP · Múltiples archivos</span>
+                    </>
+                  )}
+                </div>
+              </label>
+              {!name.trim() && (
+                <p className="text-xs text-muted-foreground">Define primero el nombre del plan en la pestaña Básico.</p>
+              )}
+
+              {hotelGalleryImages.length > 0 && (
+                <div className="space-y-3">
+                  <DndContext
+                    sensors={hotelGallerySensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleHotelGalleryReorder}
+                  >
+                    <SortableContext
+                      items={hotelGalleryImages.map((img) => img.imageUrl)}
+                      strategy={rectSortingStrategy}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {hotelGalleryImages.map((img, i) => (
+                          <SortableImageCard
+                            key={img.imageUrl}
+                            img={img}
+                            index={i}
+                            onRemove={() => removeHotelGalleryImage(i)}
+                            isReordering={reorderHotelGalleryMutation.isPending}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                  <p className="text-xs text-muted-foreground">
+                    Arrastra las miniaturas para cambiar el orden; los nombres en Supabase se actualizan al soltar.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="flex justify-between pt-2">
             <Button type="button" variant="ghost" onClick={() => setActiveTab("itinerario")}>
               <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1703,6 +2038,100 @@ Puedes usar **texto** para resaltar.`}
               )}
             </CardContent>
           </Card>
+
+          <div className="rounded-xl border border-primary/20 bg-muted/30 p-4 sm:p-5 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold tracking-tight">Adicionales</h3>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                Galería aparte del catálogo del plan: estas imágenes se imprimen en la última hoja del PDF, bloque ADICIONALES, después de las fotos de la galería de hoteles. Almacenamiento en Supabase: bucket <code className="text-xs rounded bg-background/80 px-1 py-0.5">plan-…-adicionales</code>.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <label
+                htmlFor="adicionales-gallery-upload"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!uploadingAdicionalesGallery && name.trim()) setDragAdicionalesGallery(true);
+                }}
+                onDragLeave={() => setDragAdicionalesGallery(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragAdicionalesGallery(false);
+                  if (!name.trim() || uploadingAdicionalesGallery) return;
+                  const files = Array.from(e.dataTransfer.files || []);
+                  processAdicionalesGalleryFiles(files);
+                }}
+                className={cn(
+                  "block w-full rounded-xl border-2 border-dashed transition-all",
+                  name.trim()
+                    ? "cursor-pointer border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30"
+                    : "cursor-not-allowed opacity-60 border-muted-foreground/20",
+                  dragAdicionalesGallery && name.trim() && "border-primary bg-primary/10"
+                )}
+              >
+                <input
+                  id="adicionales-gallery-upload"
+                  ref={adicionalesGalleryFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={handleAdicionalesGalleryUpload}
+                  disabled={uploadingAdicionalesGallery || !name.trim()}
+                />
+                <div className="flex flex-col items-center justify-center py-10 px-6">
+                  {uploadingAdicionalesGallery ? (
+                    <>
+                      <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mb-3" />
+                      <span className="text-sm font-medium text-foreground">Subiendo imágenes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ImagePlus className="w-12 h-12 text-muted-foreground mb-3" />
+                      <span className="text-sm font-medium text-foreground">
+                        Arrastra imágenes o haz clic para subir (Adicionales)
+                      </span>
+                      <span className="text-xs text-muted-foreground mt-1">PNG, JPG o WebP · Múltiples archivos</span>
+                    </>
+                  )}
+                </div>
+              </label>
+              {!name.trim() && (
+                <p className="text-xs text-muted-foreground">Define primero el nombre del plan en la pestaña Básico.</p>
+              )}
+
+              {adicionalesGalleryImages.length > 0 && (
+                <div className="space-y-3">
+                  <DndContext
+                    sensors={adicionalesGallerySensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleAdicionalesGalleryReorder}
+                  >
+                    <SortableContext
+                      items={adicionalesGalleryImages.map((img) => img.imageUrl)}
+                      strategy={rectSortingStrategy}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {adicionalesGalleryImages.map((img, i) => (
+                          <SortableImageCard
+                            key={img.imageUrl}
+                            img={img}
+                            index={i}
+                            onRemove={() => removeAdicionalesGalleryImage(i)}
+                            isReordering={reorderAdicionalesGalleryMutation.isPending}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                  <p className="text-xs text-muted-foreground">
+                    Arrastra las miniaturas para cambiar el orden; los nombres en Supabase se actualizan al soltar.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="flex justify-between pt-2">
             <Button type="button" variant="ghost" onClick={() => setActiveTab("precios")}>
               <ChevronLeft className="mr-2 h-4 w-4" />

@@ -7,9 +7,11 @@ import {
   isSupabaseStorageEnabled,
   uploadToBucket,
   getPlanBucketName,
+  getPlanHotelsBucketName,
+  getPlanAdicionalesBucketName,
   getImagesBucketName,
   getMedicalAssistanceBucketName,
-  getItineraryMapsBucketName,
+  ITINERARY_MAP_STORAGE_PREFIX,
   destinationNameToBucketSlug,
   parseSupabaseStorageUrl,
   downloadFromBucket,
@@ -90,6 +92,10 @@ export async function handleFileUpload(req: Request, res: Response) {
     const galleryIndex = req.body?.galleryIndex as string | undefined;
     const isMedicalAssistance = galleryIndex === "medical-assistance";
     const isItineraryMap = galleryIndex === "mapa-itinerario";
+    const isHotelGallery =
+      typeof galleryIndex === "string" && /^hotel-\d+$/.test(galleryIndex);
+    const isAdicionalesGallery =
+      typeof galleryIndex === "string" && /^adicional-\d+$/.test(galleryIndex);
 
     let bucketName: string;
     let subPath: string;
@@ -100,13 +106,36 @@ export async function handleFileUpload(req: Request, res: Response) {
       subPath = "";
       filename = `${Date.now()}-${randomBytes(8).toString("hex")}.${ext}`;
     } else if (isItineraryMap) {
-      bucketName = getItineraryMapsBucketName();
-      subPath = "";
+      if (!planName?.trim()) {
+        return res.status(400).json({
+          message: "Ingresa el nombre del plan antes de subir el mapa del itinerario.",
+        });
+      }
+      bucketName = getPlanBucketName(planName);
+      subPath = ITINERARY_MAP_STORAGE_PREFIX;
       filename = `${Date.now()}-${randomBytes(8).toString("hex")}.${ext}`;
     } else if (isAvatar) {
       bucketName = getImagesBucketName();
       subPath = "avatars";
       filename = `${randomBytes(16).toString("hex")}.${ext}`;
+    } else if (planName && isHotelGallery) {
+      bucketName = getPlanHotelsBucketName(planName);
+      subPath = "";
+      const hotelNum = parseInt(String(galleryIndex).replace(/^hotel-/, ""), 10);
+      if (Number.isInteger(hotelNum) && hotelNum >= 1 && hotelNum <= 9999) {
+        filename = `${hotelNum}.${ext}`;
+      } else {
+        filename = `${randomBytes(16).toString("hex")}.${ext}`;
+      }
+    } else if (planName && isAdicionalesGallery) {
+      bucketName = getPlanAdicionalesBucketName(planName);
+      subPath = "";
+      const adNum = parseInt(String(galleryIndex).replace(/^adicional-/, ""), 10);
+      if (Number.isInteger(adNum) && adNum >= 1 && adNum <= 9999) {
+        filename = `${adNum}.${ext}`;
+      } else {
+        filename = `${randomBytes(16).toString("hex")}.${ext}`;
+      }
     } else if (planName) {
       bucketName = getPlanBucketName(planName);
       subPath = "";

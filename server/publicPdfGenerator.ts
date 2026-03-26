@@ -9,6 +9,7 @@ import {
   formatUSD,
   formatDate,
 } from "@shared/schema";
+import { connectionSegmentPdfHeading, displayPlanNamesForCombo } from "@shared/quoteCombination";
 import {
   getDestinationImages,
   getDestinationImageSet,
@@ -222,6 +223,7 @@ interface PublicQuoteData {
   returnFlightImages?: string[];
   domesticFlightImages?: string[];
   connectionFlightImages?: string[];
+  connectionFlightSegments?: Array<{ images: string[] }>;
   includeFlights?: boolean;
   outboundCabinBaggage?: boolean;
   outboundHoldBaggage?: boolean;
@@ -294,9 +296,19 @@ export async function generatePublicQuotePDF(
     // Add plan-specific medical assistance and map images
     const dest = d.destination as { medicalAssistanceImageUrl?: string | null; itineraryMapImageUrl?: string | null; internalFlights?: Array<{ imageUrl: string }> } | undefined;
     if (dest?.medicalAssistanceImageUrl) allDestImages.push(dest.medicalAssistanceImageUrl);
-    if (dest?.itineraryMapImageUrl) allDestImages.push(dest.itineraryMapImageUrl);
+    if (data.destinations.length < 2 && dest?.itineraryMapImageUrl) {
+      allDestImages.push(dest.itineraryMapImageUrl);
+    }
     if (dest?.internalFlights?.length) {
       dest.internalFlights.forEach((f) => f.imageUrl && allDestImages.push(f.imageUrl));
+    }
+    const destHotels = d.destination as { hotelGalleryImageUrls?: string[] | null } | undefined;
+    if (destHotels?.hotelGalleryImageUrls?.length) {
+      destHotels.hotelGalleryImageUrls.forEach((u) => u && allDestImages.push(u));
+    }
+    const destAdicionales = d.destination as { adicionalesGalleryImageUrls?: string[] | null } | undefined;
+    if (destAdicionales?.adicionalesGalleryImageUrls?.length) {
+      destAdicionales.adicionalesGalleryImageUrls.forEach((u) => u && allDestImages.push(u));
     }
   });
 
@@ -310,7 +322,9 @@ export async function generatePublicQuotePDF(
       ...(data.outboundFlightImages || []),
       ...(data.returnFlightImages || []),
       ...(data.domesticFlightImages || []),
-      ...(data.connectionFlightImages || []),
+      ...(data.connectionFlightSegments?.length
+        ? data.connectionFlightSegments.flatMap((s) => s.images || [])
+        : data.connectionFlightImages || []),
     ]),
   ]);
   
@@ -364,7 +378,11 @@ export async function generatePublicQuotePDF(
 
   addPageBackground();
 
-  const destinationNames = data.destinations.map((d) => d.name).join(" + ");
+  const rawTitleNames = data.destinations.map((d) => d.name || "");
+  const destinationNames =
+    data.destinations.length >= 2
+      ? displayPlanNamesForCombo(rawTitleNames).filter(Boolean).join(" + ")
+      : (rawTitleNames[0] || "").trim();
   
   let totalDuration = data.destinations.reduce((sum, d) => sum + (d.duration || 0), 0);
   if (data.destinations.some((d) => (d.destination as { requiresExtraDay?: boolean })?.requiresExtraDay === true)) totalDuration += 1;
@@ -382,49 +400,99 @@ export async function generatePublicQuotePDF(
   const totalNights = data.destinations.reduce((sum, d) => sum + d.nights, 0);
 
   // Store both relative (for cache lookup) and absolute (for fallback) paths
-  // Prioridad: dest.imageUrl (imagen principal elegida en Basic) > images[0]
+  // Portada combinada: 1 plan = lógica histórica; 2+ = reglas por cantidad de planes (orden = cotización)
+  type DestBlock = PublicQuoteData["destinations"][number];
   const imageInfo: Array<{ relativePath: string; absolutePath: string }> = [];
   const addImageEntry = (relativePath: string) => {
+    if (!relativePath?.trim()) return;
     let absolutePath: string;
-    if (relativePath.startsWith('https://')) {
+    if (relativePath.startsWith("https://")) {
       absolutePath = relativePath;
-    } else if (relativePath.startsWith('/images/')) {
-      absolutePath = path.join(process.cwd(), 'public', relativePath.slice(1));
+    } else if (relativePath.startsWith("/images/")) {
+      absolutePath = path.join(process.cwd(), "public", relativePath.slice(1));
     } else {
-      absolutePath = path.join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+      absolutePath = path.join(
+        process.cwd(),
+        relativePath.startsWith("/") ? relativePath.slice(1) : relativePath,
+      );
     }
     imageInfo.push({ relativePath, absolutePath });
   };
 
-  data.destinations.forEach((dest) => {
+  const coverPrimaryUrl = (dest: DestBlock): string => {
+    const mainImageUrl = (dest.destination as { imageUrl?: string | null })?.imageUrl?.trim();
+    if (mainImageUrl) return mainImageUrl;
+    if (dest.images && dest.images.length > 0) return dest.images[0].imageUrl;
+    const fb = getDestinationImageSet({ name: dest.name || "", country: dest.country || "" });
+    return fb[0] || "";
+  };
+
+  const galleryOrderedUnique = (dest: DestBlock): string[] => {
+    const main = (dest.destination as { imageUrl?: string | null })?.imageUrl?.trim();
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const push = (u: string) => {
+      if (u && !seen.has(u)) {
+        seen.add(u);
+        out.push(u);
+      }
+    };
+    if (main) push(main);
+    if (dest.images?.length) {
+      dest.images.forEach((img) => push(img.imageUrl));
+    }
+    if (out.length === 0) {
+      getDestinationImageSet({ name: dest.name || "", country: dest.country || "" }).forEach(push);
+    }
+    return out;
+  };
+
+  const twoExtrasFromPlan = (dest: DestBlock): [string, string] => {
+    const gal = galleryOrderedUnique(dest);
+    const p = coverPrimaryUrl(dest);
+    const others = gal.filter((u) => u !== p);
+    const a = others[0] ?? gal[1] ?? p;
+    const b = others[1] ?? gal[2] ?? gal[1] ?? p;
+    return [a, b];
+  };
+
+  const ds = data.destinations;
+  if (ds.length === 1) {
+    const dest = ds[0];
     const mainImageUrl = (dest.destination as { imageUrl?: string | null })?.imageUrl;
     if (dest.images && dest.images.length > 0) {
-      // Primera imagen = la elegida en Basic (imageUrl) si existe, sino images[0]
       const coverUrl = mainImageUrl || dest.images[0].imageUrl;
       addImageEntry(coverUrl);
-      // Resto de imágenes (excluyendo la ya usada como portada si está en el array)
       dest.images
-        .filter(img => img.imageUrl !== coverUrl)
-        .forEach(img => addImageEntry(img.imageUrl));
+        .filter((img) => img.imageUrl !== coverUrl)
+        .forEach((img) => addImageEntry(img.imageUrl));
     } else if (mainImageUrl) {
       addImageEntry(mainImageUrl);
     } else {
-      // Fallback to old logic - get ALL old images
       const oldImages = getDestinationImageSet({ name: dest.name, country: dest.country });
-      oldImages.forEach(img => {
+      oldImages.forEach((img) => {
         let absolutePath = img;
-        
-        if (img.startsWith('https://')) {
-           absolutePath = img;
-        } else if (img.startsWith('/images/')) {
-           absolutePath = path.join(process.cwd(), 'public', img.slice(1));
+        if (img.startsWith("https://")) {
+          absolutePath = img;
+        } else if (img.startsWith("/images/")) {
+          absolutePath = path.join(process.cwd(), "public", img.slice(1));
         } else {
-           absolutePath = img;
+          absolutePath = img;
         }
         imageInfo.push({ relativePath: img, absolutePath });
       });
     }
-  });
+  } else if (ds.length >= 2) {
+    addImageEntry(coverPrimaryUrl(ds[0]));
+    if (ds.length === 2) {
+      const [e1, e2] = twoExtrasFromPlan(ds[1]);
+      addImageEntry(e1);
+      addImageEntry(e2);
+    } else {
+      addImageEntry(coverPrimaryUrl(ds[1]));
+      addImageEntry(coverPrimaryUrl(ds[2]));
+    }
+  }
 
   // Add Special Offer banner on first page only (top-right corner) - 100% in corner
   try {
@@ -1049,14 +1117,14 @@ export async function generatePublicQuotePDF(
     align: "right",
   });
 
-  // Add map image: use plan-specific itineraryMapImageUrl if set, else Turkey map for Turkey destinations
+  // Mapa del itinerario resumido: solo un destino; con combinación (2+) se omite (un mapa no representa bien varios países)
   const customMapUrl = data.destinations.find(
     (d) => (d.destination as { itineraryMapImageUrl?: string | null })?.itineraryMapImageUrl?.trim()
   )?.destination as { itineraryMapImageUrl?: string } | undefined;
   const mapImageUrl = customMapUrl?.itineraryMapImageUrl?.trim();
   const mapCacheKey = mapImageUrl || (isTurkey ? TURKEY_MAPA_CACHE_KEY : null);
 
-  if (mapCacheKey) {
+  if (mapCacheKey && data.destinations.length < 2) {
     try {
       const cached = getCachedImageOrPath(mapCacheKey);
       if (typeof cached === "object") {
@@ -1105,6 +1173,122 @@ export async function generatePublicQuotePDF(
       }
     });
     return Math.ceil(totalHeight) + 20;
+  };
+
+  const renderConnectionFlightBlock = (sectionTitle: string, flightImages: string[]) => {
+    if (!flightImages.length) return;
+
+    const baggageItemsConn = ["PERSONAL 8KG"];
+    if (data.connectionCabinBaggage) baggageItemsConn.push("CABINA 10KG");
+    if (data.connectionHoldBaggage) baggageItemsConn.push("BODEGA 23KG");
+    const baggageTextConn = baggageItemsConn.join(" + ");
+    const termsHeightConn = calculateFlightTermsHeight();
+
+    doc.addPage();
+    addPageBackground();
+    addPlaneLogoBottom();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(18)
+      .fillColor(textColor)
+      .text(sectionTitle, leftMargin, 80, {
+        align: "center",
+        width: contentWidth,
+      });
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor(textColor)
+      .text(baggageTextConn, leftMargin, 110, {
+        align: "center",
+        width: contentWidth,
+      });
+
+    let flightImageY = 140;
+
+    for (let index = 0; index < flightImages.length; index++) {
+      const imageUrl = flightImages[index];
+      const filename = imageUrl.split("/").pop();
+      if (!filename) continue;
+      const cachedImage = imageCache.get(filename);
+      if (!cachedImage) continue;
+      try {
+        const imageWidth = contentWidth;
+        let naturalHeight =
+          cachedImage.height && cachedImage.width
+            ? (cachedImage.height / cachedImage.width) * imageWidth
+            : contentWidth * 0.6;
+        const isLastImage = index === flightImages.length - 1;
+        let imageHeight = naturalHeight;
+
+        if (isLastImage) {
+          let maxAvailableHeight = Math.max(
+            0,
+            pageHeight - 50 - flightImageY - termsHeightConn - 40,
+          );
+          const minimumImageHeight = 200;
+          if (index > 0 && maxAvailableHeight < minimumImageHeight) {
+            doc.addPage();
+            addPageBackground();
+            addPlaneLogoBottom();
+            doc
+              .font("Helvetica-Bold")
+              .fontSize(18)
+              .fillColor(textColor)
+              .text(sectionTitle, leftMargin, 80, {
+                align: "center",
+                width: contentWidth,
+              });
+            doc
+              .font("Helvetica-Bold")
+              .fontSize(12)
+              .fillColor(textColor)
+              .text(baggageTextConn, leftMargin, 110, {
+                align: "center",
+                width: contentWidth,
+              });
+            flightImageY = 140;
+            maxAvailableHeight = Math.max(
+              0,
+              pageHeight - 50 - flightImageY - termsHeightConn - 40,
+            );
+          }
+          imageHeight = Math.min(naturalHeight, maxAvailableHeight);
+        }
+
+        doc.image(cachedImage.buffer, leftMargin, flightImageY, {
+          width: imageWidth,
+          height: imageHeight,
+          align: "center",
+        });
+        flightImageY += imageHeight + 10;
+      } catch (error) {
+        console.error(`[PDF Generator] Error rendering connection image ${index}:`, error);
+      }
+    }
+
+    if (flightImageY > 80) {
+      flightImageY += 20;
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
+      doc.text("Términos y condiciones", leftMargin, flightImageY, {
+        width: contentWidth,
+      });
+      doc.moveDown(0.5);
+      doc.font("Helvetica").fontSize(9).fillColor(textColor);
+      flightTermsLines.forEach((line) => {
+        if (line === "") doc.moveDown(0.3);
+        else {
+          doc.text(line, { width: contentWidth, align: "left" });
+          doc.moveDown(0.3);
+        }
+      });
+    }
+
+    doc.addPage();
+    addPageBackground();
+    addPlaneLogoBottom();
   };
 
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
@@ -1480,21 +1664,46 @@ export async function generatePublicQuotePDF(
   doc.text("Itinerario Detallado", leftMargin, 60);
   doc.moveDown(1.5);
 
-  data.destinations.forEach((dest, destIndex) => {
-    if (!dest.itinerary || dest.itinerary.length === 0) return;
+  const connectionPlanNames = data.destinations.map((d) => d.name || "");
+  const nPlansConn = data.destinations.length;
+  const segmentAfterPlan: Array<{ images: string[]; heading: string } | null> =
+    Array(nPlansConn).fill(null);
+  if (nPlansConn >= 2) {
+    if (data.connectionFlightSegments && data.connectionFlightSegments.length > 0) {
+      for (let i = 0; i < nPlansConn - 1; i++) {
+        segmentAfterPlan[i] = {
+          images: data.connectionFlightSegments[i]?.images ?? [],
+          heading: connectionSegmentPdfHeading(connectionPlanNames, i),
+        };
+      }
+    } else if (data.connectionFlightImages && data.connectionFlightImages.length > 0) {
+      segmentAfterPlan[0] = {
+        images: data.connectionFlightImages,
+        heading: connectionSegmentPdfHeading(connectionPlanNames, 0),
+      };
+    }
+  }
 
+  const itineraryHeadingNames = displayPlanNamesForCombo(
+    data.destinations.map((d) => d.name || ""),
+  );
+
+  for (let destIndex = 0; destIndex < data.destinations.length; destIndex++) {
+    const dest = data.destinations[destIndex];
+    if (dest.itinerary && dest.itinerary.length > 0) {
     if (doc.y > 700) {
       doc.addPage();
       addPageBackground();
       addPlaneLogoBottom();
     }
 
+    const itineraryHeading =
+      data.destinations.length >= 2
+        ? (itineraryHeadingNames[destIndex] || dest.name || "").trim() || dest.name || "DESTINO"
+        : dest.name || "DESTINO";
+
     doc.font("Helvetica-Bold").fontSize(12).fillColor(primaryColor);
-    doc.text(
-      `${dest.name?.toUpperCase() || "DESTINO"}`,
-      leftMargin,
-      doc.y,
-    );
+    doc.text(`${itineraryHeading.toUpperCase()}`, leftMargin, doc.y);
     doc.moveDown(0.5);
 
     let destImages: string[] = [];
@@ -1551,8 +1760,9 @@ export async function generatePublicQuotePDF(
       if (day.location?.trim()) dayExtras.push(`Ciudad: ${day.location.trim()}`);
       if (day.meals && Array.isArray(day.meals) && day.meals.length > 0) {
         dayExtras.push(`Alimentación: ${day.meals.filter(Boolean).join(", ")}`);
-      } else if (typeof day.meals === "string" && day.meals.trim()) {
-        dayExtras.push(`Alimentación: ${day.meals.trim()}`);
+      } else if (day.meals != null && !Array.isArray(day.meals)) {
+        const m = String(day.meals).trim();
+        if (m) dayExtras.push(`Alimentación: ${m}`);
       }
       if (day.accommodation?.trim()) dayExtras.push(`Alojamiento: ${day.accommodation.trim()}`);
       if (dayExtras.length > 0) {
@@ -1739,179 +1949,12 @@ export async function generatePublicQuotePDF(
     });
 
     doc.moveDown(0.5);
-
-    // Check for Connection Flight after Turkey itinerary
-    const isTurkeyDest = dest.destination?.name?.toLowerCase().includes("turquía") || dest.name?.toLowerCase().includes("turquía");
-    const hasDubaiDestination = data.destinations.some(d => 
-      d.destination?.name?.toLowerCase().includes("dubai") || d.name?.toLowerCase().includes("dubai")
-    );
-    
-    console.log("[PDF Generator - Connection Flight Debug]", {
-      currentDest: dest.name,
-      isTurkeyDest,
-      hasDubaiDestination,
-      hasConnectionImages: !!data.connectionFlightImages,
-      connectionImagesLength: data.connectionFlightImages?.length || 0,
-      connectionImages: data.connectionFlightImages
-    });
-    
-    if (isTurkeyDest && hasDubaiDestination && data.connectionFlightImages && data.connectionFlightImages.length > 0) {
-      console.log("[PDF Generator] Rendering connection flight page with images:", data.connectionFlightImages);
-      doc.addPage();
-      addPageBackground();
-      addPlaneLogoBottom();
-
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(18)
-        .fillColor(textColor)
-        .text("VUELO DE CONEXIÓN TURQUÍA - DUBAI", leftMargin, 80, {
-          align: "center",
-          width: contentWidth,
-        });
-
-      // Generar texto de equipajes dinámicamente
-      const baggageItems = ["PERSONAL 8KG"];
-      if (data.connectionCabinBaggage) {
-        baggageItems.push("CABINA 10KG");
-      }
-      if (data.connectionHoldBaggage) {
-        baggageItems.push("BODEGA 23KG");
-      }
-      const baggageText = baggageItems.join(" + ");
-
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(12)
-        .fillColor(textColor)
-        .text(baggageText, leftMargin, 110, {
-          align: "center",
-          width: contentWidth,
-        });
-
-      const termsHeight = calculateFlightTermsHeight();
-      let flightImageY = 140; // Start closer to baggage text
-
-      for (let index = 0; index < data.connectionFlightImages.length; index++) {
-        const imageUrl = data.connectionFlightImages[index];
-        console.log(`[PDF Generator] Processing connection image ${index}:`, imageUrl);
-        // Extract filename from URL (format: /api/images/filename.ext)
-        const filename = imageUrl.split("/").pop();
-        if (filename) {
-          // Use cached image data for faster processing
-          const cachedImage = imageCache.get(filename);
-          
-          if (cachedImage) {
-            try {
-              const imageWidth = contentWidth;
-
-              // Calculate natural height based on aspect ratio from cached dimensions
-              let naturalHeight =
-                cachedImage.height && cachedImage.width
-                  ? (cachedImage.height / cachedImage.width) * imageWidth
-                  : contentWidth * 0.6; // Fallback estimate
-
-              // For the last image, maximize to fit available space with terms
-              const isLastImage = index === data.connectionFlightImages.length - 1;
-              let imageHeight = naturalHeight;
-
-              if (isLastImage) {
-                // Recalculate available space based on CURRENT position (after previous images)
-                let maxAvailableHeight = Math.max(
-                  0,
-                  pageHeight - 50 - flightImageY - termsHeight - 40,
-                );
-
-                // If available space is too small (less than 200px), move to new page WITH section header
-                // Skip for first image (index === 0) to avoid empty page - we're already on a fresh page
-                const minimumImageHeight = 200;
-                if (index > 0 && maxAvailableHeight < minimumImageHeight) {
-                  console.log(
-                    `[PDF Generator] Insufficient space for connection image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
-                  );
-                  doc.addPage();
-                  addPageBackground();
-                  addPlaneLogoBottom();
-
-                  // Re-render section title and baggage text on new page
-                  doc
-                    .font("Helvetica-Bold")
-                    .fontSize(18)
-                    .fillColor(textColor)
-                    .text("VUELO DE CONEXIÓN TURQUÍA - DUBAI", leftMargin, 80, {
-                      align: "center",
-                      width: contentWidth,
-                    });
-                  doc
-                    .font("Helvetica-Bold")
-                    .fontSize(12)
-                    .fillColor(textColor)
-                    .text(baggageText, leftMargin, 110, {
-                      align: "center",
-                      width: contentWidth,
-                    });
-
-                  flightImageY = 140; // Start after header
-                  maxAvailableHeight = Math.max(
-                    0,
-                    pageHeight - 50 - flightImageY - termsHeight - 40,
-                  );
-                }
-
-                // Maximize to fit available space, but respect natural height if smaller
-                imageHeight = Math.min(naturalHeight, maxAvailableHeight);
-              }
-
-              doc.image(cachedImage.buffer, leftMargin, flightImageY, {
-                width: imageWidth,
-                height: imageHeight,
-                align: "center",
-              });
-
-              flightImageY += imageHeight + 10; // Add spacing between images
-            } catch (error) {
-              console.error(
-                `[PDF Generator] Error rendering connection image ${index}:`,
-                error,
-              );
-            }
-          } else {
-            console.error(
-              `[PDF Generator] Image not found in cache: ${filename}`,
-            );
-          }
-        }
-      }
-
-      // Add flight terms and conditions after images
-      if (flightImageY > 80) {
-        flightImageY += 20; // Add some spacing
-
-        doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
-        doc.text("Términos y condiciones", leftMargin, flightImageY, {
-          width: contentWidth,
-        });
-        doc.moveDown(0.5);
-
-        doc.font("Helvetica").fontSize(9).fillColor(textColor);
-
-        flightTermsLines.forEach((line) => {
-          if (line === "") {
-            doc.moveDown(0.3);
-          } else {
-            doc.text(line, { width: contentWidth, align: "left" });
-            doc.moveDown(0.3);
-          }
-        });
-      }
-      
-      // Add new page after connection flight so Dubai starts on its own page
-      console.log("[PDF Generator] Adding new page after connection flight");
-      doc.addPage();
-      addPageBackground();
-      addPlaneLogoBottom();
     }
-  });
+    const segConn = segmentAfterPlan[destIndex];
+    if (segConn?.images?.length) {
+      renderConnectionFlightBlock(segConn.heading, segConn.images);
+    }
+  }
 
   // Generic upgrades: show section for each destination that has upgrades defined in the plan
   // Uses plan's upgrades (destinations.upgrades), selected from selectedUpgrades or legacy fields
@@ -2967,6 +3010,87 @@ export async function generatePublicQuotePDF(
     });
 
     console.log("[PDF Generator] Turkey holidays page added successfully");
+  }
+
+  // Página(s) finales: galería de hoteles + galería Adicionales (misma hoja «ADICIONALES»)
+  const adicionalesSections: { planName: string; urls: string[] }[] = [];
+  data.destinations.forEach((d) => {
+    const dest = d.destination as Destination | undefined;
+    const hotelUrls = (dest?.hotelGalleryImageUrls ?? []).filter(
+      (u): u is string => typeof u === "string" && u.trim().length > 0
+    );
+    const extraUrls = (dest?.adicionalesGalleryImageUrls ?? []).filter(
+      (u): u is string => typeof u === "string" && u.trim().length > 0
+    );
+    const urls = [...hotelUrls, ...extraUrls];
+    if (urls.length) adicionalesSections.push({ planName: d.name || "Plan", urls });
+  });
+
+  if (adicionalesSections.length > 0) {
+    const bottomSafe = pageHeight - 55;
+    const imgGap = 10;
+    const cols = 2;
+    const imgW = (contentWidth - imgGap) / cols;
+    const imgH = 125;
+
+    doc.addPage();
+    addPageBackground();
+    addPlaneLogoBottom();
+    doc.y = 50;
+    doc.font("Helvetica-Bold").fontSize(20).fillColor(primaryColor);
+    doc.text("ADICIONALES", leftMargin, doc.y, { width: contentWidth, align: "center" });
+    doc.moveDown(1.1);
+
+    for (const section of adicionalesSections) {
+      if (doc.y > bottomSafe - 48) {
+        doc.addPage();
+        addPageBackground();
+        addPlaneLogoBottom();
+        doc.y = 50;
+      }
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
+      doc.text(section.planName.toUpperCase(), leftMargin, doc.y, { width: contentWidth });
+      doc.moveDown(0.35);
+
+      let rowY = doc.y;
+      for (let i = 0; i < section.urls.length; i++) {
+        const col = i % cols;
+        if (col === 0 && i > 0) {
+          rowY += imgH + imgGap;
+        }
+        if (rowY + imgH > bottomSafe) {
+          doc.addPage();
+          addPageBackground();
+          addPlaneLogoBottom();
+          doc.y = 50;
+          rowY = doc.y;
+        }
+        const xPos = leftMargin + col * (imgW + imgGap);
+        const ref = section.urls[i];
+        try {
+          const cached = getCachedImageOrPath(ref);
+          let imageSource: Buffer | string | null = null;
+          if (typeof cached === "object") imageSource = cached.buffer;
+          else if (ref.startsWith("/images/")) {
+            const localPath = path.join(process.cwd(), "public", ref.slice(1));
+            if (fs.existsSync(localPath)) imageSource = localPath;
+          }
+          if (imageSource) {
+            doc.image(imageSource, xPos, rowY, {
+              width: imgW,
+              height: imgH,
+              align: "center",
+              valign: "center",
+            });
+            doc.rect(xPos, rowY, imgW, imgH).stroke(borderColor);
+          }
+        } catch (e) {
+          console.error("[PDF Generator] Adicionales image error", e);
+        }
+      }
+      const rowsUsed = Math.ceil(section.urls.length / cols);
+      doc.y = rowY + (section.urls.length > 0 ? imgH : 0) + (rowsUsed > 0 ? 18 : 6);
+    }
   }
 
   return doc;

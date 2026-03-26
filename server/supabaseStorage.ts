@@ -3,7 +3,9 @@
  *
  * Estructura de buckets:
  * - images: Imágenes generales (vuelos, adjuntos de cotizaciones)
- * - plan-{slug}: Un bucket por plan/destino (ej: plan-turquia-esencial)
+ * - plan-{slug}: Galería principal del plan
+ * - plan-{slug}-hotels: Galería de imágenes de hoteles (solo ese plan, PDF «Adicionales»)
+ * - plan-{slug}-adicionales: Galería Adicionales (misma página del PDF que hoteles)
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
@@ -44,9 +46,22 @@ export function getPlanBucketName(destinationName: string): string {
   return `plan-${slug}`;
 }
 
+/** Bucket solo para la galería de hoteles del plan: plan-{slug}-hotels */
+export function getPlanHotelsBucketName(destinationName: string): string {
+  return `${getPlanBucketName(destinationName)}-hotels`;
+}
+
+/** Bucket para la galería Adicionales del plan: plan-{slug}-adicionales */
+export function getPlanAdicionalesBucketName(destinationName: string): string {
+  return `${getPlanBucketName(destinationName)}-adicionales`;
+}
+
 const BUCKET_IMAGES = "images";
 const BUCKET_MEDICAL_ASSISTANCE = "medical-assistance";
 const BUCKET_ITINERARY_MAPS = "itinerary-maps";
+
+/** Carpeta dentro del bucket del plan donde viven los mapas del itinerario (por plan, no compartida) */
+export const ITINERARY_MAP_STORAGE_PREFIX = "mapa-itinerario";
 
 /** Bucket general para imágenes (vuelos, etc.) */
 export function getImagesBucketName(): string {
@@ -58,7 +73,7 @@ export function getMedicalAssistanceBucketName(): string {
   return BUCKET_MEDICAL_ASSISTANCE;
 }
 
-/** Bucket dedicado para mapas del itinerario (compartido entre planes) */
+/** Bucket legado para mapas del itinerario (antes era compartido; ya no se usa para subidas nuevas) */
 export function getItineraryMapsBucketName(): string {
   return BUCKET_ITINERARY_MAPS;
 }
@@ -182,6 +197,28 @@ export async function listBucketFiles(bucketName: string): Promise<string[]> {
   }
 }
 
+/** Lista archivos en una carpeta del bucket (un nivel). Devuelve paths completos `carpeta/archivo.ext`. */
+export async function listBucketFilesInFolder(bucketName: string, folderPath: string): Promise<string[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  const prefix = folderPath.replace(/^\/+|\/+$/g, "");
+  if (!prefix || prefix.includes("..")) return [];
+  try {
+    const { data, error } = await client.storage.from(bucketName).list(prefix, { limit: 500 });
+    if (error) {
+      logger.error("[SupabaseStorage] List folder error", { bucketName, prefix, error: error.message });
+      return [];
+    }
+    const rows = (data || []).filter((f) => f.name && !f.name.startsWith("."));
+    return rows
+      .filter((f) => /\.(jpe?g|png|gif|webp)$/i.test(f.name))
+      .map((f) => `${prefix}/${f.name}`);
+  } catch (err) {
+    logger.error("[SupabaseStorage] listBucketFilesInFolder error", { bucketName, prefix, err });
+    return [];
+  }
+}
+
 /** Elimina archivos de un bucket */
 export async function removeFromBucket(bucketName: string, paths: string[]): Promise<boolean> {
   if (!paths.length) return true;
@@ -275,7 +312,11 @@ export async function deleteOrphanPlanBuckets(
   }
 
   const validPlanBucketNames = new Set(
-    destinationNames.map((name) => getPlanBucketName(name))
+    destinationNames.flatMap((name) => [
+      getPlanBucketName(name),
+      getPlanHotelsBucketName(name),
+      getPlanAdicionalesBucketName(name),
+    ])
   );
   const allBuckets = await listAllBuckets();
   const planBucketPrefix = "plan-";
@@ -307,49 +348,55 @@ export async function deleteOrphanPlanBuckets(
   return result;
 }
 
-/** Elimina el bucket de un plan y todos sus archivos. No falla si el bucket no existe o Supabase no está configurado. */
-export async function deletePlanBucket(destinationName: string): Promise<{ deleted: boolean; error?: string }> {
+/** Elimina un bucket por nombre (vacía y delete). Ok si no existe. */
+async function deleteStorageBucketByName(bucketName: string): Promise<{ ok: boolean; error?: string }> {
   const client = getSupabaseClient();
-  if (!client) {
-    return { deleted: false, error: "Supabase no configurado" };
-  }
-  const bucketName = getPlanBucketName(destinationName);
+  if (!client) return { ok: false, error: "Supabase no configurado" };
   try {
     const { data: buckets } = await client.storage.listBuckets();
     const exists = buckets?.some((b) => b.name === bucketName);
     if (!exists) {
       logger.info("[SupabaseStorage] Bucket no existe, nada que eliminar", { bucketName });
-      return { deleted: true };
+      return { ok: true };
     }
     const emptied = await emptyBucket(bucketName);
     if (!emptied) {
-      return { deleted: false, error: "No se pudieron eliminar los archivos del bucket" };
+      return { ok: false, error: `No se pudieron eliminar los archivos del bucket ${bucketName}` };
     }
     const { error } = await client.storage.deleteBucket(bucketName);
     if (error) {
       logger.error("[SupabaseStorage] Error eliminando bucket", { bucketName, error: error.message });
-      return { deleted: false, error: error.message };
+      return { ok: false, error: error.message };
     }
     logger.info("[SupabaseStorage] Bucket eliminado", { bucketName });
-    return { deleted: true };
+    return { ok: true };
   } catch (err) {
     const msg = (err as Error).message;
-    logger.error("[SupabaseStorage] deletePlanBucket error", { bucketName, err });
-    return { deleted: false, error: msg };
+    logger.error("[SupabaseStorage] deleteStorageBucketByName error", { bucketName, err });
+    return { ok: false, error: msg };
   }
 }
 
-/** Reordena imágenes de un plan: descarga, elimina numeradas en bucket, sube en nuevo orden con nombres 1.ext, 2.ext, ... */
-export async function reorderPlanImages(
-  planName: string,
+/** Elimina los buckets del plan (galería principal, hoteles y adicionales). */
+export async function deletePlanBucket(destinationName: string): Promise<{ deleted: boolean; error?: string }> {
+  const main = await deleteStorageBucketByName(getPlanBucketName(destinationName));
+  const hotels = await deleteStorageBucketByName(getPlanHotelsBucketName(destinationName));
+  const adicionales = await deleteStorageBucketByName(getPlanAdicionalesBucketName(destinationName));
+  if (!main.ok) return { deleted: false, error: main.error };
+  if (!hotels.ok) return { deleted: false, error: hotels.error };
+  if (!adicionales.ok) return { deleted: false, error: adicionales.error };
+  return { deleted: true };
+}
+
+async function reorderNumberedImagesInBucket(
+  bucketName: string,
   imageUrls: string[]
 ): Promise<{ urls: string[]; error?: string }> {
   const client = getSupabaseClient();
   if (!client) return { urls: [], error: "Supabase no configurado" };
 
-  const bucketName = getPlanBucketName(planName);
   const created = await ensureBucketExists(bucketName);
-  if (!created) return { urls: [], error: "No se pudo acceder al bucket del plan" };
+  if (!created) return { urls: [], error: "No se pudo acceder al bucket" };
 
   const buffers: { buffer: Buffer; ext: string }[] = [];
   for (const url of imageUrls) {
@@ -394,4 +441,28 @@ export async function reorderPlanImages(
     }
   }
   return { urls: newUrls };
+}
+
+/** Reordena imágenes de la galería del plan (bucket plan-{slug}). */
+export async function reorderPlanImages(
+  planName: string,
+  imageUrls: string[]
+): Promise<{ urls: string[]; error?: string }> {
+  return reorderNumberedImagesInBucket(getPlanBucketName(planName), imageUrls);
+}
+
+/** Reordena imágenes de la galería de hoteles (bucket plan-{slug}-hotels). */
+export async function reorderPlanHotelsImages(
+  planName: string,
+  imageUrls: string[]
+): Promise<{ urls: string[]; error?: string }> {
+  return reorderNumberedImagesInBucket(getPlanHotelsBucketName(planName), imageUrls);
+}
+
+/** Reordena imágenes de la galería Adicionales (bucket plan-{slug}-adicionales). */
+export async function reorderPlanAdicionalesImages(
+  planName: string,
+  imageUrls: string[]
+): Promise<{ urls: string[]; error?: string }> {
+  return reorderNumberedImagesInBucket(getPlanAdicionalesBucketName(planName), imageUrls);
 }

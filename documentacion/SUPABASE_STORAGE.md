@@ -58,3 +58,23 @@ Esto crea/actualiza el bucket `plan-turquia-esencial` con:
 - `1.png` … `6.png` (imágenes del destino)
 
 Tras ejecutarlo, la carpeta `attached_assets/` ya no se necesita para Turquía.
+
+## Eliminación de planes y buckets
+
+Al eliminar un plan desde Admin → Planes, el sistema:
+1. **Elimina el bucket** en Supabase (plan-{slug}) y todos sus archivos
+2. **Elimina el registro** en la base de datos (destinations y tablas relacionadas)
+
+Si el bucket no se puede eliminar (ej: Supabase no configurado), el plan se elimina igual de la BD para no dejar datos huérfanos.
+
+## Limpieza de buckets huérfanos
+
+Si se eliminaron planes sin que se borraran sus buckets, ejecuta:
+
+```bash
+npm run db:cleanup-orphan-buckets
+```
+
+Este script elimina todos los buckets `plan-*` que no tienen un plan asociado en la BD. Mantiene solo los buckets de planes existentes (activos o inactivos) y los compartidos (images, medical-assistance, itinerary-maps).
+
+También existe el endpoint `POST /api/admin/cleanup-orphan-buckets` (super_admin) para ejecutar la limpieza desde la API.
