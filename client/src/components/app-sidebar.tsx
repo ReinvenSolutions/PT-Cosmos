@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { FileText, Users, BarChart3, LogOut, Plane, Zap, MapPin, Camera, UserCog } from "lucide-react";
+import { GlobalTrmAdminMenuItem } from "@/components/global-trm-admin-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -353,6 +354,7 @@ export function AppSidebar() {
             <SidebarGroupContent className="group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
               <SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col">
                 {renderMenuItems(section.items)}
+                {isAdmin && section.label === "Administración" ? <GlobalTrmAdminMenuItem /> : null}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

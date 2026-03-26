@@ -45,6 +45,10 @@ export class QuoteService {
       returnHoldBaggage: data.returnHoldBaggage ?? false,
       domesticCabinBaggage: data.domesticCabinBaggage ?? false,
       domesticHoldBaggage: data.domesticHoldBaggage ?? false,
+      connectionFlightImages: data.connectionFlightImages || null,
+      connectionCabinBaggage: data.connectionCabinBaggage ?? false,
+      connectionHoldBaggage: data.connectionHoldBaggage ?? false,
+      connectionFlightSegments: data.connectionFlightSegments || null,
       turkeyUpgrade: data.turkeyUpgrade || null,
       italiaUpgrade: data.italiaUpgrade || null,
       granTourUpgrade: data.granTourUpgrade || null,
@@ -158,6 +162,18 @@ export class QuoteService {
     }
     if (data.domesticHoldBaggage !== undefined) {
       quoteData.domesticHoldBaggage = data.domesticHoldBaggage;
+    }
+    if (data.connectionFlightImages !== undefined) {
+      quoteData.connectionFlightImages = data.connectionFlightImages || null;
+    }
+    if (data.connectionCabinBaggage !== undefined) {
+      quoteData.connectionCabinBaggage = data.connectionCabinBaggage;
+    }
+    if (data.connectionHoldBaggage !== undefined) {
+      quoteData.connectionHoldBaggage = data.connectionHoldBaggage;
+    }
+    if (data.connectionFlightSegments !== undefined) {
+      quoteData.connectionFlightSegments = data.connectionFlightSegments || null;
     }
     if (data.turkeyUpgrade !== undefined) {
       quoteData.turkeyUpgrade = data.turkeyUpgrade || null;

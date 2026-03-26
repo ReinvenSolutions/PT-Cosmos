@@ -33,10 +33,20 @@ import {
   quoteLogs,
   type QuoteLog,
   type InsertQuoteLog,
+  appSettings,
 } from "@shared/schema";
+import { GLOBAL_TRM_BASE_SETTING_KEY } from "@shared/trm";
 import { db } from "./db";
 import { eq, or, sql, desc, count, inArray } from "drizzle-orm";
+
+function parseGlobalTrmBase(raw: string | null): number | null {
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
 import { logger } from "./logger";
+import { ValidationError } from "./errors/AppError";
 
 export interface IStorage {
   getDestinations(params?: { isActive?: boolean }): Promise<Destination[]>;
@@ -117,6 +127,11 @@ export interface IStorage {
   getTopDestinationsByAmount(limit?: number): Promise<{ destinationId: string; destinationName: string; amount: number }[]>;
   getQuotesByDateRange(days: number): Promise<{ date: string, count: number, amount: number }[]>;
   getQuotesByClient(clientId: string): Promise<Quote[]>;
+
+  getAppSetting(key: string): Promise<string | null>;
+  setAppSetting(key: string, value: string): Promise<void>;
+  getGlobalTrmBase(): Promise<number | null>;
+  setGlobalTrmBase(baseTrm: number | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -388,13 +403,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    const quoteCount = await this.countQuotesByUser(id);
-    if (quoteCount > 0) {
-      throw new Error(`No se puede eliminar: el usuario tiene ${quoteCount} cotización(es) asociada(s). Desactívalo en su lugar.`);
-    }
-    // Eliminar quote_logs primero (FK sin cascade bloqueaba el delete)
-    await db.delete(quoteLogs).where(eq(quoteLogs.userId, id));
-    await db.delete(users).where(eq(users.id, id));
+    await db.transaction(async (tx) => {
+      const existing = await tx.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
+      if (!existing[0]) {
+        throw new ValidationError("Usuario no encontrado");
+      }
+
+      const userQuotes = await tx.select({ id: quotes.id }).from(quotes).where(eq(quotes.userId, id));
+      const quoteIds = userQuotes.map((q) => q.id);
+      if (quoteIds.length > 0) {
+        await tx.delete(quoteDestinations).where(inArray(quoteDestinations.quoteId, quoteIds));
+        await tx.delete(quotes).where(eq(quotes.userId, id));
+      }
+
+      await tx.delete(quoteLogs).where(eq(quoteLogs.userId, id));
+      await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, id));
+      await tx.delete(twoFactorSessions).where(eq(twoFactorSessions.userId, id));
+
+      await tx.delete(users).where(eq(users.id, id));
+    });
   }
 
   async findUserByUsername(username: string): Promise<User | undefined> {
@@ -564,9 +591,14 @@ export class DatabaseStorage implements IStorage {
         returnHoldBaggage: quotes.returnHoldBaggage,
         domesticCabinBaggage: quotes.domesticCabinBaggage,
         domesticHoldBaggage: quotes.domesticHoldBaggage,
+        connectionFlightImages: quotes.connectionFlightImages,
+        connectionCabinBaggage: quotes.connectionCabinBaggage,
+        connectionHoldBaggage: quotes.connectionHoldBaggage,
+        connectionFlightSegments: quotes.connectionFlightSegments,
         turkeyUpgrade: quotes.turkeyUpgrade,
         italiaUpgrade: quotes.italiaUpgrade,
         granTourUpgrade: quotes.granTourUpgrade,
+        selectedUpgrades: quotes.selectedUpgrades,
         trm: quotes.trm,
         customFilename: quotes.customFilename,
         minPayment: quotes.minPayment,
@@ -602,9 +634,14 @@ export class DatabaseStorage implements IStorage {
       domesticFlightImages: r.domesticFlightImages,
       domesticCabinBaggage: r.domesticCabinBaggage,
       domesticHoldBaggage: r.domesticHoldBaggage,
+      connectionFlightImages: r.connectionFlightImages,
+      connectionCabinBaggage: r.connectionCabinBaggage,
+      connectionHoldBaggage: r.connectionHoldBaggage,
+      connectionFlightSegments: r.connectionFlightSegments,
       turkeyUpgrade: r.turkeyUpgrade,
       italiaUpgrade: r.italiaUpgrade,
       granTourUpgrade: r.granTourUpgrade,
+      selectedUpgrades: r.selectedUpgrades,
       trm: r.trm,
       customFilename: r.customFilename,
       minPayment: r.minPayment,
@@ -638,9 +675,14 @@ export class DatabaseStorage implements IStorage {
         domesticFlightImages: quotes.domesticFlightImages,
         domesticCabinBaggage: quotes.domesticCabinBaggage,
         domesticHoldBaggage: quotes.domesticHoldBaggage,
+        connectionFlightImages: quotes.connectionFlightImages,
+        connectionCabinBaggage: quotes.connectionCabinBaggage,
+        connectionHoldBaggage: quotes.connectionHoldBaggage,
+        connectionFlightSegments: quotes.connectionFlightSegments,
         turkeyUpgrade: quotes.turkeyUpgrade,
         italiaUpgrade: quotes.italiaUpgrade,
         granTourUpgrade: quotes.granTourUpgrade,
+        selectedUpgrades: quotes.selectedUpgrades,
         trm: quotes.trm,
         customFilename: quotes.customFilename,
         minPayment: quotes.minPayment,
@@ -676,9 +718,14 @@ export class DatabaseStorage implements IStorage {
       domesticFlightImages: r.domesticFlightImages,
       domesticCabinBaggage: r.domesticCabinBaggage,
       domesticHoldBaggage: r.domesticHoldBaggage,
+      connectionFlightImages: r.connectionFlightImages,
+      connectionCabinBaggage: r.connectionCabinBaggage,
+      connectionHoldBaggage: r.connectionHoldBaggage,
+      connectionFlightSegments: r.connectionFlightSegments,
       turkeyUpgrade: r.turkeyUpgrade,
       italiaUpgrade: r.italiaUpgrade,
       granTourUpgrade: r.granTourUpgrade,
+      selectedUpgrades: r.selectedUpgrades,
       trm: r.trm,
       customFilename: r.customFilename,
       minPayment: r.minPayment,
@@ -712,6 +759,10 @@ export class DatabaseStorage implements IStorage {
         returnHoldBaggage: quotes.returnHoldBaggage,
         domesticCabinBaggage: quotes.domesticCabinBaggage,
         domesticHoldBaggage: quotes.domesticHoldBaggage,
+        connectionFlightImages: quotes.connectionFlightImages,
+        connectionCabinBaggage: quotes.connectionCabinBaggage,
+        connectionHoldBaggage: quotes.connectionHoldBaggage,
+        connectionFlightSegments: quotes.connectionFlightSegments,
         turkeyUpgrade: quotes.turkeyUpgrade,
         italiaUpgrade: quotes.italiaUpgrade,
         granTourUpgrade: quotes.granTourUpgrade,
@@ -771,6 +822,10 @@ export class DatabaseStorage implements IStorage {
       domesticFlightImages: quoteResult[0].domesticFlightImages,
       domesticCabinBaggage: quoteResult[0].domesticCabinBaggage,
       domesticHoldBaggage: quoteResult[0].domesticHoldBaggage,
+      connectionFlightImages: quoteResult[0].connectionFlightImages,
+      connectionCabinBaggage: quoteResult[0].connectionCabinBaggage,
+      connectionHoldBaggage: quoteResult[0].connectionHoldBaggage,
+      connectionFlightSegments: quoteResult[0].connectionFlightSegments,
       turkeyUpgrade: quoteResult[0].turkeyUpgrade,
       italiaUpgrade: quoteResult[0].italiaUpgrade,
       granTourUpgrade: quoteResult[0].granTourUpgrade,
@@ -1069,6 +1124,34 @@ export class DatabaseStorage implements IStorage {
     );
 
     return quotesWithDestinations;
+  }
+
+  async getAppSetting(key: string): Promise<string | null> {
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
+    return rows[0]?.value ?? null;
+  }
+
+  async setAppSetting(key: string, value: string): Promise<void> {
+    await db
+      .insert(appSettings)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: appSettings.key,
+        set: { value, updatedAt: new Date() },
+      });
+  }
+
+  async getGlobalTrmBase(): Promise<number | null> {
+    const raw = await this.getAppSetting(GLOBAL_TRM_BASE_SETTING_KEY);
+    return parseGlobalTrmBase(raw);
+  }
+
+  async setGlobalTrmBase(baseTrm: number | null): Promise<void> {
+    if (baseTrm == null || !Number.isFinite(baseTrm) || baseTrm <= 0) {
+      await db.delete(appSettings).where(eq(appSettings.key, GLOBAL_TRM_BASE_SETTING_KEY));
+      return;
+    }
+    await this.setAppSetting(GLOBAL_TRM_BASE_SETTING_KEY, String(baseTrm));
   }
 }
 

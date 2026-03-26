@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Destination, formatUSD, formatDate } from "@shared/schema";
+import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -17,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane, MessageCircle, Info } from "lucide-react";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane, MessageCircle, Info, GripVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
 import { OptimizedImage } from "@/components/optimized-image";
@@ -30,6 +32,29 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PDFLoadingModal } from "@/components/pdf-loading-modal";
 import { trackQuote } from "@/lib/tracking";
 import { FlightImageGallery } from "@/components/flight-image-gallery";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils";
+import {
+  connectionSegmentCardTitle,
+  remapConnectionSegmentsByEdgeOrder,
+  type ConnectionSegmentImages,
+} from "@shared/quoteCombination";
 
 // WhatsApp Icon Component
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -42,6 +67,87 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
   </svg>
 );
+
+function SortableQuoteDestinationRow({
+  dest,
+  effectiveTrm,
+}: {
+  dest: Destination;
+  effectiveTrm: number;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: dest.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
+  const imageUrl = getDestinationImage(dest);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex gap-2 sm:gap-4 p-3 bg-accent/50 rounded-lg border border-border",
+        isDragging && "opacity-80 shadow-md z-10 ring-2 ring-primary/30",
+      )}
+    >
+      <button
+        type="button"
+        className="cursor-grab active:cursor-grabbing p-2 rounded-md hover:bg-muted self-center touch-none shrink-0"
+        {...attributes}
+        {...listeners}
+        aria-label="Arrastrar para reordenar destinos"
+      >
+        <GripVertical className="h-5 w-5 text-muted-foreground" />
+      </button>
+      {imageUrl && (
+        <div className="w-28 h-24 sm:w-32 flex-shrink-0 rounded-md overflow-hidden">
+          <OptimizedImage
+            src={imageUrl}
+            alt={dest.name}
+            containerClassName="w-full h-full"
+            imageClassName="object-cover"
+          />
+        </div>
+      )}
+      <div className="flex-1 flex justify-between items-center min-w-0 gap-2">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-foreground truncate">{dest.name}</h3>
+          <p className="text-sm text-muted-foreground">{dest.country}</p>
+          <Badge variant="secondary" className="mt-1">
+            {dest.duration} Días / {dest.nights} Noches
+          </Badge>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-xl sm:text-2xl font-extrabold text-price-accent">
+            US$ {basePrice.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </div>
+          {effectiveTrm > 0 && (
+            <div className="text-sm font-bold text-chart-3">
+              ${" "}
+              {(basePrice * effectiveTrm).toLocaleString("es-CO", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}{" "}
+              COP
+            </div>
+          )}
+          <div className="text-xs font-medium text-muted-foreground">Porción terrestre</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Client {
   id: string;
@@ -59,7 +165,7 @@ export default function QuoteSummary() {
   const [outboundImages, setOutboundImages] = useState<string[]>([]);
   const [returnImages, setReturnImages] = useState<string[]>([]);
   const [domesticFlightImages, setDomesticFlightImages] = useState<string[]>([]);
-  const [connectionFlightImages, setConnectionFlightImages] = useState<string[]>([]);
+  const [connectionSegments, setConnectionSegments] = useState<ConnectionSegmentImages[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
   const [uploadingDomesticFlight, setUploadingDomesticFlight] = useState(false);
@@ -85,13 +191,19 @@ export default function QuoteSummary() {
   const [italiaUpgrade, setItaliaUpgrade] = useState<string>("");
   const [granTourUpgrade, setGranTourUpgrade] = useState<string>("");
   const [otherDestUpgrades, setOtherDestUpgrades] = useState<Record<string, string>>({});
-  const [trm, setTrm] = useState("");
+  const [quoteInCop, setQuoteInCop] = useState(false);
   const [finalPrice, setFinalPrice] = useState("");
   const [minPayment, setMinPayment] = useState("");
   const [customFilename, setCustomFilename] = useState("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isPDFComplete, setIsPDFComplete] = useState(false);
   const pdfCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const quoteSessionHydratedRef = useRef(false);
+
+  const destinationSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // New Client State
   const [activeTab, setActiveTab] = useState("existing");
@@ -105,6 +217,14 @@ export default function QuoteSummary() {
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/admin/clients"],
+  });
+
+  const { data: globalTrmSettings } = useQuery<{
+    baseTrm: number | null;
+    effectiveTrm: number | null;
+    surchargeCop: number;
+  }>({
+    queryKey: ["/api/settings/global-trm"],
   });
 
   const createClientMutation = useMutation({
@@ -154,20 +274,75 @@ export default function QuoteSummary() {
   useEffect(() => {
     const savedData = sessionStorage.getItem("quoteData");
     if (savedData) {
-      const { destinations: destIds, startDate: start } = JSON.parse(savedData);
+      const parsed = JSON.parse(savedData) as {
+        destinations: string[];
+        startDate?: string;
+        connectionFlightSegments?: Array<{ images?: string[] }>;
+      };
+      const { destinations: destIds, startDate: start, connectionFlightSegments: savedSegs } = parsed;
       setSelectedDestinations(destIds);
+
+      if (Array.isArray(savedSegs) && savedSegs.length > 0) {
+        setConnectionSegments(
+          savedSegs.map((s) => ({ images: [...(s.images ?? [])] })),
+        );
+      }
 
       // Parsear fecha en zona horaria local para evitar problemas de UTC
       if (start) {
-        const [year, month, day] = start.split('-').map(Number);
+        const [year, month, day] = start.split("-").map(Number);
         setStartDate(new Date(year, month - 1, day));
       } else {
         setStartDate(undefined);
       }
+      quoteSessionHydratedRef.current = true;
     } else {
       setLocation("/");
     }
   }, [setLocation]);
+
+  useEffect(() => {
+    const need = Math.max(0, selectedDestinations.length - 1);
+    setConnectionSegments((prev) => {
+      if (prev.length === need) return prev;
+      if (prev.length < need) {
+        return [
+          ...prev,
+          ...Array.from({ length: need - prev.length }, () => ({ images: [] as string[] })),
+        ];
+      }
+      return prev.slice(0, need);
+    });
+  }, [selectedDestinations.length]);
+
+  const writeQuoteSession = useCallback(() => {
+    try {
+      const raw = sessionStorage.getItem("quoteData");
+      const base = raw ? JSON.parse(raw) : {};
+      const formatLocalDate = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      };
+      sessionStorage.setItem(
+        "quoteData",
+        JSON.stringify({
+          ...base,
+          destinations: selectedDestinations,
+          startDate: startDate ? formatLocalDate(startDate) : base.startDate ?? "",
+          connectionFlightSegments: connectionSegments,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [selectedDestinations, startDate, connectionSegments]);
+
+  useEffect(() => {
+    if (!quoteSessionHydratedRef.current) return;
+    writeQuoteSession();
+  }, [writeQuoteSession]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -178,7 +353,13 @@ export default function QuoteSummary() {
     };
   }, []);
 
-  const selectedDests = destinations.filter((d) => selectedDestinations.includes(d.id));
+  const selectedDests = useMemo(
+    () =>
+      selectedDestinations
+        .map((id) => destinations.find((d) => d.id === id))
+        .filter((d): d is Destination => !!d),
+    [selectedDestinations, destinations],
+  );
 
   const hasTurkeyDestinations = selectedDests.some(
     (d) =>
@@ -187,28 +368,12 @@ export default function QuoteSummary() {
   );
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
-  const hasDubaiMaravilloso = selectedDests.some((d) => d.name === "DUBAI Maravilloso");
+  const showConnectionFlight = selectedDestinations.length >= 2;
 
-  // Detectar cualquier destino de Turquía
-  const hasTurkey = selectedDests.some((d) =>
-    d.country?.toLowerCase().includes('turquía') ||
-    d.country?.toLowerCase().includes('turquia') ||
-    d.name.toLowerCase().includes('turquía') ||
-    d.name.toLowerCase().includes('turquia')
+  const flatConnectionFlightImages = useMemo(
+    () => connectionSegments.flatMap((s) => s.images),
+    [connectionSegments],
   );
-
-  // Detectar cualquier destino de Dubai o Emiratos
-  const hasDubaiOrEmirates = selectedDests.some((d) =>
-    d.country?.toLowerCase().includes('emiratos') ||
-    d.country?.toLowerCase().includes('emirates') ||
-    d.name.toLowerCase().includes('dubai') ||
-    d.name.toLowerCase().includes('emiratos')
-  );
-
-  // Mostrar vuelo de conexión: combinación Turquía+Dubai (legacy) o cualquier multi-plan con flag
-  const showConnectionFlight =
-    (selectedDestinations.length >= 2 && selectedDests.some((d) => d.hasInternalOrConnectionFlight)) ||
-    (hasTurkey && hasDubaiOrEmirates);
 
   const turkeyDestination = selectedDests.find((d) => d.name === "Turquía Esencial");
   const turkeyUpgrades = turkeyDestination?.upgrades || [];
@@ -355,8 +520,8 @@ export default function QuoteSummary() {
 
   const landPortionTotal = landPortionPerPerson * passengers;
 
-  const trmValue = trm ? parseFloat(trm) : 0;
-  const effectiveTrm = trmValue > 0 ? trmValue + 30 : 0;
+  const systemBaseTrm = globalTrmSettings?.baseTrm ?? null;
+  const effectiveTrm = quoteInCop ? (effectiveTrmFromBase(systemBaseTrm) ?? 0) : 0;
 
   const formatAllowedDays = (days: string[]): string => {
     const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -384,9 +549,10 @@ export default function QuoteSummary() {
     return sortedDays.map(d => dayMapSpanish[d]).join(' y ');
   };
 
-  // Auto-switch to COP when TRM is entered
+  // Al cotizar en COP, los importes del cliente se ingresan en pesos cuando la TRM global está configurada
   useEffect(() => {
-    if (trmValue > 0) {
+    const baseOk = systemBaseTrm != null && systemBaseTrm > 0;
+    if (quoteInCop && baseOk) {
       setInputCurrencyFlights("COP");
       setInputCurrencyAssistance("COP");
       setInputCurrencyFinal("COP");
@@ -395,7 +561,7 @@ export default function QuoteSummary() {
       setInputCurrencyAssistance("USD");
       setInputCurrencyFinal("USD");
     }
-  }, [trmValue > 0]);
+  }, [quoteInCop, systemBaseTrm]);
 
   const formatNumber = (value: string) => {
     const clean = value.replace(/[^\d.]/g, "");
@@ -557,19 +723,47 @@ export default function QuoteSummary() {
     }
   };
 
-  const processConnectionFlightFiles = async (files: File[]) => {
+  const processConnectionFlightFilesForSegment = (segmentIndex: number) => async (files: File[]) => {
+    if (files.length === 0) return;
     setUploadingConnectionFlight(true);
     try {
-      await uploadFlightImages(
-        files,
-        setConnectionFlightImages,
-        `${files.length} imagen(es) del vuelo de conexión guardadas`
-      );
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!response.ok) throw new Error("Upload failed");
+        const { url } = await response.json();
+        uploadedUrls.push(url);
+      }
+      setConnectionSegments((prev) => {
+        const next = [...prev];
+        const cur = next[segmentIndex]?.images ?? [];
+        next[segmentIndex] = { images: [...cur, ...uploadedUrls] };
+        return next;
+      });
+      toast({
+        title: "Imágenes subidas",
+        description: `${uploadedUrls.length} imagen(es) de conexión guardadas`,
+      });
     } catch {
       toast({ title: "Error", description: "No se pudieron subir algunas imágenes.", variant: "destructive" });
     } finally {
       setUploadingConnectionFlight(false);
     }
+  };
+
+  const handleDestinationDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = selectedDestinations.indexOf(active.id as string);
+    const newIndex = selectedDestinations.indexOf(over.id as string);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const nextOrder = arrayMove(selectedDestinations, oldIndex, newIndex);
+    setSelectedDestinations(nextOrder);
+    setConnectionSegments((segs) =>
+      remapConnectionSegmentsByEdgeOrder(selectedDestinations, nextOrder, segs),
+    );
   };
 
   const handleSendWhatsApp = () => {
@@ -644,8 +838,18 @@ export default function QuoteSummary() {
       return;
     }
 
+    if (quoteInCop && (systemBaseTrm == null || systemBaseTrm <= 0)) {
+      toast({
+        title: "TRM no configurada",
+        description:
+          "Pide al super administrador que defina la TRM en Administración → TRM del cotizador, o desactiva «Cotizar en COP».",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 ||
-      domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
+      domesticFlightImages.length > 0 || flatConnectionFlightImages.length > 0 ||
       outboundCabinBaggage || outboundHoldBaggage ||
       returnCabinBaggage || returnHoldBaggage ||
       domesticCabinBaggage || domesticHoldBaggage ||
@@ -692,7 +896,8 @@ export default function QuoteSummary() {
       outboundFlightImages: outboundImages,
       returnFlightImages: returnImages,
       domesticFlightImages: domesticFlightImages,
-      connectionFlightImages: connectionFlightImages,
+      connectionFlightImages: flatConnectionFlightImages,
+      connectionFlightSegments: connectionSegments,
       includeFlights: hasFlightData,
       outboundCabinBaggage,
       outboundHoldBaggage,
@@ -748,6 +953,16 @@ export default function QuoteSummary() {
     // Prevent concurrent PDF generation
     if (isGeneratingPDF) return;
 
+    if (quoteInCop && (systemBaseTrm == null || systemBaseTrm <= 0)) {
+      toast({
+        title: "TRM no configurada",
+        description:
+          "Pide al super administrador que defina la TRM en Administración → TRM del cotizador, o desactiva «Cotizar en COP».",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Clear any existing completion timeout
     if (pdfCompletionTimeoutRef.current) {
       clearTimeout(pdfCompletionTimeoutRef.current);
@@ -772,7 +987,7 @@ export default function QuoteSummary() {
 
     try {
       const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 ||
-        domesticFlightImages.length > 0 || connectionFlightImages.length > 0 ||
+        domesticFlightImages.length > 0 || flatConnectionFlightImages.length > 0 ||
         outboundCabinBaggage || outboundHoldBaggage ||
         returnCabinBaggage || returnHoldBaggage ||
         domesticCabinBaggage || domesticHoldBaggage ||
@@ -855,7 +1070,8 @@ export default function QuoteSummary() {
           outboundFlightImages: outboundImages,
           returnFlightImages: returnImages,
           domesticFlightImages: domesticFlightImages,
-          connectionFlightImages: connectionFlightImages,
+          connectionFlightImages: flatConnectionFlightImages,
+          connectionFlightSegments: connectionSegments,
           includeFlights: hasFlightData,
           outboundCabinBaggage,
           outboundHoldBaggage,
@@ -973,6 +1189,11 @@ export default function QuoteSummary() {
               <MapPin className="w-5 h-5" />
               Destinos Seleccionados
             </CardTitle>
+            {selectedDestinations.length >= 2 && (
+              <p className="text-sm text-muted-foreground pt-1">
+                Arrastra con el asa ⋮⋮ para definir el orden del itinerario, la portada del PDF y cada tramo de conexión entre planes.
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -987,46 +1208,60 @@ export default function QuoteSummary() {
                     </div>
                   </div>
                 ))
+              ) : selectedDestinations.length >= 2 ? (
+                <DndContext
+                  sensors={destinationSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDestinationDragEnd}
+                >
+                  <SortableContext items={selectedDestinations} strategy={verticalListSortingStrategy}>
+                    {selectedDests.map((dest) => (
+                      <div key={dest.id} className="mb-3 last:mb-0">
+                        <SortableQuoteDestinationRow dest={dest} effectiveTrm={effectiveTrm} />
+                      </div>
+                    ))}
+                  </SortableContext>
+                </DndContext>
               ) : (
-              selectedDests.map((dest) => {
-                const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
-                const imageUrl = getDestinationImage(dest);
+                selectedDests.map((dest) => {
+                  const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
+                  const imageUrl = getDestinationImage(dest);
 
-                return (
-                  <div key={dest.id} className="flex gap-4 p-3 bg-accent/50 rounded-lg border border-border">
-                    {imageUrl && (
-                      <div className="w-32 h-24 flex-shrink-0 rounded-md overflow-hidden">
-                        <OptimizedImage
-                          src={imageUrl}
-                          alt={dest.name}
-                          containerClassName="w-full h-full"
-                          imageClassName="object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-semibold text-foreground">{dest.name}</h3>
-                        <p className="text-sm text-muted-foreground">{dest.country}</p>
-                        <Badge variant="secondary" className="mt-1">
-                          {dest.duration} Días / {dest.nights} Noches
-                        </Badge>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-extrabold text-price-accent">
-                          US$ {basePrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  return (
+                    <div key={dest.id} className="flex gap-4 p-3 bg-accent/50 rounded-lg border border-border">
+                      {imageUrl && (
+                        <div className="w-32 h-24 flex-shrink-0 rounded-md overflow-hidden">
+                          <OptimizedImage
+                            src={imageUrl}
+                            alt={dest.name}
+                            containerClassName="w-full h-full"
+                            imageClassName="object-cover"
+                          />
                         </div>
-                        {effectiveTrm > 0 && (
-                          <div className="text-sm font-bold text-chart-3">
-                            $ {(basePrice * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                      )}
+                      <div className="flex-1 flex justify-between items-center">
+                        <div>
+                          <h3 className="font-semibold text-foreground">{dest.name}</h3>
+                          <p className="text-sm text-muted-foreground">{dest.country}</p>
+                          <Badge variant="secondary" className="mt-1">
+                            {dest.duration} Días / {dest.nights} Noches
+                          </Badge>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-extrabold text-price-accent">
+                            US$ {basePrice.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </div>
-                        )}
-                        <div className="text-xs font-medium text-muted-foreground">Porción terrestre</div>
+                          {effectiveTrm > 0 && (
+                            <div className="text-sm font-bold text-chart-3">
+                              $ {(basePrice * effectiveTrm).toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                            </div>
+                          )}
+                          <div className="text-xs font-medium text-muted-foreground">Porción terrestre</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
               )}
 
               <div className="border-t border-border pt-3 mt-3">
@@ -1496,28 +1731,53 @@ export default function QuoteSummary() {
           </Card>
         )}
 
-        {/* Connection Flight Card - For Turkey + Dubai/Emirates combinations */}
         {showConnectionFlight && (
-          <Card className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200 dark:from-orange-950/50 dark:to-amber-950/50 dark:border-orange-700/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-foreground">
-                <Plane className="w-5 h-5" />
-                Vuelo de Conexión entre Destinos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FlightImageGallery
-                images={connectionFlightImages}
-                setImages={setConnectionFlightImages}
-                onFilesUpload={processConnectionFlightFiles}
-                isUploading={uploadingConnectionFlight}
-                label="vuelo de conexión entre destinos"
-                description="Sube las imágenes del vuelo de conexión (máximo 10). Arrastra aquí o haz clic para seleccionar. El orden definido se usará en el PDF."
-                inputId="connection-flight-images"
-              />
+          <div className="space-y-6 mb-6">
+            {connectionSegments.map((segment, segmentIndex) => {
+              const title = connectionSegmentCardTitle(
+                selectedDests.map((d) => d.name),
+                segmentIndex,
+              );
+              return (
+                <Card
+                  key={`conn-${segmentIndex}-${selectedDests[segmentIndex]?.id ?? segmentIndex}`}
+                  className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200 dark:from-orange-950/50 dark:to-amber-950/50 dark:border-orange-700/60"
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
+                      <Plane className="w-5 h-5 shrink-0" />
+                      <span className="leading-snug">{title}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FlightImageGallery
+                      images={segment.images}
+                      setImages={(updater) => {
+                        setConnectionSegments((prev) => {
+                          const next = [...prev];
+                          const prevImgs = next[segmentIndex]?.images ?? [];
+                          const newImgs =
+                            typeof updater === "function"
+                              ? (updater as (p: string[]) => string[])(prevImgs)
+                              : updater;
+                          next[segmentIndex] = { images: newImgs };
+                          return next;
+                        });
+                      }}
+                      onFilesUpload={processConnectionFlightFilesForSegment(segmentIndex)}
+                      isUploading={uploadingConnectionFlight}
+                      label={`vuelo de conexión (${title})`}
+                      description="Sube las imágenes de este tramo (máximo 10). El orden se respeta en el PDF, en páginas insertadas entre los planes indicados."
+                      inputId={`connection-flight-segment-${segmentIndex}`}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })}
 
-              <div className="mt-4 pt-4 border-t border-orange-200/60 dark:border-orange-700/40">
-                <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
+            <Card className="border-orange-200/80 dark:border-orange-700/50 bg-orange-50/40 dark:bg-orange-950/20">
+              <CardContent className="pt-6">
+                <p className="text-sm font-semibold text-foreground mb-3">Equipajes incluidos (todos los tramos de conexión)</p>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -1543,9 +1803,9 @@ export default function QuoteSummary() {
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         <Card className="mb-8">
@@ -1598,24 +1858,43 @@ export default function QuoteSummary() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <DollarSign className="w-5 h-5" />
-              TRM - Tasa Representativa del Mercado + 30 COP
+              Moneda de cotización
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Ingresa la TRM para convertir el total de USD a COP (Pesos Colombianos) el sistema sumara 30 COP automaticamente.
-            </p>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg font-semibold text-foreground">$</span>
-              <Input
-                type="text"
-                placeholder="0.00"
-                value={formatNumber(trm)}
-                onChange={(e) => setTrm(e.target.value.replace(/,/g, ""))}
-                className="text-lg font-semibold"
-                data-testid="input-trm"
-              />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <p className="text-sm font-medium text-foreground">Cotizar en COP</p>
+                <p className="text-sm text-muted-foreground">
+                  Usa la TRM global del sistema (header). Se suman {TRM_EFFECTIVE_SURCHARGE_COP} COP a la base definida por el super administrador.
+                </p>
+                {quoteInCop && (systemBaseTrm == null || systemBaseTrm <= 0) && (
+                  <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+                    Aún no hay TRM global configurada. Activa el interruptor solo cuando el administrador haya guardado un valor en Administración → TRM del cotizador.
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <Label htmlFor="quote-in-cop" className="text-sm text-muted-foreground cursor-pointer">
+                  {quoteInCop ? "COP" : "USD"}
+                </Label>
+                <Switch
+                  id="quote-in-cop"
+                  checked={quoteInCop}
+                  onCheckedChange={setQuoteInCop}
+                  data-testid="switch-quote-in-cop"
+                />
+              </div>
             </div>
+            {quoteInCop && systemBaseTrm != null && systemBaseTrm > 0 && effectiveTrm > 0 && (
+              <p className="text-sm text-muted-foreground mt-3 pt-3 border-t border-green-200/80 dark:border-green-800/50">
+                Tasa aplicada:{" "}
+                <span className="font-semibold text-foreground">
+                  $ {effectiveTrm.toLocaleString("es-CO", { maximumFractionDigits: 0 })} COP/USD
+                </span>{" "}
+                (base {systemBaseTrm.toLocaleString("es-CO")} + {TRM_EFFECTIVE_SURCHARGE_COP})
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -1636,7 +1915,7 @@ export default function QuoteSummary() {
               <div>
                 <Label>Vuelos</Label>
                 <div className="flex items-center gap-2 mt-1">
-                  {trmValue > 0 ? (
+                  {effectiveTrm > 0 ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
@@ -1672,7 +1951,7 @@ export default function QuoteSummary() {
               <div>
                 <Label>Asistencia</Label>
                 <div className="flex items-center gap-2 mt-1">
-                  {trmValue > 0 ? (
+                  {effectiveTrm > 0 ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
@@ -1772,7 +2051,7 @@ export default function QuoteSummary() {
               Ingresa el precio final que verá el cliente en el PDF.
             </p>
             <div className="flex items-center gap-2 mb-4">
-              {trmValue > 0 ? (
+              {effectiveTrm > 0 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">

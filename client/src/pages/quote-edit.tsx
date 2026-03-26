@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Upload, X, Save, Star, Download } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatUSD, formatDate } from "@shared/schema";
+import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
 
 interface Client {
   id: string;
@@ -94,7 +96,7 @@ export default function QuoteEdit() {
   const [italiaUpgrade, setItaliaUpgrade] = useState<string>("");
   
   // New fields state
-  const [trm, setTrm] = useState("");
+  const [quoteInCop, setQuoteInCop] = useState(false);
   const [customFilename, setCustomFilename] = useState("");
   const [minPayment, setMinPayment] = useState("");
   const [minPaymentCOP, setMinPaymentCOP] = useState("");
@@ -125,6 +127,14 @@ export default function QuoteEdit() {
     },
   });
 
+  const { data: globalTrmSettings } = useQuery<{
+    baseTrm: number | null;
+    effectiveTrm: number | null;
+    surchargeCop: number;
+  }>({
+    queryKey: ["/api/settings/global-trm"],
+  });
+
   useEffect(() => {
     if (quote) {
       setClientId(quote.clientId);
@@ -142,7 +152,8 @@ export default function QuoteEdit() {
       setItaliaUpgrade(quote.italiaUpgrade || "");
       
       // Set new fields
-      setTrm(quote.trm || "");
+      const savedTrm = quote.trm ? parseFloat(quote.trm) : 0;
+      setQuoteInCop(Number.isFinite(savedTrm) && savedTrm > 0);
       setCustomFilename(quote.customFilename || "");
       setMinPayment(quote.minPayment || "");
       setMinPaymentCOP(quote.minPaymentCOP || "");
@@ -336,6 +347,20 @@ export default function QuoteEdit() {
 
     if (!quote) return;
 
+    if (quoteInCop && (globalTrmSettings?.baseTrm == null || globalTrmSettings.baseTrm <= 0)) {
+      toast({
+        title: "TRM no configurada",
+        description:
+          "Configura la TRM en Administración → TRM del cotizador o desactiva «Cotizar en COP».",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const trmForSave = quoteInCop
+      ? effectiveTrmFromBase(globalTrmSettings?.baseTrm ?? null)
+      : null;
+
     const updateData = {
       clientId,
       totalPrice: parseFloat(totalPrice),
@@ -350,7 +375,7 @@ export default function QuoteEdit() {
       returnHoldBaggage,
       turkeyUpgrade: turkeyUpgrade || null,
       italiaUpgrade: italiaUpgrade || null,
-      trm: trm || null,
+      trm: trmForSave != null && trmForSave > 0 ? trmForSave : null,
       customFilename: customFilename || null,
       minPayment: minPayment || null,
       minPaymentCOP: minPaymentCOP || null,
@@ -607,22 +632,42 @@ export default function QuoteEdit() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>TRM (Tasa Representativa del Mercado)</CardTitle>
+                  <CardTitle>Moneda y TRM</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold">$</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={trm}
-                      onChange={(e) => setTrm(e.target.value)}
-                      placeholder="0.00"
-                    />
+                <CardContent className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Cotizar en COP</p>
+                      <p className="text-sm text-muted-foreground">
+                        Usa la TRM global (Administración → TRM del cotizador). Se suman {TRM_EFFECTIVE_SURCHARGE_COP} COP a la base.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Label htmlFor="edit-quote-in-cop" className="text-sm text-muted-foreground">
+                        {quoteInCop ? "COP" : "USD"}
+                      </Label>
+                      <Switch
+                        id="edit-quote-in-cop"
+                        checked={quoteInCop}
+                        onCheckedChange={setQuoteInCop}
+                      />
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Se sumarán 30 COP automáticamente al valor ingresado.
-                  </p>
+                  {quoteInCop &&
+                    globalTrmSettings?.baseTrm != null &&
+                    globalTrmSettings.baseTrm > 0 &&
+                    effectiveTrmFromBase(globalTrmSettings.baseTrm) != null && (
+                      <p className="text-sm text-muted-foreground">
+                        Tasa aplicada al guardar:{" "}
+                        <span className="font-semibold text-foreground">
+                          ${" "}
+                          {effectiveTrmFromBase(globalTrmSettings.baseTrm)!.toLocaleString("es-CO", {
+                            maximumFractionDigits: 0,
+                          })}{" "}
+                          COP/USD
+                        </span>
+                      </p>
+                    )}
                 </CardContent>
               </Card>
 

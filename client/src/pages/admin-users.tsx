@@ -151,11 +151,12 @@ export default function AdminUsers() {
   };
 
   const handleConfirmDelete = () => {
-    if (!deleteUser || confirmWord !== randomWord) return;
+    const typed = confirmWord.trim().toUpperCase();
+    if (!deleteUser || !randomWord || typed !== randomWord) return;
     deleteMutation.mutate(deleteUser.id);
   };
 
-  const canDelete = confirmWord === randomWord && randomWord.length > 0;
+  const canDelete = confirmWord.trim().toUpperCase() === randomWord && randomWord.length > 0;
 
   const filteredUsers = users?.filter(
     (u) =>
@@ -300,12 +301,20 @@ export default function AdminUsers() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar usuario permanentemente</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Para confirmar, escribe la palabra{" "}
-              <strong className="font-mono text-destructive bg-destructive/10 px-2 py-0.5 rounded">
-                {randomWord}
-              </strong>{" "}
-              en el recuadro.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Se eliminarán también las cotizaciones guardadas y el historial de ese usuario. Esta acción no se puede
+                  deshacer.
+                </p>
+                <p>
+                  Para confirmar, escribe la palabra{" "}
+                  <strong className="font-mono text-destructive bg-destructive/10 px-2 py-0.5 rounded">
+                    {randomWord || "…"}
+                  </strong>{" "}
+                  en el recuadro (mayúsculas, sin espacios al inicio o al final).
+                </p>
+              </div>
             </AlertDialogDescription>
             {deleteUser && (
               <p className="text-sm text-muted-foreground">
@@ -313,11 +322,12 @@ export default function AdminUsers() {
               </p>
             )}
             <Input
-              placeholder={`Escribe "${randomWord}" para confirmar`}
+              placeholder={randomWord ? `Escribe "${randomWord}" para confirmar` : "Abriendo…"}
               value={confirmWord}
               onChange={(e) => setConfirmWord(e.target.value.toUpperCase())}
               className="font-mono mt-2"
               autoComplete="off"
+              disabled={!randomWord}
             />
           </AlertDialogHeader>
           <AlertDialogFooter>

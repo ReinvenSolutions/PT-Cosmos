@@ -17,12 +17,13 @@ import { sql, eq, and, ne } from "drizzle-orm";
 import { users as usersTable } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, insertQuoteDestinationSchema, type User } from "@shared/schema";
+import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
 import { z } from "zod";
 import validator from "validator";
 import multer from "multer";
 import { handleFileUpload, getImageBuffer } from "./upload";
 import { handleExtractPlanFromDocument } from "./handlers/extractPlanFromDocument";
-import { reorderPlanImages, deletePlanBucket, deleteOrphanPlanBuckets, listBucketFiles, getPublicUrl, removeFromBucket, getMedicalAssistanceBucketName, getItineraryMapsBucketName, parseSupabaseStorageUrl, ensureBucketExists, getPlanBucketName } from "./supabaseStorage";
+import { reorderPlanImages, reorderPlanHotelsImages, reorderPlanAdicionalesImages, deletePlanBucket, deleteOrphanPlanBuckets, listBucketFiles, listBucketFilesInFolder, getPublicUrl, removeFromBucket, getMedicalAssistanceBucketName, getItineraryMapsBucketName, ITINERARY_MAP_STORAGE_PREFIX, parseSupabaseStorageUrl, ensureBucketExists, getPlanBucketName, getPlanHotelsBucketName, getPlanAdicionalesBucketName } from "./supabaseStorage";
 import { useSupabaseStorage, localToSupabaseUrl } from "./utils/imageUrls";
 import path from "path";
 import fs from "fs";
@@ -73,6 +74,9 @@ const publicQuotePdfSchema = z.object({
   domesticCabinBaggage: z.boolean().optional(),
   domesticHoldBaggage: z.boolean().optional(),
   connectionFlightImages: z.array(z.string()).optional(),
+  connectionFlightSegments: z
+    .array(z.object({ images: z.array(z.string()) }))
+    .optional(),
   connectionCabinBaggage: z.boolean().optional(),
   connectionHoldBaggage: z.boolean().optional(),
   turkeyUpgrade: z.string().nullable().optional(),
@@ -105,6 +109,13 @@ const createQuoteSchema = z.object({
   returnHoldBaggage: z.boolean().optional(),
   domesticCabinBaggage: z.boolean().optional(),
   domesticHoldBaggage: z.boolean().optional(),
+  connectionFlightImages: z.array(z.string()).nullable().optional(),
+  connectionCabinBaggage: z.boolean().optional(),
+  connectionHoldBaggage: z.boolean().optional(),
+  connectionFlightSegments: z
+    .array(z.object({ images: z.array(z.string()) }))
+    .nullable()
+    .optional(),
   turkeyUpgrade: z.string().nullable().optional(),
   italiaUpgrade: z.string().nullable().optional(),
   granTourUpgrade: z.string().nullable().optional(),
@@ -437,6 +448,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ urls: result.urls });
   }));
 
+  app.post("/api/admin/reorder-plan-hotel-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const schema = z.object({
+      planName: z.string().min(1, "planName requerido"),
+      imageUrls: z.array(z.string().url()).min(1, "imageUrls requerido"),
+    });
+    const { planName, imageUrls } = schema.parse(req.body);
+    const result = await reorderPlanHotelsImages(planName, imageUrls);
+    if (result.error) {
+      return res.status(500).json({ message: result.error });
+    }
+    res.json({ urls: result.urls });
+  }));
+
+  app.post("/api/admin/reorder-plan-adicionales-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const schema = z.object({
+      planName: z.string().min(1, "planName requerido"),
+      imageUrls: z.array(z.string().url()).min(1, "imageUrls requerido"),
+    });
+    const { planName, imageUrls } = schema.parse(req.body);
+    const result = await reorderPlanAdicionalesImages(planName, imageUrls);
+    if (result.error) {
+      return res.status(500).json({ message: result.error });
+    }
+    res.json({ urls: result.urls });
+  }));
+
   const MEDICAL_IMAGE_EXT = /\.(jpg|jpeg|png|gif|webp)$/i;
 
   app.get("/api/admin/medical-assistance-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
@@ -463,24 +500,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   app.get("/api/admin/itinerary-map-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
-    const bucketName = getItineraryMapsBucketName();
-    const files = await listBucketFiles(bucketName);
-    const images = files
-      .filter((f) => MEDICAL_IMAGE_EXT.test(f))
-      .map((path) => ({ path, url: getPublicUrl(bucketName, path) }));
+    const planName = String(req.query.planName ?? "").trim();
+    if (!planName) {
+      return res.json({ images: [] });
+    }
+    const bucketName = getPlanBucketName(planName);
+    const paths = await listBucketFilesInFolder(bucketName, ITINERARY_MAP_STORAGE_PREFIX);
+    const images = paths
+      .filter((p) => MEDICAL_IMAGE_EXT.test(p.split("/").pop() || ""))
+      .map((storagePath) => ({ path: storagePath, url: getPublicUrl(bucketName, storagePath) }));
     res.json({ images });
   }));
 
   app.delete("/api/admin/itinerary-map-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
-    const path = (req.query.path ?? req.body?.path) as string | undefined;
-    if (!path || typeof path !== "string" || path.trim() === "") {
-      return res.status(400).json({ message: "path requerido (query o body)" });
+    const fileUrl = (req.query.url ?? req.body?.url) as string | undefined;
+    if (!fileUrl || typeof fileUrl !== "string" || !fileUrl.startsWith("https://")) {
+      return res.status(400).json({ message: "url requerido (URL pública de la imagen en Supabase)" });
     }
-    if (path.includes("..") || path.includes("/")) {
-      return res.status(400).json({ message: "Path inválido" });
+    const parsed = parseSupabaseStorageUrl(fileUrl);
+    if (!parsed || parsed.path.includes("..")) {
+      return res.status(400).json({ message: "URL de almacenamiento inválida" });
     }
-    const bucketName = getItineraryMapsBucketName();
-    const ok = await removeFromBucket(bucketName, [path]);
+    const { bucket, path: storagePath } = parsed;
+    const legacyMapsBucket = getItineraryMapsBucketName();
+    const mapFileName = storagePath.split("/").pop() || "";
+    const isLegacyRoot =
+      bucket === legacyMapsBucket && !storagePath.includes("/") && MEDICAL_IMAGE_EXT.test(mapFileName);
+    const isPlanMap =
+      bucket.startsWith("plan-") &&
+      storagePath.startsWith(`${ITINERARY_MAP_STORAGE_PREFIX}/`) &&
+      storagePath.indexOf("/", ITINERARY_MAP_STORAGE_PREFIX.length + 1) === -1 &&
+      MEDICAL_IMAGE_EXT.test(mapFileName);
+    if (!isLegacyRoot && !isPlanMap) {
+      return res.status(400).json({
+        message: "Solo se pueden eliminar mapas del itinerario en la carpeta del plan o en el bucket legado.",
+      });
+    }
+    const ok = await removeFromBucket(bucket, [storagePath]);
     if (!ok) return res.status(500).json({ message: "Error al eliminar la imagen" });
     res.json({ success: true });
   }));
@@ -593,7 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       originCity, outboundFlightImages, returnFlightImages, includeFlights,
       outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage,
       domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
-      connectionFlightImages, connectionCabinBaggage, connectionHoldBaggage,
+      connectionFlightImages, connectionFlightSegments, connectionCabinBaggage, connectionHoldBaggage,
       turkeyUpgrade, italiaUpgrade, granTourUpgrade, selectedUpgrades: reqSelectedUpgrades, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
       customFilename, minPayment, minPaymentCOP
     } = validatedData;
@@ -687,6 +743,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       domesticCabinBaggage: domesticCabinBaggage ?? false,
       domesticHoldBaggage: domesticHoldBaggage ?? false,
       connectionFlightImages: connectionFlightImages || undefined,
+      connectionFlightSegments: connectionFlightSegments?.length
+        ? connectionFlightSegments
+        : undefined,
       connectionCabinBaggage: connectionCabinBaggage ?? false,
       connectionHoldBaggage: connectionHoldBaggage ?? false,
       turkeyUpgrade: turkeyUpgrade || null,
@@ -743,6 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
     const cacheKey = CacheKeys.destinations(isActive);
     const destinations = await getOrSetCache(cacheKey, () => storage.getDestinations({ isActive }));
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
     res.json(destinations);
   }));
 
@@ -750,6 +810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
     const cacheKey = CacheKeys.destinationsPreviews(isActive);
     const data = await getOrSetCache(cacheKey, () => storage.getDestinationsWithPreviews({ isActive }));
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
     res.json(data);
   }));
 
@@ -771,6 +832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       getOrSetCache(CacheKeys.images(req.params.id), () => storage.getDestinationImages(req.params.id)),
     ]);
 
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
     res.json({
       ...destination,
       itinerary,
@@ -985,6 +1047,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     flightTerms: z.string().nullable().optional(),
     termsConditions: z.string().nullable().optional(),
     hasInternalOrConnectionFlight: z.boolean().optional(),
+    hotelGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
+    adicionalesGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
   });
 
   app.get("/api/admin/destinations", requireRole("super_admin"), asyncHandler(async (req, res) => {
@@ -1033,6 +1097,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       itineraryMapImageUrl: validated.itineraryMapImageUrl ?? null,
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
+      hotelGalleryImageUrls: validated.hotelGalleryImageUrls?.length
+        ? validated.hotelGalleryImageUrls
+        : null,
+      adicionalesGalleryImageUrls: validated.adicionalesGalleryImageUrls?.length
+        ? validated.adicionalesGalleryImageUrls
+        : null,
     };
     try {
       const destination = await storage.createDestination(destData);
@@ -1044,6 +1114,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Asegurar que el bucket del plan existe (crítico para planes nuevos: las imágenes se subieron antes de guardar)
       if (validImages.length > 0 && useSupabaseStorage()) {
         await ensureBucketExists(getPlanBucketName(validated.name));
+      }
+      const validHotelGallery =
+        validated.hotelGalleryImageUrls?.filter((u) => u && String(u).trim().length > 0) ?? [];
+      if (validHotelGallery.length > 0 && useSupabaseStorage()) {
+        await ensureBucketExists(getPlanHotelsBucketName(validated.name));
+      }
+      const validAdicionalesGallery =
+        validated.adicionalesGalleryImageUrls?.filter((u) => u && String(u).trim().length > 0) ?? [];
+      if (validAdicionalesGallery.length > 0 && useSupabaseStorage()) {
+        await ensureBucketExists(getPlanAdicionalesBucketName(validated.name));
       }
 
       // Ejecutar todas las operaciones de reemplazo en paralelo para mayor velocidad
@@ -1091,12 +1171,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (validImages.length > 0 && useSupabaseStorage()) {
       await ensureBucketExists(getPlanBucketName(validated.name));
     }
+    const validHotelGalleryPut =
+      validated.hotelGalleryImageUrls?.filter((u) => u && String(u).trim().length > 0) ?? [];
+    if (validHotelGalleryPut.length > 0 && useSupabaseStorage()) {
+      await ensureBucketExists(getPlanHotelsBucketName(validated.name));
+    }
+    const validAdicionalesGalleryPut =
+      validated.adicionalesGalleryImageUrls?.filter((u) => u && String(u).trim().length > 0) ?? [];
+    if (validAdicionalesGalleryPut.length > 0 && useSupabaseStorage()) {
+      await ensureBucketExists(getPlanAdicionalesBucketName(validated.name));
+    }
 
     // Obtener URLs antiguas para eliminar del bucket las que ya no se usan
     const [oldImages, oldInternalFlights] = await Promise.all([
       storage.getDestinationImages(id),
       Promise.resolve((existing as { internalFlights?: Array<{ imageUrl?: string }> }).internalFlights ?? []),
     ]);
+    const oldHotelGallery = (existing as { hotelGalleryImageUrls?: string[] | null }).hotelGalleryImageUrls ?? [];
+    const oldAdicionalesGallery = (existing as { adicionalesGalleryImageUrls?: string[] | null })
+      .adicionalesGalleryImageUrls ?? [];
     const oldImageUrls = new Set((oldImages ?? []).map((img) => img.imageUrl));
     const newImageUrls = new Set(validImages.map((img) => img.imageUrl));
     const oldInternalUrls = new Set(
@@ -1105,10 +1198,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const newInternalUrls = new Set(
       (validated.internalFlights ?? []).flatMap((f: { imageUrl?: string }) => (f?.imageUrl ? [f.imageUrl] : []))
     );
+    const oldHotelUrls = new Set((Array.isArray(oldHotelGallery) ? oldHotelGallery : []).filter(Boolean) as string[]);
+    const newHotelUrls = new Set(validHotelGalleryPut);
+    const oldAdicionalesUrls = new Set(
+      (Array.isArray(oldAdicionalesGallery) ? oldAdicionalesGallery : []).filter(Boolean) as string[]
+    );
+    const newAdicionalesUrls = new Set(validAdicionalesGalleryPut);
     const removedUrls = [
-      ...oldImageUrls.values(),
-      ...oldInternalUrls.values(),
-    ].filter((url) => !newImageUrls.has(url) && !newInternalUrls.has(url));
+      ...Array.from(oldImageUrls),
+      ...Array.from(oldInternalUrls),
+      ...Array.from(oldHotelUrls),
+      ...Array.from(oldAdicionalesUrls),
+    ].filter(
+      (url) =>
+        !newImageUrls.has(url) &&
+        !newInternalUrls.has(url) &&
+        !newHotelUrls.has(url) &&
+        !newAdicionalesUrls.has(url)
+    );
 
     // Eliminar del bucket Supabase las imágenes que ya no están en el plan (solo buckets plan-*)
     const toDeleteByBucket = new Map<string, string[]>();
@@ -1121,7 +1228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toDeleteByBucket.set(parsed.bucket, list);
       }
     }
-    for (const [bucket, paths] of toDeleteByBucket) {
+    for (const [bucket, paths] of Array.from(toDeleteByBucket.entries())) {
       const ok = await removeFromBucket(bucket, paths);
       if (ok) logger.info("Removed orphan images from bucket", { bucket, count: paths.length });
     }
@@ -1152,6 +1259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       itineraryMapImageUrl: validated.itineraryMapImageUrl ?? null,
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
+      hotelGalleryImageUrls: validHotelGalleryPut.length ? validHotelGalleryPut : null,
+      adicionalesGalleryImageUrls: validAdicionalesGalleryPut.length ? validAdicionalesGalleryPut : null,
     };
     await storage.updateDestination(id, destData);
 
@@ -1266,6 +1375,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(stats);
   }));
 
+  app.get("/api/settings/global-trm", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+    const baseTrm = await storage.getGlobalTrmBase();
+    res.json({
+      baseTrm,
+      effectiveTrm: effectiveTrmFromBase(baseTrm),
+      surchargeCop: TRM_EFFECTIVE_SURCHARGE_COP,
+    });
+  }));
+
+  app.put("/api/admin/settings/global-trm", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const bodySchema = z.object({
+      baseTrm: z.union([z.number(), z.string()]).nullable(),
+    });
+    const { baseTrm: raw } = bodySchema.parse(req.body);
+
+    if (raw === null || raw === "") {
+      await storage.setGlobalTrmBase(null);
+    } else {
+      const n = typeof raw === "string" ? parseFloat(raw) : raw;
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ message: "La TRM base debe ser un número mayor que cero." });
+      }
+      await storage.setGlobalTrmBase(n);
+    }
+
+    const baseTrm = await storage.getGlobalTrmBase();
+    res.json({
+      baseTrm,
+      effectiveTrm: effectiveTrmFromBase(baseTrm),
+      surchargeCop: TRM_EFFECTIVE_SURCHARGE_COP,
+    });
+  }));
+
   app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), userRateLimiter, asyncHandler(async (req, res) => {
     const user = req.user as User;
 
@@ -1377,6 +1519,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       domesticFlightImages: quote.domesticFlightImages || undefined,
       domesticCabinBaggage: quote.domesticCabinBaggage ?? false,
       domesticHoldBaggage: quote.domesticHoldBaggage ?? false,
+      connectionFlightImages: quote.connectionFlightImages || undefined,
+      connectionFlightSegments: (quote.connectionFlightSegments as Array<{ images: string[] }> | null) || undefined,
+      connectionCabinBaggage: quote.connectionCabinBaggage ?? false,
+      connectionHoldBaggage: quote.connectionHoldBaggage ?? false,
       turkeyUpgrade: quote.turkeyUpgrade || null,
       italiaUpgrade: quote.italiaUpgrade || null,
       granTourUpgrade: quote.granTourUpgrade || null,

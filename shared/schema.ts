@@ -30,6 +30,10 @@ export const destinations = pgTable(
     firstPageComments: text("first_page_comments"),
     cardTooltip: text("card_tooltip"),
     itineraryMapImageUrl: text("itinerary_map_image_url"),
+    /** URLs ordenadas de la galería solo-hoteles (bucket Supabase plan-{slug}-hotels por plan) */
+    hotelGalleryImageUrls: text("hotel_gallery_image_urls").array(),
+    /** URLs ordenadas de la galería Adicionales (bucket plan-{slug}-adicionales; mismo PDF que hoteles) */
+    adicionalesGalleryImageUrls: text("adicionales_gallery_image_urls").array(),
     flightTerms: text("flight_terms"),
     termsConditions: text("terms_conditions"),
     createdAt: timestamp("created_at").defaultNow(),
@@ -187,6 +191,10 @@ export const quotes = pgTable("quotes", {
   returnHoldBaggage: boolean("return_hold_baggage").default(false),
   domesticCabinBaggage: boolean("domestic_cabin_baggage").default(false),
   domesticHoldBaggage: boolean("domestic_hold_baggage").default(false),
+  connectionFlightImages: text("connection_flight_images").array(),
+  connectionCabinBaggage: boolean("connection_cabin_baggage").default(false),
+  connectionHoldBaggage: boolean("connection_hold_baggage").default(false),
+  connectionFlightSegments: json("connection_flight_segments").$type<Array<{ images: string[] }>>(),
   turkeyUpgrade: text("turkey_upgrade"),
   italiaUpgrade: text("italia_upgrade"),
   granTourUpgrade: text("gran_tour_upgrade"),
@@ -250,6 +258,14 @@ export const insertQuoteLogSchema = createInsertSchema(quoteLogs).omit({
 });
 export type InsertQuoteLog = z.infer<typeof insertQuoteLogSchema>;
 export type QuoteLog = typeof quoteLogs.$inferSelect;
+
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AppSetting = typeof appSettings.$inferSelect;
 
 export const sessions = pgTable("sessions", {
   sid: varchar("sid").primaryKey(),

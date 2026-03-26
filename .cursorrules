@@ -1,0 +1,8 @@
+# Reglas del proyecto ViajeRapido
+
+## Protección de planes en producción
+
+- Los planes en la base de datos de producción son la fuente de verdad.
+- NUNCA agregar sync-data.ts ni sync-canonical-data al flujo de deploy/migración.
+- Las migraciones solo deben cambiar esquema (ALTER TABLE, etc.), nunca insertar/actualizar destinos.
+- No sugerir ejecutar `npm run db:seed` en producción sin advertir que sync-data fue removido por diseño.
