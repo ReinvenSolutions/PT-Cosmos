@@ -14,6 +14,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import passport from "./auth";
 import { pool } from "./db";
+import { ensureDestinationBloqueoColumns } from "./ensure-destination-bloqueo-columns";
 import { seedDatabaseIfEmpty } from "./seed";
 import { syncCanonicalData } from "./sync-canonical-data";
 import { isEmailConfigured } from "./email";
@@ -50,6 +51,8 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"], // Allow Google Fonts
+      // Sin esto, default-src 'self' bloquea iframes de YouTube (Academia digital, lecciones con video)
+      frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
     },
   },
   crossOriginEmbedderPolicy: false, // Disable for compatibility
@@ -134,6 +137,8 @@ app.use((req, res, next) => {
     if (env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
       runAuthMigrationInBackground(pool);
     }
+
+    await ensureDestinationBloqueoColumns(pool);
 
     const server = await registerRoutes(app);
 

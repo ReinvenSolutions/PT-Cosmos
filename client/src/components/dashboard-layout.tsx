@@ -55,7 +55,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const [location] = useLocation();
 
     const isQuoteExpress = location === "/cotizacion-express";
-    const isFullWidthPage = location === "/" || location === "/cotizacion" || location === "/cotizacion-express";
+    const isFullWidthPage =
+      location === "/" ||
+      location === "/cotizacion" ||
+      location === "/cotizacion-express" ||
+      location.startsWith("/tutoriales");
 
     return (
         <SidebarProvider>

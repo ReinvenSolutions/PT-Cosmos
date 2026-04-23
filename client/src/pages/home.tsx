@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Menu, Building2, UtensilsCrossed, Star, Stethoscope, Landmark, ExternalLink } from "lucide-react";
+import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Building2, UtensilsCrossed, Star, Stethoscope, Landmark, ExternalLink, BookOpen } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
 import { DatePicker } from "@/components/ui/date-picker";
 import { isTuesday } from "date-fns";
@@ -16,6 +16,12 @@ import { isTurkeyHoliday, getTurkeyHolidayDescription } from "@/lib/turkey-holid
 import { GroupDiscountBanner } from "@/components/group-discount-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/optimized-image";
+import {
+  loadHomeBuilderSelection,
+  saveHomeBuilderSelection,
+  formatLocalYmd,
+  parseLocalYmd,
+} from "@/lib/home-selection-storage";
 
 interface DestinationDetail {
   destination: Destination;
@@ -30,6 +36,7 @@ export default function Home() {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [selectionHydrated, setSelectionHydrated] = useState(false);
   const { toast } = useToast();
 
   type DestinationWithPreviews = Destination & { hotels: any[]; itinerary: any[] };
@@ -42,6 +49,32 @@ export default function Home() {
     queryKey: ["/api/destinations-previews?isActive=true"],
   });
 
+  useEffect(() => {
+    const saved = loadHomeBuilderSelection();
+    if (saved) {
+      if (saved.destinations.length > 0) {
+        setSelectedDestinations(saved.destinations);
+      }
+      const d = saved.startDate ? parseLocalYmd(saved.startDate) : undefined;
+      if (d) setStartDate(d);
+    }
+    setSelectionHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!selectionHydrated) return;
+    saveHomeBuilderSelection({
+      destinations: selectedDestinations,
+      startDate: startDate ? formatLocalYmd(startDate) : "",
+    });
+  }, [selectedDestinations, startDate, selectionHydrated]);
+
+  useEffect(() => {
+    if (!selectionHydrated || destinationsWithPreviews.length === 0) return;
+    const validIds = new Set(destinationsWithPreviews.map((d) => d.id));
+    setSelectedDestinations((prev) => prev.filter((id) => validIds.has(id)));
+  }, [destinationsWithPreviews, selectionHydrated]);
+
   const destinations = destinationsWithPreviews;
   const destinationDetails: Record<string, DestinationDetail> = Object.fromEntries(
     destinationsWithPreviews.map((d) => [
@@ -52,7 +85,7 @@ export default function Home() {
 
   const selectedDests = selectedDestinations
     .map((id) => destinations.find((d) => d.id === id))
-    .filter((d): d is Destination => !!d);
+    .filter((d): d is DestinationWithPreviews => !!d);
 
   const hasTurkeyDestinations = selectedDests.some(
     (d) =>
@@ -106,6 +139,16 @@ export default function Home() {
 
   const endDate = calculateEndDate();
 
+  /** Un bloqueo tiene salida fija: al seleccionarlo sola, fijar la fecha del calendario automáticamente. */
+  useEffect(() => {
+    if (selectedDestinations.length !== 1) return;
+    const one = destinations.find((d) => d.id === selectedDestinations[0]);
+    if (one?.isBloqueo && one.bloqueoSalidaFecha) {
+      const [y, m, d] = one.bloqueoSalidaFecha.split("-").map(Number);
+      setStartDate(new Date(y, m - 1, d));
+    }
+  }, [selectedDestinations, destinations]);
+
   const isAllowedDay = (date: Date, allowedDays: string[]): boolean => {
     const dayOfWeek = date.getDay();
     const dayNames: Record<number, string> = {
@@ -127,10 +170,20 @@ export default function Home() {
     return `${year}-${month}-${day}`;
   };
 
+  const firstSelectedDest = selectedDests[0];
+  const bloqueoSalidaFija =
+    selectedDests.length === 1 && firstSelectedDest?.isBloqueo && firstSelectedDest.bloqueoSalidaFecha
+      ? firstSelectedDest.bloqueoSalidaFecha
+      : null;
+
   const disableDates = (date: Date) => {
     // Disable past dates
     if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
       return true;
+    }
+
+    if (bloqueoSalidaFija) {
+      return getDateString(date) !== bloqueoSalidaFija;
     }
 
     // For Turkey Esencial, check if date has exact priceTier match (Monday or Tuesday only)
@@ -163,7 +216,7 @@ export default function Home() {
     if (europePlan) {
       const dateStr = getDateString(date);
       // Only allow dates that have an exact match in priceTiers (flight day or arrival day)
-      const hasExactDate = europePlan.priceTiers.some(tier => tier.endDate === dateStr);
+      const hasExactDate = (europePlan.priceTiers ?? []).some((tier) => tier.endDate === dateStr);
       return !hasExactDate; // Return immediately - don't check other conditions
     }
 
@@ -385,9 +438,12 @@ export default function Home() {
   };
 
   const filteredDestinations = destinations.filter((dest) => {
-    const matchesCategory = selectedCategory === "promociones"
-      ? dest.isPromotion
-      : dest.category === selectedCategory;
+    const matchesCategory =
+      selectedCategory === "bloqueos"
+        ? !!dest.isBloqueo &&
+          !!dest.bloqueoSalidaFecha &&
+          dest.bloqueoCuposDisponibles != null
+        : dest.category === selectedCategory;
 
     const matchesSearch = searchQuery === "" ||
       dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -396,6 +452,9 @@ export default function Home() {
     return matchesCategory && matchesSearch;
   });
 
+  const isBloqueoAgotado = (dest: Destination) =>
+    !!dest.isBloqueo && dest.bloqueoCuposDisponibles != null && dest.bloqueoCuposDisponibles <= 0;
+
   const toggleDestination = (destId: string) => {
     const dest = destinations.find((d) => d.id === destId);
 
@@ -403,6 +462,45 @@ export default function Home() {
       // Deseleccionar el destino actual
       setSelectedDestinations(selectedDestinations.filter((id) => id !== destId));
     } else {
+      if (dest && isBloqueoAgotado(dest)) {
+        toast({
+          title: "Cupos agotados",
+          description: "Este bloqueo ya no tiene cupos disponibles.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (dest?.isBloqueo) {
+        const otros = selectedDestinations.filter((id) => {
+          const x = destinations.find((d) => d.id === id);
+          return x && !x.isBloqueo;
+        });
+        if (otros.length > 0) {
+          toast({
+            title: "Solo bloqueo",
+            description: "Un bloqueo no se puede combinar con otros planes. Quita los demás destinos primero.",
+            variant: "destructive",
+          });
+          return;
+        }
+        setSelectedDestinations([destId]);
+        if (dest.bloqueoSalidaFecha) {
+          const [y, mo, d] = dest.bloqueoSalidaFecha.split("-").map(Number);
+          setStartDate(new Date(y, mo - 1, d));
+        }
+        return;
+      }
+
+      if (selectedDests.some((d) => d.isBloqueo)) {
+        toast({
+          title: "Quita el bloqueo",
+          description: "Para cotizar otros destinos, deselecciona primero el plan bloqueo.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (dest?.allowedDays && dest.allowedDays.length > 0 && startDate && !isAllowedDay(startDate, dest.allowedDays)) {
         const dateStr = startDate.toLocaleDateString("es-CO", {
           weekday: "long",
@@ -441,6 +539,23 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       <GroupDiscountBanner />
+
+      <div className="bg-background/80 backdrop-blur-sm border-b border-border/50 py-3 px-4 shadow-sm">
+        <div className="container mx-auto max-w-lg">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar destinos por nombre o país..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 pl-12 border-2 border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent shadow-sm"
+              data-testid="input-search-destinations"
+            />
+            <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          </div>
+        </div>
+      </div>
+
 
       <main className="flex-1 overflow-y-auto bg-gradient-to-b from-accent/50 to-background">
         <div className="container mx-auto px-4 py-12 lg:py-16">
@@ -646,19 +761,6 @@ export default function Home() {
             )}
           </div>
 
-          <div className="mb-8 max-w-lg mx-auto">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar destinos por nombre o país..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-3 pl-12 border-2 border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent shadow-sm"
-                data-testid="input-search-destinations"
-              />
-              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            </div>
-          </div>
 
           {destinationsQueryError && (
             <Alert variant="destructive" className="mb-8 max-w-3xl mx-auto">
@@ -669,16 +771,23 @@ export default function Home() {
                   {(destinationsQueryErr as Error)?.message || "Error desconocido"}
                 </span>
                 <span className="block text-sm opacity-90">
-                  Si aparece una columna faltante (por ejemplo <code className="rounded bg-background/80 px-1">hotel_gallery_image_urls</code>),
-                  aplica la migración <code className="rounded bg-background/80 px-1">0014_destination_hotel_gallery.sql</code> en tu base
-                  o ejecuta <code className="rounded bg-background/80 px-1">npm run db:apply-pending</code>. Revisa también la consola del
-                  servidor (<code className="rounded bg-background/80 px-1">npm run dev</code>).
+                  Si aparece una columna faltante (por ejemplo <code className="rounded bg-background/80 px-1">is_bloqueo</code>,{" "}
+                  <code className="rounded bg-background/80 px-1">hotel_gallery_image_urls</code>), aplica la migración correspondiente
+                  (p. ej. <code className="rounded bg-background/80 px-1">0018_destinations_bloqueos.sql</code>,{" "}
+                  <code className="rounded bg-background/80 px-1">0014_destination_hotel_gallery.sql</code>) en la misma base que usa{" "}
+                  <code className="rounded bg-background/80 px-1">DATABASE_URL</code>, o ejecuta{" "}
+                  <code className="rounded bg-background/80 px-1">npm run db:apply-pending</code> con ese <code className="rounded bg-background/80 px-1">.env</code>.
+                  Revisa la consola del servidor (<code className="rounded bg-background/80 px-1">npm run dev</code>).
                 </span>
               </AlertDescription>
             </Alert>
           )}
 
           <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full tabs-category">
+            <p className="text-sm text-muted-foreground mb-4 max-w-3xl">
+              <strong className="text-foreground">Clic en la tarjeta</strong> para seleccionar o quitar un plan en tu combinación.
+              Usa <strong className="text-foreground">«Ficha del plan»</strong> para abrir el itinerario completo, galerías y precios sin descargar el PDF.
+            </p>
             <TabsList className="grid w-full grid-cols-3 mb-8 h-12">
               <TabsTrigger value="nacional" data-testid="tab-nacional">
                 Colombia
@@ -686,16 +795,16 @@ export default function Home() {
               <TabsTrigger value="internacional" data-testid="tab-internacional">
                 Planes Internacionales
               </TabsTrigger>
-              <TabsTrigger value="promociones" data-testid="tab-promociones">
-                Promociones
+              <TabsTrigger value="bloqueos" data-testid="tab-bloqueos">
+                Bloqueos
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value={selectedCategory} className="mt-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {destinationsLoading ? (
-                  Array.from({ length: 9 }).map((i) => (
-                    <Card key={i} variant="glass" className="overflow-hidden">
+                  Array.from({ length: 9 }, (_, i) => (
+                    <Card key={`dest-skeleton-${i}`} variant="glass" className="overflow-hidden">
                       <Skeleton className="aspect-video w-full rounded-none" />
                       <CardContent className="p-4">
                         <Skeleton className="h-3 w-16 mb-2" />
@@ -713,12 +822,13 @@ export default function Home() {
                   const hotelStars = getHotelStars(dest.id);
                   const mealsInfo = getMealsInfo(dest.id);
                   const tooltipText = getTooltipForCard(dest);
+                  const agotado = isBloqueoAgotado(dest);
 
                   return (
                     <div
                       key={dest.id}
-                      className={`rounded-xl transition-all cursor-pointer ${isSelected ? "ring-4 ring-price-accent ring-offset-2 ring-offset-background" : ""}`}
-                      onClick={() => toggleDestination(dest.id)}
+                      className={`rounded-xl transition-all ${agotado ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} ${isSelected ? "ring-4 ring-price-accent ring-offset-2 ring-offset-background" : ""}`}
+                      onClick={() => !agotado && toggleDestination(dest.id)}
                     >
                     <Card
                       variant="glass"
@@ -742,7 +852,7 @@ export default function Home() {
                           <Building2 className="w-3 h-3 text-primary" />
                           <div className="flex">
                             {Array.from({ length: hotelStars }).map((_, i) => (
-                              <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                              <Star key={`${dest.id}-star-${i}`} className="w-3 h-3 fill-amber-400 text-amber-400" />
                             ))}
                           </div>
                         </div>
@@ -774,7 +884,7 @@ export default function Home() {
 
                         <div className="flex items-baseline justify-between gap-2 mb-3 border-t border-b border-border py-3">
                           <div className="text-xs font-medium text-muted-foreground uppercase">
-                            Precio desde
+                            {dest.isBloqueo ? "Precio fijo" : "Precio desde"}
                           </div>
                           <div className="text-right">
                             <span className="text-2xl font-extrabold text-price-accent">
@@ -790,18 +900,44 @@ export default function Home() {
                             <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
                           </div>
 
-                          {dest.priceTiers && dest.priceTiers.length > 0 && dest.name !== "Turquía Esencial" && dest.name !== "Tour Cusco Aventura" && (
+                          {dest.priceTiers && dest.priceTiers.length > 0 && !dest.isBloqueo && dest.name !== "Turquía Esencial" && dest.name !== "Tour Cusco Aventura" && (
                             <Badge className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs">
                               PRECIO DINÁMICO
                             </Badge>
                           )}
                         </div>
 
-                        {dest.isPromotion && (
-                          <Badge variant="destructive" className="mt-2">
-                            ¡Promoción!
-                          </Badge>
+                        {dest.isBloqueo && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {dest.bloqueoSalidaFecha && (
+                              <Badge variant="secondary" className="text-xs">
+                                Salida {new Date(dest.bloqueoSalidaFecha + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
+                              </Badge>
+                            )}
+                            {dest.bloqueoCuposDisponibles != null && (
+                              <Badge variant={agotado ? "destructive" : "outline"} className="text-xs">
+                                {agotado ? "Agotado" : `${dest.bloqueoCuposDisponibles} cupos`}
+                              </Badge>
+                            )}
+                          </div>
                         )}
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-3 gap-2 border-primary/25 hover:bg-primary/5"
+                          disabled={agotado}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLocation(`/plan/${dest.id}`);
+                          }}
+                          data-testid={`button-plan-detail-${dest.id}`}
+                        >
+                          <BookOpen className="h-4 w-4 shrink-0" />
+                          Ficha del plan
+                        </Button>
                       </CardContent>
 
                       {isExpanded && (
@@ -820,7 +956,7 @@ export default function Home() {
                   <p className="text-muted-foreground text-lg">
                     {destinations.length === 0
                       ? "No hay planes activos en el catálogo. En admin, activa los planes (interruptor «activo») o revisa la base de datos."
-                      : `No hay ${selectedCategory === "promociones" ? "promociones" : "destinos"} en esta pestaña con el filtro actual.`}
+                      : `No hay ${selectedCategory === "bloqueos" ? "bloqueos" : "destinos"} en esta pestaña con el filtro actual.`}
                   </p>
                 </div>
               )}

@@ -42,7 +42,7 @@ import { FlightImageGallery } from "@/components/flight-image-gallery";
 import { ImageUploadZone } from "@/components/image-upload-zone";
 import { MedicalAssistanceGallery } from "@/components/medical-assistance-gallery";
 import { ItineraryMapGallery } from "@/components/itinerary-map-gallery";
-import type { InternalFlightItem } from "@/components/plan-modals";
+import { InternalFlightsModal, type InternalFlightItem } from "@/components/plan-modals";
 
 type ItineraryDay = {
   dayNumber: number;
@@ -183,7 +183,9 @@ function AdminPlanForm() {
   const [imageUrl, setImageUrl] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [category, setCategory] = useState("internacional");
-  const [isPromotion, setIsPromotion] = useState(false);
+  const [isBloqueo, setIsBloqueo] = useState(false);
+  const [bloqueoSalidaFecha, setBloqueoSalidaFecha] = useState("");
+  const [bloqueoCuposDisponibles, setBloqueoCuposDisponibles] = useState<number | "">("");
   const [displayOrder, setDisplayOrder] = useState(999);
   const [isActive, setIsActive] = useState(true);
   const [allowedDays, setAllowedDays] = useState<string[]>([]);
@@ -197,6 +199,7 @@ function AdminPlanForm() {
   const [hotelGalleryImages, setHotelGalleryImages] = useState<ImageItem[]>([]);
   const [adicionalesGalleryImages, setAdicionalesGalleryImages] = useState<ImageItem[]>([]);
   const [internalFlights, setInternalFlights] = useState<InternalFlightItem[]>([]);
+  const [bloqueoFlightsModalOpen, setBloqueoFlightsModalOpen] = useState(false);
   const [medicalAssistanceInfo, setMedicalAssistanceInfo] = useState("");
   const [medicalAssistanceImageUrl, setMedicalAssistanceImageUrl] = useState("");
   const [firstPageComments, setFirstPageComments] = useState("");
@@ -239,7 +242,9 @@ function AdminPlanForm() {
     imageUrl?: string | null;
     basePrice?: string | null;
     category?: string;
-    isPromotion?: boolean;
+    isBloqueo?: boolean;
+    bloqueoSalidaFecha?: string | null;
+    bloqueoCuposDisponibles?: number | null;
     displayOrder?: number;
     isActive?: boolean;
     allowedDays?: string[] | null;
@@ -277,7 +282,11 @@ function AdminPlanForm() {
       setImageUrl(existing.imageUrl ?? "");
       setBasePrice(existing.basePrice ?? "");
       setCategory(existing.category ?? "internacional");
-      setIsPromotion(existing.isPromotion ?? false);
+      setIsBloqueo(!!existing.isBloqueo);
+      setBloqueoSalidaFecha(existing.bloqueoSalidaFecha?.trim() ?? "");
+      setBloqueoCuposDisponibles(
+        existing.bloqueoCuposDisponibles != null ? existing.bloqueoCuposDisponibles : "",
+      );
       setDisplayOrder(existing.displayOrder ?? 999);
       setIsActive(existing.isActive ?? true);
       setAllowedDays(
@@ -339,6 +348,28 @@ function AdminPlanForm() {
   });
 
   const handleSave = () => {
+    if (isBloqueo) {
+      if (!basePrice?.trim()) {
+        toast({ title: "Bloqueo incompleto", description: "Indica el precio fijo (USD).", variant: "destructive" });
+        return;
+      }
+      if (!bloqueoSalidaFecha?.trim()) {
+        toast({ title: "Bloqueo incompleto", description: "Indica la fecha de salida.", variant: "destructive" });
+        return;
+      }
+      if (bloqueoCuposDisponibles === "") {
+        toast({ title: "Bloqueo incompleto", description: "Indica los cupos disponibles (0 = agotado).", variant: "destructive" });
+        return;
+      }
+      if (!internalFlights.length) {
+        toast({
+          title: "Bloqueo incompleto",
+          description: "Abre «Gestionar vuelos del bloqueo» y carga al menos una imagen (ida, regreso y/o conexión).",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     const payload = {
       name,
       country,
@@ -349,20 +380,24 @@ function AdminPlanForm() {
       imageUrl: imageUrl || null,
       basePrice: basePrice ? String(basePrice) : null,
       category,
-      isPromotion,
+      isBloqueo,
+      bloqueoSalidaFecha: isBloqueo ? bloqueoSalidaFecha.trim() : null,
+      bloqueoCuposDisponibles: isBloqueo ? Number(bloqueoCuposDisponibles) : null,
       displayOrder,
       isActive,
       requiresTuesday: allowedDays.length === 1 && allowedDays[0] === "tuesday",
       requiresExtraDay,
       allowedDays: allowedDays.length ? allowedDays : null,
-      priceTiers: priceTiers.length ? priceTiers : null,
+      priceTiers: isBloqueo ? null : priceTiers.length ? priceTiers : null,
       upgrades: upgrades.length ? upgrades : null,
       itinerary: itinerary.map(itineraryDayToPayload),
       hotels,
       inclusions,
       exclusions,
       images,
-      hasInternalOrConnectionFlight,
+      hasInternalOrConnectionFlight: isBloqueo
+        ? internalFlights.length > 0
+        : hasInternalOrConnectionFlight,
       internalFlights: internalFlights.length ? internalFlights : null,
       medicalAssistanceInfo: medicalAssistanceInfo || null,
       medicalAssistanceImageUrl: medicalAssistanceImageUrl || null,
@@ -1170,15 +1205,25 @@ function AdminPlanForm() {
                 </div>
               </div>
 
-              {/* Activo, Es promoción y Día adicional transatlántico */}
+              {/* Activo, Bloqueo y Día adicional transatlántico */}
               <div className="flex flex-wrap items-center gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Switch checked={isActive} onCheckedChange={(c) => setIsActive(!!c)} />
                   <span>Activo en catálogo</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={isPromotion} onCheckedChange={(c) => setIsPromotion(!!c)} />
-                  Es promoción
+                  <Checkbox
+                    checked={isBloqueo}
+                    onCheckedChange={(c) => {
+                      const on = !!c;
+                      setIsBloqueo(on);
+                      if (!on) {
+                        setBloqueoSalidaFecha("");
+                        setBloqueoCuposDisponibles("");
+                      }
+                    }}
+                  />
+                  Plan bloqueo (salida fija, cupos, precio fijo, vuelos cargados)
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer" title="Viajes transatlánticos (Turquía, Dubái, Europa) suman +1 día al total por vuelo desde Colombia. En LATAM no aplica.">
                   <Switch checked={requiresExtraDay} onCheckedChange={(c) => setRequiresExtraDay(!!c)} />
@@ -1186,7 +1231,92 @@ function AdminPlanForm() {
                 </label>
               </div>
 
-              {/* Días permitidos - debajo de Activo/Promoción */}
+              {isBloqueo && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
+                  <p className="text-sm font-medium text-foreground">Configuración del bloqueo</p>
+                  <p className="text-xs text-muted-foreground">
+                    El precio visible es <strong>basePrice</strong> (porción terrestre). Los vuelos se cargan con «Gestionar vuelos del bloqueo» (ida, regreso y/o
+                    conexión interna).
+                    La fecha de salida no se puede cambiar después de guardarla. Puedes ajustar los cupos cuando vendas; en 0 el plan aparece como agotado.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Fecha de salida (fija)</Label>
+                      <Input
+                        type="date"
+                        value={bloqueoSalidaFecha}
+                        onChange={(e) => setBloqueoSalidaFecha(e.target.value)}
+                        disabled={isEditing && !!existing?.bloqueoSalidaFecha}
+                        className="max-w-xs"
+                      />
+                      {isEditing && existing?.bloqueoSalidaFecha ? (
+                        <p className="text-xs text-muted-foreground">La fecha ya está definida y no es editable.</p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Cupos disponibles</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={bloqueoCuposDisponibles === "" ? "" : bloqueoCuposDisponibles}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setBloqueoCuposDisponibles(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
+                        }}
+                        className="max-w-xs"
+                      />
+                      <p className="text-xs text-muted-foreground">Al guardar cotizaciones se descuenta por pasajeros; al borrar una cotización se liberan.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 pt-3 border-t border-amber-500/25">
+                    <Label>Vuelos del bloqueo</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Indica por cada imagen si es ida, regreso o conexión/vuelo interno. Esa información se usa al generar el PDF del bloqueo.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" variant="secondary" size="sm" onClick={() => setBloqueoFlightsModalOpen(true)}>
+                        {internalFlights.some((f) => f.imageUrl) ? "Gestionar vuelos del bloqueo" : "Cargar vuelos del bloqueo"}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {internalFlights.filter((f) => f.imageUrl).length} imagen(es) con imagen cargada
+                      </span>
+                    </div>
+                    {internalFlights.some((f) => f.imageUrl) && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {internalFlights
+                          .map((f, i) => ({ f, i }))
+                          .filter(({ f }) => f.imageUrl)
+                          .map(({ f, i }) => (
+                            <div
+                              key={`${f.imageUrl}-${i}`}
+                              className="relative h-14 w-20 rounded border overflow-hidden bg-muted"
+                              title={f.label}
+                            >
+                              <img src={f.imageUrl} alt="" className="h-full w-full object-cover" />
+                              <span className="absolute bottom-0 left-0 right-0 bg-background/90 text-[10px] text-center font-medium py-0.5 truncate px-0.5">
+                                {f.flightRole === "return"
+                                  ? "Regreso"
+                                  : f.flightRole === "domestic"
+                                    ? "Conexión"
+                                    : "Ida"}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                    <InternalFlightsModal
+                      open={bloqueoFlightsModalOpen}
+                      onOpenChange={setBloqueoFlightsModalOpen}
+                      internalFlights={internalFlights}
+                      onSave={setInternalFlights}
+                      planName={name}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Días permitidos - debajo de Activo/Bloqueo */}
               <div>
                 <Label>Días permitidos para salida</Label>
                 <p className="text-sm text-muted-foreground mt-0.5 mb-3">
@@ -1474,7 +1604,7 @@ Puedes usar **texto** para resaltar.`}
                   </p>
                 </div>
 
-                {hasInternalOrConnectionFlight && (
+                {hasInternalOrConnectionFlight && !isBloqueo && (
                   <div>
                     <Label className="text-sm font-medium">Imágenes del vuelo interno/conexión</Label>
                     <p className="text-xs text-muted-foreground mb-2">
@@ -1488,7 +1618,7 @@ Puedes usar **texto** para resaltar.`}
                         setInternalFlights((prev) =>
                           nextUrls.map((url) => {
                             const existing = prev.find((f) => f.imageUrl === url);
-                            return existing ?? { imageUrl: url, cabinBaggage: false, holdBaggage: false };
+                            return existing ?? { imageUrl: url, cabinBaggage: false, holdBaggage: false, flightRole: "outbound" as const };
                           })
                         );
                       }}
@@ -1514,7 +1644,10 @@ Puedes usar **texto** para resaltar.`}
                             const res = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" });
                             if (!res.ok) throw new Error("Upload failed");
                             const { url } = await res.json();
-                            setInternalFlights((prev) => [...prev, { imageUrl: url, cabinBaggage: false, holdBaggage: false }]);
+                            setInternalFlights((prev) => [
+                              ...prev,
+                              { imageUrl: url, cabinBaggage: false, holdBaggage: false, flightRole: "outbound" },
+                            ]);
                           }
                           toast({ title: "Imágenes subidas", description: `${files.length} imagen(es) agregada(s).` });
                         } catch {

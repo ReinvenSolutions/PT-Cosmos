@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean, uniqueIndex, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, uniqueIndex, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -16,6 +16,12 @@ export const destinations = pgTable(
     basePrice: decimal("base_price", { precision: 10, scale: 2 }),
     category: text("category").default("internacional"),
     isPromotion: boolean("is_promotion").default(false),
+    /** Plan “bloqueo”: pestaña Bloqueos, salida fija, cupos limitados, precio fijo en base_price. */
+    isBloqueo: boolean("is_bloqueo").default(false),
+    /** Fecha de salida fija (YYYY-MM-DD). No editable en admin una vez definida. */
+    bloqueoSalidaFecha: text("bloqueo_salida_fecha"),
+    /** Cupos restantes; al guardar cotización se descuenta por pasajeros; el admin puede ajustar manualmente. */
+    bloqueoCuposDisponibles: integer("bloqueo_cupos_disponibles"),
     displayOrder: integer("display_order").default(999),
     isActive: boolean("is_active").default(true),
     requiresTuesday: boolean("requires_tuesday").default(false),
@@ -24,7 +30,16 @@ export const destinations = pgTable(
     priceTiers: json("price_tiers").$type<Array<{ startDate?: string; endDate: string; price: string; isFlightDay?: boolean; flightLabel?: string }>>(),
     upgrades: json("upgrades").$type<Array<{ code: string; name: string; description?: string; price: number }>>(),
     hasInternalOrConnectionFlight: boolean("has_internal_or_connection_flight").default(false),
-    internalFlights: json("internal_flights").$type<Array<{ imageUrl: string; label?: string; cabinBaggage?: boolean; holdBaggage?: boolean }>>(),
+    internalFlights: json("internal_flights").$type<
+      Array<{
+        imageUrl: string;
+        label?: string;
+        cabinBaggage?: boolean;
+        holdBaggage?: boolean;
+        /** Ida, regreso o conexión/interno (planes bloqueo en cotización/PDF). */
+        flightRole?: "outbound" | "return" | "domestic";
+      }>
+    >(),
     medicalAssistanceInfo: text("medical_assistance_info"),
     medicalAssistanceImageUrl: text("medical_assistance_image_url"),
     firstPageComments: text("first_page_comments"),
@@ -289,6 +304,69 @@ export const insertTermsConditionsSchema = createInsertSchema(termsConditions).o
 });
 export type InsertTermsConditions = z.infer<typeof insertTermsConditionsSchema>;
 export type TermsConditions = typeof termsConditions.$inferSelect;
+
+/** Cursos de la academia / tutoriales (admin edita, usuarios avanzan con progreso). */
+export const tutorialCourses = pgTable("tutorial_courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  displayOrder: integer("display_order").default(0).notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTutorialCourseSchema = createInsertSchema(tutorialCourses).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTutorialCourse = z.infer<typeof insertTutorialCourseSchema>;
+export type TutorialCourse = typeof tutorialCourses.$inferSelect;
+
+export const tutorialLessons = pgTable("tutorial_lessons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id")
+    .notNull()
+    .references(() => tutorialCourses.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  videoUrl: text("video_url"),
+  displayOrder: integer("display_order").default(0).notNull(),
+  isPublished: boolean("is_published").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [index("tutorial_lessons_course_idx").on(t.courseId)]);
+
+export const insertTutorialLessonSchema = createInsertSchema(tutorialLessons).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTutorialLesson = z.infer<typeof insertTutorialLessonSchema>;
+export type TutorialLesson = typeof tutorialLessons.$inferSelect;
+
+export const tutorialLessonProgress = pgTable("tutorial_lesson_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  lessonId: varchar("lesson_id")
+    .notNull()
+    .references(() => tutorialLessons.id, { onDelete: "cascade" }),
+  viewCount: integer("view_count").default(0).notNull(),
+  firstViewedAt: timestamp("first_viewed_at"),
+  lastViewedAt: timestamp("last_viewed_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("tutorial_progress_user_lesson").on(t.userId, t.lessonId),
+  index("tutorial_progress_lesson_idx").on(t.lessonId),
+  index("tutorial_progress_user_idx").on(t.userId),
+]);
+
+export const insertTutorialLessonProgressSchema = createInsertSchema(tutorialLessonProgress).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTutorialLessonProgress = z.infer<typeof insertTutorialLessonProgressSchema>;
+export type TutorialLessonProgress = typeof tutorialLessonProgress.$inferSelect;
 
 export function formatUSD(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;

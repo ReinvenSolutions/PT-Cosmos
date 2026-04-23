@@ -34,10 +34,19 @@ import {
   type QuoteLog,
   type InsertQuoteLog,
   appSettings,
+  tutorialCourses,
+  tutorialLessons,
+  tutorialLessonProgress,
+  type TutorialCourse,
+  type InsertTutorialCourse,
+  type TutorialLesson,
+  type InsertTutorialLesson,
+  type TutorialLessonProgress,
 } from "@shared/schema";
 import { GLOBAL_TRM_BASE_SETTING_KEY } from "@shared/trm";
 import { db } from "./db";
-import { eq, or, sql, desc, count, inArray } from "drizzle-orm";
+import { eq, or, sql, desc, asc, count, inArray, and } from "drizzle-orm";
+import { applyBloqueoCuposForQuoteChange } from "./bloqueoCupos";
 
 function parseGlobalTrmBase(raw: string | null): number | null {
   if (raw == null || raw === "") return null;
@@ -132,6 +141,67 @@ export interface IStorage {
   setAppSetting(key: string, value: string): Promise<void>;
   getGlobalTrmBase(): Promise<number | null>;
   setGlobalTrmBase(baseTrm: number | null): Promise<void>;
+
+  getTutorialCourse(id: string): Promise<TutorialCourse | undefined>;
+  listTutorialCoursesAdmin(): Promise<TutorialCourse[]>;
+  createTutorialCourse(data: InsertTutorialCourse): Promise<TutorialCourse>;
+  updateTutorialCourse(id: string, data: Partial<InsertTutorialCourse>): Promise<TutorialCourse>;
+  deleteTutorialCourse(id: string): Promise<void>;
+  listTutorialLessonsByCourse(courseId: string): Promise<TutorialLesson[]>;
+  getTutorialLesson(id: string): Promise<TutorialLesson | undefined>;
+  createTutorialLesson(data: InsertTutorialLesson): Promise<TutorialLesson>;
+  updateTutorialLesson(id: string, data: Partial<InsertTutorialLesson>): Promise<TutorialLesson>;
+  deleteTutorialLesson(id: string): Promise<void>;
+  listPublishedTutorialCoursesForUser(userId: string): Promise<
+    Array<TutorialCourse & { publishedLessonCount: number; completedLessonCount: number }>
+  >;
+  getPublishedCourseWithLessonsForUser(
+    courseId: string,
+    userId: string
+  ): Promise<{
+    course: TutorialCourse;
+    lessons: Array<
+      TutorialLesson & {
+        progress: { viewCount: number; completedAt: Date | null; lastViewedAt: Date | null } | null;
+      }
+    >;
+  } | null>;
+  getPublishedLessonForUser(lessonId: string, userId: string): Promise<{
+    lesson: TutorialLesson;
+    course: TutorialCourse;
+    progress: TutorialLessonProgress | null;
+  } | null>;
+  recordTutorialLessonView(userId: string, lessonId: string): Promise<TutorialLessonProgress>;
+  completeTutorialLesson(userId: string, lessonId: string): Promise<TutorialLessonProgress>;
+  uncompleteTutorialLesson(userId: string, lessonId: string): Promise<TutorialLessonProgress>;
+  getTutorialAnalytics(): Promise<{
+    totals: {
+      totalCourses: number;
+      publishedCourses: number;
+      totalLessons: number;
+      publishedLessons: number;
+      uniqueUsersWithActivity: number;
+      totalLessonViews: number;
+      totalCompletions: number;
+    };
+    byLesson: Array<{
+      lessonId: string;
+      lessonTitle: string;
+      courseId: string;
+      courseTitle: string;
+      viewSum: number;
+      uniqueViewers: number;
+      completedCount: number;
+    }>;
+    byUser: Array<{
+      userId: string;
+      name: string | null;
+      username: string;
+      lessonsWithViews: number;
+      lessonsCompleted: number;
+      totalViews: number;
+    }>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -525,6 +595,15 @@ export class DatabaseStorage implements IStorage {
 
   async createQuote(quoteData: InsertQuote, destinationsData: InsertQuoteDestination[]): Promise<Quote> {
     return await db.transaction(async (tx) => {
+      await applyBloqueoCuposForQuoteChange(
+        tx,
+        [],
+        destinationsData.map((d) => ({
+          destinationId: d.destinationId,
+          passengers: d.passengers ?? 1,
+        })),
+      );
+
       const [quote] = await tx.insert(quotes).values(quoteData).returning();
 
       if (destinationsData.length > 0) {
@@ -551,6 +630,23 @@ export class DatabaseStorage implements IStorage {
       if (!existingQuote[0] || existingQuote[0].userId !== userId) {
         throw new Error("Quote not found or unauthorized");
       }
+
+      const previousDestRows = await tx
+        .select({
+          destinationId: quoteDestinations.destinationId,
+          passengers: quoteDestinations.passengers,
+        })
+        .from(quoteDestinations)
+        .where(eq(quoteDestinations.quoteId, id));
+
+      await applyBloqueoCuposForQuoteChange(
+        tx,
+        previousDestRows,
+        destinationsData.map((d) => ({
+          destinationId: d.destinationId,
+          passengers: d.passengers ?? 1,
+        })),
+      );
 
       const [updatedQuote] = await tx
         .update(quotes)
@@ -882,6 +978,16 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Quote not found or unauthorized");
       }
 
+      const previousDestRows = await tx
+        .select({
+          destinationId: quoteDestinations.destinationId,
+          passengers: quoteDestinations.passengers,
+        })
+        .from(quoteDestinations)
+        .where(eq(quoteDestinations.quoteId, id));
+
+      await applyBloqueoCuposForQuoteChange(tx, previousDestRows, []);
+
       await tx.delete(quoteDestinations).where(eq(quoteDestinations.quoteId, id));
       await tx.delete(quotes).where(eq(quotes.id, id));
     });
@@ -1152,6 +1258,330 @@ export class DatabaseStorage implements IStorage {
       return;
     }
     await this.setAppSetting(GLOBAL_TRM_BASE_SETTING_KEY, String(baseTrm));
+  }
+
+  async getTutorialCourse(id: string): Promise<TutorialCourse | undefined> {
+    const [row] = await db.select().from(tutorialCourses).where(eq(tutorialCourses.id, id)).limit(1);
+    return row;
+  }
+
+  async listTutorialCoursesAdmin(): Promise<TutorialCourse[]> {
+    return db.select().from(tutorialCourses).orderBy(asc(tutorialCourses.displayOrder), asc(tutorialCourses.title));
+  }
+
+  async createTutorialCourse(data: InsertTutorialCourse): Promise<TutorialCourse> {
+    const [row] = await db.insert(tutorialCourses).values(data).returning();
+    return row;
+  }
+
+  async updateTutorialCourse(id: string, data: Partial<InsertTutorialCourse>): Promise<TutorialCourse> {
+    const [row] = await db.update(tutorialCourses).set(data).where(eq(tutorialCourses.id, id)).returning();
+    if (!row) throw new ValidationError("Curso no encontrado");
+    return row;
+  }
+
+  async deleteTutorialCourse(id: string): Promise<void> {
+    await db.delete(tutorialCourses).where(eq(tutorialCourses.id, id));
+  }
+
+  async listTutorialLessonsByCourse(courseId: string): Promise<TutorialLesson[]> {
+    return db
+      .select()
+      .from(tutorialLessons)
+      .where(eq(tutorialLessons.courseId, courseId))
+      .orderBy(asc(tutorialLessons.displayOrder), asc(tutorialLessons.title));
+  }
+
+  async getTutorialLesson(id: string): Promise<TutorialLesson | undefined> {
+    const [row] = await db.select().from(tutorialLessons).where(eq(tutorialLessons.id, id)).limit(1);
+    return row;
+  }
+
+  async createTutorialLesson(data: InsertTutorialLesson): Promise<TutorialLesson> {
+    const [row] = await db.insert(tutorialLessons).values(data).returning();
+    return row;
+  }
+
+  async updateTutorialLesson(id: string, data: Partial<InsertTutorialLesson>): Promise<TutorialLesson> {
+    const [row] = await db.update(tutorialLessons).set(data).where(eq(tutorialLessons.id, id)).returning();
+    if (!row) throw new ValidationError("Lección no encontrada");
+    return row;
+  }
+
+  async deleteTutorialLesson(id: string): Promise<void> {
+    await db.delete(tutorialLessons).where(eq(tutorialLessons.id, id));
+  }
+
+  async listPublishedTutorialCoursesForUser(
+    userId: string
+  ): Promise<Array<TutorialCourse & { publishedLessonCount: number; completedLessonCount: number }>> {
+    const publishedCourses = await db
+      .select()
+      .from(tutorialCourses)
+      .where(eq(tutorialCourses.isPublished, true))
+      .orderBy(asc(tutorialCourses.displayOrder), asc(tutorialCourses.title));
+    const out: Array<TutorialCourse & { publishedLessonCount: number; completedLessonCount: number }> = [];
+    for (const c of publishedCourses) {
+      const lessons = await db
+        .select()
+        .from(tutorialLessons)
+        .where(and(eq(tutorialLessons.courseId, c.id), eq(tutorialLessons.isPublished, true)));
+      const publishedLessonCount = lessons.length;
+      if (publishedLessonCount === 0) continue;
+      const lessonIds = lessons.map((l) => l.id);
+      const progressRows =
+        lessonIds.length === 0
+          ? []
+          : await db
+              .select()
+              .from(tutorialLessonProgress)
+              .where(
+                and(
+                  eq(tutorialLessonProgress.userId, userId),
+                  inArray(tutorialLessonProgress.lessonId, lessonIds)
+                )
+              );
+      const completedLessonCount = progressRows.filter((p) => p.completedAt != null).length;
+      out.push({ ...c, publishedLessonCount, completedLessonCount });
+    }
+    return out;
+  }
+
+  async getPublishedCourseWithLessonsForUser(
+    courseId: string,
+    userId: string
+  ): Promise<{
+    course: TutorialCourse;
+    lessons: Array<
+      TutorialLesson & {
+        progress: { viewCount: number; completedAt: Date | null; lastViewedAt: Date | null } | null;
+      }
+    >;
+  } | null> {
+    const [course] = await db
+      .select()
+      .from(tutorialCourses)
+      .where(and(eq(tutorialCourses.id, courseId), eq(tutorialCourses.isPublished, true)))
+      .limit(1);
+    if (!course) return null;
+    const lessons = await db
+      .select()
+      .from(tutorialLessons)
+      .where(and(eq(tutorialLessons.courseId, courseId), eq(tutorialLessons.isPublished, true)))
+      .orderBy(asc(tutorialLessons.displayOrder), asc(tutorialLessons.title));
+    if (lessons.length === 0) return { course, lessons: [] };
+    const lessonIds = lessons.map((l) => l.id);
+    const progressRows = await db
+      .select()
+      .from(tutorialLessonProgress)
+      .where(and(eq(tutorialLessonProgress.userId, userId), inArray(tutorialLessonProgress.lessonId, lessonIds)));
+    const byLesson = new Map(progressRows.map((p) => [p.lessonId, p]));
+    return {
+      course,
+      lessons: lessons.map((l) => {
+        const p = byLesson.get(l.id);
+        return {
+          ...l,
+          progress: p
+            ? { viewCount: p.viewCount, completedAt: p.completedAt, lastViewedAt: p.lastViewedAt }
+            : null,
+        };
+      }),
+    };
+  }
+
+  async getPublishedLessonForUser(
+    lessonId: string,
+    userId: string
+  ): Promise<{
+    lesson: TutorialLesson;
+    course: TutorialCourse;
+    progress: TutorialLessonProgress | null;
+  } | null> {
+    const [lesson] = await db
+      .select()
+      .from(tutorialLessons)
+      .where(and(eq(tutorialLessons.id, lessonId), eq(tutorialLessons.isPublished, true)))
+      .limit(1);
+    if (!lesson) return null;
+    const [course] = await db
+      .select()
+      .from(tutorialCourses)
+      .where(and(eq(tutorialCourses.id, lesson.courseId), eq(tutorialCourses.isPublished, true)))
+      .limit(1);
+    if (!course) return null;
+    const [progress] = await db
+      .select()
+      .from(tutorialLessonProgress)
+      .where(and(eq(tutorialLessonProgress.userId, userId), eq(tutorialLessonProgress.lessonId, lessonId)))
+      .limit(1);
+    return { lesson, course, progress: progress ?? null };
+  }
+
+  async recordTutorialLessonView(userId: string, lessonId: string): Promise<TutorialLessonProgress> {
+    const now = new Date();
+    const [row] = await db
+      .insert(tutorialLessonProgress)
+      .values({
+        userId,
+        lessonId,
+        viewCount: 1,
+        firstViewedAt: now,
+        lastViewedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [tutorialLessonProgress.userId, tutorialLessonProgress.lessonId],
+        set: {
+          viewCount: sql`${tutorialLessonProgress.viewCount} + 1`,
+          lastViewedAt: now,
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async completeTutorialLesson(userId: string, lessonId: string): Promise<TutorialLessonProgress> {
+    const now = new Date();
+    const [existing] = await db
+      .select()
+      .from(tutorialLessonProgress)
+      .where(and(eq(tutorialLessonProgress.userId, userId), eq(tutorialLessonProgress.lessonId, lessonId)))
+      .limit(1);
+    if (existing) {
+      if (existing.completedAt) return existing;
+      const [row] = await db
+        .update(tutorialLessonProgress)
+        .set({ completedAt: now, lastViewedAt: now })
+        .where(
+          and(eq(tutorialLessonProgress.userId, userId), eq(tutorialLessonProgress.lessonId, lessonId))
+        )
+        .returning();
+      return row!;
+    }
+    const [row] = await db
+      .insert(tutorialLessonProgress)
+      .values({
+        userId,
+        lessonId,
+        viewCount: 0,
+        firstViewedAt: now,
+        lastViewedAt: now,
+        completedAt: now,
+      })
+      .returning();
+    return row;
+  }
+
+  async uncompleteTutorialLesson(userId: string, lessonId: string): Promise<TutorialLessonProgress> {
+    const [existing] = await db
+      .select()
+      .from(tutorialLessonProgress)
+      .where(and(eq(tutorialLessonProgress.userId, userId), eq(tutorialLessonProgress.lessonId, lessonId)))
+      .limit(1);
+    if (!existing) {
+      throw new ValidationError("No hay progreso registrado para esta lección");
+    }
+    if (!existing.completedAt) {
+      return existing;
+    }
+    const now = new Date();
+    const [row] = await db
+      .update(tutorialLessonProgress)
+      .set({ completedAt: null, lastViewedAt: now })
+      .where(and(eq(tutorialLessonProgress.userId, userId), eq(tutorialLessonProgress.lessonId, lessonId)))
+      .returning();
+    return row!;
+  }
+
+  async getTutorialAnalytics() {
+    const allCourses = await db.select().from(tutorialCourses);
+    const allLessons = await db.select().from(tutorialLessons);
+    const publishedCourses = allCourses.filter((c) => c.isPublished);
+    const publishedLessons = allLessons.filter((l) => l.isPublished);
+    const progress = await db.select().from(tutorialLessonProgress);
+    const uniqueUsers = new Set(progress.map((p) => p.userId));
+    const totalLessonViews = progress.reduce((s, p) => s + (p.viewCount || 0), 0);
+    const totalCompletions = progress.filter((p) => p.completedAt != null).length;
+
+    const courseTitleById = new Map(allCourses.map((c) => [c.id, c.title]));
+    const byLesson: Array<{
+      lessonId: string;
+      lessonTitle: string;
+      courseId: string;
+      courseTitle: string;
+      viewSum: number;
+      uniqueViewers: number;
+      completedCount: number;
+    }> = [];
+    for (const les of allLessons) {
+      const rows = progress.filter((p) => p.lessonId === les.id);
+      const viewSum = rows.reduce((s, p) => s + p.viewCount, 0);
+      const uniqueViewers = rows.length;
+      const completedCount = rows.filter((p) => p.completedAt != null).length;
+      byLesson.push({
+        lessonId: les.id,
+        lessonTitle: les.title,
+        courseId: les.courseId,
+        courseTitle: courseTitleById.get(les.courseId) ?? "",
+        viewSum,
+        uniqueViewers,
+        completedCount,
+      });
+    }
+    byLesson.sort((a, b) => b.viewSum - a.viewSum);
+
+    const byUserMap = new Map<
+      string,
+      { userId: string; lessonsWithViews: number; lessonsCompleted: number; totalViews: number }
+    >();
+    for (const p of progress) {
+      const u = byUserMap.get(p.userId) ?? {
+        userId: p.userId,
+        lessonsWithViews: 0,
+        lessonsCompleted: 0,
+        totalViews: 0,
+      };
+      u.totalViews += p.viewCount;
+      if (p.viewCount > 0) u.lessonsWithViews += 1;
+      if (p.completedAt) u.lessonsCompleted += 1;
+      byUserMap.set(p.userId, u);
+    }
+    const uids = Array.from(byUserMap.keys());
+    const userMeta =
+      uids.length === 0
+        ? []
+        : await db
+            .select({ id: users.id, name: users.name, username: users.username })
+            .from(users)
+            .where(inArray(users.id, uids));
+    const metaById = new Map(userMeta.map((r) => [r.id, r]));
+    const byUser = uids
+      .map((id) => {
+        const meta = metaById.get(id);
+        const agg = byUserMap.get(id)!;
+        return {
+          userId: id,
+          name: meta?.name ?? null,
+          username: meta?.username ?? id,
+          ...agg,
+        };
+      })
+      .filter((r) => r.totalViews > 0 || r.lessonsCompleted > 0);
+    byUser.sort((a, b) => b.lessonsCompleted - a.lessonsCompleted || b.totalViews - a.totalViews);
+
+    return {
+      totals: {
+        totalCourses: allCourses.length,
+        publishedCourses: publishedCourses.length,
+        totalLessons: allLessons.length,
+        publishedLessons: publishedLessons.length,
+        uniqueUsersWithActivity: uniqueUsers.size,
+        totalLessonViews,
+        totalCompletions,
+      },
+      byLesson,
+      byUser,
+    };
   }
 }
 

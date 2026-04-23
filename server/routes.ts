@@ -23,6 +23,7 @@ import validator from "validator";
 import multer from "multer";
 import { handleFileUpload, getImageBuffer } from "./upload";
 import { handleExtractPlanFromDocument } from "./handlers/extractPlanFromDocument";
+import { registerTutorialRoutes } from "./tutorialRoutes";
 import { reorderPlanImages, reorderPlanHotelsImages, reorderPlanAdicionalesImages, deletePlanBucket, deleteOrphanPlanBuckets, listBucketFiles, listBucketFilesInFolder, getPublicUrl, removeFromBucket, getMedicalAssistanceBucketName, getItineraryMapsBucketName, ITINERARY_MAP_STORAGE_PREFIX, parseSupabaseStorageUrl, ensureBucketExists, getPlanBucketName, getPlanHotelsBucketName, getPlanAdicionalesBucketName } from "./supabaseStorage";
 import { useSupabaseStorage, localToSupabaseUrl } from "./utils/imageUrls";
 import path from "path";
@@ -1007,6 +1008,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     basePrice: z.union([z.string(), z.number()]).nullable().optional(),
     category: z.string().default("internacional"),
     isPromotion: z.boolean().optional(),
+    isBloqueo: z.boolean().optional(),
+    bloqueoSalidaFecha: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha bloqueo: usar YYYY-MM-DD")
+      .nullable()
+      .optional(),
+    bloqueoCuposDisponibles: z.number().int().min(0).nullable().optional(),
     displayOrder: z.number().optional(),
     isActive: z.boolean().optional(),
     requiresTuesday: z.boolean().optional(),
@@ -1038,6 +1046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       label: z.string().optional(),
       cabinBaggage: z.boolean().optional(),
       holdBaggage: z.boolean().optional(),
+      flightRole: z.enum(["outbound", "return", "domestic"]).optional(),
     })).nullable().optional(),
     medicalAssistanceInfo: z.string().nullable().optional(),
     medicalAssistanceImageUrl: z.string().nullable().optional(),
@@ -1071,6 +1080,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/destinations", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const validated = fullDestinationSchema.parse(req.body);
+    const isBloqueo = validated.isBloqueo ?? false;
+    if (isBloqueo) {
+      if (validated.basePrice == null || validated.basePrice === "") {
+        throw new ValidationError("Un bloqueo requiere precio fijo (porción terrestre / USD).");
+      }
+      if (!validated.bloqueoSalidaFecha) {
+        throw new ValidationError("Un bloqueo requiere fecha de salida.");
+      }
+      if (validated.bloqueoCuposDisponibles == null) {
+        throw new ValidationError("Un bloqueo requiere cupos disponibles (0 = agotado).");
+      }
+      if (!validated.internalFlights?.length) {
+        throw new ValidationError("Un bloqueo requiere al menos un vuelo cargado (pestaña con vuelos internos/conexión).");
+      }
+    }
     const destData = {
       name: validated.name,
       country: validated.country,
@@ -1080,13 +1104,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       imageUrl: validated.imageUrl ?? null,
       basePrice: validated.basePrice != null ? String(validated.basePrice) : null,
       category: validated.category,
-      isPromotion: validated.isPromotion ?? false,
+      isPromotion: isBloqueo || (validated.isPromotion ?? false),
+      isBloqueo,
+      bloqueoSalidaFecha: isBloqueo ? validated.bloqueoSalidaFecha ?? null : null,
+      bloqueoCuposDisponibles: isBloqueo ? validated.bloqueoCuposDisponibles ?? null : null,
       displayOrder: validated.displayOrder ?? 999,
       isActive: validated.isActive ?? true,
       requiresTuesday: validated.requiresTuesday ?? false,
       requiresExtraDay: validated.requiresExtraDay ?? false,
       allowedDays: validated.allowedDays ?? null,
-      priceTiers: validated.priceTiers ?? null,
+      priceTiers: isBloqueo ? null : validated.priceTiers ?? null,
       upgrades: validated.upgrades ?? null,
       hasInternalOrConnectionFlight: validated.hasInternalOrConnectionFlight ?? false,
       internalFlights: validated.internalFlights ?? null,
@@ -1165,6 +1192,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!existing) throw new NotFoundError("Destination");
 
     const validated = fullDestinationSchema.parse(req.body);
+    const isBloqueo = validated.isBloqueo ?? false;
+    if (isBloqueo) {
+      if (validated.basePrice == null || validated.basePrice === "") {
+        throw new ValidationError("Un bloqueo requiere precio fijo (porción terrestre / USD).");
+      }
+      if (!validated.bloqueoSalidaFecha) {
+        throw new ValidationError("Un bloqueo requiere fecha de salida.");
+      }
+      if (validated.bloqueoCuposDisponibles == null) {
+        throw new ValidationError("Un bloqueo requiere cupos disponibles (0 = agotado).");
+      }
+      if (!validated.internalFlights?.length) {
+        throw new ValidationError("Un bloqueo requiere al menos un vuelo cargado (pestaña con vuelos internos/conexión).");
+      }
+    }
+    if (
+      existing.bloqueoSalidaFecha &&
+      validated.bloqueoSalidaFecha &&
+      validated.bloqueoSalidaFecha !== existing.bloqueoSalidaFecha
+    ) {
+      throw new ValidationError("La fecha de salida del bloqueo no se puede modificar una vez definida.");
+    }
     const validImages = validated.images?.filter((img) => img?.imageUrl && String(img.imageUrl).trim().length > 0) ?? [];
 
     // Asegurar que el bucket del plan existe antes de guardar imágenes
@@ -1242,13 +1291,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       imageUrl: validated.imageUrl ?? null,
       basePrice: validated.basePrice != null ? String(validated.basePrice) : null,
       category: validated.category,
-      isPromotion: validated.isPromotion ?? false,
+      isPromotion: isBloqueo || (validated.isPromotion ?? false),
+      isBloqueo,
+      bloqueoSalidaFecha: isBloqueo ? validated.bloqueoSalidaFecha ?? null : null,
+      bloqueoCuposDisponibles: isBloqueo ? validated.bloqueoCuposDisponibles ?? null : null,
       displayOrder: validated.displayOrder ?? 999,
       isActive: validated.isActive ?? true,
       requiresTuesday: validated.requiresTuesday ?? false,
       requiresExtraDay: validated.requiresExtraDay ?? false,
       allowedDays: validated.allowedDays ?? null,
-      priceTiers: validated.priceTiers ?? null,
+      priceTiers: isBloqueo ? null : validated.priceTiers ?? null,
       upgrades: validated.upgrades ?? null,
       hasInternalOrConnectionFlight: validated.hasInternalOrConnectionFlight ?? false,
       internalFlights: validated.internalFlights ?? null,
@@ -1605,6 +1657,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     res.status(201).json(log);
   }));
+
+  registerTutorialRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

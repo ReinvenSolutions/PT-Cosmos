@@ -28,6 +28,8 @@ const MIGRATIONS = [
   "0014_destination_hotel_gallery.sql",
   "0015_destination_adicionales_gallery.sql",
   "0016_quote_connection_flight.sql",
+  "0017_tutorial_academy.sql",
+  "0018_destinations_bloqueos.sql",
 ];
 
 async function main() {
