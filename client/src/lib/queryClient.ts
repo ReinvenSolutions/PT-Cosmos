@@ -1,6 +1,15 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 /**
+ * Invalida la caché de la vista pública de Tutoriales (Academia) tras guardar cursos o lecciones en admin.
+ * el QueryClient global usa `staleTime: Infinity`, así que sin esto el listado no se actualiza hasta F5.
+ */
+export function invalidatePublicTutorialQueries(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: ["/api/tutorials/courses"] });
+  void qc.invalidateQueries({ queryKey: ["/api/tutorials/lessons"] });
+}
+
+/**
  * Invalida listas y previews públicos de destinos (cotizador, home).
  * Tras guardar/editar planes en admin hay que llamarla además de /api/admin/destinations:
  * la home usa `/api/destinations-previews`, no `/api/destinations`.
@@ -10,6 +19,7 @@ export function invalidatePublicDestinationQueries(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ["/api/destinations?isActive=false"] });
   qc.invalidateQueries({ queryKey: ["/api/destinations-previews?isActive=true"] });
   qc.invalidateQueries({ queryKey: ["/api/destinations-previews?isActive=false"] });
+  qc.invalidateQueries({ queryKey: ["/api/destinations"], exact: false });
 }
 
 async function throwIfResNotOk(res: Response) {

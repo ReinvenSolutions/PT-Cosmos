@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { FileText, Users, BarChart3, LogOut, Plane, Zap, MapPin, Camera, UserCog } from "lucide-react";
+import { FileText, Users, BarChart3, LogOut, Plane, Zap, MapPin, Camera, UserCog, GraduationCap, BookOpen, Library } from "lucide-react";
 import { GlobalTrmAdminMenuItem } from "@/components/global-trm-admin-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -252,7 +252,7 @@ function ProfileSection({
         data-testid="button-sidebar-logout"
       >
         <LogOut className="h-4 w-4 mr-2.5 opacity-70" />
-        Cerrar Sesión
+        Cerrar sesión
       </Button>
     </>
   );
@@ -266,7 +266,19 @@ export function AppSidebar() {
   // Prefetch rutas en segundo plano tras cargar (no compite con la carga inicial)
   useEffect(() => {
     const t = setTimeout(() => {
-      ["/", "/admin/dashboard", "/admin/plans", "/admin/clients", "/admin/users", "/advisor", "/cotizacion", "/cotizacion-express"].forEach(prefetchRoute);
+      [
+        "/",
+        "/tutoriales",
+        "/admin/dashboard",
+        "/admin/plans",
+        "/admin/tutoriales",
+        "/admin/tutoriales/metricas",
+        "/admin/clients",
+        "/admin/users",
+        "/advisor",
+        "/cotizacion",
+        "/cotizacion-express",
+      ].forEach(prefetchRoute);
     }, 1500);
     return () => clearTimeout(t);
   }, []);
@@ -278,6 +290,11 @@ export function AppSidebar() {
 
   const isAdmin = user?.role === "super_admin";
 
+  const contenidoSection = {
+    label: "Contenido",
+    items: [{ title: "Academia digital", url: "/tutoriales", icon: GraduationCap }],
+  };
+
   const adminSection = {
     label: "Administración",
     items: [
@@ -285,17 +302,19 @@ export function AppSidebar() {
       { title: "Admin Planes", url: "/admin/plans", icon: MapPin },
       { title: "Clientes", url: "/admin/clients", icon: Users },
       { title: "Usuarios", url: "/admin/users", icon: UserCog },
+      { title: "Academia (cursos)", url: "/admin/tutoriales", icon: BookOpen },
+      { title: "Academia (métricas)", url: "/admin/tutoriales/metricas", icon: Library },
     ],
   };
 
   const cotizacionesItems = [
-    { title: "Nueva Cotización", url: "/", icon: Plane },
-    { title: "Cotización Express", url: "/cotizacion-express", icon: Zap },
+    { title: "Nueva cotización", url: "/", icon: Plane },
+    { title: "Cotización express", url: "/cotizacion-express", icon: Zap },
   ];
 
   const advisorSection = {
     label: "Cotizaciones",
-    items: [...cotizacionesItems, { title: "Mis Cotizaciones", url: "/advisor", icon: FileText }],
+    items: [...cotizacionesItems, { title: "Mis cotizaciones", url: "/advisor", icon: FileText }],
   };
 
   const adminCotizacionesSection = {
@@ -304,15 +323,23 @@ export function AppSidebar() {
   };
 
   const sections = isAdmin
-    ? [adminSection, adminCotizacionesSection]
-    : [{ label: "Navegación", items: advisorSection.items }];
+    ? [adminSection, adminCotizacionesSection, contenidoSection]
+    : [{ label: "Cotizaciones", items: advisorSection.items }, contenidoSection];
+
+  const isMenuActive = (url: string) => {
+    if (url === "/tutoriales") return location.startsWith("/tutoriales");
+    if (url === "/admin/tutoriales")
+      return location === "/admin/tutoriales" || location.startsWith("/admin/tutoriales/curso/");
+    if (url === "/admin/tutoriales/metricas") return location === "/admin/tutoriales/metricas";
+    return location === url;
+  };
 
   const renderMenuItems = (items: typeof advisorSection.items) =>
     items.map((item) => (
       <SidebarMenuItem key={item.url}>
         <SidebarMenuButton
           asChild
-          isActive={location === item.url}
+          isActive={isMenuActive(item.url)}
           tooltip={item.title}
           data-testid={`sidebar-${item.title.toLowerCase().replace(/ /g, "-")}`}
           className="rounded-lg px-3 py-2.5 text-[13px] data-[active=true]:font-medium [&>svg]:opacity-70 [&>svg]:size-[18px] [&>svg]:shrink-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&_span]:hidden"

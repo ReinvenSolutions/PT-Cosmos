@@ -4,7 +4,7 @@
  * - loading="lazy": Carga la imagen completa en alta definición cuando entra al viewport.
  *   NO reduce calidad, solo difiere el momento de carga.
  * - decoding="async": Decodificación no bloqueante para mejor rendimiento.
- * - fetchpriority="high": Para imágenes above-the-fold (prioridad alta).
+ * - fetchpriority (HTML): prioridad de red en navegadores compatibles (React 18: minúsculas, no fetchPriority).
  * - Skeleton mientras carga: Feedback visual inmediato.
  *
  * La imagen siempre se carga en resolución completa; no hay compresión ni reducción de calidad.
@@ -45,7 +45,6 @@ export function OptimizedImage({
         src={src}
         alt={alt}
         loading={priority ? "eager" : "lazy"}
-        fetchPriority={priority ? "high" : "auto"}
         decoding="async"
         onLoad={() => setIsLoaded(true)}
         className={cn(
@@ -55,6 +54,8 @@ export function OptimizedImage({
           className
         )}
         {...imgProps}
+        // Atributo HTML (minúsculas). `fetchPriority` en camelCase provoca warning en React 18.
+        {...({ fetchpriority: priority ? "high" : "auto" } as Record<string, string>)}
       />
     </div>
   );

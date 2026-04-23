@@ -25,12 +25,17 @@ const AdvisorDashboard = lazy(() => import("@/pages/advisor-dashboard"));
 const QuoteDetail = lazy(() => import("@/pages/quote-detail"));
 const QuoteEdit = lazy(() => import("@/pages/quote-edit"));
 const Home = lazy(() => import("@/pages/home"));
+const PlanDetail = lazy(() => import("@/pages/plan-detail"));
 const QuoteSummary = lazy(() => import("@/pages/quote-summary"));
 const QuoteExpress = lazy(() => import("@/pages/quote-express"));
 const Clients = lazy(() => import("@/pages/clients"));
 const AdminPlans = lazy(() => import("@/pages/admin-plans"));
 const AdminPlanForm = lazy(() => import("@/pages/admin-plan-form"));
 const AdminUsers = lazy(() => import("@/pages/admin-users"));
+const Tutoriales = lazy(() => import("@/pages/tutoriales"));
+const AdminTutorials = lazy(() => import("@/pages/admin-tutorials"));
+const AdminTutorialCourseForm = lazy(() => import("@/pages/admin-tutorial-course-form"));
+const AdminTutorialsMetricas = lazy(() => import("@/pages/admin-tutorials-metricas"));
 
 function ProtectedRoute({
   component: Component,
@@ -118,6 +123,24 @@ function AppRoutes() {
       <Route path="/admin/plans">
         <ProtectedRoute component={AdminPlans} allowedRoles={["super_admin"]} />
       </Route>
+      <Route path="/admin/tutoriales/metricas">
+        <ProtectedRoute component={AdminTutorialsMetricas} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/admin/tutoriales/curso/:id">
+        <ProtectedRoute component={AdminTutorialCourseForm} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/admin/tutoriales">
+        <ProtectedRoute component={AdminTutorials} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/tutoriales/curso/:courseId/leccion/:lessonId">
+        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "advisor"]} />
+      </Route>
+      <Route path="/tutoriales/curso/:courseId">
+        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "advisor"]} />
+      </Route>
+      <Route path="/tutoriales">
+        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "advisor"]} />
+      </Route>
       <Route path="/advisor/quotes/:id/edit">
         <ProtectedRoute component={QuoteEdit} allowedRoles={["advisor", "super_admin"]} />
       </Route>
@@ -132,6 +155,9 @@ function AppRoutes() {
       </Route>
       <Route path="/cotizacion-express">
         <ProtectedRoute component={QuoteExpress} allowedRoles={["super_admin", "advisor"]} />
+      </Route>
+      <Route path="/plan/:id">
+        <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "advisor"]} />
       </Route>
       <Route path="/">
         <ProtectedRoute component={Home} allowedRoles={["super_admin", "advisor"]} />

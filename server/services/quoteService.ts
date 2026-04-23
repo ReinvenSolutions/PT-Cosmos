@@ -4,13 +4,17 @@ import type { User } from "@shared/schema";
 import { NotFoundError, ValidationError } from "../errors/AppError";
 import { clearDestinationCache } from "../utils/cache";
 import { logger } from "../logger";
+import { assertBloqueoQuoteAllowed } from "../bloqueoQuoteValidation";
 
 export class QuoteService {
   async createQuote(data: CreateQuoteInput, user: User) {
+    const allDestinations = await storage.getDestinations();
+    const destinationsById = new Map(allDestinations.map((d) => [d.id, d]));
+    assertBloqueoQuoteAllowed(data.destinations, destinationsById);
+
     // Validate turkeyUpgrade - only allow if Turquía Esencial is in destinations
     if (data.turkeyUpgrade) {
       const destinationIds = data.destinations.map((d) => d.destinationId);
-      const allDestinations = await storage.getDestinations();
       const hasTurkeyEsencial = allDestinations.some(
         (dest) => destinationIds.includes(dest.id) && dest.name === "Turquía Esencial"
       );
@@ -101,10 +105,16 @@ export class QuoteService {
       throw new NotFoundError("Quote");
     }
 
+    const allDestinations = await storage.getDestinations();
+    const destinationsById = new Map(allDestinations.map((d) => [d.id, d]));
+
+    if (data.destinations && data.destinations.length > 0) {
+      assertBloqueoQuoteAllowed(data.destinations, destinationsById);
+    }
+
     // Validate turkeyUpgrade if provided
     if (data.turkeyUpgrade && data.destinations) {
       const destinationIds = data.destinations.map((d) => d.destinationId);
-      const allDestinations = await storage.getDestinations();
       const hasTurkeyEsencial = allDestinations.some(
         (dest) => destinationIds.includes(dest.id) && dest.name === "Turquía Esencial"
       );

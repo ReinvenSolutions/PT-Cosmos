@@ -361,6 +361,89 @@ export default function QuoteSummary() {
     [selectedDestinations, destinations],
   );
 
+  const formatLocalYmd = useCallback((date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  const bloqueoPlan = selectedDests.length === 1 && selectedDests[0]?.isBloqueo ? selectedDests[0] : null;
+  const maxBloqueoPax = bloqueoPlan?.bloqueoCuposDisponibles ?? null;
+  const bloqueoPdfOnly = Boolean(bloqueoPlan);
+
+  const bloqueoPrefillRef = useRef(false);
+  useEffect(() => {
+    bloqueoPrefillRef.current = false;
+  }, [bloqueoPlan?.id]);
+
+  useEffect(() => {
+    if (!bloqueoPlan?.internalFlights?.length || bloqueoPrefillRef.current) return;
+    bloqueoPrefillRef.current = true;
+    const outbound: string[] = [];
+    const returnI: string[] = [];
+    const domestic: string[] = [];
+    let obC = false;
+    let obH = false;
+    let rC = false;
+    let rH = false;
+    let dC = false;
+    let dH = false;
+    for (const f of bloqueoPlan.internalFlights) {
+      const url = f.imageUrl?.trim();
+      if (!url) continue;
+      const role = f.flightRole ?? "outbound";
+      if (role === "return") {
+        returnI.push(url);
+        rC ||= !!f.cabinBaggage;
+        rH ||= !!f.holdBaggage;
+      } else if (role === "domestic") {
+        domestic.push(url);
+        dC ||= !!f.cabinBaggage;
+        dH ||= !!f.holdBaggage;
+      } else {
+        outbound.push(url);
+        obC ||= !!f.cabinBaggage;
+        obH ||= !!f.holdBaggage;
+      }
+    }
+    if (outbound.length) setOutboundImages(outbound);
+    if (returnI.length) setReturnImages(returnI);
+    if (domestic.length) setDomesticFlightImages(domestic);
+    setOutboundCabinBaggage(obC);
+    setOutboundHoldBaggage(obH);
+    setReturnCabinBaggage(rC);
+    setReturnHoldBaggage(rH);
+    setDomesticCabinBaggage(dC);
+    setDomesticHoldBaggage(dH);
+  }, [bloqueoPlan?.id]);
+
+  useEffect(() => {
+    if (!bloqueoPlan) return;
+    setQuoteInCop(false);
+    setFlightsCost("");
+    setAssistanceCost("");
+    setOriginCity("");
+    setTurkeyUpgrade("");
+    setItaliaUpgrade("");
+    setGranTourUpgrade("");
+    setOtherDestUpgrades({});
+    setMinPayment("");
+  }, [bloqueoPlan?.id]);
+
+  useEffect(() => {
+    if (!bloqueoPlan?.bloqueoSalidaFecha || !quoteSessionHydratedRef.current) return;
+    const [y, m, d] = bloqueoPlan.bloqueoSalidaFecha.split("-").map(Number);
+    setStartDate(new Date(y, m - 1, d));
+  }, [bloqueoPlan?.id, bloqueoPlan?.bloqueoSalidaFecha]);
+
+  useEffect(() => {
+    if (maxBloqueoPax == null || maxBloqueoPax <= 0) return;
+    if (passengers > maxBloqueoPax) {
+      setPassengers(maxBloqueoPax);
+    }
+  }, [maxBloqueoPax, passengers]);
+
   const hasTurkeyDestinations = selectedDests.some(
     (d) =>
       d.country?.toLowerCase().includes("turquía") ||
@@ -415,6 +498,10 @@ export default function QuoteSummary() {
       return true;
     }
 
+    if (bloqueoPlan?.bloqueoSalidaFecha) {
+      return formatLocalYmd(date) !== bloqueoPlan.bloqueoSalidaFecha;
+    }
+
     if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays) {
       // If priceTiers exist with specific dates, only allow those exact dates
       if (allowedDaysDestination.priceTiers && allowedDaysDestination.priceTiers.length > 0) {
@@ -466,9 +553,8 @@ export default function QuoteSummary() {
     if (selectedDests.some((d) => (d as { requiresExtraDay?: boolean }).requiresExtraDay === true)) totalDuration += 1;
     if (totalDuration === 0) return "";
 
-    // Convert startDate to YYYY-MM-DD string to avoid timezone issues
-    const startDateStr = startDate.toISOString().split("T")[0];
-    const [year, month, day] = startDateStr.split('-').map(Number);
+    const startDateStr = formatLocalYmd(startDate);
+    const [year, month, day] = startDateStr.split("-").map(Number);
 
     // Create a new date in local timezone
     const start = new Date(year, month - 1, day);
@@ -495,6 +581,9 @@ export default function QuoteSummary() {
   const displayDuration = calculateDisplayDuration();
 
   const getPriceForDate = (dest: Destination, date: Date | undefined): number => {
+    if (dest.isBloqueo) {
+      return dest.basePrice ? parseFloat(dest.basePrice) : 0;
+    }
     if (!date || !dest.priceTiers || dest.priceTiers.length === 0) {
       return dest.basePrice ? parseFloat(dest.basePrice) : 0;
     }
@@ -626,6 +715,11 @@ export default function QuoteSummary() {
   const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost + otherUpgradesCost;
 
   const grandTotalCOP = effectiveTrm > 0 ? grandTotal * effectiveTrm : 0;
+
+  useEffect(() => {
+    if (!bloqueoPlan) return;
+    setFinalPrice(grandTotal.toFixed(2));
+  }, [bloqueoPlan?.id, grandTotal]);
 
   const finalPriceValue = getUSDValue(finalPrice, inputCurrencyFinal);
   const profit = finalPriceValue - grandTotal;
@@ -926,9 +1020,9 @@ export default function QuoteSummary() {
       finalPriceCurrency: inputCurrencyFinal,
       destinations: selectedDests.map((dest) => ({
         destinationId: dest.id,
-        startDate: startDate?.toISOString().split("T")[0] || "",
+        startDate: startDate ? formatLocalYmd(startDate) : "",
         passengers: passengers,
-        price: dest.basePrice ? parseFloat(dest.basePrice) : 0,
+        price: getPriceForDate(dest, startDate),
       })),
     };
 
@@ -1061,7 +1155,7 @@ export default function QuoteSummary() {
             nights: d.nights,
             basePrice: d.basePrice || "0",
           })),
-          startDate: startDate?.toISOString().split("T")[0] || "",
+          startDate: startDate ? formatLocalYmd(startDate) : "",
           endDate,
           flightsAndExtras: flightsAndExtrasValue,
           landPortionTotal,
@@ -1180,7 +1274,11 @@ export default function QuoteSummary() {
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-extrabold text-foreground mb-2">Resumen de tu Cotización</h2>
-          <p className="text-muted-foreground">Revisa los detalles y agrega la información de tus vuelos</p>
+          <p className="text-muted-foreground">
+            {bloqueoPdfOnly
+              ? "El bloqueo ya incluye precio fijo, fecha y vuelos. Solo indica el nombre del PDF y expórtalo."
+              : "Revisa los detalles y agrega la información de tus vuelos"}
+          </p>
         </div>
 
         <Card className="mb-6">
@@ -1295,6 +1393,11 @@ export default function QuoteSummary() {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                   Fecha de Inicio
+                  {bloqueoPlan && (
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                      Salida fija (bloqueo)
+                    </Badge>
+                  )}
                   {hasTurkeyEsencial && <Badge variant="secondary">Martes o Miércoles</Badge>}
                   {hasGranTourEuropa && <Badge variant="secondary" className="bg-purple-100 text-purple-800">Domingo o Lunes</Badge>}
                   {hasTurkeyDestinations && !hasTurkeyEsencial && <Badge variant="secondary">Solo Martes</Badge>}
@@ -1308,17 +1411,19 @@ export default function QuoteSummary() {
                   date={startDate}
                   onDateChange={setStartDate}
                   placeholder={
-                    hasAllowedDaysRestriction && allowedDaysDestination
-                      ? formatAllowedDays(allowedDaysDestination.allowedDays || [])
-                      : hasTurkeyEsencial
-                        ? "Selecciona martes o miércoles"
-                        : hasGranTourEuropa
-                          ? "Selecciona domingo o lunes"
-                          : hasTurkeyDestinations
-                            ? "Selecciona un martes"
-                            : "Selecciona una fecha"
+                    bloqueoPlan
+                      ? bloqueoPlan.bloqueoSalidaFecha ?? "Fecha del bloqueo"
+                      : hasAllowedDaysRestriction && allowedDaysDestination
+                        ? formatAllowedDays(allowedDaysDestination.allowedDays || [])
+                        : hasTurkeyEsencial
+                          ? "Selecciona martes o miércoles"
+                          : hasGranTourEuropa
+                            ? "Selecciona domingo o lunes"
+                            : hasTurkeyDestinations
+                              ? "Selecciona un martes"
+                              : "Selecciona una fecha"
                   }
-                  disabled={disableDates}
+                  disabled={bloqueoPlan ? () => true : disableDates}
                   priceTiers={
                     selectedDestinations.length > 0
                       ? selectedDests.flatMap(dest =>
@@ -1330,7 +1435,30 @@ export default function QuoteSummary() {
                       : undefined
                   }
                 />
-                {selectedDestinations.length > 0 && selectedDests.some(d => d.priceTiers && d.priceTiers.length > 0) && (
+                {bloqueoPlan && maxBloqueoPax != null && maxBloqueoPax > 0 && (
+                  <div className="mt-3 space-y-1">
+                    <Label className="text-sm">Pasajeros (máx. {maxBloqueoPax} cupos)</Label>
+                    <Select
+                      value={String(passengers)}
+                      onValueChange={(v) => setPassengers(Math.min(maxBloqueoPax, Math.max(1, parseInt(v, 10) || 1)))}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: maxBloqueoPax }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {!bloqueoPdfOnly &&
+                  selectedDestinations.length > 0 &&
+                  selectedDests.some((d) => d.priceTiers && d.priceTiers.length > 0) && (
                   <div className="mt-2 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
                     <div className="flex items-start gap-2">
                       <Info className="w-4 h-4 text-chart-3 mt-0.5 flex-shrink-0" />
@@ -1374,7 +1502,7 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        {hasTurkeyEsencial && (turkeyUpgrades.length > 0 ? (
+        {!bloqueoPdfOnly && hasTurkeyEsencial && (turkeyUpgrades.length > 0 ? (
           <Card className="mb-6 border-orange-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-price-accent">
@@ -1477,7 +1605,7 @@ export default function QuoteSummary() {
           </Card>
         ))}
 
-        {hasItaliaTuristica && italiaUpgrades.length > 0 && (
+        {!bloqueoPdfOnly && hasItaliaTuristica && italiaUpgrades.length > 0 && (
           <Card className="mb-6 border-primary/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-primary">
@@ -1520,7 +1648,7 @@ export default function QuoteSummary() {
           </Card>
         )}
 
-        {destsWithUpgradesOther.map((dest) => (
+        {!bloqueoPdfOnly && destsWithUpgradesOther.map((dest) => (
           <Card key={dest.id} className="mb-6 border-primary/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-primary">
@@ -1568,7 +1696,7 @@ export default function QuoteSummary() {
           </Card>
         ))}
 
-        {hasGranTourEuropa && granTourUpgrades.length > 0 && (
+        {!bloqueoPdfOnly && hasGranTourEuropa && granTourUpgrades.length > 0 && (
           <Card className="mb-6 border-purple-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-purple-600">
@@ -1611,6 +1739,7 @@ export default function QuoteSummary() {
           </Card>
         )}
 
+        {!bloqueoPdfOnly && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1632,7 +1761,9 @@ export default function QuoteSummary() {
             />
           </CardContent>
         </Card>
+        )}
 
+        {!bloqueoPdfOnly && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Vuelos de Ida</CardTitle>
@@ -1678,9 +1809,12 @@ export default function QuoteSummary() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Domestic Flight Card - For single plan with internal/connection flight flag */}
-        {selectedDestinations.length === 1 && selectedDests[0]?.hasInternalOrConnectionFlight && (
+        {!bloqueoPdfOnly &&
+          selectedDestinations.length === 1 &&
+          (selectedDests[0]?.hasInternalOrConnectionFlight || selectedDests[0]?.isBloqueo) && (
           <Card className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 dark:from-purple-950/50 dark:to-indigo-950/50 dark:border-purple-700/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
@@ -1731,7 +1865,7 @@ export default function QuoteSummary() {
           </Card>
         )}
 
-        {showConnectionFlight && (
+        {!bloqueoPdfOnly && showConnectionFlight && (
           <div className="space-y-6 mb-6">
             {connectionSegments.map((segment, segmentIndex) => {
               const title = connectionSegmentCardTitle(
@@ -1808,6 +1942,7 @@ export default function QuoteSummary() {
           </div>
         )}
 
+        {!bloqueoPdfOnly && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Vuelos de Regreso</CardTitle>
@@ -1853,7 +1988,10 @@ export default function QuoteSummary() {
             </div>
           </CardContent>
         </Card>
+        )}
 
+        {!bloqueoPdfOnly && (
+        <>
         <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-950/50 dark:to-emerald-950/50 dark:border-green-700/60">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
@@ -2191,6 +2329,27 @@ export default function QuoteSummary() {
             )}
           </CardContent>
         </Card>
+        </>
+        )}
+
+        {bloqueoPdfOnly && (
+          <Card className="mb-6 border-amber-200/80 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-800/50">
+            <CardContent className="pt-6">
+              <p className="text-sm font-medium text-foreground mb-1">Total del bloqueo (precio fijo × pasajeros)</p>
+              <p className="text-2xl font-extrabold text-price-accent">US$ {formatUSD(grandTotal)}</p>
+              {effectiveTrm > 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Aprox. ${" "}
+                  {(grandTotal * effectiveTrm).toLocaleString("es-CO", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}{" "}
+                  COP
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="mb-6 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 dark:from-slate-900/50 dark:to-slate-800/50 dark:border-slate-600/60">
           <CardHeader>
@@ -2201,7 +2360,9 @@ export default function QuoteSummary() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-3">
-              Ingresa un nombre personalizado para el archivo PDF. Si se deja vacío, se usará el nombre por defecto.
+              {bloqueoPdfOnly
+                ? "Elige cómo se guardará el PDF al exportarlo."
+                : "Ingresa un nombre personalizado para el archivo PDF. Si se deja vacío, se usará el nombre por defecto."}
             </p>
             <Input
               type="text"
@@ -2214,7 +2375,7 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className={cn("grid gap-4", bloqueoPdfOnly ? "grid-cols-1 max-w-md mx-auto" : "grid-cols-1 md:grid-cols-3")}>
           <Button
             size="lg"
             className="w-full bg-blue-600 hover:bg-blue-700 text-white"
@@ -2226,25 +2387,29 @@ export default function QuoteSummary() {
             {isGeneratingPDF ? "Generando..." : "Exportar PDF"}
           </Button>
 
-          <Button
-            size="lg"
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-            onClick={handleSendWhatsApp}
-            data-testid="button-send-whatsapp"
-          >
-            <WhatsAppIcon className="w-5 h-5 mr-2" />
-            Validar Disponibilidad
-          </Button>
+          {!bloqueoPdfOnly && (
+            <>
+              <Button
+                size="lg"
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleSendWhatsApp}
+                data-testid="button-send-whatsapp"
+              >
+                <WhatsAppIcon className="w-5 h-5 mr-2" />
+                Validar Disponibilidad
+              </Button>
 
-          <Button
-            size="lg"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            onClick={() => setShowSaveDialog(true)}
-            data-testid="button-save-quote"
-          >
-            <Save className="w-5 h-5 mr-2" />
-            Guardar Cotización
-          </Button>
+              <Button
+                size="lg"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => setShowSaveDialog(true)}
+                data-testid="button-save-quote"
+              >
+                <Save className="w-5 h-5 mr-2" />
+                Guardar Cotización
+              </Button>
+            </>
+          )}
         </div>
 
         <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
