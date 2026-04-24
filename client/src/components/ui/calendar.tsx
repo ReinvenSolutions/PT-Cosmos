@@ -89,27 +89,27 @@ function Calendar({
             type="button"
             className={cn(
               buttonVariants({ variant: "outline" }),
-              "h-9 w-9 rounded-full bg-white p-0 opacity-100 hover:bg-gray-100 shadow-md border-gray-200 pointer-events-auto transition-transform hover:scale-105"
+              "h-9 w-9 rounded-full bg-white dark:bg-gray-800 p-0 opacity-100 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md border-gray-200 dark:border-gray-600 pointer-events-auto transition-transform hover:scale-105"
             )}
             onClick={(e) => {
               const prevButton = e.currentTarget.closest('.relative')?.querySelector('[name="previous-month"]') as HTMLButtonElement;
               prevButton?.click();
             }}
           >
-            <ChevronLeft className="h-5 w-5 text-gray-700" />
+            <ChevronLeft className="h-5 w-5 text-gray-700 dark:text-gray-200" />
           </button>
           <button
             type="button"
             className={cn(
               buttonVariants({ variant: "outline" }),
-              "h-9 w-9 rounded-full bg-white p-0 opacity-100 hover:bg-gray-100 shadow-md border-gray-200 pointer-events-auto transition-transform hover:scale-105"
+              "h-9 w-9 rounded-full bg-white dark:bg-gray-800 p-0 opacity-100 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md border-gray-200 dark:border-gray-600 pointer-events-auto transition-transform hover:scale-105"
             )}
             onClick={(e) => {
               const nextButton = e.currentTarget.closest('.relative')?.querySelector('[name="next-month"]') as HTMLButtonElement;
               nextButton?.click();
             }}
           >
-            <ChevronRight className="h-5 w-5 text-gray-700" />
+            <ChevronRight className="h-5 w-5 text-gray-700 dark:text-gray-200" />
           </button>
         </div>
       )}
@@ -121,7 +121,7 @@ function Calendar({
           months: "flex flex-col sm:flex-row space-y-4 sm:space-x-12 sm:space-y-0 justify-center",
           month: "space-y-4",
           caption: "flex justify-center pt-1 relative items-center mb-4",
-          caption_label: "text-base font-semibold text-gray-800",
+          caption_label: "text-base font-semibold text-gray-800 dark:text-gray-100",
           nav: "hidden",
           nav_button: "hidden",
           nav_button_previous: "hidden",
@@ -139,7 +139,7 @@ function Calendar({
           day_range_end: "day-range-end",
           day_selected:
             "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md scale-105 z-10",
-          day_today: "bg-blue-50 text-blue-700 font-semibold border border-blue-100",
+          day_today: "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold border border-blue-100 dark:border-blue-700",
           day_outside:
             "day-outside text-muted-foreground opacity-30 aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
           day_disabled: "text-muted-foreground opacity-50",
