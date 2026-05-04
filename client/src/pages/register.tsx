@@ -106,7 +106,7 @@ export default function Register() {
   };
 
   return (
-    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden relative">
+    <div className="relative w-full min-h-dvh lg:h-screen lg:grid lg:grid-cols-2 lg:overflow-hidden">
       <ThemeToggleCompact />
       {/* Left Side - Image & Branding */}
       <div className="hidden lg:flex relative h-full flex-col bg-muted text-white dark:border-r">
@@ -134,7 +134,7 @@ export default function Register() {
       </div>
 
       {/* Right Side - Register Form */}
-      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background overflow-y-auto h-full">
+      <div className="flex flex-col items-center justify-start py-8 pb-12 px-4 sm:px-6 lg:px-8 bg-background lg:h-full lg:min-h-0 lg:justify-center lg:overflow-y-auto lg:py-12">
         <div className="mx-auto w-full max-w-[450px] space-y-6">
           <div className="flex flex-col space-y-2 text-center">
             <div className="lg:hidden flex justify-center mb-4">

@@ -99,7 +99,7 @@ export default function Login() {
   };
 
   return (
-    <div className="w-full h-screen lg:grid lg:grid-cols-2 overflow-hidden relative">
+    <div className="relative w-full min-h-dvh lg:h-screen lg:grid lg:grid-cols-2 lg:overflow-hidden">
       <ThemeToggleCompact />
       {/* Left Side - Image & Branding */}
       <div className="hidden lg:flex relative h-full flex-col bg-muted text-white dark:border-r">
@@ -127,7 +127,7 @@ export default function Login() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 min-h-screen bg-background/95 backdrop-blur-sm overflow-y-auto">
+      <div className="flex flex-col items-center justify-start py-8 pb-12 px-4 sm:px-6 lg:px-8 bg-background/95 backdrop-blur-sm lg:h-full lg:min-h-0 lg:justify-center lg:overflow-y-auto lg:py-12">
         {/* Destinations Banner */}
         <div className="text-center space-y-6 mb-10 w-full max-w-[600px]">
           <h2 className="text-3xl font-bold text-foreground">
