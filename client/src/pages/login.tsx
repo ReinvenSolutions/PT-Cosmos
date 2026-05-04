@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Plane, Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, ShieldCheck } from "lucide-react";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
 import { TwoFactorInput } from "@/components/two-factor-input";
+import { AuthCommercialContactCard } from "@/components/auth-commercial-contact";
+import { RntNotice } from "@/components/rnt-notice";
 
 const FlagIcon = ({ code, title }: { code: string, title: string }) => (
   <img 
@@ -125,7 +127,7 @@ export default function Login() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 min-h-screen bg-background/95 backdrop-blur-sm">
+      <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 min-h-screen bg-background/95 backdrop-blur-sm overflow-y-auto">
         {/* Destinations Banner */}
         <div className="text-center space-y-6 mb-10 w-full max-w-[600px]">
           <h2 className="text-3xl font-bold text-foreground">
@@ -267,6 +269,8 @@ export default function Login() {
           </form>
           )}
 
+          <AuthCommercialContactCard />
+
           {step === "credentials" && (
             <>
               <div className="relative">
@@ -286,8 +290,10 @@ export default function Login() {
                   </Button>
                 </Link>
               </div>
+              <RntNotice className="pt-2" />
             </>
           )}
+          {step === "2fa" && <RntNotice className="pt-4" />}
         </div>
       </div>
     </div>

@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Plane, Eye, EyeOff, Check, X, User, Mail, Lock, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
+import { AuthCommercialContactCard } from "@/components/auth-commercial-contact";
+import { RntNotice } from "@/components/rnt-notice";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -290,6 +292,8 @@ export default function Register() {
             </Button>
           </form>
 
+          <AuthCommercialContactCard />
+
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
@@ -308,6 +312,7 @@ export default function Register() {
               </Button>
             </Link>
           </div>
+          <RntNotice className="pt-2" />
         </div>
       </div>
     </div>
