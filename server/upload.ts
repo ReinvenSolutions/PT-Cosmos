@@ -16,7 +16,7 @@ import {
   parseSupabaseStorageUrl,
   downloadFromBucket,
 } from "./supabaseStorage";
-import { validateFile } from "./utils/validateFile";
+import { validateFile, validatePlanDescriptiveAudio } from "./utils/validateFile";
 import { logger } from "./logger";
 
 // Determine storage mode: Supabase > local filesystem
@@ -276,3 +276,58 @@ export async function getImagePathForPDF(filenameOrUrl: string): Promise<string>
 }
 
 export { destinationNameToBucketSlug, getPlanBucketName };
+
+const PLAN_AUDIO_MAX_BYTES = 40 * 1024 * 1024;
+
+/** Sube MP3 descriptivo al bucket del plan: `audio/programa-descriptivo.mp3` (sobrescribe). */
+export async function handlePlanDescriptiveAudioUpload(req: Request, res: Response) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No se recibió ningún archivo" });
+    }
+    if (!isSupabaseStorageEnabled()) {
+      return res.status(503).json({
+        message: "La subida de audio requiere Supabase Storage (SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY).",
+      });
+    }
+    const planName = String(req.body?.planName ?? "").trim();
+    if (!planName) {
+      return res.status(400).json({
+        message: "Ingresa el nombre del plan antes de subir el audio (campo planName).",
+      });
+    }
+    if (req.file.size > PLAN_AUDIO_MAX_BYTES) {
+      return res.status(400).json({
+        message: `El audio no puede superar ${PLAN_AUDIO_MAX_BYTES / (1024 * 1024)} MB.`,
+      });
+    }
+    const validation = await validatePlanDescriptiveAudio(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      PLAN_AUDIO_MAX_BYTES,
+    );
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.error || "Archivo no válido" });
+    }
+    const bucketName = getPlanBucketName(planName);
+    const storagePath = "audio/programa-descriptivo.mp3";
+    const publicUrl = await uploadToBucket(
+      bucketName,
+      storagePath,
+      req.file.buffer,
+      validation.mimeType || "audio/mpeg",
+    );
+    if (!publicUrl) {
+      return res.status(500).json({ message: "Error al subir el audio a Supabase Storage" });
+    }
+    logger.info("[Upload] Plan descriptive audio uploaded", { bucket: bucketName, path: storagePath });
+    return res.json({ url: publicUrl });
+  } catch (error) {
+    const err = error as Error;
+    logger.error("Plan audio upload error", { error: err.message });
+    res.status(500).json({
+      message: process.env.NODE_ENV === "development" ? err.message : "Error al subir el audio.",
+    });
+  }
+}

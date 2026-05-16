@@ -82,3 +82,54 @@ export async function validateFile(
     };
   }
 }
+
+const PLAN_AUDIO_MAX_BYTES_DEFAULT = 40 * 1024 * 1024;
+
+/** Valida MP3 por firma (magic bytes) para audio descriptivo del plan. */
+export async function validatePlanDescriptiveAudio(
+  buffer: Buffer,
+  originalName: string,
+  reportedMimeType: string,
+  maxBytes: number = PLAN_AUDIO_MAX_BYTES_DEFAULT,
+): Promise<FileValidationResult> {
+  if (buffer.length > maxBytes) {
+    const mb = Math.round(maxBytes / (1024 * 1024));
+    return { valid: false, error: `El archivo supera el tamaño máximo (${mb} MB).` };
+  }
+
+  const ext = originalName.split(".").pop()?.toLowerCase();
+  if (ext !== "mp3") {
+    return { valid: false, error: "Extensión no válida. Usa un archivo .mp3." };
+  }
+
+  const okReported =
+    reportedMimeType === "audio/mpeg" ||
+    reportedMimeType === "audio/mp3" ||
+    reportedMimeType === "application/octet-stream";
+  if (!okReported) {
+    return {
+      valid: false,
+      error: "Tipo MIME no reconocido para MP3. Prueba desde otro navegador o re-exporta el audio.",
+    };
+  }
+
+  try {
+    const fileType = await fileTypeFromBuffer(buffer);
+    if (!fileType) {
+      return {
+        valid: false,
+        error: "No se pudo verificar el audio. Asegúrate de que sea un MP3 válido.",
+      };
+    }
+    const detectedMime = String(fileType.mime);
+    if (detectedMime !== "audio/mpeg" && detectedMime !== "audio/mp3") {
+      return {
+        valid: false,
+        error: `Tipo detectado: ${detectedMime}. Solo se permiten archivos MP3.`,
+      };
+    }
+    return { valid: true, mimeType: "audio/mpeg" };
+  } catch {
+    return { valid: false, error: "Error al validar el audio." };
+  }
+}

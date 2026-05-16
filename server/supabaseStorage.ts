@@ -3,7 +3,7 @@
  *
  * Estructura de buckets:
  * - images: Imágenes generales (vuelos, adjuntos de cotizaciones)
- * - plan-{slug}: Galería principal del plan
+ * - plan-{slug}: Galería principal del plan, mapa del itinerario y audio descriptivo (MP3)
  * - plan-{slug}-hotels: Galería de imágenes de hoteles (solo ese plan, PDF «Adicionales»)
  * - plan-{slug}-adicionales: Galería Adicionales (misma página del PDF que hoteles)
  */
@@ -60,6 +60,34 @@ const BUCKET_IMAGES = "images";
 const BUCKET_MEDICAL_ASSISTANCE = "medical-assistance";
 const BUCKET_ITINERARY_MAPS = "itinerary-maps";
 
+const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+
+/** Buckets `plan-{slug}` (galería principal + mapa + audio MP3). No incluye -hotels ni -adicionales. */
+export function isPlanMainGalleryBucket(bucketName: string): boolean {
+  return (
+    bucketName.startsWith("plan-") &&
+    !bucketName.endsWith("-hotels") &&
+    !bucketName.endsWith("-adicionales")
+  );
+}
+
+function defaultImageBucketOptions(publicFlag: boolean) {
+  return {
+    public: publicFlag,
+    fileSizeLimit: 10 * 1024 * 1024,
+    allowedMimeTypes: [...IMAGE_MIME_TYPES],
+  };
+}
+
+/** Límite mayor para galería + audio descriptivo (MP3 hasta ~40 MB en upload). */
+function planMainGalleryBucketOptions(publicFlag: boolean) {
+  return {
+    public: publicFlag,
+    fileSizeLimit: 50 * 1024 * 1024,
+    allowedMimeTypes: [...IMAGE_MIME_TYPES, "audio/mpeg", "audio/mp3"],
+  };
+}
+
 /** Carpeta dentro del bucket del plan donde viven los mapas del itinerario (por plan, no compartida) */
 export const ITINERARY_MAP_STORAGE_PREFIX = "mapa-itinerario";
 
@@ -78,7 +106,9 @@ export function getItineraryMapsBucketName(): string {
   return BUCKET_ITINERARY_MAPS;
 }
 
-/** Asegura que el bucket existe. Crea si no existe. */
+/** Asegura que el bucket existe. Crea si no existe.
+ * Buckets principales de plan (`plan-{slug}`) permiten imágenes + MP3 y límite 50 MB.
+ * Si el bucket ya existía solo con imágenes, intenta actualizar MIME y límite (Supabase). */
 export async function ensureBucketExists(
   bucketName: string,
   options?: { public?: boolean }
@@ -88,20 +118,36 @@ export async function ensureBucketExists(
 
   try {
     const { data: buckets } = await client.storage.listBuckets();
-    const exists = buckets?.some((b) => b.name === bucketName);
+    const existing = buckets?.find((b) => b.name === bucketName);
+    const publicFlag = options?.public ?? true;
+    const isPlanMain = isPlanMainGalleryBucket(bucketName);
 
-    if (!exists) {
-      const { error } = await client.storage.createBucket(bucketName, {
-        public: options?.public ?? true,
-        fileSizeLimit: 10 * 1024 * 1024, // 10MB
-        allowedMimeTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
-      });
+    if (!existing) {
+      const bucketOpts = isPlanMain
+        ? planMainGalleryBucketOptions(publicFlag)
+        : defaultImageBucketOptions(publicFlag);
+      const { error } = await client.storage.createBucket(bucketName, bucketOpts);
       if (error) {
         logger.error("[SupabaseStorage] Error creating bucket", { bucketName, error });
         return false;
       }
       logger.info("[SupabaseStorage] Bucket created", { bucketName });
+      return true;
     }
+
+    if (isPlanMain) {
+      const { error: updateErr } = await client.storage.updateBucket(
+        bucketName,
+        planMainGalleryBucketOptions(existing.public ?? publicFlag),
+      );
+      if (updateErr) {
+        logger.warn("[SupabaseStorage] updateBucket plan principal (MIME/tamaño)", {
+          bucketName,
+          message: updateErr.message,
+        });
+      }
+    }
+
     return true;
   } catch (err) {
     logger.error("[SupabaseStorage] ensureBucketExists error", { bucketName, err });

@@ -14,10 +14,11 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import passport from "./auth";
 import { pool } from "./db";
-import { ensureDestinationBloqueoColumns } from "./ensure-destination-bloqueo-columns";
-import { seedDatabaseIfEmpty } from "./seed";
 import { syncCanonicalData } from "./sync-canonical-data";
 import { isEmailConfigured } from "./email";
+import { ensureDestinationBloqueoColumns } from "./ensure-destination-bloqueo-columns";
+import { ensureDestinationDescriptiveAudioColumn } from "./ensure-destination-descriptive-audio";
+import { seedDatabaseIfEmpty } from "./seed";
 
 /** Aplica migración 0008 (auth tokens, 2FA) si no existe. No bloquea el arranque. */
 function runAuthMigrationInBackground(pool: InstanceType<typeof Pool>) {
@@ -49,6 +50,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Needed for inline styles and Google Fonts
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
+      mediaSrc: ["'self'", "blob:", "https:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"], // Allow Google Fonts
       // Sin esto, default-src 'self' bloquea iframes de YouTube (Academia digital, lecciones con video)
@@ -63,6 +65,7 @@ app.use(compression({
   filter: (req, res) => {
     if (req.headers["x-no-compression"]) return false;
     if (req.path === "/api/admin/extract-plan") return false; // streaming NDJSON no debe comprimirse
+    if (req.path.includes("/descriptive-audio-download")) return false; // MP3 ya comprimido
     return compression.filter(req, res);
   },
   level: 3,
@@ -139,6 +142,7 @@ app.use((req, res, next) => {
     }
 
     await ensureDestinationBloqueoColumns(pool);
+    await ensureDestinationDescriptiveAudioColumn(pool);
 
     const server = await registerRoutes(app);
 

@@ -17,6 +17,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { OptimizedImage } from "@/components/optimized-image";
+import { PlanAudioPlayer } from "@/components/plan-audio-player";
 import { getDestinationImage } from "@/lib/destination-images";
 import {
   ArrowLeft,
@@ -394,6 +395,16 @@ export default function PlanDetail() {
             Revisa aquí el itinerario y las condiciones. Para armar la cotización, vuelve al inicio, selecciona este u otros planes, elige fechas y continúa.
           </span>
         </p>
+
+        {plan.descriptiveAudioUrl?.trim() ? (
+          <div className="sticky top-14 z-[15] -mx-1 px-1 pb-1">
+            <PlanAudioPlayer
+              destinationId={plan.id}
+              src={plan.descriptiveAudioUrl.trim()}
+              planTitle={plan.name}
+            />
+          </div>
+        ) : null}
 
         <div className="rounded-2xl overflow-hidden border border-border/80 shadow-lg bg-card">
           <div className="relative aspect-[21/9] min-h-[200px] w-full bg-muted">
