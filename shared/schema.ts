@@ -45,6 +45,8 @@ export const destinations = pgTable(
     firstPageComments: text("first_page_comments"),
     cardTooltip: text("card_tooltip"),
     itineraryMapImageUrl: text("itinerary_map_image_url"),
+    /** URL pública del audio descriptivo del programa (MP3), p. ej. Supabase plan-{slug}/audio/… */
+    descriptiveAudioUrl: text("descriptive_audio_url"),
     /** URLs ordenadas de la galería solo-hoteles (bucket Supabase plan-{slug}-hotels por plan) */
     hotelGalleryImageUrls: text("hotel_gallery_image_urls").array(),
     /** URLs ordenadas de la galería Adicionales (bucket plan-{slug}-adicionales; mismo PDF que hoteles) */

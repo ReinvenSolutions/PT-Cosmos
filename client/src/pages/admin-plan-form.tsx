@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles, Loader2, ImageOff } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles, Loader2, ImageOff, Headphones } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { CosmoProcessingDialog } from "@/components/cosmo-processing-dialog";
@@ -204,6 +204,8 @@ function AdminPlanForm() {
   const [medicalAssistanceImageUrl, setMedicalAssistanceImageUrl] = useState("");
   const [firstPageComments, setFirstPageComments] = useState("");
   const [itineraryMapImageUrl, setItineraryMapImageUrl] = useState("");
+  const [descriptiveAudioUrl, setDescriptiveAudioUrl] = useState("");
+  const [uploadingDescriptiveAudio, setUploadingDescriptiveAudio] = useState(false);
   const [flightTerms, setFlightTerms] = useState("");
   const [termsConditions, setTermsConditions] = useState("");
   const [hasInternalOrConnectionFlight, setHasInternalOrConnectionFlight] = useState(false);
@@ -231,6 +233,7 @@ function AdminPlanForm() {
   const adicionalesGalleryFileInputRef = useRef<HTMLInputElement>(null);
   const mainImageFileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
+  const descriptiveAudioFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: existing, isLoading } = useQuery<{
     name?: string;
@@ -266,6 +269,7 @@ function AdminPlanForm() {
     requiresExtraDay?: boolean;
     hotelGalleryImageUrls?: string[] | null;
     adicionalesGalleryImageUrls?: string[] | null;
+    descriptiveAudioUrl?: string | null;
   }>({
     queryKey: [`/api/admin/destinations/${id}`],
     enabled: isEditing && !!id,
@@ -308,6 +312,7 @@ function AdminPlanForm() {
       setMedicalAssistanceImageUrl(existing.medicalAssistanceImageUrl ?? "");
       setFirstPageComments(existing.firstPageComments ?? "");
       setItineraryMapImageUrl(existing.itineraryMapImageUrl ?? "");
+      setDescriptiveAudioUrl(existing.descriptiveAudioUrl ?? "");
       setFlightTerms(existing.flightTerms ?? "");
       setTermsConditions(existing.termsConditions ?? "");
       setHasInternalOrConnectionFlight(existing.hasInternalOrConnectionFlight ?? false);
@@ -411,6 +416,7 @@ function AdminPlanForm() {
         adicionalesGalleryImages.length > 0
           ? adicionalesGalleryImages.map((x) => x.imageUrl)
           : null,
+      descriptiveAudioUrl: descriptiveAudioUrl.trim() || null,
     };
     saveMutation.mutate(payload);
   };
@@ -518,6 +524,50 @@ function AdminPlanForm() {
     e.target.value = "";
   };
 
+  const processDescriptiveAudioFile = async (file: File) => {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".mp3")) {
+      toast({ title: "Formato no válido", description: "Solo se permiten archivos MP3.", variant: "destructive" });
+      return;
+    }
+    if (!name.trim()) {
+      toast({ title: "Nombre requerido", description: "Ingresa el nombre del plan antes de subir el audio.", variant: "destructive" });
+      return;
+    }
+    setUploadingDescriptiveAudio(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("planName", name.trim());
+      const res = await fetch("/api/admin/upload/plan-descriptive-audio", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof body?.message === "string" ? body.message : "Error al subir el audio");
+      }
+      if (!body?.url) throw new Error("Respuesta sin URL");
+      setDescriptiveAudioUrl(String(body.url));
+      toast({ title: "Audio subido", description: "Guarda el plan para publicar el audio en la ficha." });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: (e as Error)?.message || "No se pudo subir el audio.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDescriptiveAudio(false);
+    }
+  };
+
+  const handleDescriptiveAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void processDescriptiveAudioFile(file);
+    e.target.value = "";
+  };
+
   const removeImage = async (i: number) => {
     const img = images[i];
     if (img?.imageUrl?.startsWith("https://")) {
@@ -546,6 +596,7 @@ function AdminPlanForm() {
     if (Array.isArray(plan.exclusions) && plan.exclusions.length) setExclusions(plan.exclusions as Exclusion[]);
     if (Array.isArray(plan.priceTiers) && plan.priceTiers.length) setPriceTiers(plan.priceTiers as PriceTier[]);
     if (Array.isArray(plan.upgrades) && plan.upgrades.length) setUpgrades(plan.upgrades as Upgrade[]);
+    if (typeof plan.descriptiveAudioUrl === "string") setDescriptiveAudioUrl(String(plan.descriptiveAudioUrl));
   };
 
   const processDocumentFile = async (file: File) => {
@@ -1057,6 +1108,62 @@ function AdminPlanForm() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Si no se completa, se usará un texto por defecto según el plan.
                 </p>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Headphones className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-base">Audio descriptivo del programa (MP3)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Opcional. Se muestra en la ficha del plan con reproductor y descarga. Máx. 40 MB. Se guarda en el bucket del plan como{" "}
+                      <code className="text-[11px] bg-muted px-1 rounded">audio/programa-descriptivo.mp3</code>.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground">URL pública del MP3</Label>
+                    <Input
+                      value={descriptiveAudioUrl}
+                      onChange={(e) => setDescriptiveAudioUrl(e.target.value)}
+                      placeholder="https://…/programa-descriptivo.mp3"
+                      className="mt-1 font-mono text-xs"
+                    />
+                  </div>
+                  <input
+                    ref={descriptiveAudioFileInputRef}
+                    type="file"
+                    accept=".mp3,audio/mpeg,audio/mp3"
+                    className="hidden"
+                    onChange={handleDescriptiveAudioUpload}
+                    disabled={uploadingDescriptiveAudio}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={uploadingDescriptiveAudio || !name.trim()}
+                    onClick={() => descriptiveAudioFileInputRef.current?.click()}
+                    className="shrink-0"
+                  >
+                    {uploadingDescriptiveAudio ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Subiendo…
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Subir MP3
+                      </>
+                    )}
+                  </Button>
+                  {descriptiveAudioUrl ? (
+                    <Button type="button" variant="ghost" size="sm" className="shrink-0 text-destructive" onClick={() => setDescriptiveAudioUrl("")}>
+                      Quitar
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               {/* Fila: Bloque Imagen principal (50%) + Bloque Categoría (50%, más centrado) */}

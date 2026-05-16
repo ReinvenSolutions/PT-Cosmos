@@ -21,7 +21,7 @@ import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
 import { z } from "zod";
 import validator from "validator";
 import multer from "multer";
-import { handleFileUpload, getImageBuffer } from "./upload";
+import { handleFileUpload, getImageBuffer, handlePlanDescriptiveAudioUpload, destinationNameToBucketSlug } from "./upload";
 import { handleExtractPlanFromDocument } from "./handlers/extractPlanFromDocument";
 import { registerTutorialRoutes } from "./tutorialRoutes";
 import { reorderPlanImages, reorderPlanHotelsImages, reorderPlanAdicionalesImages, deletePlanBucket, deleteOrphanPlanBuckets, listBucketFiles, listBucketFilesInFolder, getPublicUrl, removeFromBucket, getMedicalAssistanceBucketName, getItineraryMapsBucketName, ITINERARY_MAP_STORAGE_PREFIX, parseSupabaseStorageUrl, ensureBucketExists, getPlanBucketName, getPlanHotelsBucketName, getPlanAdicionalesBucketName } from "./supabaseStorage";
@@ -170,6 +170,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const extractPlanUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 },
+  });
+
+  const planAudioUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 40 * 1024 * 1024 },
   });
 
   // extract-plan PRIMERO (antes de apiLimiter) para máxima prioridad
@@ -435,6 +440,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   app.post("/api/upload", requireAuth, upload.single("file"), handleFileUpload);
+
+  app.post(
+    "/api/admin/upload/plan-descriptive-audio",
+    requireRole("super_admin"),
+    planAudioUpload.single("file"),
+    asyncHandler(handlePlanDescriptiveAudioUpload),
+  );
 
   app.post("/api/admin/reorder-plan-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const schema = z.object({
@@ -844,6 +856,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
+  /** Descarga forzada del MP3 descriptivo (evita abrir pestaña por CORS en URL de Supabase). */
+  app.get(
+    "/api/destinations/:id/descriptive-audio-download",
+    requireRoles(["super_admin", "advisor"]),
+    asyncHandler(async (req, res) => {
+      const dest = await storage.getDestination(req.params.id);
+      if (!dest) throw new NotFoundError("Destination");
+      const audioUrl = dest.descriptiveAudioUrl?.trim();
+      if (!audioUrl) throw new NotFoundError("Audio descriptivo");
+      if (!audioUrl.startsWith("https://")) {
+        throw new ValidationError("URL de audio no permitida");
+      }
+      let buffer: Buffer;
+      try {
+        buffer = await getImageBuffer(audioUrl);
+      } catch {
+        throw new NotFoundError("Audio descriptivo");
+      }
+      const filenameBase = destinationNameToBucketSlug(dest.name) || "programa";
+      const safeFilename = `${filenameBase}.mp3`.replace(/[^a-zA-Z0-9._-]/g, "_");
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.send(buffer);
+    }),
+  );
+
   app.post("/api/admin/clients", requireRoles(["super_admin", "advisor"]), asyncHandler(async (req, res) => {
     const validatedData = insertClientSchema.parse(req.body);
     try {
@@ -1058,6 +1097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     hasInternalOrConnectionFlight: z.boolean().optional(),
     hotelGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     adicionalesGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
+    descriptiveAudioUrl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
   });
 
   app.get("/api/admin/destinations", requireRole("super_admin"), asyncHandler(async (req, res) => {
@@ -1130,6 +1170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       adicionalesGalleryImageUrls: validated.adicionalesGalleryImageUrls?.length
         ? validated.adicionalesGalleryImageUrls
         : null,
+      descriptiveAudioUrl:
+        typeof validated.descriptiveAudioUrl === "string" && validated.descriptiveAudioUrl.trim() !== ""
+          ? validated.descriptiveAudioUrl.trim()
+          : null,
     };
     try {
       const destination = await storage.createDestination(destData);
@@ -1282,6 +1326,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (ok) logger.info("Removed orphan images from bucket", { bucket, count: paths.length });
     }
 
+    const oldDescriptiveAudio = (existing as { descriptiveAudioUrl?: string | null }).descriptiveAudioUrl?.trim() || null;
+    const newDescriptiveAudio =
+      typeof validated.descriptiveAudioUrl === "string" && validated.descriptiveAudioUrl.trim() !== ""
+        ? validated.descriptiveAudioUrl.trim()
+        : null;
+    if (
+      oldDescriptiveAudio &&
+      oldDescriptiveAudio !== newDescriptiveAudio &&
+      oldDescriptiveAudio.startsWith("https://")
+    ) {
+      const parsedAudio = parseSupabaseStorageUrl(oldDescriptiveAudio);
+      if (parsedAudio?.bucket.startsWith("plan-")) {
+        const okAudio = await removeFromBucket(parsedAudio.bucket, [parsedAudio.path]);
+        if (okAudio) {
+          logger.info("Removed previous plan descriptive audio from storage", {
+            bucket: parsedAudio.bucket,
+            path: parsedAudio.path,
+          });
+        }
+      }
+    }
+
     const destData = {
       name: validated.name,
       country: validated.country,
@@ -1313,6 +1379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       termsConditions: validated.termsConditions ?? null,
       hotelGalleryImageUrls: validHotelGalleryPut.length ? validHotelGalleryPut : null,
       adicionalesGalleryImageUrls: validAdicionalesGalleryPut.length ? validAdicionalesGalleryPut : null,
+      descriptiveAudioUrl: newDescriptiveAudio,
     };
     await storage.updateDestination(id, destData);
 
