@@ -3,6 +3,8 @@
  * (obtenido de PDF o Word). Soporta modo IA (OpenAI) o heurístico.
  */
 
+import { getOpenAIClient } from "./openaiClient";
+
 export type ExtractedPlan = {
   name: string;
   country: string;
@@ -221,13 +223,9 @@ export function extractPlanHeuristic(rawText: string): ExtractedPlan {
 
 /** Intenta extraer con OpenAI si la API key está configurada */
 export async function extractPlanWithAI(rawText: string): Promise<ExtractedPlan | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-
   try {
-    // Dynamic import para no fallar si no hay openai instalado
-    const { default: OpenAI } = await import("openai");
-    const client = new OpenAI({ apiKey });
+    const client = await getOpenAIClient();
+    if (!client) return null;
     const schema = `{
   "name": "string",
   "country": "string",

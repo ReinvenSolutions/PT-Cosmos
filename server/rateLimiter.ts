@@ -21,6 +21,15 @@ export const publicPdfLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Cosmos AI chat (por IP; además requireAuth en la ruta)
+export const cosmosChatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDevelopment ? 200 : 40,
+  message: "Demasiadas consultas a Cosmos. Espera un momento e intenta de nuevo.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // General API rate limiter
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

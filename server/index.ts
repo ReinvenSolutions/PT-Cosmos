@@ -65,6 +65,7 @@ app.use(compression({
   filter: (req, res) => {
     if (req.headers["x-no-compression"]) return false;
     if (req.path === "/api/admin/extract-plan") return false; // streaming NDJSON no debe comprimirse
+    if (req.path === "/api/cosmos/chat") return false; // SSE Cosmos
     if (req.path.includes("/descriptive-audio-download")) return false; // MP3 ya comprimido
     return compression.filter(req, res);
   },

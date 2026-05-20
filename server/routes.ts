@@ -5,7 +5,9 @@ import express from "express";
 import { generatePublicQuotePDF } from "./publicPdfGenerator";
 import passport from "./auth";
 import { requireAuth, requireRole, requireRoles } from "./middleware";
-import { authLimiter, publicPdfLimiter, apiLimiter } from "./rateLimiter";
+import { authLimiter, publicPdfLimiter, apiLimiter, cosmosChatLimiter } from "./rateLimiter";
+import { handleCosmosChat } from "./handlers/cosmosChat";
+import { isOpenAIConfigured } from "./services/openaiClient";
 import { userRateLimiter } from "./middleware/userRateLimiter";
 import { asyncHandler } from "./utils/asyncHandler";
 import { logger } from "./logger";
@@ -1493,6 +1495,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const stats = await storage.getQuoteStats();
     res.json(stats);
   }));
+
+  app.get("/api/cosmos/status", requireRoles(["advisor", "super_admin"]), (_req, res) => {
+    res.json({ available: isOpenAIConfigured(), name: "Cosmos" });
+  });
+
+  app.post(
+    "/api/cosmos/chat",
+    requireRoles(["advisor", "super_admin"]),
+    cosmosChatLimiter,
+    asyncHandler(handleCosmosChat)
+  );
 
   app.get("/api/settings/global-trm", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
     const baseTrm = await storage.getGlobalTrmBase();
