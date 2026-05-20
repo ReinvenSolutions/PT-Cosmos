@@ -1,4 +1,4 @@
-/** Persiste en sessionStorage la selección del cotizador (home) para no perderla al abrir la ficha de un plan. */
+/** Clave legacy: la selección del home ya no se persiste; la cotización activa usa `quoteData`. */
 
 const STORAGE_KEY = "viajeRapido_home_builder";
 
@@ -30,6 +30,14 @@ export function saveHomeBuilderSelection(data: HomeBuilderPersisted) {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
     /* ignore quota / private mode */
+  }
+}
+
+export function clearHomeBuilderSelection() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
