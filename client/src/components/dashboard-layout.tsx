@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CosmosFooter } from "@/components/cosmos-footer";
+import { CosmosChatWidget } from "@/components/cosmos-chat-widget";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
@@ -112,6 +113,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <CosmosFooter />
                 </main>
             </div>
+            <CosmosChatWidget />
         </SidebarProvider>
     );
 }
