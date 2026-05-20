@@ -7,21 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, MapPin, Clock, ArrowRight, AlertCircle, Info, Building2, UtensilsCrossed, Star, Stethoscope, Landmark, ExternalLink, BookOpen } from "lucide-react";
+import { MapPin, Clock, ArrowRight, AlertCircle, Info, Building2, UtensilsCrossed, Star, Stethoscope, Landmark, ExternalLink, BookOpen } from "lucide-react";
 import { getDestinationImage } from "@/lib/destination-images";
-import { DatePicker } from "@/components/ui/date-picker";
-import { isTuesday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { isTurkeyHoliday, getTurkeyHolidayDescription } from "@/lib/turkey-holidays";
 import { GroupDiscountBanner } from "@/components/group-discount-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/optimized-image";
-import {
-  loadHomeBuilderSelection,
-  saveHomeBuilderSelection,
-  formatLocalYmd,
-  parseLocalYmd,
-} from "@/lib/home-selection-storage";
+import { clearHomeBuilderSelection } from "@/lib/home-selection-storage";
 
 interface DestinationDetail {
   destination: Destination;
@@ -33,10 +25,8 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("internacional");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  const [selectionHydrated, setSelectionHydrated] = useState(false);
   const { toast } = useToast();
 
   type DestinationWithPreviews = Destination & { hotels: any[]; itinerary: any[] };
@@ -50,30 +40,14 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const saved = loadHomeBuilderSelection();
-    if (saved) {
-      if (saved.destinations.length > 0) {
-        setSelectedDestinations(saved.destinations);
-      }
-      const d = saved.startDate ? parseLocalYmd(saved.startDate) : undefined;
-      if (d) setStartDate(d);
-    }
-    setSelectionHydrated(true);
+    clearHomeBuilderSelection();
   }, []);
 
   useEffect(() => {
-    if (!selectionHydrated) return;
-    saveHomeBuilderSelection({
-      destinations: selectedDestinations,
-      startDate: startDate ? formatLocalYmd(startDate) : "",
-    });
-  }, [selectedDestinations, startDate, selectionHydrated]);
-
-  useEffect(() => {
-    if (!selectionHydrated || destinationsWithPreviews.length === 0) return;
+    if (destinationsWithPreviews.length === 0) return;
     const validIds = new Set(destinationsWithPreviews.map((d) => d.id));
     setSelectedDestinations((prev) => prev.filter((id) => validIds.has(id)));
-  }, [destinationsWithPreviews, selectionHydrated]);
+  }, [destinationsWithPreviews]);
 
   const destinations = destinationsWithPreviews;
   const destinationDetails: Record<string, DestinationDetail> = Object.fromEntries(
@@ -94,186 +68,18 @@ export default function Home() {
   );
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
-  const hasAllowedDaysRestriction = selectedDests.some((d) => d.allowedDays && d.allowedDays.length > 0);
-  const allowedDaysDestination = selectedDests.find((d) => d.allowedDays && d.allowedDays.length > 0);
 
-  const turkeyDestinations = selectedDests.filter(
-    (d) =>
-      d.country?.toLowerCase().includes("turquía") ||
-      d.country?.toLowerCase().includes("turquia")
-  );
   const otherDestinations = selectedDests.filter(
     (d) =>
       !d.country?.toLowerCase().includes("turquía") &&
       !d.country?.toLowerCase().includes("turquia")
   );
 
-  const calculateTotalDuration = (): number => {
-    if (!startDate || selectedDestinations.length === 0) return 0;
-
-    let total = selectedDestinations.reduce((sum, destId) => {
-      const dest = destinations.find((d) => d.id === destId);
-      return sum + (dest?.duration || 0);
-    }, 0);
-
-    // +1 día si algún plan tiene requiresExtraDay activo (configurable en admin)
-    const hasExtraDay = selectedDestinations.some((destId) => {
-      const dest = destinations.find((d) => d.id === destId);
-      return (dest as { requiresExtraDay?: boolean })?.requiresExtraDay === true;
-    });
-    if (hasExtraDay) total += 1;
-
-    return total;
-  };
-
-  const calculateEndDate = (): string => {
-    const totalDuration = calculateTotalDuration();
-
-    if (totalDuration === 0 || !startDate) return "";
-
-    const end = new Date(startDate);
-    end.setDate(end.getDate() + totalDuration - 1);
-
-    return end.toISOString().split("T")[0];
-  };
-
-  const endDate = calculateEndDate();
-
-  /** Un bloqueo tiene salida fija: al seleccionarlo sola, fijar la fecha del calendario automáticamente. */
-  useEffect(() => {
-    if (selectedDestinations.length !== 1) return;
-    const one = destinations.find((d) => d.id === selectedDestinations[0]);
-    if (one?.isBloqueo && one.bloqueoSalidaFecha) {
-      const [y, m, d] = one.bloqueoSalidaFecha.split("-").map(Number);
-      setStartDate(new Date(y, m - 1, d));
-    }
-  }, [selectedDestinations, destinations]);
-
-  const isAllowedDay = (date: Date, allowedDays: string[]): boolean => {
-    const dayOfWeek = date.getDay();
-    const dayNames: Record<number, string> = {
-      0: 'sunday',
-      1: 'monday',
-      2: 'tuesday',
-      3: 'wednesday',
-      4: 'thursday',
-      5: 'friday',
-      6: 'saturday'
-    };
-    return allowedDays.includes(dayNames[dayOfWeek]);
-  };
-
-  const getDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const firstSelectedDest = selectedDests[0];
-  const bloqueoSalidaFija =
-    selectedDests.length === 1 && firstSelectedDest?.isBloqueo && firstSelectedDest.bloqueoSalidaFecha
-      ? firstSelectedDest.bloqueoSalidaFecha
-      : null;
-
-  const disableDates = (date: Date) => {
-    // Disable past dates
-    if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
-      return true;
-    }
-
-    if (bloqueoSalidaFija) {
-      return getDateString(date) !== bloqueoSalidaFija;
-    }
-
-    // For Turkey Esencial, check if date has exact priceTier match (Monday or Tuesday only)
-    if (hasTurkeyEsencial) {
-      if (isTurkeyHoliday(date)) {
-        return true;
-      }
-
-      const destinationWithTiers = selectedDests.find(d => d.name === "Turquía Esencial");
-      if (destinationWithTiers?.priceTiers) {
-        const dateStr = getDateString(date);
-        // Only allow dates that have an exact match in priceTiers (Monday with COL or Tuesday with price)
-        const hasExactDate = destinationWithTiers.priceTiers.some(tier => tier.endDate === dateStr);
-        return !hasExactDate;
-      }
-
-      // Fallback: allow Monday (1) for flight and Tuesday (2) for arrival
-      const dayOfWeek = date.getDay();
-      return !(dayOfWeek === 1 || dayOfWeek === 2);
-    }
-
-    // For Europe plans with priceTiers and flight days, check exact date matches
-    const europePlan = selectedDests.find(d =>
-      (d.name.includes("Italia Turística") ||
-        d.name.includes("España e Italia") ||
-        d.name.includes("Gran Tour de Europa")) &&
-      d.priceTiers && d.priceTiers.length > 0
-    );
-
-    if (europePlan) {
-      const dateStr = getDateString(date);
-      // Only allow dates that have an exact match in priceTiers (flight day or arrival day)
-      const hasExactDate = (europePlan.priceTiers ?? []).some((tier) => tier.endDate === dateStr);
-      return !hasExactDate; // Return immediately - don't check other conditions
-    }
-
-    // For destinations with priceTiers (date ranges like Dubai), check if date is within valid range
-    // Exclude Europe plans and Turkey Esencial
-    const destinationWithTiers = selectedDests.find(d =>
-      d.priceTiers && d.priceTiers.length > 0 &&
-      d.name !== "Turquía Esencial" &&
-      !d.name.includes("Italia Turística") &&
-      !d.name.includes("España e Italia") &&
-      !d.name.includes("Gran Tour de Europa")
-    );
-
-    if (destinationWithTiers) {
-      const dateStr = getDateString(date);
-      const isWithinRange = destinationWithTiers.priceTiers!.some(tier => {
-        const startDate = tier.startDate || '2000-01-01'; // If no startDate, use a past date
-        return dateStr >= startDate && dateStr <= tier.endDate;
-      });
-
-      if (!isWithinRange) {
-        return true; // Disable dates outside all price tier ranges
-      }
-    }
-
-    // For destinations with specific allowed days (e.g., Egypt: Monday and Friday only)
-    // Don't apply to Europe plans as they handle their own date logic
-    if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays &&
-      !europePlan) {
-      // Check if it's an allowed day of the week
-      if (!isAllowedDay(date, allowedDaysDestination.allowedDays)) {
-        return true;
-      }
-
-      return false;
-    }
-
-    // For other Turkey destinations, only disable non-Tuesday dates
-    if (hasTurkeyDestinations) {
-      return !isTuesday(date);
-    }
-
-    return false;
-  };
-
-  // Validate selected date against Turkey holidays
-  useEffect(() => {
-    if (hasTurkeyEsencial && startDate && isTurkeyHoliday(startDate)) {
-      const description = getTurkeyHolidayDescription(startDate);
-      toast({
-        title: "Fecha no disponible",
-        description: `No se puede seleccionar esta fecha porque es festivo en Turquía: ${description}`,
-        variant: "destructive",
-      });
-      setStartDate(undefined);
-    }
-  }, [startDate, hasTurkeyEsencial, toast]);
+  const showBuilderPanel =
+    hasTurkeyEsencial ||
+    hasGranTourEuropa ||
+    (hasTurkeyDestinations && !hasTurkeyEsencial) ||
+    selectedDestinations.length > 0;
 
   /** Parsea la categoría del hotel para obtener las estrellas. Soporta: "5*", "4 estrellas", "3*", etc. */
   const parseHotelCategoryToStars = (category: string | null | undefined): number | null => {
@@ -301,32 +107,6 @@ export default function Home() {
     if (starCounts.length === 0) return 4;
 
     return Math.max(...starCounts, 1);
-  };
-
-  const formatAllowedDays = (days: string[]): string => {
-    const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const dayMapSpanish: Record<string, string> = {
-      'monday': 'Lunes',
-      'tuesday': 'Martes',
-      'wednesday': 'Miércoles',
-      'thursday': 'Jueves',
-      'friday': 'Viernes',
-      'saturday': 'Sábado',
-      'sunday': 'Domingo'
-    };
-
-    // Sort days by their order in the week
-    const sortedDays = days.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
-
-    // Check for consecutive days to create ranges
-    if (sortedDays.length >= 5) {
-      const firstDay = dayMapSpanish[sortedDays[0]];
-      const lastDay = dayMapSpanish[sortedDays[sortedDays.length - 1]];
-      return `${firstDay} a ${lastDay}`;
-    }
-
-    // For few days, list them
-    return sortedDays.map(d => dayMapSpanish[d]).join(' y ');
   };
 
   const getMealsInfo = (destId: string): { breakfasts: number; lunches: number; dinners: number; total: number } => {
@@ -485,10 +265,6 @@ export default function Home() {
           return;
         }
         setSelectedDestinations([destId]);
-        if (dest.bloqueoSalidaFecha) {
-          const [y, mo, d] = dest.bloqueoSalidaFecha.split("-").map(Number);
-          setStartDate(new Date(y, mo - 1, d));
-        }
         return;
       }
 
@@ -498,37 +274,6 @@ export default function Home() {
           description: "Para cotizar otros destinos, deselecciona primero el plan bloqueo.",
           variant: "destructive",
         });
-        return;
-      }
-
-      if (dest?.allowedDays && dest.allowedDays.length > 0 && startDate && !isAllowedDay(startDate, dest.allowedDays)) {
-        const dateStr = startDate.toLocaleDateString("es-CO", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-
-        const allowedDaysText = dest.allowedDays.map(day => {
-          const dayMap: Record<string, string> = {
-            'monday': 'lunes',
-            'tuesday': 'martes',
-            'wednesday': 'miércoles',
-            'thursday': 'jueves',
-            'friday': 'viernes',
-            'saturday': 'sábado',
-            'sunday': 'domingo'
-          };
-          return dayMap[day] || day;
-        }).join(' y ');
-
-        toast({
-          title: `${dest.name} - Días Limitados`,
-          description: `La fecha seleccionada (${dateStr}) no está disponible. Este programa solo puede iniciarse los días ${allowedDaysText}. Por favor, selecciona una fecha válida.`,
-          variant: "destructive",
-        });
-
-        setStartDate(undefined);
         return;
       }
 
@@ -615,6 +360,7 @@ export default function Home() {
             </div>
           </section>
 
+          {showBuilderPanel && (
           <div className="glass-card rounded-xl p-6 mb-8">
             {hasTurkeyEsencial && (
               <Alert className="mb-4 border-primary/30 bg-accent">
@@ -650,100 +396,6 @@ export default function Home() {
               </Alert>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Fecha de Inicio del Viaje
-                  {hasTurkeyEsencial && <Badge variant="secondary" className="ml-2">Martes o Miércoles</Badge>}
-                  {hasGranTourEuropa && <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800">Domingo o Lunes</Badge>}
-                  {hasTurkeyDestinations && !hasTurkeyEsencial && <Badge variant="secondary" className="ml-2">Solo Martes</Badge>}
-                  {hasAllowedDaysRestriction && allowedDaysDestination && (
-                    <Badge variant="secondary" className="ml-2">
-                      {formatAllowedDays(allowedDaysDestination.allowedDays || [])}
-                    </Badge>
-                  )}
-                </label>
-                <DatePicker
-                  date={startDate}
-                  onDateChange={setStartDate}
-                  placeholder={
-                    hasAllowedDaysRestriction && allowedDaysDestination
-                      ? formatAllowedDays(allowedDaysDestination.allowedDays || [])
-                      : hasTurkeyEsencial
-                        ? "Selecciona martes o miércoles"
-                        : hasTurkeyDestinations
-                          ? "Selecciona un martes"
-                          : "Selecciona una fecha"
-                  }
-                  disabled={disableDates}
-                  priceTiers={
-                    selectedDestinations.length > 0
-                      ? selectedDests.flatMap(dest =>
-                        (dest.priceTiers || []).map(tier => ({
-                          ...tier,
-                          destinationName: dest.name
-                        }))
-                      )
-                      : undefined
-                  }
-                />
-                {selectedDestinations.length > 0 && selectedDests.some(d => d.priceTiers && d.priceTiers.length > 0) && (
-                  <div className="mt-2 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" />
-                      <div className="text-xs text-emerald-800 space-y-1">
-                        <p className="font-semibold">Información del Calendario:</p>
-                        <ul className="list-disc list-inside space-y-0.5 ml-1">
-                          <li>Las fechas con <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[0.65rem] font-medium">precio</span> están disponibles</li>
-                          {hasTurkeyEsencial && (
-                            <li>
-                              <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[0.6rem] font-medium">🛫 COL</span> = Vuelo desde Colombia (lunes, 11 días total)
-                            </li>
-                          )}
-                          {hasTurkeyEsencial && (
-                            <li>
-                              Martes = Llegada directa desde otro país (10 días)
-                            </li>
-                          )}
-                          {selectedDestinations.length > 1 && (
-                            <li>El número <span className="bg-blue-600 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[0.5rem] font-bold">2+</span> indica múltiples destinos en esa fecha</li>
-                          )}
-                          <li>Pasa el mouse sobre una fecha para ver detalles de precio por destino</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Fecha de Finalización (Calculada Automáticamente)
-                </label>
-                <div className="w-full px-3 py-2 border rounded-md bg-muted/50 text-foreground flex items-center" data-testid="text-end-date">
-                  {endDate ? (
-                    <span className="font-medium">
-                      {new Date(endDate + "T00:00:00").toLocaleDateString("es-CO", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground italic">Selecciona fecha de inicio y destinos</span>
-                  )}
-                </div>
-                {endDate && selectedDestinations.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Basado en {calculateTotalDuration()} días de viaje
-                    {hasTurkeyDestinations && <span className="text-price-accent"> (incluye día de vuelo a Turquía)</span>}
-                  </p>
-                )}
-              </div>
-            </div>
-
             {selectedDestinations.length > 0 && (
               <div className="mt-4 p-4 bg-accent rounded-lg border border-border">
                 <p className="text-sm font-medium text-foreground mb-2">Destinos Seleccionados:</p>
@@ -760,7 +412,7 @@ export default function Home() {
               </div>
             )}
           </div>
-
+          )}
 
           {destinationsQueryError && (
             <Alert variant="destructive" className="mb-8 max-w-3xl mx-auto">
@@ -969,19 +621,12 @@ export default function Home() {
                 size="lg"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl"
                 onClick={() => {
-                  // Formatear fecha en zona horaria local para evitar problemas de UTC
-                  const formatLocalDate = (date: Date) => {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                  };
-
                   const selectedData = {
                     destinations: selectedDestinations,
-                    startDate: startDate ? formatLocalDate(startDate) : "",
+                    startDate: "",
                   };
                   sessionStorage.setItem("quoteData", JSON.stringify(selectedData));
+                  clearHomeBuilderSelection();
                   setLocation("/cotizacion");
                 }}
                 data-testid="button-continue"
