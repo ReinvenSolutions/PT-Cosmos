@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { prefetchRoute } from "@/lib/route-prefetch";
 import {
@@ -12,6 +13,7 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
+  SidebarMenuBadge,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -289,10 +291,26 @@ export function AppSidebar() {
   };
 
   const isAdmin = user?.role === "super_admin";
+  const isAgency = user?.role === "agency";
+
+  const { data: pendingApprovalData } = useQuery<{ count: number }>({
+    queryKey: ["/api/admin/users/pending-approval-count"],
+    enabled: isAdmin,
+    refetchInterval: 60_000,
+  });
+  const pendingApprovalCount = pendingApprovalData?.count ?? 0;
 
   const contenidoSection = {
     label: "Contenido",
     items: [{ title: "Academia digital", url: "/tutoriales", icon: GraduationCap }],
+  };
+
+  const agencySection = {
+    label: "Mis planes",
+    items: [
+      { title: "Administrar planes", url: "/admin/plans", icon: MapPin },
+      { title: "Ver catálogo", url: "/", icon: Plane },
+    ],
   };
 
   const adminSection = {
@@ -324,7 +342,9 @@ export function AppSidebar() {
 
   const sections = isAdmin
     ? [adminSection, adminCotizacionesSection, contenidoSection]
-    : [{ label: "Cotizaciones", items: advisorSection.items }, contenidoSection];
+    : isAgency
+      ? [agencySection]
+      : [{ label: "Cotizaciones", items: advisorSection.items }, contenidoSection];
 
   const isMenuActive = (url: string) => {
     if (url === "/tutoriales") return location.startsWith("/tutoriales");
@@ -334,8 +354,13 @@ export function AppSidebar() {
     return location === url;
   };
 
-  const renderMenuItems = (items: typeof advisorSection.items) =>
-    items.map((item) => (
+  const renderMenuItems = (
+    items: typeof advisorSection.items,
+    badges?: Partial<Record<string, number>>
+  ) =>
+    items.map((item) => {
+      const badgeCount = badges?.[item.url];
+      return (
       <SidebarMenuItem key={item.url}>
         <SidebarMenuButton
           asChild
@@ -349,8 +374,19 @@ export function AppSidebar() {
             <span>{item.title}</span>
           </Link>
         </SidebarMenuButton>
+        {badgeCount != null && badgeCount > 0 ? (
+          <SidebarMenuBadge className="bg-destructive text-destructive-foreground min-w-[1.25rem] h-5 px-1.5 font-semibold">
+            {badgeCount > 99 ? "99+" : badgeCount}
+          </SidebarMenuBadge>
+        ) : null}
       </SidebarMenuItem>
-    ));
+    );
+    });
+
+  const adminMenuBadges =
+    isAdmin && pendingApprovalCount > 0
+      ? { "/admin/users": pendingApprovalCount }
+      : undefined;
 
   return (
     <Sidebar className={cn("sidebar-modern", state === "collapsed" && "sidebar-collapsed")} collapsible="icon">
@@ -364,7 +400,7 @@ export function AppSidebar() {
               Cosmos Mayorista
             </span>
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-              {isAdmin ? "Administrador" : "Asesor"}
+              {isAdmin ? "Administrador" : isAgency ? "Agencia" : "Asesor"}
             </span>
           </div>
         </div>
@@ -380,7 +416,10 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent className="group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
               <SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col">
-                {renderMenuItems(section.items)}
+                {renderMenuItems(
+                  section.items,
+                  section.label === "Administración" ? adminMenuBadges : undefined
+                )}
                 {isAdmin && section.label === "Administración" ? <GlobalTrmAdminMenuItem /> : null}
               </SidebarMenu>
             </SidebarGroupContent>

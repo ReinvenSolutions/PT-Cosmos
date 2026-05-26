@@ -5,6 +5,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { MapPin, Plus, Pencil, Trash2, Search, GripVertical, Loader2, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { useState, useCallback } from "react";
 import { prefetchRoute } from "@/lib/route-prefetch";
@@ -64,6 +66,8 @@ interface Destination {
   isActive: boolean;
   displayOrder: number;
   imageUrl: string | null;
+  agencyDisplayName?: string | null;
+  createdByUserId?: string | null;
 }
 
 function SortableRow({
@@ -73,6 +77,8 @@ function SortableRow({
   onToggleActive,
   isSortable,
   isToggling,
+  canDelete,
+  showAgencyColumn,
 }: {
   dest: Destination;
   onEdit: (id: string) => void;
@@ -80,6 +86,8 @@ function SortableRow({
   onToggleActive: (id: string, isActive: boolean) => void;
   isSortable: boolean;
   isToggling: boolean;
+  canDelete: boolean;
+  showAgencyColumn: boolean;
 }) {
   const {
     attributes,
@@ -138,6 +146,17 @@ function SortableRow({
         )}
       </TableCell>
       <TableCell className="font-medium">{dest.name}</TableCell>
+      {showAgencyColumn && (
+        <TableCell>
+          {dest.agencyDisplayName ? (
+            <Badge variant="secondary" className="text-xs font-medium bg-violet-500/15 text-violet-800 dark:text-violet-200 border-violet-500/30">
+              {dest.agencyDisplayName}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-sm">Cosmos</span>
+          )}
+        </TableCell>
+      )}
       <TableCell>{dest.country}</TableCell>
       <TableCell>{dest.duration} días</TableCell>
       <TableCell>
@@ -163,15 +182,17 @@ function SortableRow({
           <Pencil className="h-4 w-4 mr-1" />
           Editar
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={() => onDelete(dest)}
-        >
-          <Trash2 className="h-4 w-4 mr-1" />
-          Eliminar
-        </Button>
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => onDelete(dest)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Eliminar
+          </Button>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -179,6 +200,11 @@ function SortableRow({
 
 export default function AdminPlans() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const isAgency = user?.role === "agency";
+  const isSuperAdmin = user?.role === "super_admin";
+  const canDeletePlans = isSuperAdmin;
+  const showAgencyColumn = isSuperAdmin;
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Destination | null>(null);
@@ -334,9 +360,13 @@ export default function AdminPlans() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Admin Planes</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isAgency ? "Mis planes" : "Admin Planes"}
+          </h1>
           <p className="text-muted-foreground">
-            Crea, edita y elimina planes turísticos. Los cambios se reflejan en el catálogo de cotizaciones.
+            {isAgency
+              ? "Crea y edita tus planes. Solo tú puedes modificar los que hayas creado; aparecerán en el catálogo con el nombre de tu agencia."
+              : "Crea, edita y elimina planes turísticos. Los planes de agencia se marcan con su nombre en el catálogo."}
           </p>
         </div>
         <Button onClick={() => setLocation("/admin/plans/new")} onMouseEnter={() => prefetchRoute("/admin/plans/new")}>
@@ -398,6 +428,7 @@ export default function AdminPlans() {
                   <TableHead className="w-10"></TableHead>
                   <TableHead className="w-[80px]">Imagen</TableHead>
                   <TableHead>Plan</TableHead>
+                  {showAgencyColumn && <TableHead>Agencia</TableHead>}
                   <TableHead>País</TableHead>
                   <TableHead>Duración</TableHead>
                   <TableHead>Precio base</TableHead>
@@ -423,13 +454,13 @@ export default function AdminPlans() {
                   </>
                 ) : isError ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={showAgencyColumn ? 9 : 8} className="text-center py-6 text-muted-foreground">
                       Corrige el error indicado arriba y recarga la página.
                     </TableCell>
                   </TableRow>
                 ) : filteredPlans.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={showAgencyColumn ? 9 : 8} className="text-center py-8 text-muted-foreground">
                       No se encontraron planes.
                     </TableCell>
                   </TableRow>
@@ -447,6 +478,8 @@ export default function AdminPlans() {
                         onToggleActive={(id, isActive) => toggleActiveMutation.mutate({ id, isActive })}
                         isSortable={canReorder}
                         isToggling={!!(toggleActiveMutation.isPending && toggleActiveMutation.variables && toggleActiveMutation.variables.id === dest.id)}
+                        canDelete={canDeletePlans}
+                        showAgencyColumn={showAgencyColumn}
                       />
                     ))}
                   </SortableContext>

@@ -1,11 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Loader2, MessageCircle, Send, Sparkles, X, Minimize2 } from "lucide-react";
+
+/** Identidad visual del asistente Cosmos (naranja en gradiente). */
+const COSMOS_ASSISTANT_GRADIENT =
+  "bg-gradient-to-br from-[hsl(24,95%,48%)] to-[hsl(32,92%,58%)]";
+const COSMOS_ASSISTANT_GRADIENT_R =
+  "bg-gradient-to-r from-[hsl(24,95%,48%)] to-[hsl(32,92%,58%)]";
+const COSMOS_ASSISTANT_SHADOW = "shadow-orange-500/30";
+
+const NUDGE_FIRST_MS = 30_000;
+const NUDGE_INTERVAL_MS = 5 * 60_000;
+const NUDGE_MESSAGE =
+  "Soy Cosmos, tu asistente virtual. ¿Puedo ayudarte en algo?";
+
+/** Si el usuario está a esta distancia (px) del final, el autoscroll sigue activo. */
+const SCROLL_NEAR_BOTTOM_PX = 80;
 
 type ChatRole = "user" | "assistant";
 
@@ -86,7 +100,10 @@ function MessageBubble({ role, content }: { role: ChatRole; content: string }) {
           "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm",
           isUser
             ? "bg-primary text-primary-foreground rounded-br-md"
-            : "bg-muted text-foreground rounded-bl-md border border-border/60"
+            : cn(
+                COSMOS_ASSISTANT_GRADIENT_R,
+                "text-white rounded-bl-md border border-orange-400/30"
+              )
         )}
       >
         <p className="whitespace-pre-wrap">{content}</p>
@@ -104,8 +121,26 @@ export function CosmosChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [nudgeVisible, setNudgeVisible] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const greetedRef = useRef(false);
+  const openRef = useRef(open);
+  const pendingNudgeRef = useRef(false);
+  openRef.current = open;
+
+  const handleViewportScroll = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceFromBottom <= SCROLL_NEAR_BOTTOM_PX;
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const el = viewportRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
 
   const planMatch = location.match(/^\/plan\/([^/]+)/);
   const currentPlanId = planMatch?.[1];
@@ -126,6 +161,37 @@ export function CosmosChatWidget() {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
+
+    const showNudge = () => {
+      if (openRef.current) {
+        pendingNudgeRef.current = true;
+      } else {
+        setNudgeVisible(true);
+      }
+    };
+
+    const firstTimer = window.setTimeout(showNudge, NUDGE_FIRST_MS);
+    const intervalId = window.setInterval(showNudge, NUDGE_INTERVAL_MS);
+
+    return () => {
+      window.clearTimeout(firstTimer);
+      window.clearInterval(intervalId);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (open) {
+      setNudgeVisible(false);
+      return;
+    }
+    if (pendingNudgeRef.current) {
+      pendingNudgeRef.current = false;
+      setNudgeVisible(true);
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (!open || !user || greetedRef.current) return;
     greetedRef.current = true;
     const name = firstName(user);
@@ -138,16 +204,24 @@ export function CosmosChatWidget() {
     ]);
   }, [open, user]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (stickToBottomRef.current) {
+      scrollToBottom("auto");
     }
-  }, [messages, loading, open]);
+  }, [messages, loading, error, open, scrollToBottom]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    stickToBottomRef.current = true;
+    scrollToBottom("auto");
+  }, [open, scrollToBottom]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || loading || !available) return;
 
+    stickToBottomRef.current = true;
     setError(null);
     const userMsg: ChatMessage = { id: newId(), role: "user", content: text };
     const assistantId = newId();
@@ -192,17 +266,22 @@ export function CosmosChatWidget() {
     <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3 pointer-events-none">
       {open && (
         <div
-          className="pointer-events-auto flex w-[min(100vw-2rem,380px)] flex-col overflow-hidden rounded-2xl border border-border/80 bg-background shadow-2xl shadow-primary/10 animate-in slide-in-from-bottom-4 fade-in duration-200"
+          className="pointer-events-auto flex w-[min(100vw-2rem,380px)] flex-col overflow-hidden rounded-2xl border border-border/80 bg-background shadow-2xl shadow-orange-500/15 animate-in slide-in-from-bottom-4 fade-in duration-200"
           role="dialog"
           aria-label="Chat con Cosmos"
         >
-          <header className="flex items-center gap-3 border-b bg-gradient-to-r from-primary to-[hsl(191,46%,48%)] px-4 py-3 text-primary-foreground">
+          <header
+            className={cn(
+              "flex items-center gap-3 border-b px-4 py-3 text-white",
+              COSMOS_ASSISTANT_GRADIENT_R
+            )}
+          >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 ring-2 ring-white/30">
               <Sparkles className="h-4 w-4" aria-hidden />
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-sm leading-tight">Cosmos</p>
-              <p className="text-[11px] text-primary-foreground/85 truncate">
+              <p className="text-[11px] text-white/85 truncate">
                 Asistente IA · planes y soporte
               </p>
             </div>
@@ -210,7 +289,7 @@ export function CosmosChatWidget() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 text-primary-foreground hover:bg-white/20"
+              className="h-8 w-8 shrink-0 text-white hover:bg-white/20"
               onClick={() => setOpen(false)}
               aria-label="Minimizar chat"
             >
@@ -218,8 +297,12 @@ export function CosmosChatWidget() {
             </Button>
           </header>
 
-          <ScrollArea className="h-[min(52vh,420px)]">
-            <div ref={scrollRef} className="space-y-3 p-4">
+          <div
+            ref={viewportRef}
+            className="h-[min(52vh,420px)] overflow-y-auto overscroll-contain"
+            onScroll={handleViewportScroll}
+          >
+            <div className="space-y-3 p-4">
               {available === false && (
                 <p className="text-sm text-muted-foreground rounded-lg bg-muted/80 p-3 border">
                   Cosmos no está activo en este servidor. El administrador debe configurar{" "}
@@ -241,7 +324,7 @@ export function CosmosChatWidget() {
                 </p>
               )}
             </div>
-          </ScrollArea>
+          </div>
 
           <div className="border-t bg-muted/30 p-3 space-y-2">
             {currentPlanId && (
@@ -268,7 +351,7 @@ export function CosmosChatWidget() {
               <Button
                 type="button"
                 size="icon"
-                className="shrink-0 h-10 w-10 rounded-xl"
+                className={cn("shrink-0 h-10 w-10 rounded-xl text-white", COSMOS_ASSISTANT_GRADIENT)}
                 disabled={!available || loading || !input.trim()}
                 onClick={() => void sendMessage()}
                 aria-label="Enviar mensaje"
@@ -280,14 +363,56 @@ export function CosmosChatWidget() {
         </div>
       )}
 
+      {nudgeVisible && !open && (
+        <div
+          className="pointer-events-auto relative max-w-[min(100vw-6rem,260px)] animate-in fade-in slide-in-from-bottom-2 duration-300"
+          role="status"
+          aria-live="polite"
+        >
+          <button
+            type="button"
+            className={cn(
+              "w-full rounded-2xl px-3.5 py-2.5 text-left text-sm text-white shadow-lg pr-9 transition-opacity hover:opacity-95",
+              COSMOS_ASSISTANT_GRADIENT_R
+            )}
+            onClick={() => {
+              setNudgeVisible(false);
+              setOpen(true);
+            }}
+          >
+            <p className="leading-snug">{NUDGE_MESSAGE}</p>
+          </button>
+          <button
+            type="button"
+            className="absolute right-2 top-2 z-10 rounded-md p-0.5 text-white/80 hover:bg-white/20 hover:text-white"
+            onClick={() => setNudgeVisible(false)}
+            aria-label="Cerrar mensaje de Cosmos"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <div
+            className={cn(
+              "absolute -bottom-1.5 right-6 h-3 w-3 rotate-45",
+              COSMOS_ASSISTANT_GRADIENT
+            )}
+            aria-hidden
+          />
+        </div>
+      )}
+
       <Button
         type="button"
         size="lg"
         className={cn(
-          "pointer-events-auto h-14 w-14 rounded-full shadow-lg shadow-primary/30 bg-gradient-to-br from-primary to-[hsl(191,46%,50%)] hover:opacity-95 transition-transform",
+          "pointer-events-auto h-14 w-14 rounded-full shadow-lg text-white hover:opacity-95 transition-transform",
+          COSMOS_ASSISTANT_GRADIENT,
+          COSMOS_ASSISTANT_SHADOW,
           open && "scale-95"
         )}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setNudgeVisible(false);
+          setOpen((v) => !v);
+        }}
         aria-expanded={open}
         aria-label={open ? "Cerrar chat Cosmos" : "Abrir chat Cosmos"}
       >

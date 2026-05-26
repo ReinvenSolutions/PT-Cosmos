@@ -7,6 +7,7 @@
 
 import nodemailer from "nodemailer";
 import { formatUSD } from "@shared/schema";
+import { ROLE_LABELS } from "@shared/roles";
 import { logger } from "./logger";
 
 const BREVO_SMTP_HOST = "smtp-relay.brevo.com";
@@ -170,17 +171,28 @@ const baseEmailStyles = `
   .divider { height: 3px; background: linear-gradient(90deg, ${COSMOS_TEAL}, ${COSMOS_GOLD}); margin: 16px 0; border-radius: 2px; }
 `;
 
-export function generateNewUserNotificationHtml(user: { name?: string | null; email?: string | null; username: string; role: string; createdAt: string }): string {
+export function generateNewUserNotificationHtml(user: {
+  name?: string | null;
+  email?: string | null;
+  username: string;
+  role: string;
+  createdAt: string;
+  pendingApproval?: boolean;
+}): string {
   const date = new Date(user.createdAt).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" });
+  const pendingNote = user.pendingApproval
+    ? `<p><strong>Acción requerida:</strong> Este usuario está <strong>pendiente de aprobación</strong>. Ingresa al panel de administración → Usuarios para aprobar o denegar el acceso.</p>`
+    : "";
   return `
     <!DOCTYPE html>
     <html>
     <head><meta charset="utf-8"><style>${baseEmailStyles}</style></head>
     <body>
       <div class="container">
-        <div class="header"><h1>Nuevo usuario registrado</h1></div>
+        <div class="header"><h1>${user.pendingApproval ? "Usuario pendiente de aprobación" : "Nuevo usuario registrado"}</h1></div>
         <div class="content">
           <p>Se ha registrado un nuevo usuario en el <strong>Cotizador Cosmos</strong>.</p>
+          ${pendingNote}
           <div class="divider"></div>
           <div class="info-row"><strong>Nombre:</strong> ${user.name || "—"}</div>
           <div class="info-row"><strong>Correo / Usuario:</strong> ${user.username}</div>
@@ -189,6 +201,50 @@ export function generateNewUserNotificationHtml(user: { name?: string | null; em
           <div class="info-row"><strong>Fecha de registro:</strong> ${date}</div>
         </div>
         <div class="footer">Cosmos Viajes · Notificación automática · info@cosmosviajes.com</div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+export function generatePendingApprovalEmailHtml(userName: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><style>${baseEmailStyles}</style></head>
+    <body>
+      <div class="container">
+        <div class="header"><h1>Registro recibido</h1></div>
+        <div class="content">
+          <h2>Hola ${userName || "viajero"},</h2>
+          <p>Tu registro en el <strong>Cotizador Cosmos</strong> fue exitoso.</p>
+          <div class="divider"></div>
+          <p><strong>Tu cuenta está pendiente de aprobación.</strong> Un administrador revisará tu solicitud y te notificaremos por correo cuando puedas iniciar sesión.</p>
+          <p>Mientras tanto, no podrás acceder a la plataforma. Si tienes preguntas, contáctanos.</p>
+        </div>
+        <div class="footer">Cosmos Viajes · Cotizador Mayorista · info@cosmosviajes.com</div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+export function generateAccountApprovedEmailHtml(userName: string | undefined): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><style>${baseEmailStyles}</style></head>
+    <body>
+      <div class="container">
+        <div class="header"><h1>¡Tu cuenta fue aprobada!</h1></div>
+        <div class="content">
+          <h2>Hola ${userName || "viajero"},</h2>
+          <p>Un administrador ha <strong>aprobado tu registro</strong> en el <strong>Cotizador Cosmos</strong>.</p>
+          <div class="divider"></div>
+          <p>Ya puedes iniciar sesión con tu correo y contraseña. Al entrar, recibirás un código de verificación por correo para mayor seguridad.</p>
+          <p>¡Te deseamos muchos viajes exitosos!</p>
+        </div>
+        <div class="footer">Cosmos Viajes · Cotizador Mayorista · info@cosmosviajes.com</div>
       </div>
     </body>
     </html>
@@ -223,11 +279,6 @@ export function generateWelcomeEmailHtml(userName: string): string {
     </html>
   `;
 }
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Super Admin",
-  advisor: "Asesor",
-};
 
 export function generateRoleChangeNotificationHtml(userName: string | undefined | null, newRole: string): string {
   const roleLabel = ROLE_LABELS[newRole] || newRole;

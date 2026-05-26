@@ -37,7 +37,10 @@ export default function Login() {
   useEffect(() => {
     if (user && step === "2fa") {
       toast({ title: "¡Bienvenido!", description: "Has iniciado sesión correctamente." });
-      navigate("/");
+      const role = user.role;
+      navigate(
+        role === "super_admin" ? "/admin/dashboard" : role === "agency" ? "/admin/plans" : "/"
+      );
     }
   }, [user, step, navigate, toast]);
 
@@ -57,7 +60,10 @@ export default function Login() {
         });
       } else if ("user" in result) {
         toast({ title: "¡Bienvenido de nuevo!", description: "Has iniciado sesión correctamente." });
-        navigate("/");
+        const role = result.user.role;
+        navigate(
+          role === "super_admin" ? "/admin/dashboard" : role === "agency" ? "/admin/plans" : "/"
+        );
       }
     } catch (error: any) {
       toast({

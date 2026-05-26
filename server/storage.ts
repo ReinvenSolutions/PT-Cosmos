@@ -58,7 +58,7 @@ import { logger } from "./logger";
 import { ValidationError } from "./errors/AppError";
 
 export interface IStorage {
-  getDestinations(params?: { isActive?: boolean }): Promise<Destination[]>;
+  getDestinations(params?: { isActive?: boolean; createdByUserId?: string }): Promise<Destination[]>;
   getDestination(id: string): Promise<Destination | undefined>;
   getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<Array<Destination & { hotels: Hotel[]; itinerary: ItineraryDay[] }>>;
   createDestination(data: InsertDestination): Promise<Destination>;
@@ -84,7 +84,8 @@ export interface IStorage {
   createUser(data: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<Pick<User, "name" | "avatarUrl">>): Promise<User>;
   listUsers(): Promise<Omit<User, "passwordHash">[]>;
-  updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; passwordHash: string; twoFactorEnabled: boolean }>): Promise<User>;
+  updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; approvalStatus: string; passwordHash: string; twoFactorEnabled: boolean }>): Promise<User>;
+  countPendingApprovalUsers(): Promise<number>;
   deleteUser(id: string): Promise<void>;
   countQuotesByUser(userId: string): Promise<number>;
   findUserByUsername(username: string): Promise<User | undefined>;
@@ -205,12 +206,26 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getDestinations(params?: { isActive?: boolean }): Promise<Destination[]> {
+  async getDestinations(params?: { isActive?: boolean; createdByUserId?: string }): Promise<Destination[]> {
+    const filters = [];
     if (params?.isActive !== undefined) {
+      filters.push(eq(destinations.isActive, params.isActive));
+    }
+    if (params?.createdByUserId) {
+      filters.push(eq(destinations.createdByUserId, params.createdByUserId));
+    }
+    if (filters.length === 1) {
       return db
         .select()
         .from(destinations)
-        .where(eq(destinations.isActive, params.isActive))
+        .where(filters[0])
+        .orderBy(destinations.displayOrder, destinations.name);
+    }
+    if (filters.length > 1) {
+      return db
+        .select()
+        .from(destinations)
+        .where(and(...filters))
         .orderBy(destinations.displayOrder, destinations.name);
     }
     return db
@@ -436,19 +451,29 @@ export class DatabaseStorage implements IStorage {
       avatarUrl: users.avatarUrl,
       role: users.role,
       isActive: users.isActive,
+      approvalStatus: users.approvalStatus,
       twoFactorEnabled: users.twoFactorEnabled,
       createdAt: users.createdAt,
     }).from(users).orderBy(users.createdAt);
     return result;
   }
 
-  async updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; passwordHash: string; twoFactorEnabled: boolean }>): Promise<User> {
+  async countPendingApprovalUsers(): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.approvalStatus, "pending"));
+    return Number(result[0]?.count ?? 0);
+  }
+
+  async updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; approvalStatus: string; passwordHash: string; twoFactorEnabled: boolean }>): Promise<User> {
     const updates: Record<string, unknown> = {};
     if (data.name !== undefined) updates.name = data.name;
     if (data.username !== undefined) updates.username = data.username;
     if (data.email !== undefined) updates.email = data.email;
     if (data.role !== undefined) updates.role = data.role;
     if (data.isActive !== undefined) updates.isActive = data.isActive;
+    if (data.approvalStatus !== undefined) updates.approvalStatus = data.approvalStatus;
     if (data.passwordHash !== undefined) updates.passwordHash = data.passwordHash;
     if (data.twoFactorEnabled !== undefined) updates.twoFactorEnabled = data.twoFactorEnabled;
     if (Object.keys(updates).length === 0) {

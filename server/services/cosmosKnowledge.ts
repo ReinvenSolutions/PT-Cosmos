@@ -92,6 +92,7 @@ ${formatUpgrades(plan)}
 ${plan.requiresTuesday ? "Requiere salida en martes. " : ""}${plan.requiresExtraDay ? "Requiere día extra. " : ""}${plan.allowedDays?.length ? `Días permitidos: ${plan.allowedDays.join(", ")}.` : ""}
 ${plan.flightTerms ? `Términos vuelo: ${plan.flightTerms.slice(0, 400)}` : ""}
 ${plan.termsConditions ? `Términos: ${plan.termsConditions.slice(0, 500)}` : ""}
+${plan.recommendations ? `Recomendaciones: ${plan.recommendations.slice(0, 500)}` : ""}
 ${plan.medicalAssistanceInfo ? `Asistencia médica: ${plan.medicalAssistanceInfo.slice(0, 300)}` : ""}
 
 Hoteles:

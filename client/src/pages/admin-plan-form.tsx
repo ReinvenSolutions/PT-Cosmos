@@ -87,6 +87,10 @@ const DAY_OPTIONS = [
 const ROW_COLOR_A = "bg-slate-200/70 dark:bg-slate-600/40";
 const ROW_COLOR_B = "bg-white dark:bg-slate-800/50";
 
+/** Misma tipografía y tamaño en todos los campos de texto largo de la pestaña Básico */
+const BASIC_TAB_TEXTAREA_CLASS =
+  "mt-1 text-[15px] leading-relaxed md:text-[15px]";
+
 function SortableImageCard({
   img,
   index,
@@ -208,6 +212,7 @@ function AdminPlanForm() {
   const [uploadingDescriptiveAudio, setUploadingDescriptiveAudio] = useState(false);
   const [flightTerms, setFlightTerms] = useState("");
   const [termsConditions, setTermsConditions] = useState("");
+  const [recommendations, setRecommendations] = useState("");
   const [hasInternalOrConnectionFlight, setHasInternalOrConnectionFlight] = useState(false);
   const [requiresExtraDay, setRequiresExtraDay] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -228,6 +233,7 @@ function AdminPlanForm() {
   const [dragDocumentOver, setDragDocumentOver] = useState(false);
   const [dragMainImageOver, setDragMainImageOver] = useState(false);
   const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hotelGalleryFileInputRef = useRef<HTMLInputElement>(null);
   const adicionalesGalleryFileInputRef = useRef<HTMLInputElement>(null);
@@ -265,6 +271,7 @@ function AdminPlanForm() {
     itineraryMapImageUrl?: string | null;
     flightTerms?: string | null;
     termsConditions?: string | null;
+    recommendations?: string | null;
     hasInternalOrConnectionFlight?: boolean;
     requiresExtraDay?: boolean;
     hotelGalleryImageUrls?: string[] | null;
@@ -315,6 +322,7 @@ function AdminPlanForm() {
       setDescriptiveAudioUrl(existing.descriptiveAudioUrl ?? "");
       setFlightTerms(existing.flightTerms ?? "");
       setTermsConditions(existing.termsConditions ?? "");
+      setRecommendations(existing.recommendations ?? "");
       setHasInternalOrConnectionFlight(existing.hasInternalOrConnectionFlight ?? false);
       setRequiresExtraDay(existing.requiresExtraDay ?? false);
       const hg = existing.hotelGalleryImageUrls;
@@ -410,6 +418,7 @@ function AdminPlanForm() {
       itineraryMapImageUrl: itineraryMapImageUrl || null,
       flightTerms: flightTerms || null,
       termsConditions: termsConditions || null,
+      recommendations: recommendations.trim() || null,
       hotelGalleryImageUrls:
         hotelGalleryImages.length > 0 ? hotelGalleryImages.map((x) => x.imageUrl) : null,
       adicionalesGalleryImageUrls:
@@ -983,7 +992,7 @@ function AdminPlanForm() {
         </Button>
       </div>
 
-      {!isEditing && (
+      {!isEditing && isSuperAdmin && (
         <Card
           className={cn(
             "border-dashed border-2 transition-colors overflow-hidden",
@@ -1092,7 +1101,13 @@ function AdminPlanForm() {
               </div>
               <div>
                 <Label>Descripción</Label>
-                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Descripción breve del plan..." />
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Descripción breve del plan..."
+                  className={BASIC_TAB_TEXTAREA_CLASS}
+                />
               </div>
               <div>
                 <Label className="flex items-center gap-2">
@@ -1104,6 +1119,7 @@ function AdminPlanForm() {
                   onChange={(e) => setCardTooltip(e.target.value)}
                   rows={3}
                   placeholder="Texto que aparece al pasar el cursor sobre la tarjeta del plan en la página principal. Ej: Salidas diarias desde 2 pax. Impuestos no incluidos..."
+                  className={BASIC_TAB_TEXTAREA_CLASS}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Si no se completa, se usará un texto por defecto según el plan.
@@ -1470,7 +1486,7 @@ function AdminPlanForm() {
                   onChange={(e) => setFirstPageComments(e.target.value)}
                   placeholder="Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana..."
                   rows={4}
-                  className="mt-1"
+                  className={BASIC_TAB_TEXTAREA_CLASS}
                 />
               </div>
 
@@ -1488,7 +1504,7 @@ function AdminPlanForm() {
                       onChange={(e) => setTermsConditions(e.target.value)}
                       placeholder="Servicios: Cambios en el itinerario posibles según condiciones..."
                       rows={4}
-                      className="mt-1"
+                      className={BASIC_TAB_TEXTAREA_CLASS}
                     />
                   </div>
                   <div>
@@ -1498,10 +1514,28 @@ function AdminPlanForm() {
                       onChange={(e) => setFlightTerms(e.target.value)}
                       placeholder="Los boletos de avión no son reembolsables..."
                       rows={5}
-                      className="mt-1 font-mono text-sm"
+                      className={BASIC_TAB_TEXTAREA_CLASS}
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Recomendaciones (última sección del PDF) */}
+              <div className="border-t border-border pt-4 mt-4">
+                <Label className="text-sm font-medium">Recomendaciones</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Texto adicional sobre recomendaciones o aspectos a tener en cuenta. Se imprime al final del PDF, en una o más hojas según la extensión del contenido.
+                </p>
+                <Textarea
+                  value={recommendations}
+                  onChange={(e) => setRecommendations(e.target.value)}
+                  placeholder="Ej: Llevar calzado cómodo para recorridos. Verificar requisitos de visa con anticipación. **Importante:** confirmar horarios de traslados 48 h antes de la salida."
+                  rows={6}
+                  className={BASIC_TAB_TEXTAREA_CLASS}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Usa saltos de línea para separar párrafos y **texto** para resaltar en negrita en el PDF.
+                </p>
               </div>
 
               {/* Asistencia médica */}
@@ -1518,7 +1552,7 @@ function AdminPlanForm() {
                       onChange={(e) => setMedicalAssistanceInfo(e.target.value)}
                       placeholder="Seguro de viaje y asistencia 24 horas incluido..."
                       rows={3}
-                      className="mt-1"
+                      className={BASIC_TAB_TEXTAREA_CLASS}
                     />
                   </div>
                   <div>

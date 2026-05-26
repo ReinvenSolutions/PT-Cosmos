@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
 import { MapPin, Headphones, Users } from "lucide-react";
 import { RntNotice } from "@/components/rnt-notice";
-import { OPERATIVE_MAIN, TEAM_CONTACTS } from "@/data/company-contacts";
+import { OPERATIVE_MAIN, RESERVATIONS_EMAIL, TEAM_CONTACTS } from "@/data/company-contacts";
+
+const linkClass =
+  "font-medium underline underline-offset-2 decoration-background/40 hover:text-white hover:decoration-white";
 
 function TelLink({ e164, children }: { e164: string; children: ReactNode }) {
   return (
     <a
       href={`tel:+${e164}`}
-      className="font-medium underline underline-offset-2 decoration-background/40 hover:text-white hover:decoration-white"
+      className={linkClass}
     >
       {children}
     </a>
@@ -36,11 +39,22 @@ export function CosmosFooter() {
             <div className="space-y-2">
               <p className="font-semibold text-background mb-1">{OPERATIVE_MAIN.area}</p>
               <p className="text-background/85">
+                {OPERATIVE_MAIN.labelBeforePhone && (
+                  <span className="text-background font-medium">
+                    {OPERATIVE_MAIN.labelBeforePhone}:{" "}
+                  </span>
+                )}
                 <TelLink e164={OPERATIVE_MAIN.phoneE164}>{OPERATIVE_MAIN.phoneDisplay}</TelLink>
               </p>
               {OPERATIVE_MAIN.note && (
                 <p className="text-background/70 text-xs">{OPERATIVE_MAIN.note}</p>
               )}
+              <p className="text-background/85">
+                <span className="text-background font-medium">Correo de Reservas: </span>
+                <a href={`mailto:${RESERVATIONS_EMAIL}`} className={linkClass}>
+                  {RESERVATIONS_EMAIL}
+                </a>
+              </p>
             </div>
           </div>
 

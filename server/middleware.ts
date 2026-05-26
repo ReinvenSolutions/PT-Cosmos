@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { User as DbUser } from "@shared/schema";
+import { PLAN_MANAGER_ROLES } from "@shared/roles";
 
 declare global {
   namespace Express {
@@ -49,3 +50,6 @@ export function requireRoles(roles: string[]) {
     next();
   };
 }
+
+/** Super admin o agencia (gestión de planes con reglas de propiedad en las rutas). */
+export const requirePlanManagers = requireRoles([...PLAN_MANAGER_ROLES]);

@@ -88,8 +88,12 @@ function DashboardRedirect() {
 
   if (user.role === "super_admin") {
     return <Redirect to="/admin/dashboard" />;
-  } else if (user.role === "advisor") {
+  }
+  if (user.role === "advisor") {
     return <Redirect to="/advisor" />;
+  }
+  if (user.role === "agency") {
+    return <Redirect to="/admin/plans" />;
   }
 
   return <Redirect to="/login" />;
@@ -115,13 +119,13 @@ function AppRoutes() {
         <ProtectedRoute component={AdminDashboard} allowedRoles={["super_admin"]} />
       </Route>
       <Route path="/admin/plans/new">
-        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin"]} />
+        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin", "agency"]} />
       </Route>
       <Route path="/admin/plans/:id/edit">
-        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin"]} />
+        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin", "agency"]} />
       </Route>
       <Route path="/admin/plans">
-        <ProtectedRoute component={AdminPlans} allowedRoles={["super_admin"]} />
+        <ProtectedRoute component={AdminPlans} allowedRoles={["super_admin", "agency"]} />
       </Route>
       <Route path="/admin/tutoriales/metricas">
         <ProtectedRoute component={AdminTutorialsMetricas} allowedRoles={["super_admin"]} />
@@ -157,10 +161,10 @@ function AppRoutes() {
         <ProtectedRoute component={QuoteExpress} allowedRoles={["super_admin", "advisor"]} />
       </Route>
       <Route path="/plan/:id">
-        <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "advisor"]} />
+        <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "advisor", "agency"]} />
       </Route>
       <Route path="/">
-        <ProtectedRoute component={Home} allowedRoles={["super_admin", "advisor"]} />
+        <ProtectedRoute component={Home} allowedRoles={["super_admin", "advisor", "agency"]} />
       </Route>
       <Route component={NotFound} />
     </Switch>
