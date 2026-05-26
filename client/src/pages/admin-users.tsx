@@ -48,9 +48,15 @@ import {
   Shield,
   UserCog,
   ShieldCheck,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Building2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { ROLE_LABELS, ROLES as ROLE_IDS } from "@shared/roles";
 
 interface AdminUser {
   id: string;
@@ -59,13 +65,28 @@ interface AdminUser {
   email: string | null;
   role: string;
   isActive: boolean;
+  approvalStatus: string;
   twoFactorEnabled?: boolean;
   createdAt: string;
 }
 
+const PENDING_APPROVAL_QUERY_KEY = "/api/admin/users/pending-approval-count";
+
+function approvalStatusLabel(status: string): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } {
+  switch (status) {
+    case "pending":
+      return { label: "Pendiente", variant: "outline" };
+    case "denied":
+      return { label: "Denegado", variant: "destructive" };
+    default:
+      return { label: "Aprobado", variant: "secondary" };
+  }
+}
+
 const ROLES = [
-  { value: "super_admin", label: "Super Admin", icon: Shield },
-  { value: "advisor", label: "Asesor", icon: UserCog },
+  { value: ROLE_IDS.SUPER_ADMIN, label: ROLE_LABELS[ROLE_IDS.SUPER_ADMIN], icon: Shield },
+  { value: ROLE_IDS.ADVISOR, label: ROLE_LABELS[ROLE_IDS.ADVISOR], icon: UserCog },
+  { value: ROLE_IDS.AGENCY, label: ROLE_LABELS[ROLE_IDS.AGENCY], icon: Building2 },
 ] as const;
 
 const CONFIRM_WORDS = [
@@ -93,11 +114,16 @@ export default function AdminUsers() {
     queryKey: ["/api/admin/users"],
   });
 
+  const invalidateUserLists = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    queryClient.invalidateQueries({ queryKey: [PENDING_APPROVAL_QUERY_KEY] });
+  };
+
   const createMutation = useMutation({
     mutationFn: (data: { name: string; username: string; email?: string; password: string; role: string }) =>
       apiRequest("POST", "/api/admin/users", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      invalidateUserLists();
       setCreateOpen(false);
       toast({ title: "Usuario creado", description: "El usuario se ha creado correctamente." });
     },
@@ -110,7 +136,7 @@ export default function AdminUsers() {
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       apiRequest("PUT", `/api/admin/users/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      invalidateUserLists();
       setEditUser(null);
       toast({ title: "Usuario actualizado", description: "Los cambios se han guardado." });
     },
@@ -123,7 +149,7 @@ export default function AdminUsers() {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       apiRequest("PATCH", `/api/admin/users/${id}/active`, { isActive }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      invalidateUserLists();
       toast({ title: "Estado actualizado", description: "El estado del usuario ha sido modificado." });
     },
     onError: (err: Error) => {
@@ -135,9 +161,32 @@ export default function AdminUsers() {
     mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: [PENDING_APPROVAL_QUERY_KEY] });
       setDeleteUser(null);
       setConfirmWord("");
       toast({ title: "Usuario eliminado", description: "El usuario ha sido eliminado." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/users/${id}/approve`),
+    onSuccess: () => {
+      invalidateUserLists();
+      toast({ title: "Usuario aprobado", description: "El usuario ya puede iniciar sesión en la plataforma." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const denyMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/users/${id}/deny`),
+    onSuccess: () => {
+      invalidateUserLists();
+      toast({ title: "Registro denegado", description: "El usuario no podrá acceder a la plataforma." });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -158,12 +207,20 @@ export default function AdminUsers() {
 
   const canDelete = confirmWord.trim().toUpperCase() === randomWord && randomWord.length > 0;
 
-  const filteredUsers = users?.filter(
-    (u) =>
-      u.name?.toLowerCase().includes(search.toLowerCase()) ||
-      u.username.toLowerCase().includes(search.toLowerCase()) ||
-      u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = users
+    ?.filter(
+      (u) =>
+        u.name?.toLowerCase().includes(search.toLowerCase()) ||
+        u.username.toLowerCase().includes(search.toLowerCase()) ||
+        u.email?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (a.approvalStatus === "pending" && b.approvalStatus !== "pending") return -1;
+      if (b.approvalStatus === "pending" && a.approvalStatus !== "pending") return 1;
+      return 0;
+    });
+
+  const pendingCount = users?.filter((u) => u.approvalStatus === "pending").length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -186,7 +243,8 @@ export default function AdminUsers() {
             <div>
               <CardTitle>Listado de Usuarios</CardTitle>
               <CardDescription>
-                {users?.length || 0} usuarios registrados.
+                {users?.length || 0} usuarios registrados
+                {pendingCount > 0 ? ` · ${pendingCount} pendiente${pendingCount === 1 ? "" : "s"} de aprobación` : ""}.
               </CardDescription>
             </div>
             <div className="relative w-72">
@@ -209,6 +267,7 @@ export default function AdminUsers() {
                 <TableHead>Usuario</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
+                <TableHead>Aprobación</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -216,19 +275,28 @@ export default function AdminUsers() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Cargando usuarios...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No se encontraron usuarios.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers?.map((user) => (
-                  <TableRow key={user.id} className={!user.isActive ? "opacity-60" : ""}>
+                filteredUsers?.map((user) => {
+                  const approval = approvalStatusLabel(user.approvalStatus);
+                  const isPending = user.approvalStatus === "pending";
+                  return (
+                  <TableRow
+                    key={user.id}
+                    className={cn(
+                      !user.isActive && "opacity-60",
+                      isPending && "bg-amber-500/5"
+                    )}
+                  >
                     <TableCell className="font-medium">{user.name || "—"}</TableCell>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email || "—"}</TableCell>
@@ -238,18 +306,51 @@ export default function AdminUsers() {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      <Badge variant={approval.variant} className={isPending ? "border-amber-500/50 text-amber-700 dark:text-amber-400" : ""}>
+                        {isPending && <Clock className="mr-1 h-3 w-3" />}
+                        {approval.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <Switch
                         checked={user.isActive}
                         onCheckedChange={(checked) =>
                           toggleActiveMutation.mutate({ id: user.id, isActive: checked })
                         }
-                        disabled={toggleActiveMutation.isPending || currentUser?.id === user.id}
+                        disabled={
+                          toggleActiveMutation.isPending ||
+                          currentUser?.id === user.id ||
+                          isPending
+                        }
                       />
                       <span className="ml-2 text-sm text-muted-foreground">
                         {user.isActive ? "Activo" : "Inactivo"}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
+                      {isPending ? (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => approveMutation.mutate(user.id)}
+                            disabled={approveMutation.isPending || denyMutation.isPending}
+                          >
+                            <CheckCircle2 className="mr-1 h-4 w-4" />
+                            Aprobar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => denyMutation.mutate(user.id)}
+                            disabled={approveMutation.isPending || denyMutation.isPending}
+                          >
+                            <XCircle className="mr-1 h-4 w-4" />
+                            Denegar
+                          </Button>
+                        </div>
+                      ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
@@ -271,9 +372,11 @@ export default function AdminUsers() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      )}
                     </TableCell>
                   </TableRow>
-                ))
+                );
+                })
               )}
             </TableBody>
           </Table>

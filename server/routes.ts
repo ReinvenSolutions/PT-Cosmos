@@ -4,7 +4,15 @@ import { storage } from "./storage";
 import express from "express";
 import { generatePublicQuotePDF } from "./publicPdfGenerator";
 import passport from "./auth";
-import { requireAuth, requireRole, requireRoles } from "./middleware";
+import { requireAuth, requireRole, requireRoles, requirePlanManagers } from "./middleware";
+import { ROLES } from "@shared/roles";
+import {
+  assertCanEditPlan,
+  assertCanDeletePlan,
+  canEditPlan,
+  resolveAgencyDisplayName,
+} from "./utils/planAccess";
+import { ForbiddenError } from "./errors/AppError";
 import { authLimiter, publicPdfLimiter, apiLimiter, cosmosChatLimiter } from "./rateLimiter";
 import { handleCosmosChat } from "./handlers/cosmosChat";
 import { isOpenAIConfigured } from "./services/openaiClient";
@@ -32,11 +40,14 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import type { DestinationInput } from "./types";
+import { getLoginBlockMessage, USER_APPROVAL_APPROVED, USER_APPROVAL_DENIED, USER_APPROVAL_PENDING } from "./utils/userAccess";
 import {
   sendEmail,
   isEmailConfigured,
   generateNewUserNotificationHtml,
   generateWelcomeEmailHtml,
+  generatePendingApprovalEmailHtml,
+  generateAccountApprovedEmailHtml,
   generatePasswordResetEmailHtml,
   generate2FACodeEmailHtml,
   generateRoleChangeNotificationHtml,
@@ -209,8 +220,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) {
       return res.status(401).json({ message: "Usuario o contraseña incorrectos" });
     }
-    if (!user.isActive) {
-      return res.status(401).json({ message: "Tu cuenta ha sido desactivada. Contacta al administrador." });
+    const loginBlock = getLoginBlockMessage(user);
+    if (loginBlock) {
+      return res.status(401).json({ message: loginBlock });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -283,6 +295,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Código inválido o expirado. Intenta iniciar sesión de nuevo." });
     }
 
+    const loginBlock2fa = getLoginBlockMessage(user);
+    if (loginBlock2fa) {
+      return res.status(401).json({ message: loginBlock2fa });
+    }
+
     req.logIn(user, (err: unknown) => {
       if (err) {
         logger.error("2FA verify req.logIn error", { err, path: "/api/auth/2fa/verify" });
@@ -328,6 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       email,
       passwordHash: hashedPassword,
       role: "advisor",
+      approvalStatus: USER_APPROVAL_PENDING,
       twoFactorEnabled: true,
     });
 
@@ -336,8 +354,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isEmailConfigured()) {
       await sendEmail({
         to: email,
-        subject: "¡Bienvenido a Cosmos Viajes!",
-        html: generateWelcomeEmailHtml(name),
+        subject: "Registro recibido - Cosmos Viajes",
+        html: generatePendingApprovalEmailHtml(name),
       });
       const superAdmins = await storage.findSuperAdmins();
       const notificationHtml = generateNewUserNotificationHtml({
@@ -346,22 +364,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: newUser.username,
         role: newUser.role,
         createdAt: String(newUser.createdAt),
+        pendingApproval: true,
       });
       for (const admin of superAdmins) {
         const to = admin.email || admin.username;
         if (to) {
           await sendEmail({
             to,
-            subject: "Nuevo usuario registrado - Cosmos Viajes",
+            subject: "Nuevo usuario pendiente de aprobación - Cosmos Viajes",
             html: notificationHtml,
           });
         }
       }
     }
 
-    const { passwordHash, ...userWithoutPassword } = newUser;
-    logger.info("User registered", { userId: newUser.id, email });
-    res.status(201).json({ user: userWithoutPassword });
+    logger.info("User registered (pending approval)", { userId: newUser.id, email });
+    res.status(201).json({
+      message: "Tu registro fue exitoso. Estás pendiente de aprobación por un administrador antes de poder acceder.",
+      pendingApproval: true,
+    });
   }));
 
   app.post("/api/auth/forgot-password", authLimiter, asyncHandler(async (req, res) => {
@@ -445,12 +466,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post(
     "/api/admin/upload/plan-descriptive-audio",
-    requireRole("super_admin"),
+    requirePlanManagers,
     planAudioUpload.single("file"),
     asyncHandler(handlePlanDescriptiveAudioUpload),
   );
 
-  app.post("/api/admin/reorder-plan-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.post("/api/admin/reorder-plan-images", requirePlanManagers, asyncHandler(async (req, res) => {
     const schema = z.object({
       planName: z.string().min(1, "planName requerido"),
       imageUrls: z.array(z.string().url()).min(1, "imageUrls requerido"),
@@ -463,7 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ urls: result.urls });
   }));
 
-  app.post("/api/admin/reorder-plan-hotel-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.post("/api/admin/reorder-plan-hotel-images", requirePlanManagers, asyncHandler(async (req, res) => {
     const schema = z.object({
       planName: z.string().min(1, "planName requerido"),
       imageUrls: z.array(z.string().url()).min(1, "imageUrls requerido"),
@@ -476,7 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ urls: result.urls });
   }));
 
-  app.post("/api/admin/reorder-plan-adicionales-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.post("/api/admin/reorder-plan-adicionales-images", requirePlanManagers, asyncHandler(async (req, res) => {
     const schema = z.object({
       planName: z.string().min(1, "planName requerido"),
       imageUrls: z.array(z.string().url()).min(1, "imageUrls requerido"),
@@ -491,7 +512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const MEDICAL_IMAGE_EXT = /\.(jpg|jpeg|png|gif|webp)$/i;
 
-  app.get("/api/admin/medical-assistance-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.get("/api/admin/medical-assistance-images", requirePlanManagers, asyncHandler(async (req, res) => {
     const bucketName = getMedicalAssistanceBucketName();
     const files = await listBucketFiles(bucketName);
     const images = files
@@ -514,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   }));
 
-  app.get("/api/admin/itinerary-map-images", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.get("/api/admin/itinerary-map-images", requirePlanManagers, asyncHandler(async (req, res) => {
     const planName = String(req.query.planName ?? "").trim();
     if (!planName) {
       return res.json({ images: [] });
@@ -557,7 +578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   /** Elimina una imagen del bucket de un plan (galería o vuelos internos). Solo buckets plan-* */
-  app.delete("/api/admin/plan-image", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.delete("/api/admin/plan-image", requirePlanManagers, asyncHandler(async (req, res) => {
     const url = (req.query.url ?? req.body?.url) as string | undefined;
     if (!url || typeof url !== "string" || !url.startsWith("https://")) {
       return res.status(400).json({ message: "url requerido (query o body, debe ser URL Supabase)" });
@@ -861,7 +882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /** Descarga forzada del MP3 descriptivo (evita abrir pestaña por CORS en URL de Supabase). */
   app.get(
     "/api/destinations/:id/descriptive-audio-download",
-    requireRoles(["super_admin", "advisor"]),
+    requireRoles(["super_admin", "advisor", "agency"]),
     asyncHandler(async (req, res) => {
       const dest = await storage.getDestination(req.params.id);
       if (!dest) throw new NotFoundError("Destination");
@@ -910,13 +931,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     username: z.string().min(1, "El usuario es requerido").max(255).regex(/^[a-zA-Z0-9._@+\-]+$/, "Usuario: letras, números, puntos, @, guiones"),
     email: z.string().email("Email inválido").max(255).optional().nullable(),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").max(255),
-    role: z.enum(["super_admin", "advisor"]),
+    role: z.enum(["super_admin", "advisor", "agency"]),
   });
   const adminUpdateUserSchema = z.object({
     name: z.string().min(1).max(255).optional().nullable().transform((v) => (v && String(v).trim()) || undefined),
     username: z.string().min(1).max(255).regex(/^[a-zA-Z0-9._@+\-]+$/, "Usuario: letras, números, puntos, @, guiones").optional().nullable().transform((v) => (v && String(v).trim()) || undefined),
     email: z.union([z.string().email("Email inválido").max(255), z.literal(""), z.null()]).optional().transform((v) => (v && String(v).trim()) || null),
-    role: z.enum(["super_admin", "advisor"]).optional(),
+    role: z.enum(["super_admin", "advisor", "agency"]).optional(),
     isActive: z.boolean().optional(),
     twoFactorEnabled: z.boolean().optional(),
     password: z.union([z.string().min(6, "Mínimo 6 caracteres").max(255), z.literal("")]).optional().transform((v) => (v && v.length >= 6 ? v : undefined)),
@@ -925,6 +946,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/users", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const usersList = await storage.listUsers();
     res.json(usersList);
+  }));
+
+  app.get("/api/admin/users/pending-approval-count", requireRole("super_admin"), asyncHandler(async (_req, res) => {
+    const count = await storage.countPendingApprovalUsers();
+    res.json({ count });
+  }));
+
+  app.post("/api/admin/users/:id/approve", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const existing = await storage.findUserById(req.params.id);
+    if (!existing) throw new NotFoundError("Usuario");
+    if (existing.approvalStatus !== USER_APPROVAL_PENDING) {
+      throw new ValidationError("Este usuario no está pendiente de aprobación");
+    }
+    const updated = await storage.updateUserByAdmin(req.params.id, {
+      approvalStatus: USER_APPROVAL_APPROVED,
+      isActive: true,
+    });
+    const { passwordHash, ...rest } = updated;
+    const emailTo = updated.email || updated.username;
+    if (isEmailConfigured() && emailTo && validator.isEmail(emailTo)) {
+      await sendEmail({
+        to: emailTo,
+        subject: "Tu cuenta fue aprobada - Cosmos Viajes",
+        html: generateAccountApprovedEmailHtml(updated.name ?? undefined),
+      });
+    }
+    logger.info("Admin approved user", { userId: req.params.id });
+    res.json(rest);
+  }));
+
+  app.post("/api/admin/users/:id/deny", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const existing = await storage.findUserById(req.params.id);
+    if (!existing) throw new NotFoundError("Usuario");
+    if (existing.approvalStatus !== USER_APPROVAL_PENDING) {
+      throw new ValidationError("Este usuario no está pendiente de aprobación");
+    }
+    const updated = await storage.updateUserByAdmin(req.params.id, {
+      approvalStatus: USER_APPROVAL_DENIED,
+      isActive: false,
+    });
+    const { passwordHash, ...rest } = updated;
+    logger.info("Admin denied user registration", { userId: req.params.id });
+    res.json(rest);
   }));
 
   app.post("/api/admin/users", requireRole("super_admin"), asyncHandler(async (req, res) => {
@@ -945,6 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       passwordHash: hashedPassword,
       role: validated.role,
       isActive: true,
+      approvalStatus: USER_APPROVAL_APPROVED,
       twoFactorEnabled: true,
     });
     const newUser = await storage.createUser(userData);
@@ -1096,20 +1161,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     itineraryMapImageUrl: z.string().nullable().optional(),
     flightTerms: z.string().nullable().optional(),
     termsConditions: z.string().nullable().optional(),
+    recommendations: z.string().nullable().optional(),
     hasInternalOrConnectionFlight: z.boolean().optional(),
     hotelGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     adicionalesGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     descriptiveAudioUrl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
   });
 
-  app.get("/api/admin/destinations", requireRole("super_admin"), asyncHandler(async (req, res) => {
-    const dests = await storage.getDestinations(); // Todos, incluyendo inactivos
+  app.get("/api/admin/destinations", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const dests =
+      user.role === ROLES.AGENCY
+        ? await storage.getDestinations({ createdByUserId: user.id })
+        : await storage.getDestinations();
     res.json(dests);
   }));
 
-  app.get("/api/admin/destinations/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.get("/api/admin/destinations/:id", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
     const dest = await storage.getDestination(req.params.id);
     if (!dest) throw new NotFoundError("Destination");
+    if (!canEditPlan(user, dest)) throw new ForbiddenError("No tienes permiso para ver este plan");
     const [itinerary, hotels, inclusions, exclusions, images] = await Promise.all([
       storage.getItineraryDays(req.params.id),
       storage.getHotels(req.params.id),
@@ -1120,7 +1192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ ...dest, itinerary, hotels, inclusions, exclusions, images });
   }));
 
-  app.post("/api/admin/destinations", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.post("/api/admin/destinations", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
     const validated = fullDestinationSchema.parse(req.body);
     const isBloqueo = validated.isBloqueo ?? false;
     if (isBloqueo) {
@@ -1166,6 +1239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       itineraryMapImageUrl: validated.itineraryMapImageUrl ?? null,
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
+      recommendations: validated.recommendations ?? null,
       hotelGalleryImageUrls: validated.hotelGalleryImageUrls?.length
         ? validated.hotelGalleryImageUrls
         : null,
@@ -1176,6 +1250,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         typeof validated.descriptiveAudioUrl === "string" && validated.descriptiveAudioUrl.trim() !== ""
           ? validated.descriptiveAudioUrl.trim()
           : null,
+      createdByUserId: user.role === ROLES.AGENCY ? user.id : null,
+      agencyDisplayName: user.role === ROLES.AGENCY ? resolveAgencyDisplayName(user) : null,
     };
     try {
       const destination = await storage.createDestination(destData);
@@ -1232,10 +1308,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
 
-  app.put("/api/admin/destinations/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.put("/api/admin/destinations/:id", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
     const id = req.params.id;
     const existing = await storage.getDestination(id);
     if (!existing) throw new NotFoundError("Destination");
+    assertCanEditPlan(user, existing);
 
     const validated = fullDestinationSchema.parse(req.body);
     const isBloqueo = validated.isBloqueo ?? false;
@@ -1379,9 +1457,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       itineraryMapImageUrl: validated.itineraryMapImageUrl ?? null,
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
+      recommendations: validated.recommendations ?? null,
       hotelGalleryImageUrls: validHotelGalleryPut.length ? validHotelGalleryPut : null,
       adicionalesGalleryImageUrls: validAdicionalesGalleryPut.length ? validAdicionalesGalleryPut : null,
       descriptiveAudioUrl: newDescriptiveAudio,
+      ...(user.role === ROLES.AGENCY
+        ? {
+            createdByUserId: existing.createdByUserId,
+            agencyDisplayName: existing.agencyDisplayName,
+          }
+        : {}),
     };
     await storage.updateDestination(id, destData);
 
@@ -1413,22 +1498,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const reorderDestinationsSchema = z.object({
     items: z.array(z.object({ id: z.string().uuid(), displayOrder: z.number() })).min(1),
   });
-  app.patch("/api/admin/destinations/reorder", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.patch("/api/admin/destinations/reorder", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
     const validated = reorderDestinationsSchema.parse(req.body);
     for (const item of validated.items) {
+      const dest = await storage.getDestination(item.id);
+      if (!dest) throw new NotFoundError("Destination");
+      if (!canEditPlan(user, dest)) {
+        throw new ForbiddenError("No puedes reordenar planes que no te pertenecen");
+      }
       await storage.updateDestination(item.id, { displayOrder: item.displayOrder });
       clearDestinationCache(item.id);
     }
     logger.info("Destinations reordered", { count: validated.items.length });
-    const dests = await storage.getDestinations();
+    const dests =
+      user.role === ROLES.AGENCY
+        ? await storage.getDestinations({ createdByUserId: user.id })
+        : await storage.getDestinations();
     res.json(dests);
   }));
 
   const patchDestinationSchema = z.object({ isActive: z.boolean() });
-  app.patch("/api/admin/destinations/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.patch("/api/admin/destinations/:id", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
     const id = req.params.id;
     const existing = await storage.getDestination(id);
     if (!existing) throw new NotFoundError("Destination");
+    assertCanEditPlan(user, existing);
     const validated = patchDestinationSchema.parse(req.body);
     await storage.updateDestination(id, { isActive: validated.isActive });
     clearDestinationCache(id);
@@ -1438,6 +1534,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   app.delete("/api/admin/destinations/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    assertCanDeletePlan(user);
     const id = req.params.id;
     const existing = await storage.getDestination(id);
     if (!existing) throw new NotFoundError("Destination");

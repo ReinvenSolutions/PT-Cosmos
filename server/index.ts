@@ -18,6 +18,9 @@ import { syncCanonicalData } from "./sync-canonical-data";
 import { isEmailConfigured } from "./email";
 import { ensureDestinationBloqueoColumns } from "./ensure-destination-bloqueo-columns";
 import { ensureDestinationDescriptiveAudioColumn } from "./ensure-destination-descriptive-audio";
+import { ensureDestinationRecommendationsColumn } from "./ensure-destination-recommendations";
+import { ensureUserApprovalStatusColumn } from "./ensure-user-approval-status";
+import { ensureDestinationAgencyColumns } from "./ensure-destination-agency-columns";
 import { seedDatabaseIfEmpty } from "./seed";
 
 /** Aplica migración 0008 (auth tokens, 2FA) si no existe. No bloquea el arranque. */
@@ -75,7 +78,7 @@ app.use(compression({
 
 // Limit request body size to prevent DoS attacks
 app.use(express.json({ limit: '5mb' }));
-  app.use(express.urlencoded({ extended: false, limit: '5mb' }));
+app.use(express.urlencoded({ extended: false, limit: '5mb' }));
 
 const PgSession = ConnectPgSimple(session);
 
@@ -144,54 +147,57 @@ app.use((req, res, next) => {
 
     await ensureDestinationBloqueoColumns(pool);
     await ensureDestinationDescriptiveAudioColumn(pool);
+    await ensureDestinationRecommendationsColumn(pool);
+    await ensureUserApprovalStatusColumn(pool);
+    await ensureDestinationAgencyColumns(pool);
 
     const server = await registerRoutes(app);
 
-  // Error handler middleware (must be last)
+    // Error handler middleware (must be last)
     app.use(errorHandler);
 
     // En producción: solo seed si BD está vacía. NUNCA sincronizar datos canónicos
     // para no sobrescribir los planes que ya están en la base de datos.
     // Regla: los planes en producción son la fuente de verdad.
     if (env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
-    (async () => {
-      await new Promise((r) => setTimeout(r, 30_000));
-      try {
-        const allowSync = process.env.ALLOW_DATA_SYNC === "true";
-        if (allowSync) {
-          logger.info("🌱 ALLOW_DATA_SYNC=true: ejecutando sincronización...");
-          await seedDatabaseIfEmpty();
-          await syncCanonicalData();
-          logger.info("✅ Sincronización completada");
-        } else {
-          await seedDatabaseIfEmpty(); // Solo seed si BD vacía (usuarios + SQL si existe)
-          logger.info("ℹ️ Sincronización de planes deshabilitada (protege planes en producción)");
+      (async () => {
+        await new Promise((r) => setTimeout(r, 30_000));
+        try {
+          const allowSync = process.env.ALLOW_DATA_SYNC === "true";
+          if (allowSync) {
+            logger.info("🌱 ALLOW_DATA_SYNC=true: ejecutando sincronización...");
+            await seedDatabaseIfEmpty();
+            await syncCanonicalData();
+            logger.info("✅ Sincronización completada");
+          } else {
+            await seedDatabaseIfEmpty(); // Solo seed si BD vacía (usuarios + SQL si existe)
+            logger.info("ℹ️ Sincronización de planes deshabilitada (protege planes en producción)");
+          }
+        } catch (error) {
+          logger.error("❌ Error durante la sincronización", { error });
         }
-      } catch (error) {
-        logger.error("❌ Error durante la sincronización", { error });
-      }
-    })();
-  }
+      })();
+    }
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    if (app.get("env") === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  server.listen(env.PORT, "0.0.0.0", () => {
-    const dbUrl = process.env.DATABASE_URL || "";
-    const dbSource = dbUrl.includes("supabase.co") ? "Supabase" : dbUrl.includes("neon.tech") ? "Neon" : "PostgreSQL";
-    const emailStatus = isEmailConfigured() ? "Email: ✓" : "Email: ✗ (SMTP_USER/SMTP_PASS en .env)";
-    logger.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode | BD: ${dbSource} | ${emailStatus}`);
-  });
+    // ALWAYS serve the app on the port specified in the environment variable PORT
+    // Other ports are firewalled. Default to 5000 if not specified.
+    // this serves both the API and the client.
+    // It is the only port that is not firewalled.
+    server.listen(env.PORT, "0.0.0.0", () => {
+      const dbUrl = process.env.DATABASE_URL || "";
+      const dbSource = dbUrl.includes("supabase.co") ? "Supabase" : dbUrl.includes("neon.tech") ? "Neon" : "PostgreSQL";
+      const emailStatus = isEmailConfigured() ? "Email: ✓" : "Email: ✗ (SMTP_USER/SMTP_PASS en .env)";
+      logger.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode | BD: ${dbSource} | ${emailStatus}`);
+    });
   } catch (err) {
     logger.error("❌ Error fatal al iniciar el servidor", { err });
     process.exit(1);

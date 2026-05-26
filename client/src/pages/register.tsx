@@ -90,7 +90,10 @@ export default function Register() {
 
       toast({
         title: "Registro exitoso",
-        description: "Tu cuenta ha sido creada. Por favor inicia sesión.",
+        description:
+          data.message ||
+          "Tu registro fue exitoso. Estás pendiente de aprobación por un administrador antes de poder acceder.",
+        duration: 8000,
       });
 
       navigate("/login");
@@ -144,7 +147,7 @@ export default function Register() {
             </div>
             <h1 className="text-3xl font-bold tracking-tight">Crear una cuenta</h1>
             <p className="text-sm text-muted-foreground">
-              Ingresa tus datos para registrarte en la plataforma
+              Ingresa tus datos para registrarte. Un administrador deberá aprobar tu cuenta antes de que puedas acceder.
             </p>
           </div>
 

@@ -14,6 +14,7 @@ import { GroupDiscountBanner } from "@/components/group-discount-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/optimized-image";
 import { clearHomeBuilderSelection } from "@/lib/home-selection-storage";
+import { cn } from "@/lib/utils";
 
 interface DestinationDetail {
   destination: Destination;
@@ -524,8 +525,22 @@ export default function Home() {
                           </div>
                         </div>
 
+                        {dest.agencyDisplayName && (
+                          <Badge
+                            className="absolute top-2 right-2 z-10 text-xs font-semibold shadow-md bg-violet-600 hover:bg-violet-600 text-white border-0 max-w-[calc(100%-1rem)] truncate"
+                            title={`Plan de agencia: ${dest.agencyDisplayName}`}
+                          >
+                            {dest.agencyDisplayName}
+                          </Badge>
+                        )}
+
                         {isSelected && (
-                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg z-10">
+                          <div
+                            className={cn(
+                              "absolute w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg z-10",
+                              dest.agencyDisplayName ? "top-10 right-2" : "top-2 right-2"
+                            )}
+                          >
                             <span className="text-white text-xs font-bold">✓</span>
                           </div>
                         )}

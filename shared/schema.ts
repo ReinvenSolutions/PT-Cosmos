@@ -53,6 +53,12 @@ export const destinations = pgTable(
     adicionalesGalleryImageUrls: text("adicionales_gallery_image_urls").array(),
     flightTerms: text("flight_terms"),
     termsConditions: text("terms_conditions"),
+    /** Recomendaciones y notas adicionales; se imprimen al final del PDF del plan. */
+    recommendations: text("recommendations"),
+    /** Usuario agencia que creó el plan; null = plan de Cosmos / super admin. */
+    createdByUserId: varchar("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    /** Nombre visible de la agencia en tarjetas del catálogo (snapshot al crear el plan). */
+    agencyDisplayName: text("agency_display_name"),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [uniqueIndex("destinations_name_country_unique").on(table.name, table.country)],
@@ -149,6 +155,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  /** approved | pending | denied — los registros públicos quedan en pending hasta que un super_admin apruebe */
+  approvalStatus: text("approval_status").default("approved").notNull(),
   twoFactorEnabled: boolean("two_factor_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

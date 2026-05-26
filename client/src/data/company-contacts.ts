@@ -9,14 +9,19 @@ export type CompanyContact = {
   /** Sin + ni espacios, ej. 573106776640 */
   phoneE164: string;
   area: string;
+  /** Texto antes del teléfono en la UI, ej. tipo de atención */
+  labelBeforePhone?: string;
   /** Texto extra, ej. disponibilidad */
   note?: string;
 };
+
+export const RESERVATIONS_EMAIL = "reservas@cosmosmayorista.com";
 
 export const OPERATIVE_MAIN: CompanyContact = {
   phoneDisplay: "314 657 6500",
   phoneE164: "573146576500",
   area: "Operativo principal",
+  labelBeforePhone: "Reservas y cotizaciones",
   note: "Disponible 24/7",
 };
 
@@ -26,12 +31,6 @@ export const TEAM_CONTACTS: CompanyContact[] = [
     phoneDisplay: "312 282 7422",
     phoneE164: "573122827422",
     area: "Área contable y facturación",
-  },
-  {
-    name: "Lina Sánchez",
-    phoneDisplay: "312 278 0222",
-    phoneE164: "573122780222",
-    area: "Reservas y cotizaciones",
   },
   {
     name: "Alejandro García",

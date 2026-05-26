@@ -3093,5 +3093,107 @@ export async function generatePublicQuotePDF(
     }
   }
 
+  // Recomendaciones — siempre al final del PDF (después de ADICIONALES)
+  const recommendationsSections: { planName: string; text: string }[] = [];
+  data.destinations.forEach((d) => {
+    const dest = d.destination as Destination | undefined;
+    const recText = dest?.recommendations?.trim();
+    if (recText) {
+      recommendationsSections.push({ planName: d.name || "Plan", text: recText });
+    }
+  });
+
+  if (recommendationsSections.length > 0) {
+    const bottomSafe = pageHeight - 55;
+    const multiPlan = recommendationsSections.length > 1;
+
+    const startRecommendationsPage = (withMainTitle: boolean) => {
+      doc.addPage();
+      addPageBackground();
+      addPlaneLogoBottom();
+      doc.y = 50;
+      if (withMainTitle) {
+        doc.font("Helvetica-Bold").fontSize(20).fillColor(primaryColor);
+        doc.text("RECOMENDACIONES", leftMargin, doc.y, { width: contentWidth, align: "center" });
+        doc.moveDown(1.1);
+      }
+    };
+
+    const ensureRecommendationsSpace = (neededHeight: number) => {
+      if (doc.y + neededHeight > bottomSafe) {
+        startRecommendationsPage(false);
+      }
+    };
+
+    startRecommendationsPage(true);
+
+    for (let sIdx = 0; sIdx < recommendationsSections.length; sIdx++) {
+      const section = recommendationsSections[sIdx];
+
+      if (multiPlan) {
+        ensureRecommendationsSpace(28);
+        doc.font("Helvetica-Bold").fontSize(11).fillColor(primaryColor);
+        doc.text(section.planName.toUpperCase(), leftMargin, doc.y, { width: contentWidth });
+        doc.moveDown(0.45);
+      }
+
+      const paragraphs = section.text.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+      for (const para of paragraphs) {
+        doc.font("Helvetica").fontSize(8).fillColor(textColor);
+        const plainPara = para.replace(/\*\*/g, "");
+        const paraHeight = doc.heightOfString(plainPara, {
+          width: contentWidth,
+          lineGap: 2,
+        });
+        ensureRecommendationsSpace(paraHeight + 10);
+
+        const parts = para.split(/(\*\*[^*]+\*\*)/g);
+        let isFirst = true;
+        let startY = doc.y;
+
+        for (const part of parts) {
+          if (!part) continue;
+          if (doc.y > bottomSafe - 16) {
+            startRecommendationsPage(false);
+            startY = doc.y;
+            isFirst = true;
+          }
+          if (part.startsWith("**") && part.endsWith("**")) {
+            doc.font("Helvetica-Bold").fontSize(8);
+            const text = part.slice(2, -2);
+            if (isFirst) {
+              doc.text(text, leftMargin, startY, {
+                width: contentWidth,
+                align: "justify",
+                lineGap: 2,
+                continued: true,
+              });
+              isFirst = false;
+            } else {
+              doc.text(text, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+            }
+          } else {
+            doc.font("Helvetica").fontSize(8);
+            if (isFirst) {
+              doc.text(part, leftMargin, startY, {
+                width: contentWidth,
+                align: "justify",
+                lineGap: 2,
+                continued: true,
+              });
+              isFirst = false;
+            } else {
+              doc.text(part, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
+            }
+          }
+        }
+        doc.text("", { continued: false });
+        doc.moveDown(0.55);
+      }
+    }
+
+    console.log("[PDF Generator] Recommendations section added at end of PDF");
+  }
+
   return doc;
 }
