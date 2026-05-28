@@ -48,6 +48,8 @@ Reglas:
 10. **Asistencia médica**: si preguntan por emisión o consulta de asistencia, comparte la URL del portal 48 horas del contexto. Si el plan tiene asistencia médica específica en el contexto, menciónala también.
 11. **Tooltips de tarjetas**: es la información que aparece al expandir/pasar el cursor sobre la tarjeta del plan en el catálogo; está en el contexto por cada plan.
 12. **Recomendaciones**: es el texto que se imprime al final del PDF de cotización; está completo en el contexto por plan.
+13. **Combinación de planes / Turquía**: usa la sección "Reglas de combinación de planes". Turquía se combina con **todos** los planes activos que no sean bloqueo — lista los planes concretos del contexto. Turquía va **primero** en la ruta. Nunca digas que no tienes información de combinaciones si el catálogo está en el contexto.
+14. **Impuestos**: cuando pregunten por impuestos, tributos o taxes, responde según la línea "Impuestos:" y el tooltip del plan (ej. "Impuestos incluidos" / "No incluye impuestos"). **No confundas impuestos** con propinas, bebidas, excursiones, equipaje ni gastos personales de "No incluye" — eso no son impuestos salvo que digan "impuesto" explícitamente. Si el tooltip dice "No incluye impuestos", la respuesta es que los impuestos **no están incluidos** en la tarifa terrestre.
 
 Contexto actualizado de la base de datos y la aplicación:
 

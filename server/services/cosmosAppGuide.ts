@@ -27,10 +27,11 @@ Cada plan incluye: nombre, país, duración, descripción, precio base USD, esca
 
 ### Cotización
 1. Elegir plan(es) y fechas de salida según reglas del plan (días permitidos, martes, etc.).
-2. Pasajeros y precio por tramo/fecha.
-3. Vuelos, equipaje, upgrades (Turquía, Italia, etc.) si aplican.
-4. TRM para precio en COP.
-5. Guardar cotización y generar **PDF** para el cliente.
+2. **Combinar destinos**: en Nueva cotización puedes seleccionar varios planes. Turquía combina con todos los demás (excepto bloqueos); Turquía va primero en la ruta.
+3. Pasajeros y precio por tramo/fecha.
+4. Vuelos, equipaje, upgrades (Turquía, Italia, etc.) si aplican.
+5. TRM para precio en COP.
+6. Guardar cotización y generar **PDF** para el cliente.
 
 ### Detalle de plan (/plan/:id)
 Itinerario completo, hoteles, qué incluye/no incluye, mapa, galerías, audio descriptivo descargable.

@@ -15,6 +15,12 @@ import {
   MEDICAL_ASSISTANCE_PORTAL_URL,
 } from "@shared/externalServices";
 import { getPlanCardTooltip } from "@shared/planCardTooltip";
+import {
+  formatCombinationRules,
+  formatTaxStatusLabel,
+  isTurkeyPlan,
+  parseTaxInclusionStatus,
+} from "@shared/planCosmosHints";
 import { storage } from "../storage";
 import { getOrSetCache } from "../utils/cache";
 import { COSMOS_APP_GUIDE } from "./cosmosAppGuide";
@@ -96,12 +102,14 @@ function formatPlanDetail(plan: FullPlan, catalog: Destination[]): string {
   }
 
   const cardTooltip = getPlanCardTooltip(plan, catalog);
+  const taxStatus = parseTaxInclusionStatus(cardTooltip, plan.description, plan.termsConditions);
 
   return `
 ### Plan: ${plan.name} [id=${plan.id}]
 País: ${plan.country} | ${plan.duration} días / ${plan.nights} noches | Categoría: ${plan.category ?? "—"}
 Precio base terrestre: USD ${plan.basePrice || "—"}${plan.isPromotion ? " (promoción)" : ""}
 Descripción: ${plan.description || "—"}
+Impuestos: ${formatTaxStatusLabel(taxStatus)}
 Tooltip de tarjeta (info al pasar el cursor en el catálogo): ${cardTooltip}
 ${bloqueo}
 Escalas de precio:
@@ -146,6 +154,14 @@ function scorePlanMatch(text: string, plan: Destination): number {
   for (const word of name.split(/\s+/).filter((w) => w.length > 3)) {
     if (hay.includes(word)) score += 2;
   }
+  const asksTurkey =
+    hay.includes("turquia") ||
+    hay.includes("turquia esencial") ||
+    hay.includes("capadocia") ||
+    hay.includes("estambul");
+  if (asksTurkey && isTurkeyPlan(plan)) score += 20;
+  if ((hay.includes("combin") || hay.includes("mezcl")) && isTurkeyPlan(plan)) score += 12;
+  if ((hay.includes("impuesto") || hay.includes("tax")) && isTurkeyPlan(plan)) score += 15;
   return score;
 }
 
@@ -165,6 +181,24 @@ function pickRelevantPlanIds(
       .slice(-4)
       .map((m) => m.content),
   ].join(" ");
+
+  const hay = normalize(recentUserText);
+  const asksTurkey =
+    hay.includes("turquia") || hay.includes("capadocia") || hay.includes("estambul");
+  const asksTaxes = hay.includes("impuesto") || hay.includes("tax");
+  const asksCombination = hay.includes("combin") || hay.includes("mezcl");
+
+  if (asksTurkey || (asksCombination && hay.includes("turquia"))) {
+    for (const plan of catalog.filter(isTurkeyPlan)) {
+      ids.add(plan.id);
+    }
+  }
+
+  if (asksTaxes && asksTurkey) {
+    for (const plan of catalog.filter(isTurkeyPlan)) {
+      ids.add(plan.id);
+    }
+  }
 
   const scored = catalog
     .map((p) => ({ id: p.id, score: scorePlanMatch(recentUserText, p) }))
@@ -217,9 +251,10 @@ function formatCatalogTooltipsAndRecommendations(catalog: Destination[]): string
   return catalog
     .map((d) => {
       const tooltip = getPlanCardTooltip(d, catalog);
+      const taxStatus = parseTaxInclusionStatus(tooltip, d.description);
       const rec = d.recommendations?.trim();
       const recBlock = rec ? `\n  Recomendaciones PDF:\n  ${rec.split("\n").join("\n  ")}` : "\n  Recomendaciones PDF: (sin texto registrado)";
-      return `- **${d.name}** (${d.country})\n  Tooltip tarjeta: ${tooltip}${recBlock}`;
+      return `- **${d.name}** (${d.country})\n  Impuestos: ${formatTaxStatusLabel(taxStatus)}\n  Tooltip tarjeta: ${tooltip}${recBlock}`;
     })
     .join("\n\n");
 }
@@ -268,6 +303,9 @@ ${trmBlock}
 
 ## Catálogo de planes activos (${catalog.length})
 ${catalogLines.join("\n") || "(ningún plan activo)"}
+
+---
+${formatCombinationRules(catalog)}
 
 ## Tooltips de tarjetas y recomendaciones — todos los planes activos
 ${formatCatalogTooltipsAndRecommendations(catalog)}
