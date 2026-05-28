@@ -10,6 +10,7 @@ import {
   formatDate,
 } from "@shared/schema";
 import { connectionSegmentPdfHeading, displayPlanNamesForCombo } from "@shared/quoteCombination";
+import { DAVIVIENDA_CARD_COMMISSION_PERCENT } from "@shared/externalServices";
 import {
   getDestinationImages,
   getDestinationImageSet,
@@ -2670,7 +2671,7 @@ export async function generatePublicQuotePDF(
     // Nota sobre fee bancario compacta
     doc.fillColor("#dc2626").font("Helvetica-Bold").fontSize(9);
     doc.text(
-      "Fee bancario no incluido, 2.5% sobre el total",
+      `Fee bancario no incluido, ${DAVIVIENDA_CARD_COMMISSION_PERCENT}% sobre el total`,
       leftMargin,
       doc.y,
       {

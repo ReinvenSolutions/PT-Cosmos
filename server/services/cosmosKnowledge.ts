@@ -1,5 +1,20 @@
 import type { Destination, Exclusion, Hotel, Inclusion, ItineraryDay } from "@shared/schema";
 import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
+import {
+  COMPANY_ADDRESS,
+  COMPANY_RNT_LINE,
+  OPERATIVE_MAIN,
+  RESERVATIONS_EMAIL,
+  TEAM_CONTACTS,
+} from "@shared/companyContacts";
+import {
+  DAVIVIENDA_CARD_COMMISSION_PERCENT,
+  DAVIVIENDA_PAYMENTS_LABEL,
+  DAVIVIENDA_PAYMENTS_URL,
+  MEDICAL_ASSISTANCE_PORTAL_LABEL,
+  MEDICAL_ASSISTANCE_PORTAL_URL,
+} from "@shared/externalServices";
+import { getPlanCardTooltip } from "@shared/planCardTooltip";
 import { storage } from "../storage";
 import { getOrSetCache } from "../utils/cache";
 import { COSMOS_APP_GUIDE } from "./cosmosAppGuide";
@@ -59,7 +74,7 @@ function formatUpgrades(d: Destination): string {
   );
 }
 
-function formatPlanDetail(plan: FullPlan): string {
+function formatPlanDetail(plan: FullPlan, catalog: Destination[]): string {
   const inc = plan.inclusions.map((x) => `  + ${x.item}`).join("\n") || "  (sin registros)";
   const exc = plan.exclusions.map((x) => `  - ${x.item}`).join("\n") || "  (sin registros)";
   const hotels =
@@ -80,20 +95,23 @@ function formatPlanDetail(plan: FullPlan): string {
     bloqueo = `\nBloqueo: salida ${plan.bloqueoSalidaFecha ?? "—"}, cupos ${plan.bloqueoCuposDisponibles ?? "—"}`;
   }
 
+  const cardTooltip = getPlanCardTooltip(plan, catalog);
+
   return `
 ### Plan: ${plan.name} [id=${plan.id}]
 País: ${plan.country} | ${plan.duration} días / ${plan.nights} noches | Categoría: ${plan.category ?? "—"}
 Precio base terrestre: USD ${plan.basePrice || "—"}${plan.isPromotion ? " (promoción)" : ""}
 Descripción: ${plan.description || "—"}
+Tooltip de tarjeta (info al pasar el cursor en el catálogo): ${cardTooltip}
 ${bloqueo}
 Escalas de precio:
 ${formatPriceTiers(plan)}
 ${formatUpgrades(plan)}
 ${plan.requiresTuesday ? "Requiere salida en martes. " : ""}${plan.requiresExtraDay ? "Requiere día extra. " : ""}${plan.allowedDays?.length ? `Días permitidos: ${plan.allowedDays.join(", ")}.` : ""}
-${plan.flightTerms ? `Términos vuelo: ${plan.flightTerms.slice(0, 400)}` : ""}
-${plan.termsConditions ? `Términos: ${plan.termsConditions.slice(0, 500)}` : ""}
-${plan.recommendations ? `Recomendaciones: ${plan.recommendations.slice(0, 500)}` : ""}
-${plan.medicalAssistanceInfo ? `Asistencia médica: ${plan.medicalAssistanceInfo.slice(0, 300)}` : ""}
+${plan.flightTerms ? `Términos vuelo: ${plan.flightTerms}` : ""}
+${plan.termsConditions ? `Términos: ${plan.termsConditions}` : ""}
+${plan.recommendations ? `Recomendaciones (texto del PDF):\n${plan.recommendations}` : "Recomendaciones: (sin texto registrado)"}
+${plan.medicalAssistanceInfo ? `Asistencia médica del plan: ${plan.medicalAssistanceInfo}` : ""}
 
 Hoteles:
 ${hotels}
@@ -160,6 +178,52 @@ function pickRelevantPlanIds(
   return Array.from(ids).slice(0, MAX_DETAIL_PLANS);
 }
 
+function formatAgencyContext(): string {
+  const teamLines = TEAM_CONTACTS.map((c) => {
+    const who = c.name ? `${c.name} — ` : "";
+    return `- ${who}${c.phoneDisplay} (${c.area})`;
+  }).join("\n");
+
+  return `
+## Cosmos Mayorista — contacto y servicios
+
+### Dirección
+${COMPANY_ADDRESS.full}
+
+### Operativo principal
+${OPERATIVE_MAIN.labelBeforePhone ?? OPERATIVE_MAIN.area}: ${OPERATIVE_MAIN.phoneDisplay} (${OPERATIVE_MAIN.note ?? "—"})
+Correo de reservas: ${RESERVATIONS_EMAIL}
+
+### Contactos por área
+${teamLines}
+
+### Registro
+${COMPANY_RNT_LINE}
+
+### Portal de pagos (botón superior en catálogo de planes)
+${DAVIVIENDA_PAYMENTS_LABEL}
+URL: ${DAVIVIENDA_PAYMENTS_URL}
+Nota importante: los pagos con tarjeta tienen una comisión adicional del ${DAVIVIENDA_CARD_COMMISSION_PERCENT}% sobre el valor a pagar.
+
+### Asistencia médica (botón superior en catálogo de planes)
+${MEDICAL_ASSISTANCE_PORTAL_LABEL}
+URL: ${MEDICAL_ASSISTANCE_PORTAL_URL}
+`.trim();
+}
+
+function formatCatalogTooltipsAndRecommendations(catalog: Destination[]): string {
+  if (!catalog.length) return "(ningún plan activo)";
+
+  return catalog
+    .map((d) => {
+      const tooltip = getPlanCardTooltip(d, catalog);
+      const rec = d.recommendations?.trim();
+      const recBlock = rec ? `\n  Recomendaciones PDF:\n  ${rec.split("\n").join("\n  ")}` : "\n  Recomendaciones PDF: (sin texto registrado)";
+      return `- **${d.name}** (${d.country})\n  Tooltip tarjeta: ${tooltip}${recBlock}`;
+    })
+    .join("\n\n");
+}
+
 export async function buildCosmosSystemContext(opts: {
   userMessage: string;
   history: CosmosChatMessage[];
@@ -177,7 +241,7 @@ export async function buildCosmosSystemContext(opts: {
   const detailBlocks: string[] = [];
   for (const id of relevantIds) {
     const plan = await fetchFullPlan(id);
-    if (plan) detailBlocks.push(formatPlanDetail(plan));
+    if (plan) detailBlocks.push(formatPlanDetail(plan, catalog));
   }
 
   const baseTrm = await storage.getGlobalTrmBase();
@@ -196,12 +260,18 @@ export async function buildCosmosSystemContext(opts: {
 ${COSMOS_APP_GUIDE}
 
 ---
+${formatAgencyContext()}
+
+---
 ${roleNote}
 ${trmBlock}
 
 ## Catálogo de planes activos (${catalog.length})
 ${catalogLines.join("\n") || "(ningún plan activo)"}
 
-${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo anterior. Si necesitas itinerario, inclusiones o precios de un plan concreto, pide el nombre del plan o país y se ampliará el contexto."}
+## Tooltips de tarjetas y recomendaciones — todos los planes activos
+${formatCatalogTooltipsAndRecommendations(catalog)}
+
+${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo, tooltips y recomendaciones anteriores. Si necesitas itinerario, inclusiones o precios ampliados de un plan concreto, menciona el nombre del plan o país."}
 `.trim();
 }

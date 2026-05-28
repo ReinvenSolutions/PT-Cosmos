@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import type { User } from "@shared/schema";
+import { DAVIVIENDA_CARD_COMMISSION_PERCENT } from "@shared/externalServices";
 import { getOpenAIClient, isOpenAIConfigured } from "../services/openaiClient";
 import { buildCosmosSystemContext, type CosmosChatMessage } from "../services/cosmosKnowledge";
 import { logger } from "../logger";
@@ -35,13 +36,18 @@ Personalidad: cálido, profesional, paciente y orientado a servicio. Respuestas 
 Usuario actual: **${firstName}** (rol: ${roleLabel}). SIEMPRE dirígete por su nombre en la primera frase cuando sea natural (ej. "Hola ${firstName}," o "${firstName}, con gusto te explico...").
 
 Reglas:
-1. Responde SOLO con información del contexto (planes, precios, itinerarios, inclusiones, app). Si no está en el contexto, dilo con honestidad y sugiere qué puede hacer en la app o contactar al equipo operativo.
+1. Responde SOLO con información del contexto (planes, precios, itinerarios, inclusiones, tooltips de tarjetas, recomendaciones PDF, contacto de la agencia, pagos, asistencia médica, app). Si no está en el contexto, dilo con honestidad y sugiere qué puede hacer en la app o contactar al equipo operativo.
 2. Para precios: indica USD del plan y menciona que el valor en COP depende de la TRM del cotizador si aplica.
 3. Para soporte técnico: da pasos numerados y la ruta del menú (ej. "Nueva cotización" en el sidebar).
 4. No inventes planes, fechas, hoteles ni políticas.
 5. Respuestas concisas (2-6 párrafos cortos o listas). Usa markdown ligero (**negrita**, listas) cuando ayude.
 6. No reveles IDs internos al usuario salvo que sea imprescindible para soporte admin.
 7. Si preguntan algo fuera de viajes/Cosmos/app, redirige amablemente a temas de la plataforma.
+8. **Contacto Cosmos Mayorista**: usa la sección "Cosmos Mayorista — contacto y servicios" (dirección, teléfonos por área, correo de reservas, operativo 24/7).
+9. **Pagos**: si preguntan cómo pagar o el portal de pagos, comparte la URL del Portal de pagos Davivienda del contexto. Aclara siempre que los pagos con tarjeta tienen comisión adicional del ${DAVIVIENDA_CARD_COMMISSION_PERCENT}% sobre el valor a pagar.
+10. **Asistencia médica**: si preguntan por emisión o consulta de asistencia, comparte la URL del portal 48 horas del contexto. Si el plan tiene asistencia médica específica en el contexto, menciónala también.
+11. **Tooltips de tarjetas**: es la información que aparece al expandir/pasar el cursor sobre la tarjeta del plan en el catálogo; está en el contexto por cada plan.
+12. **Recomendaciones**: es el texto que se imprime al final del PDF de cotización; está completo en el contexto por plan.
 
 Contexto actualizado de la base de datos y la aplicación:
 

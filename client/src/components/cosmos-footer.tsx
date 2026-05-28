@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { MapPin, Headphones, Users } from "lucide-react";
 import { RntNotice } from "@/components/rnt-notice";
-import { OPERATIVE_MAIN, RESERVATIONS_EMAIL, TEAM_CONTACTS } from "@/data/company-contacts";
+import { OPERATIVE_MAIN, RESERVATIONS_EMAIL, TEAM_CONTACTS, COMPANY_ADDRESS } from "@/data/company-contacts";
 
 const linkClass =
   "font-medium underline underline-offset-2 decoration-background/40 hover:text-white hover:decoration-white";
@@ -27,9 +27,9 @@ export function CosmosFooter() {
             <div>
               <p className="font-semibold text-background mb-1.5">Dirección</p>
               <address className="not-italic text-background/85 leading-relaxed">
-                CRA 53 # 50 - 67
+                {COMPANY_ADDRESS.street}
                 <br />
-                Venecia, Antioquia
+                {COMPANY_ADDRESS.city}
               </address>
             </div>
           </div>
