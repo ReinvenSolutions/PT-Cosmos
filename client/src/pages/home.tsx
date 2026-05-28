@@ -15,6 +15,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/optimized-image";
 import { clearHomeBuilderSelection } from "@/lib/home-selection-storage";
 import { cn } from "@/lib/utils";
+import { getPlanCardTooltip } from "@shared/planCardTooltip";
+import {
+  DAVIVIENDA_PAYMENTS_URL,
+  MEDICAL_ASSISTANCE_PORTAL_URL,
+} from "@shared/externalServices";
 
 interface DestinationDetail {
   destination: Destination;
@@ -142,81 +147,7 @@ export default function Home() {
     return { breakfasts, lunches, dinners, total: breakfasts + lunches + dinners };
   };
 
-  /** Prioridad: el texto de tooltip configurado en la edición o creación de planes (admin) es el oficial. Solo si está vacío se usa el fallback por defecto. */
-  const getTooltipForCard = (dest: Destination): string => {
-    const custom = (dest as { cardTooltip?: string | null }).cardTooltip?.trim();
-    if (custom) return custom;
-    return getTooltipContentFallback(dest);
-  };
-
-  const getTooltipContentFallback = (dest: Destination): string => {
-    // Tooltip específico para Lo Mejor de Cusco + Lima
-    if (dest.name === "Lo Mejor de Cusco + Lima") {
-      return "Salidas diarias, programa incluye todas las actividades de interes para los dias de viaje. Cualquier cambio, bajo solicitud. Incluye impuestos. Acompañamiento de guia, solo en actividades. Requiere vuelos internos para el 4to dia; se recomienda sea antes de las 07:00am, tienen incluida actividad el primer dia de llegada a CUZ.";
-    }
-
-    // Tooltip específico para todos los programas de Perú
-    if (dest.country === "Perú" ||
-      dest.name.includes("Cusco") ||
-      dest.name.includes("Perú") ||
-      dest.name.includes("Lima") ||
-      dest.name.includes("Machu Picchu") ||
-      dest.name.includes("Paracas") ||
-      dest.name.includes("Nazca") ||
-      dest.name.includes("Huacachina")) {
-      return "Salidas diarias, programa incluye todas las actividades de interes para los dias de viaje. Cualquier cambio, bajo solicitud. Incluye impuestos. Acompañamiento de guia, solo en actividades. No requiere vuelos internos";
-    }
-
-    // Tooltip específico para Dubai Maravilloso
-    if (dest.name === "DUBAI Maravilloso") {
-      return "Salidas diarias desde 2 pax. Combinalo facil. Tarifa dinamica. Plan no requiere mejoras. Impuestos no incluidos. Acompañamiento de guia durante todo el recorrido";
-    }
-
-    // Tooltip específico para Auroras Boreales Finlandia
-    if (dest.name === "Auroras boreales finlandia") {
-      return "Salidas diarias desde 2 pax. Programa se sugiere combinar con Madrid o Paris al inicio y/o final del viaje. Impuestos incluidos. Acompañamiento de guia, solo en las actividades. Permite mejoras o cambios, bajo solicitud. Temporada de auroras de diciembre a marzo";
-    }
-
-    // Tooltip específico para Egipto con Crucero + Emiratos
-    if (dest.name === "Egipto (Con Crucero) + Emiratos Árabes") {
-      return "Fechas puntuales (revisar disponibilidad). Programa combinado con vuelos internos incluidos en EGIPTO (El Cairo- Aswan/ Luxor- El Cairo en clase turista). Guia acompañante durante recorrido en El Cairo - Dubai. Programa no requeire mejoras";
-    }
-
-    // Tooltip específico para Gran Tour de Europa
-    if (dest.name === "Gran Tour de Europa") {
-      return "Salidas dias lunes (revisar disponibilidad). Programa circuito con acompañamiento de guia durante todo el recorrido. Inicia en MAD - termina en MAD. Programa permite incluir mejoras (actividades opcionales no incluidas)";
-    }
-
-    // Tooltip específico para Italia Turística - Euro Express
-    if (dest.name === "Italia Turística - Euro Express") {
-      return "Salidas dias viernes (validar disponibilidad) Programa circuito con acompañamiento de guia de habla hispana, durante todo el recorrido. Programa inicia en Roma y termina en Milán. Programa APLICA para mejoras";
-    }
-
-    // Tooltip específico para España e Italia Turística - Euro Express
-    if (dest.name === "España e Italia Turística - Euro Express") {
-      return "Salidas dias lunes (validar disponibilidad) Programa circuito con acompañamiento de guia de habla hispana durante todo el recorrido. Programa inicia en Madrid y termina en Milan.  Programa NO requiere mejoras.";
-    }
-
-    // Tooltip específico para Turquía Esencial
-    if (dest.name === "Turquía Esencial") {
-      return "Salidas todos los miércoles del año. Sabados entre marzo a nov 2026. Si vendes con vuelo, debes cotizar salida los martes y viernes desde Colombia. Programa terrestre con acompañamiento de guía habla hispana en destino. No incluye impuestos.";
-    }
-
-    if (
-      dest.country?.toLowerCase().includes("turquía") ||
-      dest.country?.toLowerCase().includes("turquia")
-    ) {
-      const otherCountries = Array.from(new Set(
-        destinations
-          .filter(d => d.category === "internacional" && d.country !== dest.country && d.country !== "Colombia")
-          .map(d => d.country)
-      )).join(", ");
-
-      return `Salidas todos los Martes desde Colombia. Combinable con: ${otherCountries || "otros destinos"} (salidas diarias). Turquía siempre va primero en la ruta.`;
-    }
-
-    return `Salidas diarias. Combinable con todos los destinos. Si combinas con Turquía, ten en cuenta que Turquía tiene salidas los Martes desde Colombia y será el primer destino en tu ruta.`;
-  };
+  const getTooltipForCard = (dest: Destination): string => getPlanCardTooltip(dest, destinations);
 
   const filteredDestinations = destinations.filter((dest) => {
     const matchesCategory =
@@ -321,7 +252,7 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <a
-                href="https://www.emisiones48hd.com/user/login/?next=/"
+                href={MEDICAL_ASSISTANCE_PORTAL_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-start gap-4 rounded-xl border-2 border-emerald-500/25 bg-emerald-500/[0.08] p-4 text-left transition-all hover:border-emerald-500/45 hover:bg-emerald-500/[0.14] hover:shadow-lg hover:shadow-emerald-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
@@ -340,7 +271,7 @@ export default function Home() {
                 </span>
               </a>
               <a
-                href="https://portalpagos.davivienda.com/#/comercio/11060/COSMOS%20INDUSTRIA%20DE%20VIAJES"
+                href={DAVIVIENDA_PAYMENTS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-start gap-4 rounded-xl border-2 border-sky-600/25 bg-sky-600/[0.08] p-4 text-left transition-all hover:border-sky-600/45 hover:bg-sky-600/[0.14] hover:shadow-lg hover:shadow-sky-600/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"

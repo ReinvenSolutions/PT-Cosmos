@@ -941,7 +941,7 @@ export const seedExclusions = [
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', item: "Equipaje adicional", displayOrder: 0 },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', item: "Propinas para el guía y el conductor (se sugieren 5 USD P.P. por día)", displayOrder: 0 },
   { destinationId: 'a0edb8c2-7e77-444e-8221-2501fe87f338', item: "Impuesto de $550 USD", displayOrder: 0 },
-  { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Fee bancario 2.5% sobre el total", displayOrder: 0 },
+  { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Fee bancario 3% sobre el total", displayOrder: 0 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Visado DE ENTRADA. SI REQUIERE DEPENDE DE LA NACIONALIDAD", displayOrder: 0 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Propinas durante todo el viaje", displayOrder: 0 },
   { destinationId: 'f8a9b3c5-4d2e-4f1a-8b9c-7e6d5f4a3b2c', item: "Todo extra no mencionado en el itinerario", displayOrder: 0 },
