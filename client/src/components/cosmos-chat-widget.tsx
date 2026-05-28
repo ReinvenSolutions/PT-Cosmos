@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -91,13 +91,87 @@ async function streamCosmosReply(
   }
 }
 
+/** Enlaces markdown [texto](url) y URLs sueltas en respuestas del asistente. */
+const LINK_OR_URL_RE = /\[([^\]]+)\]\(([^)]+)\)|(https?:\/\/[^\s<>\]]+)/g;
+
+function renderInlineFormatting(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const boldRe = /\*\*([^*]+)\*\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = boldRe.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    nodes.push(
+      <strong key={`${keyPrefix}-b-${i++}`} className="font-semibold">
+        {m[1]}
+      </strong>
+    );
+    last = boldRe.lastIndex;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes.length ? nodes : [text];
+}
+
+function renderMessageContent(content: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  LINK_OR_URL_RE.lastIndex = 0;
+  while ((match = LINK_OR_URL_RE.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      const segment = content.slice(lastIndex, match.index);
+      nodes.push(...renderInlineFormatting(segment, `t-${key}`));
+    }
+
+    if (match[1] !== undefined && match[2] !== undefined) {
+      const label = match[1];
+      const href = match[2];
+      nodes.push(
+        <a
+          key={`link-${key++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium underline underline-offset-2 decoration-white/70 hover:decoration-white break-all"
+        >
+          {label}
+        </a>
+      );
+    } else if (match[3]) {
+      const href = match[3];
+      nodes.push(
+        <a
+          key={`url-${key++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium underline underline-offset-2 decoration-white/70 hover:decoration-white break-all"
+        >
+          {href}
+        </a>
+      );
+    }
+
+    lastIndex = LINK_OR_URL_RE.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    nodes.push(...renderInlineFormatting(content.slice(lastIndex), `end-${key}`));
+  }
+
+  return nodes.length ? nodes : [content];
+}
+
 function MessageBubble({ role, content }: { role: ChatRole; content: string }) {
   const isUser = role === "user";
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm",
+          "max-w-[88%] min-w-0 rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm",
           isUser
             ? "bg-primary text-primary-foreground rounded-br-md"
             : cn(
@@ -106,7 +180,13 @@ function MessageBubble({ role, content }: { role: ChatRole; content: string }) {
               )
         )}
       >
-        <p className="whitespace-pre-wrap">{content}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap break-words">{content}</p>
+        ) : (
+          <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {renderMessageContent(content)}
+          </div>
+        )}
       </div>
     </div>
   );
