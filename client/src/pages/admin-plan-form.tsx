@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles, Loader2, ImageOff, Headphones } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles, Loader2, ImageOff, Headphones, Receipt } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { CosmoProcessingDialog } from "@/components/cosmo-processing-dialog";
@@ -43,6 +43,7 @@ import { ImageUploadZone } from "@/components/image-upload-zone";
 import { MedicalAssistanceGallery } from "@/components/medical-assistance-gallery";
 import { ItineraryMapGallery } from "@/components/itinerary-map-gallery";
 import { InternalFlightsModal, type InternalFlightItem } from "@/components/plan-modals";
+import { createEmptyPlanTax, type PlanTax } from "@shared/planTaxes";
 
 type ItineraryDay = {
   dayNumber: number;
@@ -195,6 +196,7 @@ function AdminPlanForm() {
   const [allowedDays, setAllowedDays] = useState<string[]>([]);
   const [priceTiers, setPriceTiers] = useState<PriceTier[]>([]);
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
+  const [planTaxes, setPlanTaxes] = useState<PlanTax[]>([]);
   const [itinerary, setItinerary] = useState<ItineraryDay[]>([]);
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [inclusions, setInclusions] = useState<Inclusion[]>([]);
@@ -277,6 +279,7 @@ function AdminPlanForm() {
     hotelGalleryImageUrls?: string[] | null;
     adicionalesGalleryImageUrls?: string[] | null;
     descriptiveAudioUrl?: string | null;
+    planTaxes?: PlanTax[] | null;
   }>({
     queryKey: [`/api/admin/destinations/${id}`],
     enabled: isEditing && !!id,
@@ -309,6 +312,7 @@ function AdminPlanForm() {
       );
       setPriceTiers((existing.priceTiers as PriceTier[]) ?? []);
       setUpgrades((existing.upgrades as Upgrade[]) ?? []);
+      setPlanTaxes((existing.planTaxes as PlanTax[]) ?? []);
       setItinerary((existing.itinerary as ItineraryDay[]) ?? []);
       setHotels((existing.hotels as Hotel[]) ?? []);
       setInclusions((existing.inclusions as Inclusion[]) ?? []);
@@ -426,6 +430,9 @@ function AdminPlanForm() {
           ? adicionalesGalleryImages.map((x) => x.imageUrl)
           : null,
       descriptiveAudioUrl: descriptiveAudioUrl.trim() || null,
+      planTaxes: planTaxes.filter((t) => t.label.trim() || t.amount.trim()).length
+        ? planTaxes.filter((t) => t.label.trim() || t.amount.trim())
+        : null,
     };
     saveMutation.mutate(payload);
   };
@@ -465,6 +472,11 @@ function AdminPlanForm() {
   const addUpgrade = () => setUpgrades((prev) => [...prev, { code: "", name: "", price: 0 }]);
   const updateUpgrade = (i: number, f: Partial<Upgrade>) => setUpgrades((prev) => prev.map((u, j) => (j === i ? { ...u, ...f } : u)));
   const removeUpgrade = (i: number) => setUpgrades((prev) => prev.filter((_, j) => j !== i));
+
+  const addPlanTax = () => setPlanTaxes((prev) => [...prev, createEmptyPlanTax()]);
+  const updatePlanTax = (i: number, f: Partial<PlanTax>) =>
+    setPlanTaxes((prev) => prev.map((t, j) => (j === i ? { ...t, ...f } : t)));
+  const removePlanTax = (i: number) => setPlanTaxes((prev) => prev.filter((_, j) => j !== i));
 
   const processImageFiles = async (files: File[]) => {
     const imageFiles = files.filter((f) => f.type.startsWith("image/"));
@@ -2209,6 +2221,69 @@ Puedes usar **texto** para resaltar.`}
                     className="w-48"
                   />
                   <Button variant="ghost" size="icon" onClick={() => removeUpgrade(i)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Impuestos del plan
+              </CardTitle>
+              <CardDescription>
+                Montos fijos que se suman al PVP al cotizar este plan. Si el plan no lleva impuestos, déjalo vacío.
+              </CardDescription>
+              <Button variant="outline" size="sm" onClick={addPlanTax}>
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar impuesto
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {planTaxes.length === 0 && (
+                <p className="text-sm text-muted-foreground">Sin impuestos configurados para este plan.</p>
+              )}
+              {planTaxes.map((tax, i) => (
+                <div key={tax.id} className="flex gap-2 items-start flex-wrap border rounded-lg p-3">
+                  <Input
+                    value={tax.label}
+                    onChange={(e) => updatePlanTax(i, { label: e.target.value })}
+                    placeholder="Nombre (ej. Tasa aeroportuaria)"
+                    className="flex-1 min-w-[180px]"
+                  />
+                  <div className="flex rounded-md border border-input p-0.5 bg-background shrink-0">
+                    {(["USD", "COP"] as const).map((cur) => (
+                      <button
+                        key={cur}
+                        type="button"
+                        onClick={() => updatePlanTax(i, { currency: cur })}
+                        className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-md transition-colors",
+                          tax.currency === cur
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {cur === "USD" ? "US$" : "COP$"}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    value={tax.amount}
+                    onChange={(e) => updatePlanTax(i, { amount: e.target.value.replace(/,/g, "") })}
+                    placeholder="Monto"
+                    className="w-28"
+                  />
+                  <label className="flex items-center gap-1.5 text-sm shrink-0 pt-2">
+                    <Checkbox
+                      checked={tax.perPassenger !== false}
+                      onCheckedChange={(c) => updatePlanTax(i, { perPassenger: !!c })}
+                    />
+                    Por pasajero
+                  </label>
+                  <Button variant="ghost" size="icon" onClick={() => removePlanTax(i)} className="shrink-0">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

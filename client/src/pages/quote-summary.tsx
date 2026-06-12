@@ -2,6 +2,16 @@ import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Destination, formatUSD, formatDate } from "@shared/schema";
+import { applyLandPortionDiscount, normalizeDiscountPercentage } from "@shared/discount";
+import {
+  EMPTY_QUOTE_FEES_CONFIG,
+  calculateQuoteFees,
+  DEFAULT_CARD_FEE_PERCENT,
+  normalizeQuoteFeesConfig,
+  type QuoteFeesConfig,
+} from "@shared/quoteFees";
+import { calculatePlanTaxes } from "@shared/planTaxes";
+import { ROLES } from "@shared/roles";
 import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane, MessageCircle, Info, GripVertical } from "lucide-react";
+import { Calendar, MapPin, Upload, X, Send, FileText, DollarSign, Save, Star, ChevronDown, Plane, MessageCircle, Info, GripVertical, Receipt, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDestinationImage } from "@/lib/destination-images";
 import { OptimizedImage } from "@/components/optimized-image";
@@ -68,12 +78,73 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+function LandPortionPriceDisplay({
+  landPrice,
+  discountPercentage,
+  effectiveTrm,
+  size = "md",
+}: {
+  landPrice: number;
+  discountPercentage: number;
+  effectiveTrm: number;
+  size?: "md" | "lg";
+}) {
+  const { discountAmount, discountedLandPortion } = applyLandPortionDiscount(landPrice, discountPercentage);
+  const hasDiscount = discountPercentage > 0;
+  const priceClass = size === "lg" ? "text-2xl" : "text-xl sm:text-2xl";
+
+  return (
+    <div className="text-right shrink-0">
+      <div className={cn(priceClass, "font-extrabold text-price-accent")}>
+        US$ {landPrice.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+      </div>
+      {effectiveTrm > 0 && (
+        <div className="text-sm font-bold text-chart-3">
+          ${" "}
+          {(landPrice * effectiveTrm).toLocaleString("es-CO", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          })}{" "}
+          COP
+        </div>
+      )}
+      {hasDiscount && (
+        <>
+          <div className="text-xs font-semibold text-green-600 dark:text-green-400 mt-1">
+            Descuento {discountPercentage}%: -US${" "}
+            {discountAmount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </div>
+          <div className="text-lg font-bold text-green-700 dark:text-green-300">
+            US${" "}
+            {discountedLandPortion.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </div>
+          {effectiveTrm > 0 && (
+            <div className="text-xs font-semibold text-green-600 dark:text-green-400">
+              ${" "}
+              {(discountedLandPortion * effectiveTrm).toLocaleString("es-CO", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}{" "}
+              COP
+            </div>
+          )}
+        </>
+      )}
+      <div className="text-xs font-medium text-muted-foreground">Porción terrestre</div>
+    </div>
+  );
+}
+
 function SortableQuoteDestinationRow({
   dest,
   effectiveTrm,
+  landPricePerPerson,
+  discountPercentage,
 }: {
   dest: Destination;
   effectiveTrm: number;
+  landPricePerPerson: number;
+  discountPercentage: number;
 }) {
   const {
     attributes,
@@ -89,7 +160,6 @@ function SortableQuoteDestinationRow({
     transition,
   };
 
-  const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
   const imageUrl = getDestinationImage(dest);
 
   return (
@@ -128,22 +198,11 @@ function SortableQuoteDestinationRow({
             {dest.duration} Días / {dest.nights} Noches
           </Badge>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-xl sm:text-2xl font-extrabold text-price-accent">
-            US$ {basePrice.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-          </div>
-          {effectiveTrm > 0 && (
-            <div className="text-sm font-bold text-chart-3">
-              ${" "}
-              {(basePrice * effectiveTrm).toLocaleString("es-CO", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}{" "}
-              COP
-            </div>
-          )}
-          <div className="text-xs font-medium text-muted-foreground">Porción terrestre</div>
-        </div>
+        <LandPortionPriceDisplay
+          landPrice={landPricePerPerson}
+          discountPercentage={discountPercentage}
+          effectiveTrm={effectiveTrm}
+        />
       </div>
     </div>
   );
@@ -193,6 +252,7 @@ export default function QuoteSummary() {
   const [otherDestUpgrades, setOtherDestUpgrades] = useState<Record<string, string>>({});
   const [quoteInCop, setQuoteInCop] = useState(false);
   const [finalPrice, setFinalPrice] = useState("");
+  const [taxesFeesConfig, setTaxesFeesConfig] = useState<QuoteFeesConfig>(EMPTY_QUOTE_FEES_CONFIG);
   const [minPayment, setMinPayment] = useState("");
   const [customFilename, setCustomFilename] = useState("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -609,6 +669,15 @@ export default function QuoteSummary() {
 
   const landPortionTotal = landPortionPerPerson * passengers;
 
+  const userDiscountPercentage =
+    user && (user.role === ROLES.ADVISOR || user.role === ROLES.AGENCY)
+      ? normalizeDiscountPercentage(user.discountPercentage)
+      : 0;
+  const {
+    discountAmount: landDiscountAmount,
+    discountedLandPortion,
+  } = applyLandPortionDiscount(landPortionTotal, userDiscountPercentage);
+
   const systemBaseTrm = globalTrmSettings?.baseTrm ?? null;
   const effectiveTrm = quoteInCop ? (effectiveTrmFromBase(systemBaseTrm) ?? 0) : 0;
 
@@ -712,23 +781,37 @@ export default function QuoteSummary() {
   const italiaUpgradeCost = getItaliaUpgradeCost();
   const granTourUpgradeCost = getGranTourUpgradeCost();
   const otherUpgradesCost = getOtherUpgradesCost();
-  const grandTotal = landPortionTotal + flightsAndExtrasValue + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost + otherUpgradesCost;
+  const grandTotal = discountedLandPortion + flightsAndExtrasValue + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost + otherUpgradesCost;
 
   const grandTotalCOP = effectiveTrm > 0 ? grandTotal * effectiveTrm : 0;
 
+  const planTaxesBreakdown = useMemo(
+    () => calculatePlanTaxes(selectedDests, passengers, effectiveTrm),
+    [selectedDests, passengers, effectiveTrm],
+  );
+  const planTaxesTotalUSD = planTaxesBreakdown.totalUSD;
+  const hasPlanTaxes = planTaxesTotalUSD > 0;
+  const planTaxesTotalCOP = effectiveTrm > 0 ? planTaxesTotalUSD * effectiveTrm : 0;
+  const netTotalUSD = grandTotal + planTaxesTotalUSD;
+  const netTotalCOP = effectiveTrm > 0 ? netTotalUSD * effectiveTrm : 0;
+
   useEffect(() => {
     if (!bloqueoPlan) return;
-    setFinalPrice(grandTotal.toFixed(2));
-  }, [bloqueoPlan?.id, grandTotal]);
+    setFinalPrice(netTotalUSD.toFixed(2));
+  }, [bloqueoPlan?.id, netTotalUSD]);
 
   const finalPriceValue = getUSDValue(finalPrice, inputCurrencyFinal);
-  const profit = finalPriceValue - grandTotal;
+  const clientPayableBeforeCardFeeUSD = finalPriceValue + planTaxesTotalUSD;
+  const feesBreakdown = calculateQuoteFees(taxesFeesConfig, clientPayableBeforeCardFeeUSD, effectiveTrm);
+  const profit = finalPriceValue - netTotalUSD;
   const finalPriceCOP = effectiveTrm > 0 ? finalPriceValue * effectiveTrm : 0;
+  const clientTotalCOP = effectiveTrm > 0 ? feesBreakdown.clientTotalUSD * effectiveTrm : 0;
+  const hasCardFee = taxesFeesConfig.cardFeeEnabled && feesBreakdown.cardFeeUSD > 0;
 
   // Calculate default minimum payment
   // Formula: (Flights + Assistance) + (30% of (Land Portion + Upgrade)) + 200 USD
   const calculateDefaultMinPayment = () => {
-    const landPortionWithUpgrade = landPortionTotal + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost + otherUpgradesCost;
+    const landPortionWithUpgrade = discountedLandPortion + turkeyUpgradeCost + italiaUpgradeCost + granTourUpgradeCost + otherUpgradesCost;
     const thirtyPercentLand = landPortionWithUpgrade * 0.30;
     const baseMinPaymentUSD = flightsAndExtrasValue + thirtyPercentLand + 200;
 
@@ -1018,6 +1101,9 @@ export default function QuoteSummary() {
       finalPrice: payloadFinalPrice,
       finalPriceCOP: payloadFinalPriceCOP,
       finalPriceCurrency: inputCurrencyFinal,
+      taxesAndFees: taxesFeesConfig.cardFeeEnabled
+        ? normalizeQuoteFeesConfig(taxesFeesConfig)
+        : null,
       destinations: selectedDests.map((dest) => ({
         destinationId: dest.id,
         startDate: startDate ? formatLocalYmd(startDate) : "",
@@ -1315,15 +1401,20 @@ export default function QuoteSummary() {
                   <SortableContext items={selectedDestinations} strategy={verticalListSortingStrategy}>
                     {selectedDests.map((dest) => (
                       <div key={dest.id} className="mb-3 last:mb-0">
-                        <SortableQuoteDestinationRow dest={dest} effectiveTrm={effectiveTrm} />
+                        <SortableQuoteDestinationRow
+                          dest={dest}
+                          effectiveTrm={effectiveTrm}
+                          landPricePerPerson={getPriceForDate(dest, startDate)}
+                          discountPercentage={userDiscountPercentage}
+                        />
                       </div>
                     ))}
                   </SortableContext>
                 </DndContext>
               ) : (
                 selectedDests.map((dest) => {
-                  const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
                   const imageUrl = getDestinationImage(dest);
+                  const landPricePerPerson = getPriceForDate(dest, startDate);
 
                   return (
                     <div key={dest.id} className="flex gap-4 p-3 bg-accent/50 rounded-lg border border-border">
@@ -1345,37 +1436,60 @@ export default function QuoteSummary() {
                             {dest.duration} Días / {dest.nights} Noches
                           </Badge>
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-extrabold text-price-accent">
-                            US$ {basePrice.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                          </div>
-                          {effectiveTrm > 0 && (
-                            <div className="text-sm font-bold text-chart-3">
-                              $ {(basePrice * effectiveTrm).toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
-                            </div>
-                          )}
-                          <div className="text-xs font-medium text-muted-foreground">Porción terrestre</div>
-                        </div>
+                        <LandPortionPriceDisplay
+                          landPrice={landPricePerPerson}
+                          discountPercentage={userDiscountPercentage}
+                          effectiveTrm={effectiveTrm}
+                          size="lg"
+                        />
                       </div>
                     </div>
                   );
                 })
               )}
 
-              <div className="border-t border-border pt-3 mt-3">
+              <div className="border-t border-border pt-3 mt-3 space-y-2">
                 <div className="flex justify-between items-center text-lg font-semibold">
                   <span className="text-foreground">Subtotal Porciones Terrestres:</span>
                   <div className="text-right">
                     <span className="text-price-accent block font-bold">
-                      US$ {landPortionTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      US$ {landPortionTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     {effectiveTrm > 0 && (
                       <span className="text-chart-3 text-sm block font-medium">
-                        $ {(landPortionTotal * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                        $ {(landPortionTotal * effectiveTrm).toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                       </span>
                     )}
                   </div>
                 </div>
+                {userDiscountPercentage > 0 && (
+                  <>
+                    <div className="flex justify-between items-center text-sm font-semibold text-green-700 dark:text-green-300">
+                      <span>Descuento asignado ({userDiscountPercentage}%):</span>
+                      <div className="text-right">
+                        <span className="block">- US$ {formatUSD(landDiscountAmount)}</span>
+                        {effectiveTrm > 0 && (
+                          <span className="text-xs block">
+                            - $ {(landDiscountAmount * effectiveTrm).toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center text-lg font-semibold">
+                      <span className="text-foreground">Porciones Terrestres con descuento:</span>
+                      <div className="text-right">
+                        <span className="text-green-700 dark:text-green-300 block font-bold">
+                          US$ {discountedLandPortion.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {effectiveTrm > 0 && (
+                          <span className="text-green-600 dark:text-green-400 text-sm block font-medium">
+                            $ {(discountedLandPortion * effectiveTrm).toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -2138,6 +2252,48 @@ export default function QuoteSummary() {
           </CardContent>
         </Card>
 
+        {hasPlanTaxes && (
+          <Card className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 dark:from-amber-950/50 dark:to-orange-950/50 dark:border-amber-700/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <Receipt className="w-5 h-5" />
+                Impuestos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-sm text-muted-foreground mb-3">
+                Impuestos fijos configurados en los planes de esta cotización. Se suman al PVP.
+              </p>
+              {planTaxesBreakdown.lines.map((line) => (
+                <div key={`${line.destinationId}-${line.taxId}`} className="flex justify-between text-sm gap-4">
+                  <span className="text-muted-foreground">
+                    {line.destinationName} — {line.label}
+                    {line.perPassenger && line.quantity > 1 ? (
+                      <span className="text-xs block">
+                        US$ {formatUSD(line.unitAmountUSD)} × {line.quantity} pax
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="font-medium shrink-0">+ US$ {formatUSD(line.amountUSD)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between items-center pt-3 border-t border-amber-200/80 dark:border-amber-700/50 font-bold">
+                <span className="text-foreground">Total impuestos:</span>
+                <div className="text-right">
+                  <span className="block text-lg text-amber-800 dark:text-amber-200">
+                    US$ {formatUSD(planTaxesTotalUSD)}
+                  </span>
+                  {effectiveTrm > 0 && (
+                    <span className="text-sm text-muted-foreground block">
+                      $ {planTaxesTotalCOP.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                    </span>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="mb-8 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-800 dark:to-blue-900 text-white border-0">
           <CardContent className="p-6">
             <div className="flex justify-between items-center">
@@ -2146,25 +2302,36 @@ export default function QuoteSummary() {
                 {effectiveTrm > 0 ? (
                   <>
                     <div className="text-4xl font-extrabold text-green-100 dark:text-green-200">
-                      $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                      $ {netTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                     </div>
                     <div className="text-xl font-bold opacity-75 mt-1">
-                      US$ {formatUSD(grandTotal)}
+                      US$ {formatUSD(netTotalUSD)}
                     </div>
                   </>
                 ) : (
                   <div className="text-4xl font-extrabold">
-                    US$ {formatUSD(grandTotal)}
+                    US$ {formatUSD(netTotalUSD)}
                   </div>
                 )}
               </div>
               <div className="text-right text-sm opacity-90">
                 <div>Porciones Terrestres: US$ {formatUSD(landPortionTotal)}</div>
+                {userDiscountPercentage > 0 && (
+                  <div className="text-green-200">
+                    Descuento ({userDiscountPercentage}%): -US$ {formatUSD(landDiscountAmount)}
+                  </div>
+                )}
+                {userDiscountPercentage > 0 && (
+                  <div className="text-green-100 font-semibold">
+                    Porciones Terrestres con descuento: US$ {formatUSD(discountedLandPortion)}
+                  </div>
+                )}
                 {turkeyUpgradeCost > 0 && <div>Mejora Turquía: US$ {formatUSD(turkeyUpgradeCost)}</div>}
                 {italiaUpgradeCost > 0 && <div>Mejora Italia: US$ {formatUSD(italiaUpgradeCost)}</div>}
                 {granTourUpgradeCost > 0 && <div>Mejora Gran Tour: US$ {formatUSD(granTourUpgradeCost)}</div>}
                 {otherUpgradesCost > 0 && <div>Otras mejoras: US$ {formatUSD(otherUpgradesCost)}</div>}
                 <div>Vuelos y Asistencia: US$ {formatUSD(flightsAndExtrasValue)}</div>
+                {hasPlanTaxes && <div>Impuestos: US$ {formatUSD(planTaxesTotalUSD)}</div>}
                 {effectiveTrm > 0 && (
                   <div className="text-xs mt-1 opacity-75">
                     (TRM: $ {effectiveTrm.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
@@ -2177,11 +2344,9 @@ export default function QuoteSummary() {
 
         <Card className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 dark:from-purple-950/50 dark:to-pink-950/50 dark:border-purple-700/60">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-foreground">
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Precio Final de Venta PVP
-              </div>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <DollarSign className="w-5 h-5" />
+              Precio Final de Venta PVP
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -2223,15 +2388,102 @@ export default function QuoteSummary() {
               </div>
             )}
 
+            <div className="rounded-lg border border-purple-200/60 dark:border-purple-700/40 p-3 mb-4 bg-background/50">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="card-fee-enabled"
+                  checked={taxesFeesConfig.cardFeeEnabled}
+                  onCheckedChange={(checked) =>
+                    setTaxesFeesConfig(
+                      normalizeQuoteFeesConfig({ cardFeeEnabled: checked === true }),
+                    )
+                  }
+                />
+                <div className="flex-1 space-y-1">
+                  <Label
+                    htmlFor="card-fee-enabled"
+                    className="flex items-center gap-2 cursor-pointer font-medium text-sm"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Fee de comisión bancaria por pago con tarjeta ({DEFAULT_CARD_FEE_PERCENT}%)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Se aplica sobre PVP + impuestos del plan. No se incluye en el PDF.
+                  </p>
+                  {hasCardFee && clientPayableBeforeCardFeeUSD > 0 && (
+                    <p className="text-sm font-semibold text-primary pt-0.5">
+                      Comisión: + US$ {formatUSD(feesBreakdown.cardFeeUSD)}
+                      {effectiveTrm > 0 && (
+                        <span className="text-muted-foreground font-normal ml-1">
+                          ($ {(feesBreakdown.cardFeeUSD * effectiveTrm).toLocaleString("es-CO", { maximumFractionDigits: 0 })} COP)
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {finalPriceValue > 0 && (
-              <div className="p-4 bg-muted/30 dark:bg-muted/20 rounded-lg border border-purple-200/60 dark:border-purple-700/40 shadow-sm">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-muted-foreground">Costo Total (Neto):</span>
+              <div className="p-4 bg-muted/30 dark:bg-muted/20 rounded-lg border border-purple-200/60 dark:border-purple-700/40 shadow-sm space-y-2">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pb-1">
+                  Desglose de costos
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Porciones terrestres{userDiscountPercentage > 0 ? ` (desc. ${userDiscountPercentage}%)` : ""}:
+                  </span>
+                  <span className="font-medium">
+                    US$ {formatUSD(userDiscountPercentage > 0 ? discountedLandPortion : landPortionTotal)}
+                  </span>
+                </div>
+                {turkeyUpgradeCost > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Mejora Turquía:</span>
+                    <span className="font-medium">US$ {formatUSD(turkeyUpgradeCost)}</span>
+                  </div>
+                )}
+                {italiaUpgradeCost > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Mejora Italia:</span>
+                    <span className="font-medium">US$ {formatUSD(italiaUpgradeCost)}</span>
+                  </div>
+                )}
+                {granTourUpgradeCost > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Mejora Gran Tour:</span>
+                    <span className="font-medium">US$ {formatUSD(granTourUpgradeCost)}</span>
+                  </div>
+                )}
+                {otherUpgradesCost > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Otras mejoras:</span>
+                    <span className="font-medium">US$ {formatUSD(otherUpgradesCost)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Vuelos:</span>
+                  <span className="font-medium">US$ {formatUSD(flightsCostUSD)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Asistencia:</span>
+                  <span className="font-medium">US$ {formatUSD(assistanceCostUSD)}</span>
+                </div>
+                {hasPlanTaxes && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Impuestos:</span>
+                    <span className="font-medium text-amber-800 dark:text-amber-200">
+                      US$ {formatUSD(planTaxesTotalUSD)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-border">
+                  <span className="text-muted-foreground font-semibold">Costo Total (Neto):</span>
                   <div className="text-right">
-                    <span className="font-semibold block text-foreground">US$ {formatUSD(grandTotal)}</span>
+                    <span className="font-semibold block text-foreground">US$ {formatUSD(netTotalUSD)}</span>
                     {effectiveTrm > 0 && (
                       <span className="text-xs text-muted-foreground block">
-                        $ {grandTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                        $ {netTotalCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
                       </span>
                     )}
                   </div>
@@ -2249,6 +2501,28 @@ export default function QuoteSummary() {
                     )}
                   </div>
                 </div>
+                {hasCardFee && (
+                  <div className="pt-2 border-t border-border space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Comisión bancaria (no va al PDF)
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Pago con tarjeta ({DEFAULT_CARD_FEE_PERCENT}%):</span>
+                      <span className="font-medium">+ US$ {formatUSD(feesBreakdown.cardFeeUSD)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-dashed border-border font-bold">
+                      <span className="text-foreground">Total con comisión bancaria:</span>
+                      <div className="text-right">
+                        <span className="block text-lg text-primary">US$ {formatUSD(feesBreakdown.clientTotalUSD)}</span>
+                        {effectiveTrm > 0 && (
+                          <span className="text-sm text-muted-foreground block">
+                            $ {clientTotalCOP.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, decimal, timestamp, boolean, uniqueIndex, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import type { QuoteFeesConfig } from "./quoteFees";
+import type { PlanTax } from "./planTaxes";
 
 export const destinations = pgTable(
   "destinations",
@@ -29,6 +31,8 @@ export const destinations = pgTable(
     allowedDays: text("allowed_days").array(),
     priceTiers: json("price_tiers").$type<Array<{ startDate?: string; endDate: string; price: string; isFlightDay?: boolean; flightLabel?: string }>>(),
     upgrades: json("upgrades").$type<Array<{ code: string; name: string; description?: string; price: number }>>(),
+    /** Impuestos fijos del plan (se suman al PVP en cotización). */
+    planTaxes: json("plan_taxes").$type<PlanTax[] | null>(),
     hasInternalOrConnectionFlight: boolean("has_internal_or_connection_flight").default(false),
     internalFlights: json("internal_flights").$type<
       Array<{
@@ -158,6 +162,8 @@ export const users = pgTable("users", {
   /** approved | pending | denied — los registros públicos quedan en pending hasta que un super_admin apruebe */
   approvalStatus: text("approval_status").default("approved").notNull(),
   twoFactorEnabled: boolean("two_factor_enabled").default(true),
+  /** Descuento % sobre porción terrestre en cotizaciones (solo asesores/agencias; asignado por super_admin) */
+  discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -231,6 +237,7 @@ export const quotes = pgTable("quotes", {
   finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
   finalPriceCOP: decimal("final_price_cop", { precision: 15, scale: 2 }),
   finalPriceCurrency: text("final_price_currency").default("USD"),
+  taxesAndFees: json("taxes_and_fees").$type<QuoteFeesConfig | null>(),
   status: text("status").notNull().default("draft"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

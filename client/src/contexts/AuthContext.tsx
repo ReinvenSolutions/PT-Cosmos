@@ -8,12 +8,13 @@ export interface User {
   name?: string | null;
   avatarUrl?: string | null;
   role: string;
+  discountPercentage?: string | number | null;
   createdAt: string;
 }
 
 export type LoginResult =
   | { user: User }
-  | { needs2FA: true; tempToken: string; message?: string };
+  | { needs2FA: true; tempToken: string; message?: string; emailMasked?: string };
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +35,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const loginMutation = useMutation({
@@ -70,12 +74,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const login = async (username: string, password: string): Promise<LoginResult> => {
-    const data = await loginMutation.mutateAsync({ username, password });
-    return data as LoginResult;
+    const data = (await loginMutation.mutateAsync({ username, password })) as LoginResult;
+    if ("user" in data) {
+      queryClient.setQueryData(["/api/auth/me"], data);
+    }
+    return data;
   };
 
   const verify2FA = async (tempToken: string, code: string) => {
-    await verify2FAMutation.mutateAsync({ tempToken, code });
+    const data = await verify2FAMutation.mutateAsync({ tempToken, code });
+    queryClient.setQueryData(["/api/auth/me"], data);
   };
 
   const logout = async () => {

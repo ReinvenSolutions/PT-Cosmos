@@ -1,4 +1,5 @@
 import type { Destination, QuoteDestination } from "@shared/schema";
+import type { QuoteFeesConfig } from "@shared/quoteFees";
 
 export interface DestinationInput {
   id: string;
@@ -39,6 +40,7 @@ export interface CreateQuoteInput {
   finalPrice?: number | string | null;
   finalPriceCOP?: number | string | null;
   finalPriceCurrency?: string;
+  taxesAndFees?: QuoteFeesConfig | null;
 }
 
 export interface PublicQuotePdfInput {

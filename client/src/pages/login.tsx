@@ -10,6 +10,7 @@ import { ThemeToggleCompact } from "@/components/theme-toggle";
 import { TwoFactorInput } from "@/components/two-factor-input";
 import { AuthCommercialContactCard } from "@/components/auth-commercial-contact";
 import { RntNotice } from "@/components/rnt-notice";
+import { getPostLoginPath } from "@/lib/authUtils";
 
 const FlagIcon = ({ code, title }: { code: string, title: string }) => (
   <img 
@@ -28,21 +29,17 @@ export default function Login() {
   const [step, setStep] = useState<"credentials" | "2fa">("credentials");
   const [tempToken, setTempToken] = useState("");
   const [code2FA, setCode2FA] = useState("");
+  const [twoFactorEmailHint, setTwoFactorEmailHint] = useState("");
   const [codeError, setCodeError] = useState(false);
-  const { user, login, verify2FA } = useAuth();
+  const { user, isLoading: authLoading, login, verify2FA } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  // Redirigir cuando el usuario esté autenticado tras 2FA (evita race: sesión lista antes de navegar)
+  // Redirigir en cuanto haya sesión válida (login directo, 2FA o visita a /login ya autenticado)
   useEffect(() => {
-    if (user && step === "2fa") {
-      toast({ title: "¡Bienvenido!", description: "Has iniciado sesión correctamente." });
-      const role = user.role;
-      navigate(
-        role === "super_admin" ? "/admin/dashboard" : role === "agency" ? "/admin/plans" : "/"
-      );
-    }
-  }, [user, step, navigate, toast]);
+    if (authLoading || !user) return;
+    navigate(getPostLoginPath(user.role));
+  }, [authLoading, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +50,7 @@ export default function Login() {
       const result = await login(username, password);
       if ("needs2FA" in result && result.needs2FA) {
         setTempToken(result.tempToken);
+        setTwoFactorEmailHint(result.emailMasked || "");
         setStep("2fa");
         toast({
           title: "Código enviado",
@@ -60,10 +58,6 @@ export default function Login() {
         });
       } else if ("user" in result) {
         toast({ title: "¡Bienvenido de nuevo!", description: "Has iniciado sesión correctamente." });
-        const role = result.user.role;
-        navigate(
-          role === "super_admin" ? "/admin/dashboard" : role === "agency" ? "/admin/plans" : "/"
-        );
       }
     } catch (error: any) {
       toast({
@@ -84,7 +78,7 @@ export default function Login() {
 
     try {
       await verify2FA(tempToken, code2FA);
-      // La redirección la hace el useEffect cuando user esté en el contexto
+      toast({ title: "¡Bienvenido!", description: "Has iniciado sesión correctamente." });
     } catch (error: any) {
       setCodeError(true);
       toast({
@@ -101,6 +95,7 @@ export default function Login() {
     setStep("credentials");
     setTempToken("");
     setCode2FA("");
+    setTwoFactorEmailHint("");
     setCodeError(false);
   };
 
@@ -178,7 +173,15 @@ export default function Login() {
                 <div className="text-center space-y-1">
                   <h2 className="text-xl font-semibold">Verificación en dos pasos</h2>
                   <p className="text-sm text-muted-foreground">
-                    Ingresa el código de 6 dígitos que enviamos a tu correo
+                    Ingresa el código de 6 dígitos que enviamos
+                    {twoFactorEmailHint ? (
+                      <> a <strong className="text-foreground">{twoFactorEmailHint}</strong></>
+                    ) : (
+                      " a tu correo"
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Revisa también spam o correo no deseado. El código vence en 10 minutos.
                   </p>
                 </div>
                 <TwoFactorInput
