@@ -50,8 +50,14 @@ import {
   generateAccountApprovedEmailHtml,
   generatePasswordResetEmailHtml,
   generate2FACodeEmailHtml,
+  generate2FACodeEmailText,
   generateRoleChangeNotificationHtml,
 } from "./email";
+import {
+  resolveTwoFactorEmail,
+  maskEmail,
+  TWO_FACTOR_CODE_EXPIRY_MINUTES,
+} from "./utils/twoFactorEmail";
 
 // Validation schemas
 const registerSchema = z.object({
@@ -141,6 +147,13 @@ const createQuoteSchema = z.object({
   finalPrice: z.union([z.number(), z.string()]).nullable().optional(),
   finalPriceCOP: z.union([z.number(), z.string()]).nullable().optional(),
   finalPriceCurrency: z.string().optional(),
+  taxesAndFees: z
+    .object({
+      cardFeeEnabled: z.boolean(),
+      cardFeePercent: z.number().min(0).max(100).optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -233,46 +246,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // 2FA: activado por defecto. Solo se salta si el admin lo desactivó explícitamente (twoFactorEnabled === false)
     const twoFactorEnabled = (user as User & { twoFactorEnabled?: boolean }).twoFactorEnabled !== false;
     if (twoFactorEnabled) {
-      const emailTo = user.email || user.username;
-      const isEmailToValid = validator.isEmail(emailTo);
+      const emailTo = resolveTwoFactorEmail(user, username);
       const emailConfigured = isEmailConfigured();
 
-      // Sin email válido no podemos enviar el código 2FA
-      if (!isEmailToValid) {
+      if (!emailTo || !validator.isEmail(emailTo)) {
         return res.status(400).json({
           message: "Tu cuenta no tiene un correo electrónico válido configurado. Contacta al administrador para añadir tu correo y poder recibir el código de verificación.",
         });
       }
 
-      if (!emailConfigured && process.env.NODE_ENV === "production") {
+      if (!emailConfigured) {
         return res.status(503).json({
           message: "El envío de correos no está configurado. Contacta al administrador.",
         });
       }
 
       const code = String(crypto.randomInt(100000, 999999));
-      const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + TWO_FACTOR_CODE_EXPIRY_MINUTES * 60 * 1000);
       const tempToken = await storage.createTwoFactorSession(user.id, code, expiresAt);
+      const emailMasked = maskEmail(emailTo);
 
-      logger.info("[2FA] Código para " + emailTo + ": " + code);
+      logger.info("[2FA] Enviando código", {
+        userId: user.id,
+        emailTo,
+        emailMasked,
+        loginIdentifier: username,
+        expiresMinutes: TWO_FACTOR_CODE_EXPIRY_MINUTES,
+      });
 
-      if (emailConfigured) {
-        sendEmail({
-          to: emailTo,
-          subject: "Código de verificación - Cosmos Viajes",
-          html: generate2FACodeEmailHtml(code, user.name ?? undefined),
-        }).then((ok) => {
-          if (ok) logger.info("[2FA] Correo enviado OK a " + emailTo);
-          else logger.warn("[2FA] Falló envío de correo a " + emailTo);
-        }).catch((err) => {
-          logger.error("[2FA] Error inesperado enviando correo", { error: (err as Error).message });
+      const emailSent = await sendEmail({
+        to: emailTo,
+        subject: "Código de verificación - Cosmos Viajes",
+        html: generate2FACodeEmailHtml(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
+        text: generate2FACodeEmailText(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
+      });
+
+      if (!emailSent) {
+        logger.error("[2FA] No se pudo enviar el correo", { userId: user.id, emailTo });
+        return res.status(503).json({
+          message: `No pudimos enviar el código a ${emailMasked}. Verifica que el correo sea correcto o contacta al administrador.`,
         });
       }
+
+      logger.info("[2FA] Correo enviado OK", { userId: user.id, emailTo });
 
       return res.json({
         needs2FA: true,
         tempToken,
-        message: "Revisa tu correo para el código de verificación",
+        emailMasked,
+        message: `Enviamos un código de 6 dígitos a ${emailMasked}. Revisa tu bandeja de entrada y la carpeta de spam. El código vence en ${TWO_FACTOR_CODE_EXPIRY_MINUTES} minutos.`,
       });
     }
 
@@ -282,7 +304,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Error al iniciar sesión" });
       }
       const { passwordHash, ...userWithoutPassword } = user;
-      return res.json({ user: userWithoutPassword });
+      req.session.save((saveErr: unknown) => {
+        if (saveErr) {
+          logger.error("Login session.save error", { err: saveErr });
+          return res.status(500).json({ message: "Error al iniciar sesión" });
+        }
+        return res.json({ user: userWithoutPassword });
+      });
     });
   }));
 
@@ -1080,6 +1108,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(rest);
   }));
 
+  app.patch("/api/admin/users/:id/discount", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const schema = z.object({
+      discountPercentage: z
+        .number({ invalid_type_error: "El porcentaje debe ser un número" })
+        .min(0, "El descuento no puede ser negativo")
+        .max(100, "El descuento no puede superar 100%"),
+    });
+    const { discountPercentage } = schema.parse(req.body);
+    const existing = await storage.findUserById(req.params.id);
+    if (!existing) throw new NotFoundError("Usuario");
+    if (existing.role !== ROLES.ADVISOR && existing.role !== ROLES.AGENCY) {
+      throw new ValidationError("Solo se puede asignar descuento a asesores y agencias");
+    }
+    const updated = await storage.updateUserByAdmin(req.params.id, {
+      discountPercentage: discountPercentage.toFixed(2),
+    });
+    const { passwordHash, ...rest } = updated;
+    logger.info("Admin updated user discount", { userId: req.params.id, discountPercentage });
+    res.json(rest);
+  }));
+
   app.delete("/api/admin/users/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const currentUser = req.user as User;
     if (currentUser.id === req.params.id) {
@@ -1166,6 +1215,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     hotelGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     adicionalesGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     descriptiveAudioUrl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
+    planTaxes: z
+      .array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          amount: z.string(),
+          currency: z.enum(["USD", "COP"]),
+          perPassenger: z.boolean().optional(),
+        }),
+      )
+      .nullable()
+      .optional(),
   });
 
   app.get("/api/admin/destinations", requirePlanManagers, asyncHandler(async (req, res) => {
@@ -1252,6 +1313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : null,
       createdByUserId: user.role === ROLES.AGENCY ? user.id : null,
       agencyDisplayName: user.role === ROLES.AGENCY ? resolveAgencyDisplayName(user) : null,
+      planTaxes: validated.planTaxes?.length ? validated.planTaxes : null,
     };
     try {
       const destination = await storage.createDestination(destData);
@@ -1461,6 +1523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       hotelGalleryImageUrls: validHotelGalleryPut.length ? validHotelGalleryPut : null,
       adicionalesGalleryImageUrls: validAdicionalesGalleryPut.length ? validAdicionalesGalleryPut : null,
       descriptiveAudioUrl: newDescriptiveAudio,
+      planTaxes: validated.planTaxes?.length ? validated.planTaxes : null,
       ...(user.role === ROLES.AGENCY
         ? {
             createdByUserId: existing.createdByUserId,

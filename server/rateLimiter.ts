@@ -5,11 +5,11 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // Rate limiter for authentication endpoints (login, register)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 1000 : 5, // More permissive in development
+  max: isDevelopment ? 1000 : 25, // Login + 2FA requiere varios intentos legítimos
   message: "Demasiados intentos de autenticación. Por favor intenta de nuevo en 15 minutos.",
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  skipSuccessfulRequests: false, // Count successful requests too
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // No penalizar logins/verificaciones exitosas
 });
 
 // Rate limiter for public PDF generation endpoint

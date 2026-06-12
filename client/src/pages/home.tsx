@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { type Destination } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -220,12 +221,12 @@ export default function Home() {
       <div className="bg-background/80 backdrop-blur-sm border-b border-border/50 py-3 px-4 shadow-sm">
         <div className="container mx-auto max-w-lg">
           <div className="relative">
-            <input
+            <Input
               type="text"
               placeholder="Buscar destinos por nombre o país..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-3 pl-12 border-2 border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent shadow-sm"
+              className="h-12 w-full border-2 pl-12 text-base shadow-sm"
               data-testid="input-search-destinations"
             />
             <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />

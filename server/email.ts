@@ -81,10 +81,23 @@ async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error("[Email] Brevo API error", {
-        status: response.status,
-        error: errorText,
-      });
+      let parsedMessage = errorText;
+      try {
+        const parsed = JSON.parse(errorText) as { message?: string; code?: string };
+        parsedMessage = parsed.message || errorText;
+        logger.error("[Email] Brevo API error", {
+          status: response.status,
+          code: parsed.code,
+          message: parsedMessage,
+          to: options.to,
+        });
+      } catch {
+        logger.error("[Email] Brevo API error", {
+          status: response.status,
+          error: errorText,
+          to: options.to,
+        });
+      }
       return false;
     }
 
@@ -325,7 +338,7 @@ export function generatePasswordResetEmailHtml(resetUrl: string, expiresInMinute
   `;
 }
 
-export function generate2FACodeEmailHtml(code: string, userName?: string): string {
+export function generate2FACodeEmailHtml(code: string, userName?: string, expiryMinutes = 10): string {
   return `
     <!DOCTYPE html>
     <html>
@@ -337,13 +350,26 @@ export function generate2FACodeEmailHtml(code: string, userName?: string): strin
           <p>Hola ${userName || "usuario"},</p>
           <p>Tu código de verificación para iniciar sesión en <strong>Cosmos Viajes</strong> es:</p>
           <div class="code-box">${code}</div>
-          <p>Este código expira en <strong>2 minutos</strong>. No lo compartas con nadie.</p>
+          <p>Este código expira en <strong>${expiryMinutes} minutos</strong>. No lo compartas con nadie.</p>
+          <p style="font-size:13px;color:#64748b;">Si no solicitaste este código, ignora este mensaje. Revisa también la carpeta de spam o correo no deseado.</p>
         </div>
         <div class="footer">Cosmos Viajes · Cotizador Mayorista · info@cosmosviajes.com</div>
       </div>
     </body>
     </html>
   `;
+}
+
+export function generate2FACodeEmailText(code: string, userName?: string, expiryMinutes = 10): string {
+  return `Hola ${userName || "usuario"},
+
+Tu código de verificación para iniciar sesión en Cosmos Viajes es: ${code}
+
+Este código expira en ${expiryMinutes} minutos. No lo compartas con nadie.
+
+Si no solicitaste este código, ignora este mensaje.
+
+Cosmos Viajes · info@cosmosviajes.com`;
 }
 
 export function generateQuoteEmailHtml(quote: any, pdfUrl: string): string {

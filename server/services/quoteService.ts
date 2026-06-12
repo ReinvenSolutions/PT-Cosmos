@@ -82,6 +82,7 @@ export class QuoteService {
             : data.finalPriceCOP)
         : null,
       finalPriceCurrency: data.finalPriceCurrency || "USD",
+      taxesAndFees: data.taxesAndFees ?? null,
       status: "draft" as const,
     };
 
@@ -235,6 +236,9 @@ export class QuoteService {
     }
     if (data.finalPriceCurrency !== undefined) {
       quoteData.finalPriceCurrency = data.finalPriceCurrency || "USD";
+    }
+    if (data.taxesAndFees !== undefined) {
+      quoteData.taxesAndFees = data.taxesAndFees ?? null;
     }
 
     const quote = await storage.updateQuote(

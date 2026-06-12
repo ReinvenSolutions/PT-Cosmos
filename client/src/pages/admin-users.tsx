@@ -52,6 +52,7 @@ import {
   XCircle,
   Clock,
   Building2,
+  Percent,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,6 +68,7 @@ interface AdminUser {
   isActive: boolean;
   approvalStatus: string;
   twoFactorEnabled?: boolean;
+  discountPercentage?: string | number | null;
   createdAt: string;
 }
 
@@ -107,6 +109,7 @@ export default function AdminUsers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<AdminUser | null>(null);
+  const [discountUser, setDiscountUser] = useState<AdminUser | null>(null);
   const [confirmWord, setConfirmWord] = useState("");
   const [randomWord, setRandomWord] = useState("");
 
@@ -193,6 +196,22 @@ export default function AdminUsers() {
     },
   });
 
+  const discountMutation = useMutation({
+    mutationFn: ({ id, discountPercentage }: { id: string; discountPercentage: number }) =>
+      apiRequest("PATCH", `/api/admin/users/${id}/discount`, { discountPercentage }),
+    onSuccess: () => {
+      invalidateUserLists();
+      setDiscountUser(null);
+      toast({
+        title: "Descuento actualizado",
+        description: "El porcentaje de descuento se aplicará en las cotizaciones del usuario.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleOpenDelete = (user: AdminUser) => {
     setDeleteUser(user);
     setConfirmWord("");
@@ -267,6 +286,7 @@ export default function AdminUsers() {
                 <TableHead>Usuario</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
+                <TableHead>Descuento</TableHead>
                 <TableHead>Aprobación</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -275,13 +295,13 @@ export default function AdminUsers() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     Cargando usuarios...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No se encontraron usuarios.
                   </TableCell>
                 </TableRow>
@@ -304,6 +324,22 @@ export default function AdminUsers() {
                       <Badge variant={user.role === "super_admin" ? "default" : "secondary"}>
                         {ROLES.find((r) => r.value === user.role)?.label ?? user.role}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.role === ROLE_IDS.ADVISOR || user.role === ROLE_IDS.AGENCY ? (
+                        <button
+                          type="button"
+                          onClick={() => setDiscountUser(user)}
+                          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                        >
+                          <Percent className="h-3.5 w-3.5" />
+                          {Number(user.discountPercentage ?? 0) > 0
+                            ? `${Number(user.discountPercentage)}%`
+                            : "Sin descuento"}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={approval.variant} className={isPending ? "border-amber-500/50 text-amber-700 dark:text-amber-400" : ""}>
@@ -362,6 +398,12 @@ export default function AdminUsers() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
+                          {(user.role === ROLE_IDS.ADVISOR || user.role === ROLE_IDS.AGENCY) && (
+                            <DropdownMenuItem onClick={() => setDiscountUser(user)}>
+                              <Percent className="mr-2 h-4 w-4" />
+                              Asignar descuento
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => handleOpenDelete(user)}
@@ -389,6 +431,16 @@ export default function AdminUsers() {
         onOpenChange={setCreateOpen}
         onSubmit={(data) => createMutation.mutate(data)}
         isSubmitting={createMutation.isPending}
+      />
+
+      {/* Discount Dialog */}
+      <DiscountDialog
+        user={discountUser}
+        onOpenChange={(open) => !open && setDiscountUser(null)}
+        onSubmit={(discountPercentage) =>
+          discountUser && discountMutation.mutate({ id: discountUser.id, discountPercentage })
+        }
+        isSubmitting={discountMutation.isPending}
       />
 
       {/* Edit User Dialog */}
@@ -449,6 +501,81 @@ export default function AdminUsers() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function DiscountDialog({
+  user,
+  onOpenChange,
+  onSubmit,
+  isSubmitting,
+}: {
+  user: AdminUser | null;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (discountPercentage: number) => void;
+  isSubmitting: boolean;
+}) {
+  const [discountPercentage, setDiscountPercentage] = useState("0");
+
+  useEffect(() => {
+    if (user) {
+      setDiscountPercentage(String(Number(user.discountPercentage ?? 0)));
+    }
+  }, [user]);
+
+  if (!user) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = parseFloat(discountPercentage);
+    if (!Number.isFinite(value) || value < 0 || value > 100) return;
+    onSubmit(value);
+  };
+
+  return (
+    <Dialog open={!!user} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Asignar descuento</DialogTitle>
+          <DialogDescription>
+            Define el porcentaje de descuento sobre la porción terrestre para{" "}
+            <strong>{user.name || user.username}</strong>. Se aplicará automáticamente en sus cotizaciones.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="discount-percentage">Porcentaje de descuento (%)</Label>
+            <div className="relative">
+              <Input
+                id="discount-percentage"
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                value={discountPercentage}
+                onChange={(e) => setDiscountPercentage(e.target.value)}
+                placeholder="Ej: 20"
+                required
+                className="pr-8"
+              />
+              <Percent className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ejemplo: con 20% sobre un plan de US$ 710, la porción terrestre quedará en US$ 568.
+              El descuento no aplica a vuelos, asistencia ni mejoras.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Guardar descuento
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

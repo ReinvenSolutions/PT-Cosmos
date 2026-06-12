@@ -33,22 +33,15 @@ export const OPERATIVE_MAIN: CompanyContact = {
 
 export const TEAM_CONTACTS: CompanyContact[] = [
   {
-    name: "Edison Zúñiga",
-    phoneDisplay: "312 282 7422",
-    phoneE164: "573122827422",
-    area: "Área contable y facturación",
-  },
-  {
-    name: "Alejandro García",
-    phoneDisplay: "312 278 7778",
-    phoneE164: "573122787778",
-    area: "Cotizaciones terrestres",
-  },
-  {
     name: "Tomas Pineda",
     phoneDisplay: "310 677 6640",
     phoneE164: "573106776640",
     area: "Gerencia comercial y producto",
+  },
+  {
+    phoneDisplay: "312 282 7422",
+    phoneE164: "573122827422",
+    area: "Área contable y facturación",
   },
 ];
 

@@ -20,7 +20,9 @@ import { ensureDestinationBloqueoColumns } from "./ensure-destination-bloqueo-co
 import { ensureDestinationDescriptiveAudioColumn } from "./ensure-destination-descriptive-audio";
 import { ensureDestinationRecommendationsColumn } from "./ensure-destination-recommendations";
 import { ensureUserApprovalStatusColumn } from "./ensure-user-approval-status";
+import { ensureUserDiscountColumn } from "./ensure-user-discount-column";
 import { ensureDestinationAgencyColumns } from "./ensure-destination-agency-columns";
+import { ensureDestinationPlanTaxesColumn } from "./ensure-destination-plan-taxes-column";
 import { seedDatabaseIfEmpty } from "./seed";
 
 /** Aplica migración 0008 (auth tokens, 2FA) si no existe. No bloquea el arranque. */
@@ -95,7 +97,7 @@ app.use(
     cookie: {
       secure: env.NODE_ENV === "production",
       httpOnly: true,
-      sameSite: env.NODE_ENV === "production" ? "lax" : "strict",
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000,
       // Domain should not be set - let the browser handle it automatically
       // This ensures cookies work on custom domains
@@ -149,7 +151,9 @@ app.use((req, res, next) => {
     await ensureDestinationDescriptiveAudioColumn(pool);
     await ensureDestinationRecommendationsColumn(pool);
     await ensureUserApprovalStatusColumn(pool);
+    await ensureUserDiscountColumn(pool);
     await ensureDestinationAgencyColumns(pool);
+    await ensureDestinationPlanTaxesColumn(pool);
 
     const server = await registerRoutes(app);
 
