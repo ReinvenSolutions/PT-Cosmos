@@ -679,7 +679,8 @@ export default function QuoteSummary() {
   } = applyLandPortionDiscount(landPortionTotal, userDiscountPercentage);
 
   const systemBaseTrm = globalTrmSettings?.baseTrm ?? null;
-  const effectiveTrm = quoteInCop ? (effectiveTrmFromBase(systemBaseTrm) ?? 0) : 0;
+  const systemEffectiveTrm = effectiveTrmFromBase(systemBaseTrm) ?? 0;
+  const effectiveTrm = quoteInCop ? systemEffectiveTrm : 0;
 
   const formatAllowedDays = (days: string[]): string => {
     const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -707,20 +708,6 @@ export default function QuoteSummary() {
     return sortedDays.map(d => dayMapSpanish[d]).join(' y ');
   };
 
-  // Al cotizar en COP, los importes del cliente se ingresan en pesos cuando la TRM global está configurada
-  useEffect(() => {
-    const baseOk = systemBaseTrm != null && systemBaseTrm > 0;
-    if (quoteInCop && baseOk) {
-      setInputCurrencyFlights("COP");
-      setInputCurrencyAssistance("COP");
-      setInputCurrencyFinal("COP");
-    } else {
-      setInputCurrencyFlights("USD");
-      setInputCurrencyAssistance("USD");
-      setInputCurrencyFinal("USD");
-    }
-  }, [quoteInCop, systemBaseTrm]);
-
   const formatNumber = (value: string) => {
     const clean = value.replace(/[^\d.]/g, "");
     if (!clean) return "";
@@ -735,10 +722,42 @@ export default function QuoteSummary() {
 
   const getUSDValue = (value: string, currency: "USD" | "COP") => {
     const num = parseNumber(value);
-    if (currency === "COP" && effectiveTrm > 0) {
-      return num / effectiveTrm;
+    if (currency === "COP" && systemEffectiveTrm > 0) {
+      return num / systemEffectiveTrm;
     }
     return num;
+  };
+
+  const convertInputBetweenCurrencies = useCallback(
+    (value: string, from: "USD" | "COP", to: "USD" | "COP"): string => {
+      if (from === to || !value.trim() || systemEffectiveTrm <= 0) return value;
+      const num = parseNumber(value);
+      if (num === 0) return "";
+      if (from === "USD" && to === "COP") {
+        return Math.round(num * systemEffectiveTrm).toString();
+      }
+      return (num / systemEffectiveTrm).toFixed(2);
+    },
+    [systemEffectiveTrm],
+  );
+
+  const handleFlightsCurrencyChange = (newCurrency: "USD" | "COP") => {
+    if (newCurrency === inputCurrencyFlights) return;
+    setFlightsCost((prev) => convertInputBetweenCurrencies(prev, inputCurrencyFlights, newCurrency));
+    setInputCurrencyFlights(newCurrency);
+  };
+
+  const handleAssistanceCurrencyChange = (newCurrency: "USD" | "COP") => {
+    if (newCurrency === inputCurrencyAssistance) return;
+    setAssistanceCost((prev) => convertInputBetweenCurrencies(prev, inputCurrencyAssistance, newCurrency));
+    setInputCurrencyAssistance(newCurrency);
+  };
+
+  const handleFinalCurrencyChange = (newCurrency: "USD" | "COP") => {
+    if (newCurrency === inputCurrencyFinal) return;
+    setFinalPrice((prev) => convertInputBetweenCurrencies(prev, inputCurrencyFinal, newCurrency));
+    setMinPayment((prev) => (prev ? convertInputBetweenCurrencies(prev, inputCurrencyFinal, newCurrency) : prev));
+    setInputCurrencyFinal(newCurrency);
   };
 
   const flightsCostUSD = getUSDValue(flightsCost, inputCurrencyFlights);
@@ -804,7 +823,7 @@ export default function QuoteSummary() {
   const clientPayableBeforeCardFeeUSD = finalPriceValue + planTaxesTotalUSD;
   const feesBreakdown = calculateQuoteFees(taxesFeesConfig, clientPayableBeforeCardFeeUSD, effectiveTrm);
   const profit = finalPriceValue - netTotalUSD;
-  const finalPriceCOP = effectiveTrm > 0 ? finalPriceValue * effectiveTrm : 0;
+  const finalPriceCOP = systemEffectiveTrm > 0 ? finalPriceValue * systemEffectiveTrm : 0;
   const clientTotalCOP = effectiveTrm > 0 ? feesBreakdown.clientTotalUSD * effectiveTrm : 0;
   const hasCardFee = taxesFeesConfig.cardFeeEnabled && feesBreakdown.cardFeeUSD > 0;
 
@@ -1040,9 +1059,9 @@ export default function QuoteSummary() {
       const rawMinPayment = parseNumber(minPayment);
       if (inputCurrencyFinal === "USD") {
         payloadMinPayment = rawMinPayment;
-        payloadMinPaymentCOP = effectiveTrm > 0 ? rawMinPayment * effectiveTrm : null;
+        payloadMinPaymentCOP = systemEffectiveTrm > 0 ? rawMinPayment * systemEffectiveTrm : null;
       } else {
-        payloadMinPayment = effectiveTrm > 0 ? rawMinPayment / effectiveTrm : null;
+        payloadMinPayment = systemEffectiveTrm > 0 ? rawMinPayment / systemEffectiveTrm : null;
         payloadMinPaymentCOP = rawMinPayment;
       }
     } else {
@@ -1058,9 +1077,9 @@ export default function QuoteSummary() {
     if (finalPrice && finalPrice.trim() !== "") {
       if (inputCurrencyFinal === "USD") {
         payloadFinalPrice = rawFinalPrice;
-        payloadFinalPriceCOP = effectiveTrm > 0 ? rawFinalPrice * effectiveTrm : null;
+        payloadFinalPriceCOP = systemEffectiveTrm > 0 ? rawFinalPrice * systemEffectiveTrm : null;
       } else {
-        payloadFinalPrice = effectiveTrm > 0 ? rawFinalPrice / effectiveTrm : null;
+        payloadFinalPrice = systemEffectiveTrm > 0 ? rawFinalPrice / systemEffectiveTrm : null;
         payloadFinalPriceCOP = rawFinalPrice;
       }
     }
@@ -1185,11 +1204,11 @@ export default function QuoteSummary() {
         if (inputCurrencyFinal === "USD") {
           payloadFinalPrice = rawFinalPrice;
           // Calculate COP equivalent if TRM is available
-          payloadFinalPriceCOP = effectiveTrm > 0 ? rawFinalPrice * effectiveTrm : null;
+          payloadFinalPriceCOP = systemEffectiveTrm > 0 ? rawFinalPrice * systemEffectiveTrm : null;
         } else {
           // COP
           // Calculate USD equivalent if TRM is available
-          payloadFinalPrice = effectiveTrm > 0 ? rawFinalPrice / effectiveTrm : null;
+          payloadFinalPrice = systemEffectiveTrm > 0 ? rawFinalPrice / systemEffectiveTrm : null;
           // The COP value is exactly what the user typed
           payloadFinalPriceCOP = rawFinalPrice;
         }
@@ -1206,9 +1225,9 @@ export default function QuoteSummary() {
         // Assume the currency matches the Final Price currency input
         if (inputCurrencyFinal === "USD") {
           payloadMinPayment = rawMinPayment;
-          payloadMinPaymentCOP = effectiveTrm > 0 ? rawMinPayment * effectiveTrm : null;
+          payloadMinPaymentCOP = systemEffectiveTrm > 0 ? rawMinPayment * systemEffectiveTrm : null;
         } else {
-          payloadMinPayment = effectiveTrm > 0 ? rawMinPayment / effectiveTrm : null;
+          payloadMinPayment = systemEffectiveTrm > 0 ? rawMinPayment / systemEffectiveTrm : null;
           payloadMinPaymentCOP = rawMinPayment;
         }
       } else {
@@ -2161,13 +2180,13 @@ export default function QuoteSummary() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-3">
-              Ingresa los valores. El sistema calculará el total.
+              Ingresa los valores en USD por defecto. Al cambiar a COP, el monto se convierte automáticamente con la TRM del sistema.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Vuelos</Label>
                 <div className="flex items-center gap-2 mt-1">
-                  {effectiveTrm > 0 ? (
+                  {systemEffectiveTrm > 0 ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
@@ -2176,8 +2195,8 @@ export default function QuoteSummary() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => setInputCurrencyFlights("USD")}>US$ - Dólares</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setInputCurrencyFlights("COP")}>COP$ - Pesos</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleFlightsCurrencyChange("USD")}>US$ - Dólares</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleFlightsCurrencyChange("COP")}>COP$ - Pesos</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
@@ -2191,10 +2210,10 @@ export default function QuoteSummary() {
                     className="text-lg font-semibold"
                   />
                 </div>
-                {effectiveTrm > 0 && (
+                {systemEffectiveTrm > 0 && (
                   <div className="mt-1 text-xs text-muted-foreground">
                     {inputCurrencyFlights === "USD"
-                      ? `$ ${(getUSDValue(flightsCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+                      ? `$ ${(getUSDValue(flightsCost, "USD") * systemEffectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
                       : `US$ ${getUSDValue(flightsCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     }
                   </div>
@@ -2203,7 +2222,7 @@ export default function QuoteSummary() {
               <div>
                 <Label>Asistencia</Label>
                 <div className="flex items-center gap-2 mt-1">
-                  {effectiveTrm > 0 ? (
+                  {systemEffectiveTrm > 0 ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
@@ -2212,8 +2231,8 @@ export default function QuoteSummary() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => setInputCurrencyAssistance("USD")}>US$ - Dólares</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setInputCurrencyAssistance("COP")}>COP$ - Pesos</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleAssistanceCurrencyChange("USD")}>US$ - Dólares</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleAssistanceCurrencyChange("COP")}>COP$ - Pesos</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
@@ -2227,10 +2246,10 @@ export default function QuoteSummary() {
                     className="text-lg font-semibold"
                   />
                 </div>
-                {effectiveTrm > 0 && (
+                {systemEffectiveTrm > 0 && (
                   <div className="mt-1 text-xs text-muted-foreground">
                     {inputCurrencyAssistance === "USD"
-                      ? `$ ${(getUSDValue(assistanceCost, "USD") * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+                      ? `$ ${(getUSDValue(assistanceCost, "USD") * systemEffectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
                       : `US$ ${getUSDValue(assistanceCost, "COP").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     }
                   </div>
@@ -2354,7 +2373,7 @@ export default function QuoteSummary() {
               Ingresa el precio final que verá el cliente en el PDF.
             </p>
             <div className="flex items-center gap-2 mb-4">
-              {effectiveTrm > 0 ? (
+              {systemEffectiveTrm > 0 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="px-2 h-10 font-bold text-lg text-foreground hover:bg-muted">
@@ -2363,8 +2382,8 @@ export default function QuoteSummary() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => setInputCurrencyFinal("USD")}>US$ - Dólares</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setInputCurrencyFinal("COP")}>COP$ - Pesos</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleFinalCurrencyChange("USD")}>US$ - Dólares</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleFinalCurrencyChange("COP")}>COP$ - Pesos</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
@@ -2379,7 +2398,7 @@ export default function QuoteSummary() {
                 data-testid="input-final-price"
               />
             </div>
-            {effectiveTrm > 0 && (
+            {systemEffectiveTrm > 0 && (
               <div className="mb-4 text-lg font-bold text-purple-700 dark:text-purple-300">
                 {inputCurrencyFinal === "USD"
                   ? `$ ${finalPriceCOP.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
@@ -2586,13 +2605,13 @@ export default function QuoteSummary() {
               />
             </div>
 
-            {effectiveTrm > 0 && (
+            {systemEffectiveTrm > 0 && (
               <div className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
                 {minPayment ? (
                   // Show conversion of manual input
                   inputCurrencyFinal === "USD"
-                    ? `$ ${(parseNumber(minPayment) * effectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
-                    : `US$ ${(parseNumber(minPayment) / effectiveTrm).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ? `$ ${(parseNumber(minPayment) * systemEffectiveTrm).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+                    : `US$ ${(parseNumber(minPayment) / systemEffectiveTrm).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 ) : (
                   // Show conversion of default calculation
                   inputCurrencyFinal === "USD"
