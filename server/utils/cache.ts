@@ -54,4 +54,5 @@ export function clearDestinationCache(destinationId: string) {
   cache.del(CacheKeys.destinationsPreviews(true));
   cache.del(CacheKeys.destinationsPreviews(false));
   cache.del(CacheKeys.destinationsPreviews());
+  cache.del("cosmos:catalog");
 }
