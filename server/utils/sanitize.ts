@@ -21,3 +21,19 @@ export function sanitizeText(text: string): string {
     ALLOWED_ATTR: [],
   });
 }
+
+/** Convierte HTML sanitizado a texto plano para contexto del asistente Cosmos. */
+export function htmlToPlainText(html: string): string {
+  const plain = sanitizeText(html)
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return plain;
+}
+
+export function sanitizeCosmosAssistantNotes(html: string | null | undefined): string | null {
+  if (!html?.trim()) return null;
+  const sanitized = sanitizeHtml(html.trim());
+  return sanitized.trim() ? sanitized : null;
+}

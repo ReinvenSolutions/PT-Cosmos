@@ -22,6 +22,8 @@ import { logger } from "./logger";
 import { quoteService } from "./services/quoteService";
 import { ValidationError, NotFoundError } from "./errors/AppError";
 import { getOrSetCache, CacheKeys, clearDestinationCache } from "./utils/cache";
+import { stripInternalDestinationFields, stripInternalDestinationFieldsList, stripInternalFieldsFromQuoteDestinations } from "./utils/destinationPublic";
+import { sanitizeCosmosAssistantNotes } from "./utils/sanitize";
 import { db } from "./db";
 import { sql, eq, and, ne } from "drizzle-orm";
 import { users as usersTable } from "@shared/schema";
@@ -821,7 +823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           duration: destination?.duration || 0,
           nights: destination?.nights || 0,
           basePrice: destination?.basePrice || "0",
-          destination,
+          destination: destination ? stripInternalDestinationFields(destination) : undefined,
           itinerary,
           hotels,
           inclusions: inclusionsList,
@@ -930,7 +932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const cacheKey = CacheKeys.destinations(isActive);
     const destinations = await getOrSetCache(cacheKey, () => storage.getDestinations({ isActive }));
     res.setHeader("Cache-Control", "private, no-store, must-revalidate");
-    res.json(destinations);
+    res.json(stripInternalDestinationFieldsList(destinations));
   }));
 
   app.get("/api/destinations-previews", asyncHandler(async (req, res) => {
@@ -938,7 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const cacheKey = CacheKeys.destinationsPreviews(isActive);
     const data = await getOrSetCache(cacheKey, () => storage.getDestinationsWithPreviews({ isActive }));
     res.setHeader("Cache-Control", "private, no-store, must-revalidate");
-    res.json(data);
+    res.json(stripInternalDestinationFieldsList(data));
   }));
 
   app.get("/api/destinations/:id", asyncHandler(async (req, res) => {
@@ -961,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     res.setHeader("Cache-Control", "private, no-store, must-revalidate");
     res.json({
-      ...destination,
+      ...stripInternalDestinationFields(destination),
       itinerary,
       hotels,
       inclusions,
@@ -1274,6 +1276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     flightTerms: z.string().nullable().optional(),
     termsConditions: z.string().nullable().optional(),
     recommendations: z.string().nullable().optional(),
+    cosmosAssistantNotes: z.string().max(50000).nullable().optional(),
     hasInternalOrConnectionFlight: z.boolean().optional(),
     hotelGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     adicionalesGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
@@ -1364,6 +1367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
       recommendations: validated.recommendations ?? null,
+      cosmosAssistantNotes: sanitizeCosmosAssistantNotes(validated.cosmosAssistantNotes),
       hotelGalleryImageUrls: validated.hotelGalleryImageUrls?.length
         ? validated.hotelGalleryImageUrls
         : null,
@@ -1583,6 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       flightTerms: validated.flightTerms ?? null,
       termsConditions: validated.termsConditions ?? null,
       recommendations: validated.recommendations ?? null,
+      cosmosAssistantNotes: sanitizeCosmosAssistantNotes(validated.cosmosAssistantNotes),
       hotelGalleryImageUrls: validHotelGalleryPut.length ? validHotelGalleryPut : null,
       adicionalesGalleryImageUrls: validAdicionalesGalleryPut.length ? validAdicionalesGalleryPut : null,
       descriptiveAudioUrl: newDescriptiveAudio,
@@ -1802,7 +1807,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       throw new NotFoundError("Quote");
     }
 
-    res.json(quote);
+    res.json({
+      ...quote,
+      destinations: stripInternalFieldsFromQuoteDestinations(quote.destinations),
+    });
   }));
 
   app.get("/api/quotes/:id/pdf", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
@@ -1830,7 +1838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           basePrice: qd.price ? qd.price.toString() : qd.destination.basePrice || "0",
           startDate: qd.startDate.toISOString(),
           passengers: qd.passengers,
-          destination: qd.destination,
+          destination: stripInternalDestinationFields(qd.destination),
           itinerary,
           hotels,
           inclusions,

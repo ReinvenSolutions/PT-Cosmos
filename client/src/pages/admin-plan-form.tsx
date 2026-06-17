@@ -12,6 +12,7 @@ import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { CosmoProcessingDialog } from "@/components/cosmo-processing-dialog";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { apiRequest, queryClient, invalidatePublicDestinationQueries } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import {
@@ -215,6 +216,7 @@ function AdminPlanForm() {
   const [flightTerms, setFlightTerms] = useState("");
   const [termsConditions, setTermsConditions] = useState("");
   const [recommendations, setRecommendations] = useState("");
+  const [cosmosAssistantNotes, setCosmosAssistantNotes] = useState("");
   const [hasInternalOrConnectionFlight, setHasInternalOrConnectionFlight] = useState(false);
   const [requiresExtraDay, setRequiresExtraDay] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -274,6 +276,7 @@ function AdminPlanForm() {
     flightTerms?: string | null;
     termsConditions?: string | null;
     recommendations?: string | null;
+    cosmosAssistantNotes?: string | null;
     hasInternalOrConnectionFlight?: boolean;
     requiresExtraDay?: boolean;
     hotelGalleryImageUrls?: string[] | null;
@@ -327,6 +330,7 @@ function AdminPlanForm() {
       setFlightTerms(existing.flightTerms ?? "");
       setTermsConditions(existing.termsConditions ?? "");
       setRecommendations(existing.recommendations ?? "");
+      setCosmosAssistantNotes(existing.cosmosAssistantNotes ?? "");
       setHasInternalOrConnectionFlight(existing.hasInternalOrConnectionFlight ?? false);
       setRequiresExtraDay(existing.requiresExtraDay ?? false);
       const hg = existing.hotelGalleryImageUrls;
@@ -423,6 +427,7 @@ function AdminPlanForm() {
       flightTerms: flightTerms || null,
       termsConditions: termsConditions || null,
       recommendations: recommendations.trim() || null,
+      cosmosAssistantNotes: cosmosAssistantNotes.trim() || null,
       hotelGalleryImageUrls:
         hotelGalleryImages.length > 0 ? hotelGalleryImages.map((x) => x.imageUrl) : null,
       adicionalesGalleryImageUrls:
@@ -1136,6 +1141,25 @@ function AdminPlanForm() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Si no se completa, se usará un texto por defecto según el plan.
                 </p>
+              </div>
+
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" aria-hidden />
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-base">Contexto para Cosmos (notas internas)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Bloc de notas con texto enriquecido. Aquí puedes dejar ideas, aclaraciones o contexto exclusivo para el asistente Cosmos sobre este plan.
+                      <strong className="font-medium text-foreground"> No se publica</strong> en el catálogo, la ficha del plan ni el PDF de cotización.
+                    </p>
+                  </div>
+                </div>
+                <RichTextEditor
+                  value={cosmosAssistantNotes}
+                  onChange={setCosmosAssistantNotes}
+                  placeholder="Ej: Si preguntan por visa, aclarar que aplica eVisa para colombianos. No combinar con bloqueos de diciembre. Precio terrestre no incluye tasas aeroportuarias en Estambul..."
+                  minHeight={240}
+                />
               </div>
 
               <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-3">

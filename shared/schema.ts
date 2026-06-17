@@ -59,6 +59,8 @@ export const destinations = pgTable(
     termsConditions: text("terms_conditions"),
     /** Recomendaciones y notas adicionales; se imprimen al final del PDF del plan. */
     recommendations: text("recommendations"),
+    /** Notas internas para Cosmos (HTML sanitizado). No se publican en catálogo ni PDF. */
+    cosmosAssistantNotes: text("cosmos_assistant_notes"),
     /** Usuario agencia que creó el plan; null = plan de Cosmos / super admin. */
     createdByUserId: varchar("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
     /** Nombre visible de la agencia en tarjetas del catálogo (snapshot al crear el plan). */

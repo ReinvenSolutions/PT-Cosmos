@@ -23,6 +23,7 @@ import {
 } from "@shared/planCosmosHints";
 import { storage } from "../storage";
 import { getOrSetCache } from "../utils/cache";
+import { htmlToPlainText } from "../utils/sanitize";
 import { COSMOS_APP_GUIDE } from "./cosmosAppGuide";
 
 export type CosmosChatMessage = { role: "user" | "assistant"; content: string };
@@ -80,6 +81,14 @@ function formatUpgrades(d: Destination): string {
   );
 }
 
+function formatCosmosAssistantNotes(plan: Destination): string {
+  const notes = plan.cosmosAssistantNotes?.trim();
+  if (!notes) return "";
+  const plain = htmlToPlainText(notes);
+  if (!plain) return "";
+  return `\nNotas internas para Cosmos (NO publicar ni citar como texto del PDF; son contexto obligatorio del equipo):\n${plain}`;
+}
+
 function formatPlanDetail(plan: FullPlan, catalog: Destination[]): string {
   const inc = plan.inclusions.map((x) => `  + ${x.item}`).join("\n") || "  (sin registros)";
   const exc = plan.exclusions.map((x) => `  - ${x.item}`).join("\n") || "  (sin registros)";
@@ -119,6 +128,7 @@ ${plan.requiresTuesday ? "Requiere salida en martes. " : ""}${plan.requiresExtra
 ${plan.flightTerms ? `Términos vuelo: ${plan.flightTerms}` : ""}
 ${plan.termsConditions ? `Términos: ${plan.termsConditions}` : ""}
 ${plan.recommendations ? `Recomendaciones (texto del PDF):\n${plan.recommendations}` : "Recomendaciones: (sin texto registrado)"}
+${formatCosmosAssistantNotes(plan)}
 ${plan.medicalAssistanceInfo ? `Asistencia médica del plan: ${plan.medicalAssistanceInfo}` : ""}
 
 Hoteles:
@@ -259,6 +269,24 @@ function formatCatalogTooltipsAndRecommendations(catalog: Destination[]): string
     .join("\n\n");
 }
 
+function formatAllCosmosAssistantNotes(catalog: Destination[]): string {
+  const blocks = catalog
+    .map((plan) => {
+      const notes = plan.cosmosAssistantNotes?.trim();
+      if (!notes) return null;
+      const plain = htmlToPlainText(notes);
+      if (!plain) return null;
+      return `### ${plan.name} (${plan.country}) [id=${plan.id}]\n${plain}`;
+    })
+    .filter((block): block is string => Boolean(block));
+
+  if (!blocks.length) {
+    return "(ningún plan con notas internas para Cosmos)";
+  }
+
+  return blocks.join("\n\n---\n\n");
+}
+
 export async function buildCosmosSystemContext(opts: {
   userMessage: string;
   history: CosmosChatMessage[];
@@ -310,6 +338,10 @@ ${formatCombinationRules(catalog)}
 ## Tooltips de tarjetas y recomendaciones — todos los planes activos
 ${formatCatalogTooltipsAndRecommendations(catalog)}
 
-${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo, tooltips y recomendaciones anteriores. Si necesitas itinerario, inclusiones o precios ampliados de un plan concreto, menciona el nombre del plan o país."}
+---
+## Notas internas de Cosmos por plan (contexto obligatorio; NO publicar en respuestas como texto del PDF ni del catálogo)
+${formatAllCosmosAssistantNotes(catalog)}
+
+${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo, tooltips, recomendaciones y notas internas anteriores. Si necesitas itinerario, inclusiones o precios ampliados de un plan concreto, menciona el nombre del plan o país."}
 `.trim();
 }
