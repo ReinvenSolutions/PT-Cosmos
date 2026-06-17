@@ -21,6 +21,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   verify2FA: (tempToken: string, code: string) => Promise<void>;
+  resend2FA: (tempToken: string, loginIdentifier?: string) => Promise<{ tempToken: string; emailMasked?: string; message?: string }>;
   logout: () => Promise<void>;
   updateProfile: (data: { name?: string; avatarUrl?: string | null }) => Promise<void>;
 }
@@ -86,6 +87,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.setQueryData(["/api/auth/me"], data);
   };
 
+  const resend2FA = async (tempToken: string, loginIdentifier?: string) => {
+    const response = await apiRequest("POST", "/api/auth/2fa/resend", { tempToken, loginIdentifier });
+    return response.json() as Promise<{ tempToken: string; emailMasked?: string; message?: string }>;
+  };
+
   const logout = async () => {
     await logoutMutation.mutateAsync();
   };
@@ -111,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         verify2FA,
+        resend2FA,
         logout,
         updateProfile,
       }}

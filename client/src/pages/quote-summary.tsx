@@ -12,7 +12,7 @@ import {
 } from "@shared/quoteFees";
 import { calculatePlanTaxes } from "@shared/planTaxes";
 import { ROLES } from "@shared/roles";
-import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
+import { effectiveTrmFromBase } from "@shared/trm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -250,7 +249,6 @@ export default function QuoteSummary() {
   const [italiaUpgrade, setItaliaUpgrade] = useState<string>("");
   const [granTourUpgrade, setGranTourUpgrade] = useState<string>("");
   const [otherDestUpgrades, setOtherDestUpgrades] = useState<Record<string, string>>({});
-  const [quoteInCop, setQuoteInCop] = useState(false);
   const [finalPrice, setFinalPrice] = useState("");
   const [taxesFeesConfig, setTaxesFeesConfig] = useState<QuoteFeesConfig>(EMPTY_QUOTE_FEES_CONFIG);
   const [minPayment, setMinPayment] = useState("");
@@ -480,7 +478,6 @@ export default function QuoteSummary() {
 
   useEffect(() => {
     if (!bloqueoPlan) return;
-    setQuoteInCop(false);
     setFlightsCost("");
     setAssistanceCost("");
     setOriginCity("");
@@ -680,7 +677,7 @@ export default function QuoteSummary() {
 
   const systemBaseTrm = globalTrmSettings?.baseTrm ?? null;
   const systemEffectiveTrm = effectiveTrmFromBase(systemBaseTrm) ?? 0;
-  const effectiveTrm = quoteInCop ? systemEffectiveTrm : 0;
+  const effectiveTrm = systemEffectiveTrm;
 
   const formatAllowedDays = (days: string[]): string => {
     const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -1034,16 +1031,6 @@ export default function QuoteSummary() {
       return;
     }
 
-    if (quoteInCop && (systemBaseTrm == null || systemBaseTrm <= 0)) {
-      toast({
-        title: "TRM no configurada",
-        description:
-          "Pide al super administrador que defina la TRM en Administración → TRM del cotizador, o desactiva «Cotizar en COP».",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const hasFlightData = outboundImages.length > 0 || returnImages.length > 0 ||
       domesticFlightImages.length > 0 || flatConnectionFlightImages.length > 0 ||
       outboundCabinBaggage || outboundHoldBaggage ||
@@ -1151,16 +1138,6 @@ export default function QuoteSummary() {
   const handleExportPDF = async () => {
     // Prevent concurrent PDF generation
     if (isGeneratingPDF) return;
-
-    if (quoteInCop && (systemBaseTrm == null || systemBaseTrm <= 0)) {
-      toast({
-        title: "TRM no configurada",
-        description:
-          "Pide al super administrador que defina la TRM en Administración → TRM del cotizador, o desactiva «Cotizar en COP».",
-        variant: "destructive",
-      });
-      return;
-    }
 
     // Clear any existing completion timeout
     if (pdfCompletionTimeoutRef.current) {
@@ -2125,50 +2102,6 @@ export default function QuoteSummary() {
 
         {!bloqueoPdfOnly && (
         <>
-        <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-950/50 dark:to-emerald-950/50 dark:border-green-700/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <DollarSign className="w-5 h-5" />
-              Moneda de cotización
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-medium text-foreground">Cotizar en COP</p>
-                <p className="text-sm text-muted-foreground">
-                  Usa la TRM global del sistema (header). Se suman {TRM_EFFECTIVE_SURCHARGE_COP} COP a la base definida por el super administrador.
-                </p>
-                {quoteInCop && (systemBaseTrm == null || systemBaseTrm <= 0) && (
-                  <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">
-                    Aún no hay TRM global configurada. Activa el interruptor solo cuando el administrador haya guardado un valor en Administración → TRM del cotizador.
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <Label htmlFor="quote-in-cop" className="text-sm text-muted-foreground cursor-pointer">
-                  {quoteInCop ? "COP" : "USD"}
-                </Label>
-                <Switch
-                  id="quote-in-cop"
-                  checked={quoteInCop}
-                  onCheckedChange={setQuoteInCop}
-                  data-testid="switch-quote-in-cop"
-                />
-              </div>
-            </div>
-            {quoteInCop && systemBaseTrm != null && systemBaseTrm > 0 && effectiveTrm > 0 && (
-              <p className="text-sm text-muted-foreground mt-3 pt-3 border-t border-green-200/80 dark:border-green-800/50">
-                Tasa aplicada:{" "}
-                <span className="font-semibold text-foreground">
-                  $ {effectiveTrm.toLocaleString("es-CO", { maximumFractionDigits: 0 })} COP/USD
-                </span>{" "}
-                (base {systemBaseTrm.toLocaleString("es-CO")} + {TRM_EFFECTIVE_SURCHARGE_COP})
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
         <Card className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200 dark:from-orange-950/50 dark:to-amber-950/50 dark:border-orange-700/60">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-foreground">

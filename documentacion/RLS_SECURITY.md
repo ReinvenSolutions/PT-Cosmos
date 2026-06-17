@@ -2,7 +2,7 @@
 
 ## Resumen
 
-La migración `0009_enable_rls_security.sql` habilita Row Level Security en todas las tablas del esquema `public` para corregir las vulnerabilidades reportadas por el Security Advisor de Supabase.
+Las migraciones `0009_enable_rls_security.sql` y `0026_enable_rls_new_tables.sql` habilitan Row Level Security en todas las tablas del esquema `public` para corregir las vulnerabilidades reportadas por el Security Advisor de Supabase.
 
 ## Vulnerabilidades corregidas
 
@@ -29,6 +29,10 @@ La migración `0009_enable_rls_security.sql` habilita Row Level Security en toda
 | `terms_conditions` | Términos y condiciones |
 | `two_factor_sessions` | Sesiones 2FA |
 | `users` | Usuarios |
+| `app_settings` | Configuración de la app (migración 0013) |
+| `tutorial_courses` | Cursos de la academia (migración 0017) |
+| `tutorial_lessons` | Lecciones de la academia |
+| `tutorial_lesson_progress` | Progreso de lecciones por usuario |
 
 ## Cómo funciona
 
@@ -48,7 +52,7 @@ npm run db:apply-rls
 npm run db:migrate
 
 # Opción 3: Manualmente en Supabase SQL Editor
-# Copiar y ejecutar el contenido de migrations/0009_enable_rls_security.sql
+# Copiar y ejecutar migrations/0009_enable_rls_security.sql y migrations/0026_enable_rls_new_tables.sql
 ```
 
 ## Verificación

@@ -32,6 +32,17 @@ export function resolveTwoFactorEmail(user: User, loginIdentifier: string): stri
   return null;
 }
 
+/** Correo de destino 2FA a partir del usuario (p. ej. reenvío sin identificador de login). */
+export function resolveUserEmailForTwoFactor(user: User): string | null {
+  if (user.email && validator.isEmail(user.email)) {
+    return user.email.trim();
+  }
+  if (validator.isEmail(user.username)) {
+    return user.username.trim();
+  }
+  return null;
+}
+
 /** Oculta parte del correo para mostrar en UI (ej. ge***@cosmosmayorista.com). */
 export function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
