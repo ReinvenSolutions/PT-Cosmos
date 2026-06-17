@@ -314,6 +314,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
+  app.post("/api/auth/2fa/resend", authLimiter, asyncHandler(async (req, res) => {
+    const schema = z.object({
+      tempToken: z.string(),
+      loginIdentifier: z.string().optional(),
+    });
+    const { tempToken, loginIdentifier } = schema.parse(req.body);
+
+    const session = await storage.getTwoFactorSession(tempToken);
+    if (!session || session.expiresAt < new Date()) {
+      return res.status(401).json({ message: "La sesión expiró. Inicia sesión de nuevo." });
+    }
+
+    const user = await storage.findUserById(session.userId);
+    if (!user) {
+      return res.status(401).json({ message: "Sesión inválida. Inicia sesión de nuevo." });
+    }
+
+    const loginBlock = getLoginBlockMessage(user);
+    if (loginBlock) {
+      return res.status(401).json({ message: loginBlock });
+    }
+
+    const emailTo = resolveTwoFactorEmail(user, loginIdentifier?.trim() || user.username);
+    if (!emailTo || !validator.isEmail(emailTo)) {
+      return res.status(400).json({
+        message: "Tu cuenta no tiene un correo electrónico válido configurado. Contacta al administrador.",
+      });
+    }
+
+    if (!isEmailConfigured()) {
+      return res.status(503).json({ message: "El envío de correos no está configurado. Contacta al administrador." });
+    }
+
+    await storage.deleteTwoFactorSession(tempToken);
+
+    const code = String(crypto.randomInt(100000, 999999));
+    const expiresAt = new Date(Date.now() + TWO_FACTOR_CODE_EXPIRY_MINUTES * 60 * 1000);
+    const newTempToken = await storage.createTwoFactorSession(user.id, code, expiresAt);
+    const emailMasked = maskEmail(emailTo);
+
+    logger.info("[2FA] Reenviando código", { userId: user.id, emailTo, emailMasked });
+
+    const emailSent = await sendEmail({
+      to: emailTo,
+      subject: "Código de verificación - Cosmos Viajes",
+      html: generate2FACodeEmailHtml(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
+      text: generate2FACodeEmailText(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
+    });
+
+    if (!emailSent) {
+      logger.error("[2FA] No se pudo reenviar el correo", { userId: user.id, emailTo });
+      return res.status(503).json({
+        message: `No pudimos enviar el código a ${emailMasked}. Revisa spam o contacta al administrador.`,
+      });
+    }
+
+    return res.json({
+      tempToken: newTempToken,
+      emailMasked,
+      message: `Enviamos un nuevo código a ${emailMasked}. Revisa bandeja de entrada y spam.`,
+    });
+  }));
+
   app.post("/api/auth/2fa/verify", authLimiter, asyncHandler(async (req, res) => {
     const schema = z.object({ tempToken: z.string(), code: z.string().length(6) });
     const { tempToken, code } = schema.parse(req.body);

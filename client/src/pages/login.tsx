@@ -31,7 +31,8 @@ export default function Login() {
   const [code2FA, setCode2FA] = useState("");
   const [twoFactorEmailHint, setTwoFactorEmailHint] = useState("");
   const [codeError, setCodeError] = useState(false);
-  const { user, isLoading: authLoading, login, verify2FA } = useAuth();
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const { user, isLoading: authLoading, login, verify2FA, resend2FA } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -97,6 +98,33 @@ export default function Login() {
     setCode2FA("");
     setTwoFactorEmailHint("");
     setCodeError(false);
+    setResendCooldown(0);
+  };
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const handleResend2FA = async () => {
+    if (!tempToken || resendCooldown > 0 || isLoading) return;
+    setIsLoading(true);
+    try {
+      const result = await resend2FA(tempToken, username);
+      setTempToken(result.tempToken);
+      if (result.emailMasked) setTwoFactorEmailHint(result.emailMasked);
+      setResendCooldown(60);
+      toast({
+        title: "Código reenviado",
+        description: result.message || "Revisa tu correo, incluida la carpeta de spam.",
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "No se pudo reenviar el código";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -199,6 +227,15 @@ export default function Login() {
                   ) : (
                     "Verificar"
                   )}
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={handleResend2FA}
+                  disabled={isLoading || resendCooldown > 0}
+                  className="w-full"
+                >
+                  {resendCooldown > 0 ? `Reenviar código (${resendCooldown}s)` : "Reenviar código"}
                 </Button>
                 <Button variant="ghost" type="button" onClick={handleBackToCredentials} className="text-muted-foreground">
                   <ArrowLeft className="mr-2 h-4 w-4" />

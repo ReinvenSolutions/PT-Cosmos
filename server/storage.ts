@@ -96,6 +96,8 @@ export interface IStorage {
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   consumePasswordResetToken(token: string): Promise<{ userId: string } | null>;
   createTwoFactorSession(userId: string, code: string, expiresAt: Date): Promise<string>;
+  getTwoFactorSession(sessionId: string): Promise<{ userId: string; expiresAt: Date } | null>;
+  deleteTwoFactorSession(sessionId: string): Promise<void>;
   verifyTwoFactorSession(sessionId: string, code: string): Promise<User | null>;
   updateUserPassword(userId: string, passwordHash: string): Promise<void>;
 
@@ -531,10 +533,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined> {
+    const normalized = usernameOrEmail.trim().toLowerCase();
     const result = await db
       .select()
       .from(users)
-      .where(or(eq(users.username, usernameOrEmail), eq(users.email, usernameOrEmail)))
+      .where(or(
+        sql`lower(${users.username}) = ${normalized}`,
+        sql`lower(${users.email}) = ${normalized}`,
+      ))
       .limit(1);
     return result[0];
   }
@@ -582,6 +588,23 @@ export class DatabaseStorage implements IStorage {
       expiresAt,
     }).returning({ id: twoFactorSessions.id });
     return result[0].id;
+  }
+
+  async getTwoFactorSession(sessionId: string): Promise<{ userId: string; expiresAt: Date } | null> {
+    const rows = await db
+      .select({
+        userId: twoFactorSessions.userId,
+        expiresAt: twoFactorSessions.expiresAt,
+      })
+      .from(twoFactorSessions)
+      .where(eq(twoFactorSessions.id, sessionId));
+    const session = rows[0];
+    if (!session) return null;
+    return { userId: session.userId, expiresAt: new Date(session.expiresAt) };
+  }
+
+  async deleteTwoFactorSession(sessionId: string): Promise<void> {
+    await db.delete(twoFactorSessions).where(eq(twoFactorSessions.id, sessionId));
   }
 
   async verifyTwoFactorSession(sessionId: string, code: string): Promise<User | null> {
