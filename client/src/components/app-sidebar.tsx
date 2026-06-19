@@ -306,12 +306,9 @@ export function AppSidebar() {
     items: [{ title: "Academia digital", url: "/tutoriales", icon: GraduationCap }],
   };
 
-  const agencySection = {
+  const providerPlansSection = {
     label: "Mis planes",
-    items: [
-      { title: "Administrar planes", url: "/admin/plans", icon: MapPin },
-      { title: "Ver catálogo", url: "/", icon: Plane },
-    ],
+    items: [{ title: "Administrar planes", url: "/admin/plans", icon: MapPin }],
   };
 
   const adminSection = {
@@ -351,7 +348,7 @@ export function AppSidebar() {
   const sections = isAdmin
     ? [adminSection, adminCotizacionesSection, contenidoSection]
     : isProvider
-      ? [agencySection, providerCotizacionesSection]
+      ? [providerPlansSection, providerCotizacionesSection]
       : [advisorSection, contenidoSection];
 
   const isMenuActive = (url: string) => {

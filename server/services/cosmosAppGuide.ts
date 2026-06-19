@@ -18,7 +18,6 @@ Herramienta interna para agencias, proveedores y administradores de Cosmos Mayor
 
 ### Menú — Proveedor (además de cotizaciones)
 - **Administrar planes** (/admin/plans): crear y editar solo tus planes.
-- **Ver catálogo** (/): explorar todos los planes activos del catálogo.
 
 ### Menú — Administrador (además)
 - **Dashboard** (/admin/dashboard): métricas y actividad.
