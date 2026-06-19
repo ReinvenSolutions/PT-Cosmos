@@ -46,6 +46,7 @@ import { MedicalAssistanceGallery } from "@/components/medical-assistance-galler
 import { ItineraryMapGallery } from "@/components/itinerary-map-gallery";
 import { InternalFlightsModal, type InternalFlightItem } from "@/components/plan-modals";
 import { createEmptyPlanTax, type PlanTax } from "@shared/planTaxes";
+import { PLAN_MANAGER_ROLES } from "@shared/roles";
 
 type ItineraryDay = {
   dayNumber: number;
@@ -240,7 +241,8 @@ function AdminPlanForm() {
   const [dragDocumentOver, setDragDocumentOver] = useState(false);
   const [dragMainImageOver, setDragMainImageOver] = useState(false);
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === "super_admin";
+  const canUsePlanAssistant =
+    !!user?.role && (PLAN_MANAGER_ROLES as readonly string[]).includes(user.role);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hotelGalleryFileInputRef = useRef<HTMLInputElement>(null);
   const adicionalesGalleryFileInputRef = useRef<HTMLInputElement>(null);
@@ -1083,7 +1085,7 @@ function AdminPlanForm() {
         </Button>
       </div>
 
-      {!isEditing && isSuperAdmin && (
+      {!isEditing && canUsePlanAssistant && (
         <Card
           className={cn(
             "border-dashed border-2 transition-colors overflow-hidden",
