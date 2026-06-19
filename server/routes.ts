@@ -5,7 +5,7 @@ import express from "express";
 import { generatePublicQuotePDF } from "./publicPdfGenerator";
 import passport from "./auth";
 import { requireAuth, requireRole, requireRoles, requirePlanManagers } from "./middleware";
-import { ROLES } from "@shared/roles";
+import { ROLES, QUOTE_USER_ROLES } from "@shared/roles";
 import {
   assertCanEditPlan,
   assertCanDeletePlan,
@@ -22,6 +22,8 @@ import { logger } from "./logger";
 import { quoteService } from "./services/quoteService";
 import { ValidationError, NotFoundError } from "./errors/AppError";
 import { getOrSetCache, CacheKeys, clearDestinationCache } from "./utils/cache";
+import { pruneExpiredPriceTiers, todayYmdInColombia } from "@shared/priceTiers";
+import { expirePriceTiers } from "./services/expirePriceTiers";
 import { stripInternalDestinationFields, stripInternalDestinationFieldsList, stripInternalFieldsFromQuoteDestinations } from "./utils/destinationPublic";
 import { sanitizeCosmosAssistantNotes } from "./utils/sanitize";
 import { db } from "./db";
@@ -437,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       username: email,
       email,
       passwordHash: hashedPassword,
-      role: "advisor",
+      role: "agency",
       approvalStatus: USER_APPROVAL_PENDING,
       twoFactorEnabled: true,
     });
@@ -975,7 +977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /** Descarga forzada del MP3 descriptivo (evita abrir pestaña por CORS en URL de Supabase). */
   app.get(
     "/api/destinations/:id/descriptive-audio-download",
-    requireRoles(["super_admin", "advisor", "agency"]),
+    requireRoles(["super_admin", "agency", "provider"]),
     asyncHandler(async (req, res) => {
       const dest = await storage.getDestination(req.params.id);
       if (!dest) throw new NotFoundError("Destination");
@@ -999,11 +1001,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }),
   );
 
-  app.post("/api/admin/clients", requireRoles(["super_admin", "advisor"]), asyncHandler(async (req, res) => {
+  app.post("/api/admin/clients", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
+    const user = req.user as User;
     const validatedData = insertClientSchema.parse(req.body);
+    const ownerUserId =
+      user.role === ROLES.SUPER_ADMIN ? null : user.id;
     try {
-      const client = await storage.createClient(validatedData);
-      logger.info("Client created", { clientId: client.id });
+      const client = await storage.createClient({ ...validatedData, userId: ownerUserId });
+      logger.info("Client created", { clientId: client.id, userId: user.id });
       res.json(client);
     } catch (error: any) {
       if (error.code === '23505') {
@@ -1013,8 +1018,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
 
-  app.get("/api/admin/clients", requireRoles(["super_admin", "advisor"]), asyncHandler(async (req, res) => {
-    const clients = await storage.listClients();
+  app.get("/api/admin/clients", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const clients =
+      user.role === ROLES.SUPER_ADMIN
+        ? await storage.listClients()
+        : await storage.listClients(user.id);
     res.json(clients);
   }));
 
@@ -1024,13 +1033,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     username: z.string().min(1, "El usuario es requerido").max(255).regex(/^[a-zA-Z0-9._@+\-]+$/, "Usuario: letras, números, puntos, @, guiones"),
     email: z.string().email("Email inválido").max(255).optional().nullable(),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").max(255),
-    role: z.enum(["super_admin", "advisor", "agency"]),
+    role: z.enum(["super_admin", "agency", "provider"]),
   });
   const adminUpdateUserSchema = z.object({
     name: z.string().min(1).max(255).optional().nullable().transform((v) => (v && String(v).trim()) || undefined),
     username: z.string().min(1).max(255).regex(/^[a-zA-Z0-9._@+\-]+$/, "Usuario: letras, números, puntos, @, guiones").optional().nullable().transform((v) => (v && String(v).trim()) || undefined),
     email: z.union([z.string().email("Email inválido").max(255), z.literal(""), z.null()]).optional().transform((v) => (v && String(v).trim()) || null),
-    role: z.enum(["super_admin", "advisor", "agency"]).optional(),
+    role: z.enum(["super_admin", "agency", "provider"]).optional(),
     isActive: z.boolean().optional(),
     twoFactorEnabled: z.boolean().optional(),
     password: z.union([z.string().min(6, "Mínimo 6 caracteres").max(255), z.literal("")]).optional().transform((v) => (v && v.length >= 6 ? v : undefined)),
@@ -1183,8 +1192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { discountPercentage } = schema.parse(req.body);
     const existing = await storage.findUserById(req.params.id);
     if (!existing) throw new NotFoundError("Usuario");
-    if (existing.role !== ROLES.ADVISOR && existing.role !== ROLES.AGENCY) {
-      throw new ValidationError("Solo se puede asignar descuento a asesores y agencias");
+    if (existing.role !== ROLES.AGENCY && existing.role !== ROLES.PROVIDER) {
+      throw new ValidationError("Solo se puede asignar descuento a agencias y proveedores");
     }
     const updated = await storage.updateUserByAdmin(req.params.id, {
       discountPercentage: discountPercentage.toFixed(2),
@@ -1212,6 +1221,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     isFlightDay: z.boolean().optional(),
     flightLabel: z.string().optional(),
   });
+  const resolvePriceTiersForSave = (
+    tiers: z.infer<typeof priceTierSchema>[] | null | undefined,
+    isBloqueo: boolean,
+  ) => {
+    if (isBloqueo) return null;
+    return pruneExpiredPriceTiers(tiers, todayYmdInColombia()) ?? null;
+  };
   const upgradeSchema = z.object({
     code: z.string(),
     name: z.string(),
@@ -1298,7 +1314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/destinations", requirePlanManagers, asyncHandler(async (req, res) => {
     const user = req.user as User;
     const dests =
-      user.role === ROLES.AGENCY
+      user.role === ROLES.PROVIDER
         ? await storage.getDestinations({ createdByUserId: user.id })
         : await storage.getDestinations();
     res.json(dests);
@@ -1355,7 +1371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       requiresTuesday: validated.requiresTuesday ?? false,
       requiresExtraDay: validated.requiresExtraDay ?? false,
       allowedDays: validated.allowedDays ?? null,
-      priceTiers: isBloqueo ? null : validated.priceTiers ?? null,
+      priceTiers: resolvePriceTiersForSave(validated.priceTiers, isBloqueo),
       upgrades: validated.upgrades ?? null,
       hasInternalOrConnectionFlight: validated.hasInternalOrConnectionFlight ?? false,
       internalFlights: validated.internalFlights ?? null,
@@ -1378,8 +1394,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         typeof validated.descriptiveAudioUrl === "string" && validated.descriptiveAudioUrl.trim() !== ""
           ? validated.descriptiveAudioUrl.trim()
           : null,
-      createdByUserId: user.role === ROLES.AGENCY ? user.id : null,
-      agencyDisplayName: user.role === ROLES.AGENCY ? resolveAgencyDisplayName(user) : null,
+      createdByUserId: user.role === ROLES.PROVIDER ? user.id : null,
+      agencyDisplayName: user.role === ROLES.PROVIDER ? resolveAgencyDisplayName(user) : null,
       planTaxes: validated.planTaxes?.length ? validated.planTaxes : null,
     };
     try {
@@ -1575,7 +1591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       requiresTuesday: validated.requiresTuesday ?? false,
       requiresExtraDay: validated.requiresExtraDay ?? false,
       allowedDays: validated.allowedDays ?? null,
-      priceTiers: isBloqueo ? null : validated.priceTiers ?? null,
+      priceTiers: resolvePriceTiersForSave(validated.priceTiers, isBloqueo),
       upgrades: validated.upgrades ?? null,
       hasInternalOrConnectionFlight: validated.hasInternalOrConnectionFlight ?? false,
       internalFlights: validated.internalFlights ?? null,
@@ -1592,7 +1608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       adicionalesGalleryImageUrls: validAdicionalesGalleryPut.length ? validAdicionalesGalleryPut : null,
       descriptiveAudioUrl: newDescriptiveAudio,
       planTaxes: validated.planTaxes?.length ? validated.planTaxes : null,
-      ...(user.role === ROLES.AGENCY
+      ...(user.role === ROLES.PROVIDER
         ? {
             createdByUserId: existing.createdByUserId,
             agencyDisplayName: existing.agencyDisplayName,
@@ -1643,7 +1659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     logger.info("Destinations reordered", { count: validated.items.length });
     const dests =
-      user.role === ROLES.AGENCY
+      user.role === ROLES.PROVIDER
         ? await storage.getDestinations({ createdByUserId: user.id })
         : await storage.getDestinations();
     res.json(dests);
@@ -1697,6 +1713,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ deleted: result.deleted, errors: result.errors });
   }));
 
+  app.post("/api/admin/cleanup-expired-price-tiers", requireRole("super_admin"), asyncHandler(async (_req, res) => {
+    const result = await expirePriceTiers();
+    logger.info("Manual expired price tiers cleanup", {
+      plansUpdated: result.plansUpdated,
+      tiersRemoved: result.tiersRemoved,
+    });
+    res.json(result);
+  }));
+
   app.get("/api/admin/quotes", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const quotes = await storage.listAllQuotes();
     res.json(quotes);
@@ -1725,18 +1750,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(stats);
   }));
 
-  app.get("/api/cosmos/status", requireRoles(["advisor", "super_admin"]), (_req, res) => {
+  app.get("/api/cosmos/status", requireRoles([...QUOTE_USER_ROLES]), (_req, res) => {
     res.json({ available: isOpenAIConfigured(), name: "Cosmos" });
   });
 
   app.post(
     "/api/cosmos/chat",
-    requireRoles(["advisor", "super_admin"]),
+    requireRoles([...QUOTE_USER_ROLES]),
     cosmosChatLimiter,
     asyncHandler(handleCosmosChat)
   );
 
-  app.get("/api/settings/global-trm", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+  app.get("/api/settings/global-trm", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
     const baseTrm = await storage.getGlobalTrmBase();
     res.json({
       baseTrm,
@@ -1769,7 +1794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.post("/api/quotes", requireRoles(["advisor", "super_admin"]), userRateLimiter, asyncHandler(async (req, res) => {
+  app.post("/api/quotes", requireRoles([...QUOTE_USER_ROLES]), userRateLimiter, asyncHandler(async (req, res) => {
     const user = req.user as User;
 
     // Validate input with Zod
@@ -1781,7 +1806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(quote);
   }));
 
-  app.put("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), userRateLimiter, asyncHandler(async (req, res) => {
+  app.put("/api/quotes/:id", requireRoles([...QUOTE_USER_ROLES]), userRateLimiter, asyncHandler(async (req, res) => {
     const user = req.user as User;
 
     // Validate input with Zod
@@ -1793,13 +1818,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(quote);
   }));
 
-  app.get("/api/quotes", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+  app.get("/api/quotes", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const quotes = await storage.listQuotesByUser(user.id);
     res.json(quotes);
   }));
 
-  app.get("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+  app.get("/api/quotes/:id", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const quote = await storage.getQuote(req.params.id, user.id);
 
@@ -1813,7 +1838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.get("/api/quotes/:id/pdf", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+  app.get("/api/quotes/:id/pdf", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const quote = await storage.getQuote(req.params.id, user.id);
 
@@ -1921,7 +1946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     pdfDoc.end();
   }));
 
-  app.delete("/api/quotes/:id", requireRoles(["advisor", "super_admin"]), asyncHandler(async (req, res) => {
+  app.delete("/api/quotes/:id", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const quote = await storage.getQuote(req.params.id, user.id);
 
@@ -1946,9 +1971,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(stats);
   }));
 
-  app.get("/api/admin/quotes/client/:clientId", requireRole("super_admin"), asyncHandler(async (req, res) => {
+  app.get("/api/admin/quotes/client/:clientId", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
+    const user = req.user as User;
     const { clientId } = req.params;
-    const quotes = await storage.getQuotesByClient(clientId);
+    if (user.role !== ROLES.SUPER_ADMIN) {
+      const client = await storage.findClientById(clientId);
+      if (!client || client.userId !== user.id) {
+        throw new ForbiddenError("No autorizado para ver este cliente");
+      }
+    }
+    const quotes = await storage.getQuotesByClient(
+      clientId,
+      user.role === ROLES.SUPER_ADMIN ? undefined : user.id,
+    );
     res.json(quotes);
   }));
 

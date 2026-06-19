@@ -201,7 +201,7 @@ function SortableRow({
 export default function AdminPlans() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const isAgency = user?.role === "agency";
+  const isProvider = user?.role === "provider";
   const isSuperAdmin = user?.role === "super_admin";
   const canDeletePlans = isSuperAdmin;
   const showAgencyColumn = isSuperAdmin;
@@ -361,12 +361,12 @@ export default function AdminPlans() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {isAgency ? "Mis planes" : "Admin Planes"}
+            {isProvider ? "Mis planes" : "Admin Planes"}
           </h1>
           <p className="text-muted-foreground">
-            {isAgency
-              ? "Crea y edita tus planes. Solo tú puedes modificar los que hayas creado; aparecerán en el catálogo con el nombre de tu agencia."
-              : "Crea, edita y elimina planes turísticos. Los planes de agencia se marcan con su nombre en el catálogo."}
+            {isProvider
+              ? "Crea y edita tus planes. Solo tú puedes modificar los que hayas creado; aparecerán en el catálogo con el nombre de tu proveedor."
+              : "Crea, edita y elimina planes turísticos. Los planes de proveedor se marcan con su nombre en el catálogo."}
           </p>
         </div>
         <Button onClick={() => setLocation("/admin/plans/new")} onMouseEnter={() => prefetchRoute("/admin/plans/new")}>
@@ -428,7 +428,7 @@ export default function AdminPlans() {
                   <TableHead className="w-10"></TableHead>
                   <TableHead className="w-[80px]">Imagen</TableHead>
                   <TableHead>Plan</TableHead>
-                  {showAgencyColumn && <TableHead>Agencia</TableHead>}
+                  {showAgencyColumn && <TableHead>Proveedor</TableHead>}
                   <TableHead>País</TableHead>
                   <TableHead>Duración</TableHead>
                   <TableHead>Precio base</TableHead>

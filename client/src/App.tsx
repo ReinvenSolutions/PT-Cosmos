@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { QUOTE_USER_ROLES } from "@shared/roles";
 
 const RouteLoadingFallback = () => (
   <div className="min-h-[40vh] flex items-center justify-center" aria-label="Cargando sección">
@@ -89,10 +90,10 @@ function DashboardRedirect() {
   if (user.role === "super_admin") {
     return <Redirect to="/admin/dashboard" />;
   }
-  if (user.role === "advisor") {
+  if (user.role === "agency") {
     return <Redirect to="/advisor" />;
   }
-  if (user.role === "agency") {
+  if (user.role === "provider") {
     return <Redirect to="/admin/plans" />;
   }
 
@@ -109,6 +110,9 @@ function AppRoutes() {
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/admin" component={DashboardRedirect} />
+      <Route path="/mis-clientes">
+        <ProtectedRoute component={Clients} allowedRoles={[...QUOTE_USER_ROLES]} />
+      </Route>
       <Route path="/admin/clients">
         <ProtectedRoute component={Clients} allowedRoles={["super_admin"]} />
       </Route>
@@ -119,13 +123,13 @@ function AppRoutes() {
         <ProtectedRoute component={AdminDashboard} allowedRoles={["super_admin"]} />
       </Route>
       <Route path="/admin/plans/new">
-        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin", "agency"]} />
+        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin", "provider"]} />
       </Route>
       <Route path="/admin/plans/:id/edit">
-        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin", "agency"]} />
+        <ProtectedRoute component={AdminPlanForm} allowedRoles={["super_admin", "provider"]} />
       </Route>
       <Route path="/admin/plans">
-        <ProtectedRoute component={AdminPlans} allowedRoles={["super_admin", "agency"]} />
+        <ProtectedRoute component={AdminPlans} allowedRoles={["super_admin", "provider"]} />
       </Route>
       <Route path="/admin/tutoriales/metricas">
         <ProtectedRoute component={AdminTutorialsMetricas} allowedRoles={["super_admin"]} />
@@ -137,34 +141,34 @@ function AppRoutes() {
         <ProtectedRoute component={AdminTutorials} allowedRoles={["super_admin"]} />
       </Route>
       <Route path="/tutoriales/curso/:courseId/leccion/:lessonId">
-        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "advisor"]} />
+        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "agency"]} />
       </Route>
       <Route path="/tutoriales/curso/:courseId">
-        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "advisor"]} />
+        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "agency"]} />
       </Route>
       <Route path="/tutoriales">
-        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "advisor"]} />
+        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "agency"]} />
       </Route>
       <Route path="/advisor/quotes/:id/edit">
-        <ProtectedRoute component={QuoteEdit} allowedRoles={["advisor", "super_admin"]} />
+        <ProtectedRoute component={QuoteEdit} allowedRoles={[...QUOTE_USER_ROLES]} />
       </Route>
       <Route path="/advisor/quotes/:id">
-        <ProtectedRoute component={QuoteDetail} allowedRoles={["advisor", "super_admin"]} />
+        <ProtectedRoute component={QuoteDetail} allowedRoles={[...QUOTE_USER_ROLES]} />
       </Route>
       <Route path="/advisor">
-        <ProtectedRoute component={AdvisorDashboard} allowedRoles={["advisor", "super_admin"]} />
+        <ProtectedRoute component={AdvisorDashboard} allowedRoles={[...QUOTE_USER_ROLES]} />
       </Route>
       <Route path="/cotizacion">
-        <ProtectedRoute component={QuoteSummary} allowedRoles={["super_admin", "advisor"]} />
+        <ProtectedRoute component={QuoteSummary} allowedRoles={[...QUOTE_USER_ROLES]} />
       </Route>
       <Route path="/cotizacion-express">
-        <ProtectedRoute component={QuoteExpress} allowedRoles={["super_admin", "advisor"]} />
+        <ProtectedRoute component={QuoteExpress} allowedRoles={[...QUOTE_USER_ROLES]} />
       </Route>
       <Route path="/plan/:id">
-        <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "advisor", "agency"]} />
+        <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "agency", "provider"]} />
       </Route>
       <Route path="/">
-        <ProtectedRoute component={Home} allowedRoles={["super_admin", "advisor", "agency"]} />
+        <ProtectedRoute component={Home} allowedRoles={["super_admin", "agency", "provider"]} />
       </Route>
       <Route component={NotFound} />
     </Switch>

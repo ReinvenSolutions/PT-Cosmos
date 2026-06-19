@@ -35,7 +35,7 @@ async function seedUsers() {
         username: "advisor1",
         email: "advisor1@sistema.com",
         passwordHash: hashedPassword,
-        role: "advisor",
+        role: "agency",
       });
       console.log("✅ Usuario 'advisor1' creado");
     } else {
@@ -52,7 +52,7 @@ async function seedUsers() {
         username: "felipe",
         email: "felipe@cosmosviajes.com",
         passwordHash: hashedPassword,
-        role: "advisor",
+        role: "agency",
       });
       console.log("✅ Usuario 'felipe' creado");
     } else {

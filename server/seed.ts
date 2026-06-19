@@ -71,7 +71,7 @@ async function seedBaseUsers() {
         username: "advisor1",
         email: "advisor1@sistema.com",
         passwordHash: advisorPassword,
-        role: "advisor",
+        role: "agency",
       });
       console.log("   ✓ Usuario advisor1 creado");
     } else {

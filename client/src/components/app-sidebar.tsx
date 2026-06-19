@@ -278,6 +278,7 @@ export function AppSidebar() {
         "/admin/clients",
         "/admin/users",
         "/advisor",
+        "/mis-clientes",
         "/cotizacion",
         "/cotizacion-express",
       ].forEach(prefetchRoute);
@@ -291,7 +292,7 @@ export function AppSidebar() {
   };
 
   const isAdmin = user?.role === "super_admin";
-  const isAgency = user?.role === "agency";
+  const isProvider = user?.role === "provider";
 
   const { data: pendingApprovalData } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/users/pending-approval-count"],
@@ -330,9 +331,16 @@ export function AppSidebar() {
     { title: "Cotización express", url: "/cotizacion-express", icon: Zap },
   ];
 
+  const misClientesItem = { title: "Mis clientes", url: "/mis-clientes", icon: Users };
+
   const advisorSection = {
     label: "Cotizaciones",
-    items: [...cotizacionesItems, { title: "Mis cotizaciones", url: "/advisor", icon: FileText }],
+    items: [...cotizacionesItems, { title: "Mis cotizaciones", url: "/advisor", icon: FileText }, misClientesItem],
+  };
+
+  const providerCotizacionesSection = {
+    label: "Cotizaciones",
+    items: advisorSection.items,
   };
 
   const adminCotizacionesSection = {
@@ -342,12 +350,13 @@ export function AppSidebar() {
 
   const sections = isAdmin
     ? [adminSection, adminCotizacionesSection, contenidoSection]
-    : isAgency
-      ? [agencySection]
-      : [{ label: "Cotizaciones", items: advisorSection.items }, contenidoSection];
+    : isProvider
+      ? [agencySection, providerCotizacionesSection]
+      : [advisorSection, contenidoSection];
 
   const isMenuActive = (url: string) => {
     if (url === "/tutoriales") return location.startsWith("/tutoriales");
+    if (url === "/mis-clientes") return location === "/mis-clientes";
     if (url === "/admin/tutoriales")
       return location === "/admin/tutoriales" || location.startsWith("/admin/tutoriales/curso/");
     if (url === "/admin/tutoriales/metricas") return location === "/admin/tutoriales/metricas";
@@ -400,7 +409,7 @@ export function AppSidebar() {
               Cosmos Mayorista
             </span>
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-              {isAdmin ? "Administrador" : isAgency ? "Agencia" : "Asesor"}
+              {isAdmin ? "Administrador" : isProvider ? "Proveedor" : "Agencia"}
             </span>
           </div>
         </div>

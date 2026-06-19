@@ -27,7 +27,12 @@ function displayName(user: User): string {
 
 function buildSystemPrompt(user: User, knowledge: string): string {
   const firstName = displayName(user);
-  const roleLabel = user.role === "super_admin" ? "administrador" : "asesor";
+  const roleLabel =
+    user.role === "super_admin"
+      ? "administrador"
+      : user.role === "provider"
+        ? "proveedor"
+        : "agencia";
 
   return `Eres **Cosmos**, el asistente virtual de Cosmos Mayorista dentro de la plataforma ViajeRapido.
 

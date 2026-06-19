@@ -8,12 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles, Loader2, ImageOff, Headphones, Receipt } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Save, ImageIcon, Check, ChevronRight, Building2, ChevronLeft, ImagePlus, GripVertical, FileText, CheckCircle2, Sparkles, Loader2, ImageOff, Headphones, Receipt, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { CosmoProcessingDialog } from "@/components/cosmo-processing-dialog";
 import { RichTextEditor } from "@/components/rich-text-editor";
-import { apiRequest, queryClient, invalidatePublicDestinationQueries } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidatePublicDestinationQueries, invalidateAdminDestinationQueries } from "@/lib/queryClient";
+import { normalizePriceTiers, normalizeTierPrice } from "@shared/priceTiers";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -196,6 +197,8 @@ function AdminPlanForm() {
   const [isActive, setIsActive] = useState(true);
   const [allowedDays, setAllowedDays] = useState<string[]>([]);
   const [priceTiers, setPriceTiers] = useState<PriceTier[]>([]);
+  const [bulkPriceInput, setBulkPriceInput] = useState("");
+  const [bulkExcludeFlightDays, setBulkExcludeFlightDays] = useState(false);
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
   const [planTaxes, setPlanTaxes] = useState<PlanTax[]>([]);
   const [itinerary, setItinerary] = useState<ItineraryDay[]>([]);
@@ -244,6 +247,7 @@ function AdminPlanForm() {
   const mainImageFileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const descriptiveAudioFileInputRef = useRef<HTMLInputElement>(null);
+  const hydratedPlanIdRef = useRef<string | null>(null);
 
   const { data: existing, isLoading } = useQuery<{
     name?: string;
@@ -286,10 +290,13 @@ function AdminPlanForm() {
   }>({
     queryKey: [`/api/admin/destinations/${id}`],
     enabled: isEditing && !!id,
+    staleTime: 0,
   });
 
   useEffect(() => {
-    if (existing) {
+    if (!existing || !id) return;
+    if (hydratedPlanIdRef.current === id) return;
+    hydratedPlanIdRef.current = id;
       setName(existing.name ?? "");
       setCountry(existing.country ?? "");
       setDuration(existing.duration ?? 1);
@@ -345,8 +352,7 @@ function AdminPlanForm() {
           ? ag.filter(Boolean).map((url, i) => ({ imageUrl: url, displayOrder: i }))
           : []
       );
-    }
-  }, [existing]);
+  }, [existing, id]);
 
   const saveMutation = useMutation({
     mutationFn: async (payload: any) => {
@@ -357,9 +363,13 @@ function AdminPlanForm() {
       const res = await apiRequest("POST", "/api/admin/destinations", payload);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/destinations"] });
+    onSuccess: (saved) => {
+      const savedId = isEditing && id ? id : (saved as { id?: string })?.id;
+      invalidateAdminDestinationQueries(queryClient, savedId);
       invalidatePublicDestinationQueries(queryClient);
+      if (savedId) {
+        queryClient.setQueryData([`/api/admin/destinations/${savedId}`], saved);
+      }
       toast({ title: isEditing ? "Plan actualizado" : "Plan creado", description: "Los cambios se han guardado correctamente." });
       setLocation("/admin/plans");
     },
@@ -409,7 +419,7 @@ function AdminPlanForm() {
       requiresTuesday: allowedDays.length === 1 && allowedDays[0] === "tuesday",
       requiresExtraDay,
       allowedDays: allowedDays.length ? allowedDays : null,
-      priceTiers: isBloqueo ? null : priceTiers.length ? priceTiers : null,
+      priceTiers: isBloqueo ? null : priceTiers.length ? normalizePriceTiers(priceTiers) : null,
       upgrades: upgrades.length ? upgrades : null,
       itinerary: itinerary.map(itineraryDayToPayload),
       hotels,
@@ -473,6 +483,70 @@ function AdminPlanForm() {
   const addPriceTier = () => setPriceTiers((prev) => [...prev, { endDate: "", price: "" }]);
   const updatePriceTier = (i: number, f: Partial<PriceTier>) => setPriceTiers((prev) => prev.map((p, j) => (j === i ? { ...p, ...f } : p)));
   const removePriceTier = (i: number) => setPriceTiers((prev) => prev.filter((_, j) => j !== i));
+  const commitPriceTierPrice = (i: number) => {
+    setPriceTiers((prev) =>
+      prev.map((tier, j) => {
+        if (j !== i || !tier.price?.trim()) return tier;
+        const normalized = normalizeTierPrice(tier.price);
+        return normalized ? { ...tier, price: normalized } : tier;
+      }),
+    );
+  };
+
+  const applyBulkPriceToAllTiers = () => {
+    const trimmed = bulkPriceInput.trim();
+    if (!trimmed) {
+      toast({
+        title: "Precio vacío",
+        description: "Ingresa un precio en USD para aplicar a todas las fechas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const normalizedPrice = normalizeTierPrice(trimmed);
+    if (!normalizedPrice) {
+      toast({
+        title: "Precio inválido",
+        description: "Usa un número válido en USD (ej: 540 o 540.00).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (priceTiers.length === 0) {
+      toast({
+        title: "Sin fechas",
+        description: "Agrega al menos un rango de fecha antes de aplicar un precio global.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const eligibleTiers = priceTiers.filter((tier) => !bulkExcludeFlightDays || !tier.isFlightDay);
+
+    if (eligibleTiers.length === 0) {
+      toast({
+        title: "Nada que actualizar",
+        description: "Todas las filas son días de vuelo. Desactiva «Excluir días de vuelo» para actualizarlas también.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPriceTiers((prev) =>
+      prev.map((tier) => {
+        if (bulkExcludeFlightDays && tier.isFlightDay) return tier;
+        return { ...tier, price: normalizedPrice };
+      }),
+    );
+
+    const skipped = priceTiers.length - eligibleTiers.length;
+    toast({
+      title: "Precio aplicado",
+      description:
+        skipped > 0
+          ? `Se actualizaron ${eligibleTiers.length} fecha(s) a USD ${normalizedPrice}. ${skipped} día(s) de vuelo no se modificaron.`
+          : `Se actualizaron ${eligibleTiers.length} fecha(s) a USD ${normalizedPrice}. Puedes ajustar fechas individuales y guardar el plan.`,
+    });
+  };
 
   const addUpgrade = () => setUpgrades((prev) => [...prev, { code: "", name: "", price: 0 }]);
   const updateUpgrade = (i: number, f: Partial<Upgrade>) => setUpgrades((prev) => prev.map((u, j) => (j === i ? { ...u, ...f } : u)));
@@ -1513,9 +1587,9 @@ function AdminPlanForm() {
 
               {/* Comentarios primera hoja del PDF */}
               <div className="border-t border-border pt-4 mt-4">
-                <Label className="text-sm font-medium">Comentarios primera hoja del PDF</Label>
+                <Label className="text-sm font-medium">Comentarios del PDF (después de Excluido)</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Texto de la sección COMENTARIOS. Usa **texto** para resaltar en negrita.
+                  Texto en recuadro después de la sección Excluido. Usa **texto** para resaltar en negrita.
                 </p>
                 <Textarea
                   value={firstPageComments}
@@ -2164,7 +2238,52 @@ Puedes usar **texto** para resaltar.`}
                 Agregar rango
               </Button>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                  Precio global
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Aplica el mismo precio a todas las filas de la lista (incluidos días de vuelo). Después puedes ajustar fechas individuales.
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="bulk-price">Precio USD</Label>
+                    <Input
+                      id="bulk-price"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={bulkPriceInput}
+                      onChange={(e) => setBulkPriceInput(e.target.value)}
+                      placeholder="Ej: 540"
+                      className="w-36"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          applyBulkPriceToAllTiers();
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button type="button" variant="secondary" onClick={applyBulkPriceToAllTiers} disabled={!priceTiers.length}>
+                    Aplicar a todas las fechas
+                  </Button>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                  <Checkbox
+                    checked={bulkExcludeFlightDays}
+                    onCheckedChange={(c) => setBulkExcludeFlightDays(!!c)}
+                  />
+                  Excluir días de vuelo (solo actualizar fechas de salida con precio)
+                </label>
+              </div>
+
+              {priceTiers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay fechas configuradas. Usa «Agregar rango» para crear la primera.</p>
+              ) : null}
+
               {priceTiers.map((t, i) => (
                 <div key={i} className="flex gap-2 items-center flex-wrap">
                   <Input
@@ -2184,6 +2303,7 @@ Puedes usar **texto** para resaltar.`}
                   <Input
                     value={t.price}
                     onChange={(e) => updatePriceTier(i, { price: e.target.value })}
+                    onBlur={() => commitPriceTierPrice(i)}
                     placeholder="Precio USD"
                     className="w-24"
                   />

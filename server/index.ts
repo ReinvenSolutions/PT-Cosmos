@@ -23,7 +23,10 @@ import { ensureUserApprovalStatusColumn } from "./ensure-user-approval-status";
 import { ensureUserDiscountColumn } from "./ensure-user-discount-column";
 import { ensureDestinationAgencyColumns } from "./ensure-destination-agency-columns";
 import { ensureDestinationPlanTaxesColumn } from "./ensure-destination-plan-taxes-column";
+import { ensureUserRoleRename } from "./ensure-user-role-rename";
+import { ensureClientsUserIdColumn } from "./ensure-clients-user-id";
 import { seedDatabaseIfEmpty } from "./seed";
+import { startPriceTierExpirationScheduler } from "./services/expirePriceTiers";
 
 /** Aplica migración 0008 (auth tokens, 2FA) si no existe. No bloquea el arranque. */
 function runAuthMigrationInBackground(pool: InstanceType<typeof Pool>) {
@@ -154,8 +157,11 @@ app.use((req, res, next) => {
     await ensureUserDiscountColumn(pool);
     await ensureDestinationAgencyColumns(pool);
     await ensureDestinationPlanTaxesColumn(pool);
+    await ensureUserRoleRename(pool);
+    await ensureClientsUserIdColumn(pool);
 
     const server = await registerRoutes(app);
+    startPriceTierExpirationScheduler();
 
     // Error handler middleware (must be last)
     app.use(errorHandler);

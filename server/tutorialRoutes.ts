@@ -27,7 +27,7 @@ const lessonUpdateBody = lessonBody.omit({ courseId: true }).partial().extend({
 });
 
 export function registerTutorialRoutes(app: Express) {
-  const tutorAccess = requireRoles(["advisor", "super_admin"]);
+  const tutorAccess = requireRoles(["agency", "super_admin"]);
 
   app.get(
     "/api/tutorials/courses",

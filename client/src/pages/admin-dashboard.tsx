@@ -147,7 +147,7 @@ const KPI_CARDS = [
   },
   {
     key: "advisors",
-    label: "Asesores",
+    label: "Agencias",
     sublabel: () => "Equipo operando",
     value: (s: AnalyticsSummary) => s?.totalUsers ?? 0,
     icon: Briefcase,
@@ -418,7 +418,7 @@ export default function AdminDashboard() {
         </Card>
       </motion.section>
 
-      {/* Gráfico + Top Asesores — Responsive layout */}
+      {/* Gráfico + Top Agencias — Responsive layout */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -505,7 +505,7 @@ export default function AdminDashboard() {
           </Card>
         </motion.div>
 
-        {/* Top Asesores */}
+        {/* Top Agencias */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
         >
           <Card variant="glass" className="h-full flex flex-col">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base sm:text-lg font-bold">Top Asesores</CardTitle>
+              <CardTitle className="text-base sm:text-lg font-bold">Top Agencias</CardTitle>
               <CardDescription className="text-xs sm:text-sm">Cotizaciones y monto total</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 min-h-0">

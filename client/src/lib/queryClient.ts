@@ -22,6 +22,18 @@ export function invalidatePublicDestinationQueries(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ["/api/destinations"], exact: false });
 }
 
+/**
+ * Invalida listado y detalle admin de destinos tras crear/editar un plan.
+ * La query de detalle usa clave `["/api/admin/destinations/:id"]` (un solo segmento);
+ * invalidar solo `["/api/admin/destinations"]` no la cubre con staleTime: Infinity.
+ */
+export function invalidateAdminDestinationQueries(qc: QueryClient, destinationId?: string) {
+  qc.invalidateQueries({ queryKey: ["/api/admin/destinations"] });
+  if (destinationId) {
+    qc.invalidateQueries({ queryKey: [`/api/admin/destinations/${destinationId}`] });
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

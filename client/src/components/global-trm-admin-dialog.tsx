@@ -130,7 +130,7 @@ export function GlobalTrmAdminMenuItem() {
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Deja el campo vacío y guarda para quitar la TRM global. Los asesores no podrán cotizar en COP hasta que configures un valor de nuevo.
+              Deja el campo vacío y guarda para quitar la TRM global. Las agencias no podrán cotizar en COP hasta que configures un valor de nuevo.
             </p>
           </div>
         </div>

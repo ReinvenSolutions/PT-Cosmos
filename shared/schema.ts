@@ -61,9 +61,9 @@ export const destinations = pgTable(
     recommendations: text("recommendations"),
     /** Notas internas para Cosmos (HTML sanitizado). No se publican en catálogo ni PDF. */
     cosmosAssistantNotes: text("cosmos_assistant_notes"),
-    /** Usuario agencia que creó el plan; null = plan de Cosmos / super admin. */
+    /** Usuario proveedor que creó el plan; null = plan de Cosmos / super admin. */
     createdByUserId: varchar("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    /** Nombre visible de la agencia en tarjetas del catálogo (snapshot al crear el plan). */
+    /** Nombre visible del proveedor en tarjetas del catálogo (snapshot al crear el plan). */
     agencyDisplayName: text("agency_display_name"),
     createdAt: timestamp("created_at").defaultNow(),
   },
@@ -164,7 +164,7 @@ export const users = pgTable("users", {
   /** approved | pending | denied — los registros públicos quedan en pending hasta que un super_admin apruebe */
   approvalStatus: text("approval_status").default("approved").notNull(),
   twoFactorEnabled: boolean("two_factor_enabled").default(true),
-  /** Descuento % sobre porción terrestre en cotizaciones (solo asesores/agencias; asignado por super_admin) */
+  /** Descuento % sobre porción terrestre en cotizaciones (solo agencias/proveedores; asignado por super_admin) */
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -197,6 +197,8 @@ export const clients = pgTable("clients", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
+  /** Agencia o proveedor dueño del cliente; null = cliente global (super admin). */
+  userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

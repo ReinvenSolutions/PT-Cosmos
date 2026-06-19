@@ -7,7 +7,7 @@ export function isAgencyOwnedPlan(dest: Pick<Destination, "createdByUserId">): b
 }
 
 export function canCreatePlans(role: string): boolean {
-  return role === ROLES.SUPER_ADMIN || role === ROLES.AGENCY;
+  return role === ROLES.SUPER_ADMIN || role === ROLES.PROVIDER;
 }
 
 export function ownsPlan(userId: string, dest: Pick<Destination, "createdByUserId">): boolean {
@@ -16,11 +16,11 @@ export function ownsPlan(userId: string, dest: Pick<Destination, "createdByUserI
 
 export function canEditPlan(user: Pick<User, "id" | "role">, dest: Pick<Destination, "createdByUserId">): boolean {
   if (user.role === ROLES.SUPER_ADMIN) return true;
-  if (user.role === ROLES.AGENCY) return ownsPlan(user.id, dest);
+  if (user.role === ROLES.PROVIDER) return ownsPlan(user.id, dest);
   return false;
 }
 
-/** Solo el super admin puede eliminar planes (incluidos los de agencia). */
+/** Solo el super admin puede eliminar planes (incluidos los de proveedor). */
 export function canDeletePlan(user: Pick<User, "role">): boolean {
   return user.role === ROLES.SUPER_ADMIN;
 }
