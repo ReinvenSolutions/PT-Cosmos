@@ -51,7 +51,7 @@ export async function applyBloqueoCuposDelta(tx: DbTransaction, deltas: Map<stri
         .returning({ id: destinations.id });
       if (updated.length === 0) {
         throw new ValidationError(
-          "No hay cupos suficientes para este bloqueo (otro asesor pudo reservar antes). Actualiza la página e intenta de nuevo.",
+          "No hay cupos suficientes para este bloqueo (otra agencia pudo reservar antes). Actualiza la página e intenta de nuevo.",
         );
       }
     } else {

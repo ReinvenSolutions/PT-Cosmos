@@ -667,7 +667,7 @@ export default function QuoteSummary() {
   const landPortionTotal = landPortionPerPerson * passengers;
 
   const userDiscountPercentage =
-    user && (user.role === ROLES.ADVISOR || user.role === ROLES.AGENCY)
+    user && (user.role === ROLES.AGENCY || user.role === ROLES.PROVIDER)
       ? normalizeDiscountPercentage(user.discountPercentage)
       : 0;
   const {

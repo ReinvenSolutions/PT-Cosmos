@@ -2,23 +2,29 @@
 export const COSMOS_APP_GUIDE = `
 ## Plataforma ViajeRapido (Cosmos Mayorista)
 
-Herramienta interna para asesores y administradores de Cosmos Mayorista. Cotiza planes de viaje terrestres, genera PDFs y gestiona el catálogo.
+Herramienta interna para agencias, proveedores y administradores de Cosmos Mayorista. Cotiza planes de viaje terrestres, genera PDFs y gestiona el catálogo.
 
 ### Roles
 - **super_admin**: dashboard, planes, clientes, usuarios, academia (admin), TRM global, cotizaciones.
-- **advisor**: nueva cotización, cotización express, mis cotizaciones, academia, ver planes.
+- **agency**: nueva cotización, cotización express, mis cotizaciones, mis clientes, academia, ver planes.
+- **provider**: administrar planes propios, ver catálogo, nueva cotización, cotización express, mis cotizaciones, mis clientes.
 
-### Menú — Asesor
+### Menú — Agencia
 - **Nueva cotización** (/): catálogo de planes activos; elegir plan → detalle → armar cotización con fechas, pasajeros y precios.
 - **Cotización express** (/cotizacion-express): flujo rápido sin recorrer todo el catálogo.
 - **Mis cotizaciones** (/advisor): listado de cotizaciones guardadas; abrir, editar, generar PDF.
+- **Mis clientes** (/mis-clientes): clientes propios y su historial de cotizaciones.
 - **Academia digital** (/tutoriales): cursos y lecciones de capacitación.
+
+### Menú — Proveedor (además de cotizaciones)
+- **Administrar planes** (/admin/plans): crear y editar solo tus planes.
+- **Ver catálogo** (/): explorar todos los planes activos del catálogo.
 
 ### Menú — Administrador (además)
 - **Dashboard** (/admin/dashboard): métricas y actividad.
 - **Admin Planes** (/admin/plans): crear, editar, reordenar planes; importar desde PDF/Word con IA.
 - **Clientes** (/admin/clients): base de clientes.
-- **Usuarios** (/admin/users): cuentas de asesores y admins.
+- **Usuarios** (/admin/users): cuentas de agencias, proveedores y admins.
 - **Academia (cursos/métricas)**: gestión de tutoriales.
 - **TRM global** (menú admin): tasa base en COP/USD; el cotizador usa TRM efectiva = base + 30 COP.
 
@@ -45,5 +51,5 @@ Sidebar inferior: foto, nombre visible para el equipo; cerrar sesión.
 - **PDF no genera**: verificar datos de vuelos/fechas y que el plan tenga itinerario.
 - **Importar plan desde PDF**: Admin Planes → nuevo/editar → subir documento (requiere OPENAI_API_KEY en servidor).
 
-Responde pasos concretos con rutas del menú. Si el usuario es asesor, no describas funciones solo de admin.
+Responde pasos concretos con rutas del menú. Si el usuario es agencia, no describas funciones solo de admin.
 `.trim();

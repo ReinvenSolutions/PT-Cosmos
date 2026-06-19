@@ -87,8 +87,8 @@ function approvalStatusLabel(status: string): { label: string; variant: "default
 
 const ROLES = [
   { value: ROLE_IDS.SUPER_ADMIN, label: ROLE_LABELS[ROLE_IDS.SUPER_ADMIN], icon: Shield },
-  { value: ROLE_IDS.ADVISOR, label: ROLE_LABELS[ROLE_IDS.ADVISOR], icon: UserCog },
-  { value: ROLE_IDS.AGENCY, label: ROLE_LABELS[ROLE_IDS.AGENCY], icon: Building2 },
+  { value: ROLE_IDS.AGENCY, label: ROLE_LABELS[ROLE_IDS.AGENCY], icon: UserCog },
+  { value: ROLE_IDS.PROVIDER, label: ROLE_LABELS[ROLE_IDS.PROVIDER], icon: Building2 },
 ] as const;
 
 const CONFIRM_WORDS = [
@@ -326,7 +326,7 @@ export default function AdminUsers() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {user.role === ROLE_IDS.ADVISOR || user.role === ROLE_IDS.AGENCY ? (
+                      {user.role === ROLE_IDS.AGENCY || user.role === ROLE_IDS.PROVIDER ? (
                         <button
                           type="button"
                           onClick={() => setDiscountUser(user)}
@@ -398,7 +398,7 @@ export default function AdminUsers() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          {(user.role === ROLE_IDS.ADVISOR || user.role === ROLE_IDS.AGENCY) && (
+                          {(user.role === ROLE_IDS.AGENCY || user.role === ROLE_IDS.PROVIDER) && (
                             <DropdownMenuItem onClick={() => setDiscountUser(user)}>
                               <Percent className="mr-2 h-4 w-4" />
                               Asignar descuento
@@ -594,7 +594,7 @@ function CreateUserDialog({
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<string>("advisor");
+  const [role, setRole] = useState<string>("agency");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -609,7 +609,7 @@ function CreateUserDialog({
     setUsername("");
     setEmail("");
     setPassword("");
-    setRole("advisor");
+    setRole("agency");
   };
 
   return (
@@ -709,7 +709,7 @@ function EditUserDialog({
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [role, setRole] = useState(user?.role ?? "advisor");
+  const [role, setRole] = useState(user?.role ?? "agency");
   const [password, setPassword] = useState("");
   // 2FA activado por defecto. Solo OFF cuando el admin lo desactivó explícitamente (twoFactorEnabled === false)
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.twoFactorEnabled !== false);

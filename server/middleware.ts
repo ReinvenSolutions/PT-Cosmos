@@ -51,5 +51,5 @@ export function requireRoles(roles: string[]) {
   };
 }
 
-/** Super admin o agencia (gestión de planes con reglas de propiedad en las rutas). */
+/** Super admin o proveedor (gestión de planes con reglas de propiedad en las rutas). */
 export const requirePlanManagers = requireRoles([...PLAN_MANAGER_ROLES]);

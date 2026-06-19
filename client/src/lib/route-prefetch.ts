@@ -8,6 +8,7 @@ const routeToImport: Record<string, () => Promise<unknown>> = {
   "/admin/dashboard": () => import("@/pages/admin-dashboard"),
   "/admin/plans": () => import("@/pages/admin-plans"),
   "/admin/plans/new": () => import("@/pages/admin-plan-form"),
+  "/mis-clientes": () => import("@/pages/clients"),
   "/admin/clients": () => import("@/pages/clients"),
   "/admin/users": () => import("@/pages/admin-users"),
   "/advisor": () => import("@/pages/advisor-dashboard"),

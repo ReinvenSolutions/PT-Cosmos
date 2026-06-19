@@ -20,7 +20,7 @@ export function AcademySection({ className, children }: { className?: string; ch
 }
 
 /**
- * Hero editorial para /tutoriales (lado asesor).
+ * Hero editorial para /tutoriales (lado agencia).
  * Usa la paleta Cosmos (teal + oro + aqua) con un acento sutil tipo LMS corporativo.
  */
 export function AcademyPublicHero({

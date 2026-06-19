@@ -101,8 +101,8 @@ export interface IStorage {
   verifyTwoFactorSession(sessionId: string, code: string): Promise<User | null>;
   updateUserPassword(userId: string, passwordHash: string): Promise<void>;
 
-  createClient(data: InsertClient): Promise<Client>;
-  listClients(): Promise<Client[]>;
+  createClient(data: InsertClient & { userId?: string | null }): Promise<Client>;
+  listClients(userId?: string): Promise<Client[]>;
   findClientById(id: string): Promise<Client | undefined>;
 
   createQuote(quoteData: InsertQuote, destinationsData: InsertQuoteDestination[]): Promise<Quote>;
@@ -138,7 +138,7 @@ export interface IStorage {
   getTopDestinations(limit?: number): Promise<{ destinationId: string; destinationName: string; count: number }[]>;
   getTopDestinationsByAmount(limit?: number): Promise<{ destinationId: string; destinationName: string; amount: number }[]>;
   getQuotesByDateRange(days: number): Promise<{ date: string, count: number, amount: number }[]>;
-  getQuotesByClient(clientId: string): Promise<Quote[]>;
+  getQuotesByClient(clientId: string, userId?: string): Promise<Quote[]>;
 
   getAppSetting(key: string): Promise<string | null>;
   setAppSetting(key: string, value: string): Promise<void>;
@@ -625,12 +625,15 @@ export class DatabaseStorage implements IStorage {
     await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
   }
 
-  async createClient(data: InsertClient): Promise<Client> {
+  async createClient(data: InsertClient & { userId?: string | null }): Promise<Client> {
     const result = await db.insert(clients).values(data).returning();
     return result[0];
   }
 
-  async listClients(): Promise<Client[]> {
+  async listClients(userId?: string): Promise<Client[]> {
+    if (userId) {
+      return db.select().from(clients).where(eq(clients.userId, userId)).orderBy(clients.name);
+    }
     return db.select().from(clients).orderBy(clients.name);
   }
 
@@ -1009,7 +1012,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(users)
       .leftJoin(quotes, eq(users.id, quotes.userId))
-      .where(eq(users.role, 'advisor'))
+      .where(eq(users.role, 'agency'))
       .groupBy(users.id, users.username)
       .orderBy(desc(sql`count(${quotes.id})`));
 
@@ -1251,11 +1254,15 @@ export class DatabaseStorage implements IStorage {
     return result.rows as any;
   }
 
-  async getQuotesByClient(clientId: string): Promise<any[]> {
+  async getQuotesByClient(clientId: string, userId?: string): Promise<any[]> {
+    const conditions = [eq(quotes.clientId, clientId)];
+    if (userId) {
+      conditions.push(eq(quotes.userId, userId));
+    }
     const quoteList = await db
       .select()
       .from(quotes)
-      .where(eq(quotes.clientId, clientId))
+      .where(and(...conditions))
       .orderBy(desc(quotes.createdAt));
 
     const quotesWithDestinations = await Promise.all(

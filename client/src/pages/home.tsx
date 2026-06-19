@@ -460,7 +460,7 @@ export default function Home() {
                         {dest.agencyDisplayName && (
                           <Badge
                             className="absolute top-2 right-2 z-10 text-xs font-semibold shadow-md bg-violet-600 hover:bg-violet-600 text-white border-0 max-w-[calc(100%-1rem)] truncate"
-                            title={`Plan de agencia: ${dest.agencyDisplayName}`}
+                            title={`Plan de proveedor: ${dest.agencyDisplayName}`}
                           >
                             {dest.agencyDisplayName}
                           </Badge>

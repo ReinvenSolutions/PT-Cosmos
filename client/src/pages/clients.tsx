@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ interface Quote {
 }
 
 export default function Clients() {
+    const [location] = useLocation();
+    const isOwnClientsView = location === "/mis-clientes";
     const [search, setSearch] = useState("");
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -53,9 +56,11 @@ export default function Clients() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">{isOwnClientsView ? "Mis Clientes" : "Clientes"}</h1>
                     <p className="text-muted-foreground">
-                        Gestiona la información de tus clientes y su historial de cotizaciones.
+                        {isOwnClientsView
+                            ? "Consulta tus clientes y el historial de cotizaciones que has generado."
+                            : "Gestiona la información de tus clientes y su historial de cotizaciones."}
                     </p>
                 </div>
                 <Button>

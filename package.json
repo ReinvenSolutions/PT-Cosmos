@@ -24,6 +24,7 @@
     "db:apply-rls": "tsx scripts/apply-rls-migration.ts",
     "db:apply-pending": "tsx scripts/apply-pending-migrations.ts",
     "db:cleanup-orphan-buckets": "tsx scripts/cleanup-orphan-buckets.ts",
+    "db:cleanup-expired-price-tiers": "tsx scripts/cleanup-expired-price-tiers.ts",
     "db:delete-plans-without-bucket": "tsx scripts/delete-plans-without-bucket.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",

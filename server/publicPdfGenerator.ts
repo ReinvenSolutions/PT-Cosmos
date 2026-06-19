@@ -248,6 +248,178 @@ interface PublicQuoteData {
   minPaymentCOP?: number | null;
 }
 
+type PdfDoc = InstanceType<typeof PDFDocument>;
+
+function getPlanDescriptionsText(data: PublicQuoteData): string {
+  const descriptions = data.destinations
+    .map((d) => d.destination?.description?.trim())
+    .filter((desc): desc is string => Boolean(desc));
+  return descriptions.join("\n\n");
+}
+
+function getFirstPageCommentsText(data: PublicQuoteData): string {
+  const customComments = data.destinations.find(
+    (d) => d.destination?.firstPageComments?.trim(),
+  )?.destination;
+  const commentsText = customComments?.firstPageComments?.trim();
+  if (commentsText) return commentsText;
+
+  const isTurkeyEsencialComments = data.destinations.some(
+    (d) =>
+      d.name?.toLowerCase().includes("turquía esencial") ||
+      d.name?.toLowerCase().includes("turquia esencial"),
+  );
+
+  if (isTurkeyEsencialComments) {
+    return "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. **Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.** NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.";
+  }
+
+  return "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guia de habla hispana.  Recuerda consultar los servicios no incluidos. **Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.** NOCHE ADICIONAL APLICA SUPLEMENTO A TRANSFER";
+}
+
+function estimateMixedTextHeight(
+  doc: PdfDoc,
+  text: string,
+  width: number,
+  fontSize = 7.5,
+  lineGap = 2,
+): number {
+  doc.font("Helvetica").fontSize(fontSize);
+  const plainText = text.replace(/\*\*([^*]+)\*\*/g, "$1");
+  const paragraphs = plainText.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  let total = 0;
+  const paragraphGap = fontSize * 0.8;
+  for (let i = 0; i < paragraphs.length; i++) {
+    if (i > 0) total += paragraphGap;
+    total += doc.heightOfString(paragraphs[i], { width, align: "justify", lineGap });
+  }
+  return total;
+}
+
+function renderMixedBoldParagraphs(
+  doc: PdfDoc,
+  text: string,
+  layout: {
+    x: number;
+    y: number;
+    width: number;
+    fontSize?: number;
+    textColor?: string;
+    align?: "justify" | "left" | "center";
+    lineGap?: number;
+  },
+): number {
+  const {
+    x,
+    y,
+    width,
+    fontSize = 7.5,
+    textColor = "#1f2937",
+    align = "justify",
+    lineGap = 2,
+  } = layout;
+
+  doc.fontSize(fontSize).fillColor(textColor);
+
+  const paragraphs = text.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  let currentY = y;
+
+  for (let paraIndex = 0; paraIndex < paragraphs.length; paraIndex++) {
+    const para = paragraphs[paraIndex];
+    if (paraIndex > 0) {
+      doc.moveDown(0.5);
+      currentY = doc.y;
+    }
+
+    const parts = para.split(/(\*\*[^*]+\*\*)/g);
+    let isFirst = true;
+    for (const part of parts) {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        doc.font("Helvetica-Bold");
+        const partText = part.slice(2, -2);
+        if (isFirst) {
+          doc.text(partText, x, currentY, { width, align, lineGap, continued: true });
+          isFirst = false;
+        } else {
+          doc.text(partText, { width, align, lineGap, continued: true });
+        }
+      } else if (part) {
+        doc.font("Helvetica");
+        if (isFirst) {
+          doc.text(part, x, currentY, { width, align, lineGap, continued: true });
+          isFirst = false;
+        } else {
+          doc.text(part, { width, align, lineGap, continued: true });
+        }
+      }
+    }
+    doc.text("", { continued: false });
+    currentY = doc.y;
+  }
+
+  return currentY;
+}
+
+function renderBoxedComments(
+  doc: PdfDoc,
+  text: string,
+  layout: {
+    leftMargin: number;
+    contentWidth: number;
+    boxPadding?: number;
+    boxColor: string;
+    boxBorderColor: string;
+    textColor: string;
+    onNewPage: () => void;
+    pageBreakY?: number;
+  },
+): void {
+  const {
+    leftMargin,
+    contentWidth,
+    boxPadding = 12,
+    boxColor,
+    boxBorderColor,
+    textColor,
+    onNewPage,
+    pageBreakY = 720,
+  } = layout;
+
+  const innerWidth = contentWidth - boxPadding * 2;
+  const fontSize = 7.5;
+  const titleFontSize = 10;
+  const titleHeight = 18;
+  const estimatedTextHeight = estimateMixedTextHeight(doc, text, innerWidth, fontSize);
+  const boxHeight = estimatedTextHeight + boxPadding * 2 + titleHeight;
+
+  let boxY = doc.y;
+  if (boxY + boxHeight > pageBreakY) {
+    doc.addPage();
+    onNewPage();
+    boxY = doc.y;
+  }
+
+  doc
+    .rect(leftMargin, boxY, contentWidth, boxHeight)
+    .lineWidth(2)
+    .fillAndStroke(boxColor, boxBorderColor);
+
+  doc.font("Helvetica-Bold").fontSize(titleFontSize).fillColor(textColor);
+  doc.text("COMENTARIOS:", leftMargin + boxPadding, boxY + boxPadding, {
+    width: innerWidth,
+  });
+
+  const endY = renderMixedBoldParagraphs(doc, text, {
+    x: leftMargin + boxPadding,
+    y: boxY + boxPadding + titleHeight,
+    width: innerWidth,
+    fontSize,
+    textColor,
+  });
+
+  doc.y = Math.max(boxY + boxHeight, endY) + 15;
+}
+
 function getPassengerText(passengers: number): string {
   // Always return "por Persona" regardless of passenger count
   // System now only supports single passenger pricing
@@ -816,104 +988,19 @@ export async function generatePublicQuotePDF(
     }
   }
 
-  // Move comments section further down and center the title
-  const commentsY = smallImagesY + smallImageHeight + 35;
+  // Plan description (no title) where comments used to appear on the first page
+  const descriptionY = smallImagesY + smallImageHeight + 35;
+  const descriptionText = getPlanDescriptionsText(data);
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(textColor);
-  doc.text("COMENTARIOS", 0, commentsY, {
-    width: pageWidth,
-    align: "center",
-  });
-
-  // Comments with mixed formatting (normal and bold)
-  const commentsStartY = commentsY + 15;
-  doc.font("Helvetica").fontSize(7.5).fillColor(textColor);
-
-  // Use plan-specific firstPageComments if set, else fallback to legacy logic
-  const customComments = data.destinations.find(
-    (d) => (d.destination as { firstPageComments?: string | null })?.firstPageComments?.trim()
-  )?.destination as { firstPageComments?: string } | undefined;
-  const commentsText = customComments?.firstPageComments?.trim();
-
-  if (commentsText) {
-    // Split by line breaks to support multi-paragraph comments
-    const paragraphs = commentsText.split(/\n+/).map((p) => p.trim()).filter(Boolean);
-    let currentY = commentsStartY;
-
-    for (let paraIndex = 0; paraIndex < paragraphs.length; paraIndex++) {
-      const para = paragraphs[paraIndex];
-      if (paraIndex > 0) {
-        doc.moveDown(0.5);
-        currentY = doc.y;
-      }
-
-      // Parse **bold** and render mixed formatting within each paragraph
-      const parts = para.split(/(\*\*[^*]+\*\*)/g);
-      let isFirst = true;
-      for (const part of parts) {
-        if (part.startsWith("**") && part.endsWith("**")) {
-          doc.font("Helvetica-Bold");
-          const text = part.slice(2, -2);
-          if (isFirst) {
-            doc.text(text, leftMargin, currentY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-            isFirst = false;
-          } else {
-            doc.text(text, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-          }
-        } else if (part) {
-          doc.font("Helvetica");
-          if (isFirst) {
-            doc.text(part, leftMargin, currentY, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-            isFirst = false;
-          } else {
-            doc.text(part, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-          }
-        }
-      }
-    }
-  } else {
-    // Legacy: Check if this is Turquía Esencial - using simple name check
-    const isTurkeyEsencialComments = data.destinations.some(
-      (d) =>
-        d.name?.toLowerCase().includes("turquía esencial") ||
-        d.name?.toLowerCase().includes("turquia esencial"),
-    );
-
-    if (isTurkeyEsencialComments) {
-      doc.text(
-        "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guía de habla hispana. Recuerda consultar los servicios no incluidos. ",
-        leftMargin,
-        commentsStartY,
-        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-      );
-      doc.font("Helvetica-Bold");
-      doc.text(
-        "Globo Turquia +415usd por persona / 6 almuerzos +200usd por persona / Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
-        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-      );
-      doc.font("Helvetica");
-      doc.text(
-        "NOCHE ADICIONAL DE HOTEL CON DESAYUNO EN ESTAMBUL + 250USD EN HOTELES DE LA MISMA CATEGORIA.",
-        { width: contentWidth, align: "justify", lineGap: 2 },
-      );
-    } else {
-      doc.text(
-        "Tarifa sujeta a cambios sin previo aviso y disponibilidad. Para el destino, cuenta con acompañamiento de guia de habla hispana.  Recuerda consultar los servicios no incluidos. ",
-        leftMargin,
-        commentsStartY,
-        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-      );
-      doc.font("Helvetica-Bold");
-      doc.text(
-        "Tarifa aérea NO reembolsable, permite cambio con penalidades + diferencia de tarifa.  ",
-        { width: contentWidth, align: "justify", lineGap: 2, continued: true },
-      );
-      doc.font("Helvetica");
-      doc.text(
-        "NOCHE ADICIONAL APLICA SUPLEMENTO A TRANSFER",
-        { width: contentWidth, align: "justify", lineGap: 2 },
-      );
-    }
+  if (descriptionText) {
+    doc.font("Helvetica").fontSize(9.5).fillColor(textColor);
+    renderMixedBoldParagraphs(doc, descriptionText, {
+      x: leftMargin,
+      y: descriptionY,
+      width: contentWidth,
+      textColor,
+      fontSize: 9.5,
+    });
   }
 
   doc.addPage();
@@ -2289,6 +2376,22 @@ export async function generatePublicQuotePDF(
     defaultExcluded.forEach((item) => {
       doc.text(`• ${item}`, leftMargin + 10, doc.y);
       doc.moveDown(0.3);
+    });
+  }
+
+  const commentsText = getFirstPageCommentsText(data);
+  if (commentsText) {
+    doc.moveDown(1);
+    renderBoxedComments(doc, commentsText, {
+      leftMargin,
+      contentWidth,
+      boxColor: "#fff7ed",
+      boxBorderColor: accentColor,
+      textColor,
+      onNewPage: () => {
+        addPageBackground();
+        addPlaneLogoBottom();
+      },
     });
   }
 

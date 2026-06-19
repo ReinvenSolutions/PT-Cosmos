@@ -38,7 +38,7 @@ export async function seedProductionDatabase() {
       username: "advisor1",
       email: "advisor@sistema.com",
       passwordHash: advisorPassword,
-      role: "advisor",
+      role: "agency",
     }).onConflictDoNothing();
 
     // 3. Ejecutar el script SQL completo para poblar destinos

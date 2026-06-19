@@ -69,7 +69,7 @@ export default function AdminTutorials() {
     <div className="max-w-4xl space-y-8">
       <AcademyAdminHeader
         title="Cursos y lecciones"
-        description="Diseña la experiencia de aprendizaje: cursos, lecciones y publicación. Los asesores consumen el contenido en la sección Tutoriales y su avance se registra en tiempo real."
+        description="Diseña la experiencia de aprendizaje: cursos, lecciones y publicación. Las agencias consumen el contenido en la sección Tutoriales y su avance se registra en tiempo real."
         actions={
           <>
             <Button variant="outline" className="rounded-xl border-border/80 shadow-sm" asChild>

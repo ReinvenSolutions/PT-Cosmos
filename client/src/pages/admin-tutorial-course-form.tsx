@@ -186,7 +186,7 @@ export default function AdminTutorialCourseForm() {
         <div className="h-1 bg-gradient-to-r from-primary/60 via-cyan-500/40 to-amber-400/50" />
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Datos del curso</CardTitle>
-          <CardDescription>Lo que verán los asesores en el listado de Tutoriales.</CardDescription>
+          <CardDescription>Lo que verán las agencias en el listado de Tutoriales.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

@@ -1,13 +1,26 @@
 import { storage } from "../storage";
 import type { CreateQuoteInput } from "../types";
 import type { User } from "@shared/schema";
-import { NotFoundError, ValidationError } from "../errors/AppError";
+import { ROLES } from "@shared/roles";
+import { NotFoundError, ValidationError, ForbiddenError } from "../errors/AppError";
 import { clearDestinationCache } from "../utils/cache";
 import { logger } from "../logger";
 import { assertBloqueoQuoteAllowed } from "../bloqueoQuoteValidation";
 
 export class QuoteService {
+  private async assertClientAccess(clientId: string, user: User): Promise<void> {
+    if (user.role === ROLES.SUPER_ADMIN) return;
+    const client = await storage.findClientById(clientId);
+    if (!client) {
+      throw new NotFoundError("Cliente");
+    }
+    if (client.userId !== user.id) {
+      throw new ForbiddenError("No autorizado para usar este cliente");
+    }
+  }
+
   async createQuote(data: CreateQuoteInput, user: User) {
+    await this.assertClientAccess(data.clientId, user);
     const allDestinations = await storage.getDestinations();
     const destinationsById = new Map(allDestinations.map((d) => [d.id, d]));
     assertBloqueoQuoteAllowed(data.destinations, destinationsById);
@@ -104,6 +117,10 @@ export class QuoteService {
     
     if (!existingQuote) {
       throw new NotFoundError("Quote");
+    }
+
+    if (data.clientId) {
+      await this.assertClientAccess(data.clientId, user);
     }
 
     const allDestinations = await storage.getDestinations();

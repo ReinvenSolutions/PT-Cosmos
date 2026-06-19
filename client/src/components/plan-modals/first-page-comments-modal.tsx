@@ -48,9 +48,9 @@ export function FirstPageCommentsModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Comentarios primera hoja del PDF</DialogTitle>
+          <DialogTitle>Comentarios del PDF</DialogTitle>
           <DialogDescription>
-            Texto que aparece en la sección &quot;COMENTARIOS&quot; de la primera hoja del PDF. Puedes usar texto normal y **negrita** para resaltar.
+            Texto que aparece en un recuadro después de la sección &quot;Excluido&quot; en el PDF. Puedes usar texto normal y **negrita** para resaltar.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">

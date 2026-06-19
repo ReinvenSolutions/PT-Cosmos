@@ -317,7 +317,9 @@ export async function buildCosmosSystemContext(opts: {
   const roleNote =
     opts.userRole === "super_admin"
       ? "El usuario es administrador (acceso completo)."
-      : "El usuario es asesor de viajes (sin permisos de administración de planes/usuarios/TRM).";
+      : opts.userRole === "provider"
+        ? "El usuario es proveedor (gestiona sus propios planes, cotizaciones y clientes; solo ve sus propios datos)."
+        : "El usuario es agencia de viajes (cotizaciones, mis clientes y academia; solo ve sus propias cotizaciones y clientes).";
 
   return `
 ${COSMOS_APP_GUIDE}
