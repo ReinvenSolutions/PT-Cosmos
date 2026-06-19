@@ -208,7 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // extract-plan PRIMERO (antes de apiLimiter) para máxima prioridad
-  app.post("/api/admin/extract-plan", requireRole("super_admin"), extractPlanUpload.single("file"), asyncHandler(handleExtractPlanFromDocument));
+  app.post("/api/admin/extract-plan", requirePlanManagers, extractPlanUpload.single("file"), asyncHandler(handleExtractPlanFromDocument));
   logger.info("Route POST /api/admin/extract-plan registered (first in API stack)");
 
   // Test email (super_admin): verificar Brevo SMTP

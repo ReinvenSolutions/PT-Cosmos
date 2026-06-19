@@ -7,7 +7,7 @@ Herramienta interna para agencias, proveedores y administradores de Cosmos Mayor
 ### Roles
 - **super_admin**: dashboard, planes, clientes, usuarios, academia (admin), TRM global, cotizaciones.
 - **agency**: nueva cotización, cotización express, mis cotizaciones, mis clientes, academia, ver planes.
-- **provider**: administrar planes propios, ver catálogo, nueva cotización, cotización express, mis cotizaciones, mis clientes.
+- **provider**: administrar planes propios (incl. importar PDF/Word con IA), nueva cotización, cotización express, mis cotizaciones, mis clientes.
 
 ### Menú — Agencia
 - **Nueva cotización** (/): catálogo de planes activos; elegir plan → detalle → armar cotización con fechas, pasajeros y precios.
@@ -17,7 +17,7 @@ Herramienta interna para agencias, proveedores y administradores de Cosmos Mayor
 - **Academia digital** (/tutoriales): cursos y lecciones de capacitación.
 
 ### Menú — Proveedor (además de cotizaciones)
-- **Administrar planes** (/admin/plans): crear y editar solo tus planes.
+- **Administrar planes** (/admin/plans): crear y editar solo tus planes; importar desde PDF/Word con COSMO (IA).
 
 ### Menú — Administrador (además)
 - **Dashboard** (/admin/dashboard): métricas y actividad.
