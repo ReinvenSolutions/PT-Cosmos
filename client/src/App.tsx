@@ -37,6 +37,8 @@ const Tutoriales = lazy(() => import("@/pages/tutoriales"));
 const AdminTutorials = lazy(() => import("@/pages/admin-tutorials"));
 const AdminTutorialCourseForm = lazy(() => import("@/pages/admin-tutorial-course-form"));
 const AdminTutorialsMetricas = lazy(() => import("@/pages/admin-tutorials-metricas"));
+const ToolsDayCounter = lazy(() => import("@/pages/tools-day-counter"));
+const ToolsMilesCalculator = lazy(() => import("@/pages/tools-miles-calculator"));
 
 function ProtectedRoute({
   component: Component,
@@ -163,6 +165,12 @@ function AppRoutes() {
       </Route>
       <Route path="/cotizacion-express">
         <ProtectedRoute component={QuoteExpress} allowedRoles={[...QUOTE_USER_ROLES]} />
+      </Route>
+      <Route path="/herramientas/contador-dias">
+        <ProtectedRoute component={ToolsDayCounter} allowedRoles={[...QUOTE_USER_ROLES]} />
+      </Route>
+      <Route path="/herramientas/cotizador-millas">
+        <ProtectedRoute component={ToolsMilesCalculator} allowedRoles={[...QUOTE_USER_ROLES]} />
       </Route>
       <Route path="/plan/:id">
         <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "agency", "provider"]} />

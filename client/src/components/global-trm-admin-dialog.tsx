@@ -16,17 +16,31 @@ import { Banknote } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { TRM_EFFECTIVE_SURCHARGE_COP, effectiveTrmFromBase } from "@shared/trm";
+import {
+  DEFAULT_USD_PER_1000_LIFEMILES,
+  DEFAULT_USD_PER_1000_SMILES,
+} from "@shared/milesCalculator";
 
 type GlobalTrmResponse = {
   baseTrm: number | null;
   effectiveTrm: number | null;
   surchargeCop: number;
+  usdPer1000LifeMiles: number;
+  usdPer1000Smiles: number;
+};
+
+type SavePayload = {
+  baseTrm: number | null;
+  usdPer1000LifeMiles: number;
+  usdPer1000Smiles: number;
 };
 
 export function GlobalTrmAdminMenuItem() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [lifeMilesRate, setLifeMilesRate] = useState(String(DEFAULT_USD_PER_1000_LIFEMILES));
+  const [smilesRate, setSmilesRate] = useState(String(DEFAULT_USD_PER_1000_SMILES));
 
   const { data, isLoading } = useQuery<GlobalTrmResponse>({
     queryKey: ["/api/settings/global-trm"],
@@ -36,26 +50,28 @@ export function GlobalTrmAdminMenuItem() {
   useEffect(() => {
     if (open && data) {
       setInputValue(data.baseTrm != null ? String(data.baseTrm) : "");
+      setLifeMilesRate(String(data.usdPer1000LifeMiles ?? DEFAULT_USD_PER_1000_LIFEMILES));
+      setSmilesRate(String(data.usdPer1000Smiles ?? DEFAULT_USD_PER_1000_SMILES));
     }
-  }, [open, data?.baseTrm]);
+  }, [open, data?.baseTrm, data?.usdPer1000LifeMiles, data?.usdPer1000Smiles]);
 
   const saveMutation = useMutation({
-    mutationFn: async (baseTrm: number | null) => {
-      const res = await apiRequest("PUT", "/api/admin/settings/global-trm", { baseTrm });
+    mutationFn: async (payload: SavePayload) => {
+      const res = await apiRequest("PUT", "/api/admin/settings/global-trm", payload);
       return res.json() as Promise<GlobalTrmResponse>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/global-trm"] });
       toast({
-        title: "TRM actualizada",
-        description: "El valor global del cotizador se guardó correctamente.",
+        title: "Configuración guardada",
+        description: "TRM y tasas de millas actualizadas correctamente.",
       });
       setOpen(false);
     },
     onError: (err: Error) => {
       toast({
         title: "Error",
-        description: err.message || "No se pudo guardar la TRM.",
+        description: err.message || "No se pudo guardar la configuración.",
         variant: "destructive",
       });
     },
@@ -63,20 +79,45 @@ export function GlobalTrmAdminMenuItem() {
 
   const handleSave = () => {
     const trimmed = inputValue.trim();
-    if (!trimmed) {
-      saveMutation.mutate(null);
-      return;
+    let baseTrm: number | null = null;
+    if (trimmed) {
+      const n = parseFloat(trimmed.replace(/,/g, ""));
+      if (!Number.isFinite(n) || n <= 0) {
+        toast({
+          title: "TRM inválida",
+          description: "Ingresa un número mayor que cero o deja vacío para quitar la TRM.",
+          variant: "destructive",
+        });
+        return;
+      }
+      baseTrm = n;
     }
-    const n = parseFloat(trimmed.replace(/,/g, ""));
-    if (!Number.isFinite(n) || n <= 0) {
+
+    const lifeMiles = parseFloat(lifeMilesRate.replace(/,/g, ""));
+    if (!Number.isFinite(lifeMiles) || lifeMiles <= 0) {
       toast({
-        title: "Valor inválido",
-        description: "Ingresa un número mayor que cero o deja vacío para quitar la TRM.",
+        title: "Tasa LifeMiles inválida",
+        description: "Ingresa un valor USD por 1,000 millas mayor que cero.",
         variant: "destructive",
       });
       return;
     }
-    saveMutation.mutate(n);
+
+    const smiles = parseFloat(smilesRate.replace(/,/g, ""));
+    if (!Number.isFinite(smiles) || smiles <= 0) {
+      toast({
+        title: "Tasa Smiles inválida",
+        description: "Ingresa un valor USD por 1,000 millas mayor que cero.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    saveMutation.mutate({
+      baseTrm,
+      usdPer1000LifeMiles: lifeMiles,
+      usdPer1000Smiles: smiles,
+    });
   };
 
   const previewBase = (() => {
@@ -103,9 +144,9 @@ export function GlobalTrmAdminMenuItem() {
       </SidebarMenuItem>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>TRM global del cotizador</DialogTitle>
+          <DialogTitle>TRM y tasas de millas</DialogTitle>
           <DialogDescription>
-            Valor base en COP por cada USD. Al cotizar en COP, el sistema suma automáticamente {TRM_EFFECTIVE_SURCHARGE_COP} COP a esta base (igual que antes).
+            Configura la TRM global del cotizador y el valor USD por cada 1,000 millas para LifeMiles y Smiles.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -132,6 +173,34 @@ export function GlobalTrmAdminMenuItem() {
             <p className="text-xs text-muted-foreground">
               Deja el campo vacío y guarda para quitar la TRM global. Las agencias no podrán cotizar en COP hasta que configures un valor de nuevo.
             </p>
+          </div>
+
+          <div className="border-t border-border pt-4 space-y-4">
+            <p className="text-sm font-medium text-foreground">Tasas del cotizador de millas</p>
+            <div className="space-y-2">
+              <Label htmlFor="global-lifemiles-rate">USD por 1,000 millas — LifeMiles</Label>
+              <Input
+                id="global-lifemiles-rate"
+                type="text"
+                inputMode="decimal"
+                placeholder={String(DEFAULT_USD_PER_1000_LIFEMILES)}
+                value={lifeMilesRate}
+                onChange={(e) => setLifeMilesRate(e.target.value)}
+                disabled={isLoading || saveMutation.isPending}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="global-smiles-rate">USD por 1,000 millas — Smiles</Label>
+              <Input
+                id="global-smiles-rate"
+                type="text"
+                inputMode="decimal"
+                placeholder={String(DEFAULT_USD_PER_1000_SMILES)}
+                value={smilesRate}
+                onChange={(e) => setSmilesRate(e.target.value)}
+                disabled={isLoading || saveMutation.isPending}
+              />
+            </div>
           </div>
         </div>
         <DialogFooter className="gap-2 sm:gap-0">

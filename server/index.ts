@@ -25,6 +25,7 @@ import { ensureDestinationAgencyColumns } from "./ensure-destination-agency-colu
 import { ensureDestinationPlanTaxesColumn } from "./ensure-destination-plan-taxes-column";
 import { ensureUserRoleRename } from "./ensure-user-role-rename";
 import { ensureClientsUserIdColumn } from "./ensure-clients-user-id";
+import { ensureToolItinerariesTable } from "./ensure-tool-itineraries-table";
 import { seedDatabaseIfEmpty } from "./seed";
 import { startPriceTierExpirationScheduler } from "./services/expirePriceTiers";
 
@@ -159,6 +160,7 @@ app.use((req, res, next) => {
     await ensureDestinationPlanTaxesColumn(pool);
     await ensureUserRoleRename(pool);
     await ensureClientsUserIdColumn(pool);
+    await ensureToolItinerariesTable(pool);
 
     const server = await registerRoutes(app);
     startPriceTierExpirationScheduler();
@@ -205,7 +207,7 @@ app.use((req, res, next) => {
     server.listen(env.PORT, "0.0.0.0", () => {
       const dbUrl = process.env.DATABASE_URL || "";
       const dbSource = dbUrl.includes("supabase.co") ? "Supabase" : dbUrl.includes("neon.tech") ? "Neon" : "PostgreSQL";
-      const emailStatus = isEmailConfigured() ? "Email: ✓" : "Email: ✗ (SMTP_USER/SMTP_PASS en .env)";
+      const emailStatus = isEmailConfigured() ? "Email: ✓" : "Email: ✗ (BREVO_API_KEY en .env)";
       logger.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode | BD: ${dbSource} | ${emailStatus}`);
     });
   } catch (err) {

@@ -53,11 +53,20 @@ import {
   Clock,
   Building2,
   Percent,
+  Coins,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { ROLE_LABELS, ROLES as ROLE_IDS } from "@shared/roles";
+import type { MilesMarkupType, MilesProgramsAllowed } from "@shared/milesCalculator";
+import {
+  canUseLifeMiles,
+  canUseSmiles,
+  formatMilesMarkupShort,
+  normalizeMilesMarkupType,
+  normalizeMilesProgramsAllowed,
+} from "@shared/milesCalculator";
 
 interface AdminUser {
   id: string;
@@ -69,6 +78,13 @@ interface AdminUser {
   approvalStatus: string;
   twoFactorEnabled?: boolean;
   discountPercentage?: string | number | null;
+  milesMarkupType?: string | null;
+  milesMarkupValue?: string | number | null;
+  milesMarkupTypeLifemiles?: string | null;
+  milesMarkupValueLifemiles?: string | number | null;
+  milesMarkupTypeSmiles?: string | null;
+  milesMarkupValueSmiles?: string | number | null;
+  milesProgramsAllowed?: string | null;
   createdAt: string;
 }
 
@@ -101,6 +117,26 @@ function generateRandomWord(): string {
   return CONFIRM_WORDS[Math.floor(Math.random() * CONFIRM_WORDS.length)];
 }
 
+function milesSettingsSummary(user: AdminUser): string {
+  const programs = normalizeMilesProgramsAllowed(user.milesProgramsAllowed);
+  if (programs === "none") return "Ninguno";
+
+  const parts: string[] = [];
+  if (canUseLifeMiles(programs)) {
+    const type = normalizeMilesMarkupType(user.milesMarkupTypeLifemiles);
+    const value = Number(user.milesMarkupValueLifemiles ?? 0);
+    const markup = formatMilesMarkupShort(type, value);
+    parts.push(markup ? `LM ${markup}` : "LM");
+  }
+  if (canUseSmiles(programs)) {
+    const type = normalizeMilesMarkupType(user.milesMarkupTypeSmiles);
+    const value = Number(user.milesMarkupValueSmiles ?? 0);
+    const markup = formatMilesMarkupShort(type, value);
+    parts.push(markup ? `SM ${markup}` : "SM");
+  }
+  return parts.join(" · ");
+}
+
 export default function AdminUsers() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -110,6 +146,7 @@ export default function AdminUsers() {
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<AdminUser | null>(null);
   const [discountUser, setDiscountUser] = useState<AdminUser | null>(null);
+  const [milesSettingsUser, setMilesSettingsUser] = useState<AdminUser | null>(null);
   const [confirmWord, setConfirmWord] = useState("");
   const [randomWord, setRandomWord] = useState("");
 
@@ -212,6 +249,42 @@ export default function AdminUsers() {
     },
   });
 
+  const milesSettingsMutation = useMutation({
+    mutationFn: ({
+      id,
+      milesProgramsAllowed,
+      milesMarkupTypeLifemiles,
+      milesMarkupValueLifemiles,
+      milesMarkupTypeSmiles,
+      milesMarkupValueSmiles,
+    }: {
+      id: string;
+      milesProgramsAllowed: MilesProgramsAllowed;
+      milesMarkupTypeLifemiles: MilesMarkupType;
+      milesMarkupValueLifemiles: number;
+      milesMarkupTypeSmiles: MilesMarkupType;
+      milesMarkupValueSmiles: number;
+    }) =>
+      apiRequest("PATCH", `/api/admin/users/${id}/miles-settings`, {
+        milesProgramsAllowed,
+        milesMarkupTypeLifemiles,
+        milesMarkupValueLifemiles,
+        milesMarkupTypeSmiles,
+        milesMarkupValueSmiles,
+      }),
+    onSuccess: () => {
+      invalidateUserLists();
+      setMilesSettingsUser(null);
+      toast({
+        title: "Cotizador de millas actualizado",
+        description: "La configuración se aplicará en el módulo de millas del usuario.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleOpenDelete = (user: AdminUser) => {
     setDeleteUser(user);
     setConfirmWord("");
@@ -287,6 +360,7 @@ export default function AdminUsers() {
                 <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Descuento</TableHead>
+                <TableHead>Cotizador millas</TableHead>
                 <TableHead>Aprobación</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -295,13 +369,13 @@ export default function AdminUsers() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     Cargando usuarios...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     No se encontraron usuarios.
                   </TableCell>
                 </TableRow>
@@ -336,6 +410,20 @@ export default function AdminUsers() {
                           {Number(user.discountPercentage ?? 0) > 0
                             ? `${Number(user.discountPercentage)}%`
                             : "Sin descuento"}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {user.role === ROLE_IDS.AGENCY || user.role === ROLE_IDS.PROVIDER ? (
+                        <button
+                          type="button"
+                          onClick={() => setMilesSettingsUser(user)}
+                          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                        >
+                          <Coins className="h-3.5 w-3.5" />
+                          {milesSettingsSummary(user)}
                         </button>
                       ) : (
                         <span className="text-sm text-muted-foreground">—</span>
@@ -404,6 +492,12 @@ export default function AdminUsers() {
                               Asignar descuento
                             </DropdownMenuItem>
                           )}
+                          {(user.role === ROLE_IDS.AGENCY || user.role === ROLE_IDS.PROVIDER) && (
+                            <DropdownMenuItem onClick={() => setMilesSettingsUser(user)}>
+                              <Coins className="mr-2 h-4 w-4" />
+                              Cotizador de millas
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => handleOpenDelete(user)}
@@ -441,6 +535,17 @@ export default function AdminUsers() {
           discountUser && discountMutation.mutate({ id: discountUser.id, discountPercentage })
         }
         isSubmitting={discountMutation.isPending}
+      />
+
+      {/* Miles Settings Dialog */}
+      <MilesSettingsDialog
+        user={milesSettingsUser}
+        onOpenChange={(open) => !open && setMilesSettingsUser(null)}
+        onSubmit={(data) =>
+          milesSettingsUser &&
+          milesSettingsMutation.mutate({ id: milesSettingsUser.id, ...data })
+        }
+        isSubmitting={milesSettingsMutation.isPending}
       />
 
       {/* Edit User Dialog */}
@@ -501,6 +606,199 @@ export default function AdminUsers() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function MilesMarkupSection({
+  programLabel,
+  markupType,
+  markupValue,
+  onTypeChange,
+  onValueChange,
+}: {
+  programLabel: string;
+  markupType: MilesMarkupType;
+  markupValue: string;
+  onTypeChange: (type: MilesMarkupType) => void;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border/60 p-4">
+      <p className="text-sm font-medium text-foreground">Recargo {programLabel}</p>
+      <div className="space-y-2">
+        <Label>Tipo de recargo</Label>
+        <Select value={markupType} onValueChange={(v) => onTypeChange(v as MilesMarkupType)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sin recargo</SelectItem>
+            <SelectItem value="percentage">Porcentaje sobre el total</SelectItem>
+            <SelectItem value="fixed">Tarifa fija adicional (COP)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {markupType !== "none" && (
+        <div className="space-y-2">
+          <Label>
+            {markupType === "percentage" ? "Porcentaje (%)" : "Valor fijo (COP)"}
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            max={markupType === "percentage" ? 100 : undefined}
+            step={markupType === "percentage" ? 0.01 : 1}
+            value={markupValue}
+            onChange={(e) => onValueChange(e.target.value)}
+            required
+          />
+          <p className="text-xs text-muted-foreground">
+            {markupType === "percentage"
+              ? "Se suma al total calculado con este programa antes de redondear."
+              : "Se suma una cantidad fija en pesos al total calculado con este programa."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MilesSettingsDialog({
+  user,
+  onOpenChange,
+  onSubmit,
+  isSubmitting,
+}: {
+  user: AdminUser | null;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: {
+    milesProgramsAllowed: MilesProgramsAllowed;
+    milesMarkupTypeLifemiles: MilesMarkupType;
+    milesMarkupValueLifemiles: number;
+    milesMarkupTypeSmiles: MilesMarkupType;
+    milesMarkupValueSmiles: number;
+  }) => void;
+  isSubmitting: boolean;
+}) {
+  const [milesProgramsAllowed, setMilesProgramsAllowed] = useState<MilesProgramsAllowed>("both");
+  const [lifemilesMarkupType, setLifemilesMarkupType] = useState<MilesMarkupType>("none");
+  const [lifemilesMarkupValue, setLifemilesMarkupValue] = useState("0");
+  const [smilesMarkupType, setSmilesMarkupType] = useState<MilesMarkupType>("none");
+  const [smilesMarkupValue, setSmilesMarkupValue] = useState("0");
+
+  useEffect(() => {
+    if (user) {
+      setMilesProgramsAllowed(normalizeMilesProgramsAllowed(user.milesProgramsAllowed));
+      setLifemilesMarkupType(
+        (user.milesMarkupTypeLifemiles as MilesMarkupType) ??
+          (user.milesMarkupType as MilesMarkupType) ??
+          "none",
+      );
+      setLifemilesMarkupValue(
+        String(Number(user.milesMarkupValueLifemiles ?? user.milesMarkupValue ?? 0)),
+      );
+      setSmilesMarkupType(
+        (user.milesMarkupTypeSmiles as MilesMarkupType) ??
+          (user.milesMarkupType as MilesMarkupType) ??
+          "none",
+      );
+      setSmilesMarkupValue(
+        String(Number(user.milesMarkupValueSmiles ?? user.milesMarkupValue ?? 0)),
+      );
+    }
+  }, [user]);
+
+  if (!user) return null;
+
+  const showLifeMilesMarkup = canUseLifeMiles(milesProgramsAllowed);
+  const showSmilesMarkup = canUseSmiles(milesProgramsAllowed);
+
+  const parseMarkupValue = (type: MilesMarkupType, raw: string): number | null => {
+    const value = parseFloat(raw);
+    if (!Number.isFinite(value) || value < 0) return null;
+    if (type === "percentage" && value > 100) return null;
+    return value;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const lifemilesValue = showLifeMilesMarkup
+      ? parseMarkupValue(lifemilesMarkupType, lifemilesMarkupValue)
+      : 0;
+    const smilesValue = showSmilesMarkup
+      ? parseMarkupValue(smilesMarkupType, smilesMarkupValue)
+      : 0;
+
+    if (showLifeMilesMarkup && lifemilesValue === null) return;
+    if (showSmilesMarkup && smilesValue === null) return;
+
+    onSubmit({
+      milesProgramsAllowed,
+      milesMarkupTypeLifemiles: showLifeMilesMarkup ? lifemilesMarkupType : "none",
+      milesMarkupValueLifemiles: showLifeMilesMarkup ? lifemilesValue! : 0,
+      milesMarkupTypeSmiles: showSmilesMarkup ? smilesMarkupType : "none",
+      milesMarkupValueSmiles: showSmilesMarkup ? smilesValue! : 0,
+    });
+  };
+
+  return (
+    <Dialog open={!!user} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Cotizador de millas</DialogTitle>
+          <DialogDescription>
+            Configura programas habilitados y recargos por tipo de millas para{" "}
+            <strong>{user.name || user.username}</strong>.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Programas habilitados</Label>
+            <Select
+              value={milesProgramsAllowed}
+              onValueChange={(v) => setMilesProgramsAllowed(v as MilesProgramsAllowed)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Ninguno (sin acceso)</SelectItem>
+                <SelectItem value="both">LifeMiles y Smiles</SelectItem>
+                <SelectItem value="lifemiles">Solo LifeMiles</SelectItem>
+                <SelectItem value="smiles">Solo Smiles</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {showLifeMilesMarkup && (
+            <MilesMarkupSection
+              programLabel="LifeMiles"
+              markupType={lifemilesMarkupType}
+              markupValue={lifemilesMarkupValue}
+              onTypeChange={setLifemilesMarkupType}
+              onValueChange={setLifemilesMarkupValue}
+            />
+          )}
+          {showSmilesMarkup && (
+            <MilesMarkupSection
+              programLabel="Smiles"
+              markupType={smilesMarkupType}
+              markupValue={smilesMarkupValue}
+              onTypeChange={setSmilesMarkupType}
+              onValueChange={setSmilesMarkupValue}
+            />
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Guardar configuración
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

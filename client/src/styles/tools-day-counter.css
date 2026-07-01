@@ -1,0 +1,202 @@
+/* Contador de días — superficies y contraste mejorados */
+
+.tools-day-counter-page {
+  --tool-page-bg: hsl(197 22% 93%);
+  --tool-surface: hsl(0 0% 100%);
+  --tool-surface-muted: hsl(197 22% 90%);
+  --tool-surface-inset: hsl(197 20% 88%);
+  --tool-border: hsl(197 20% 78%);
+  --tool-border-strong: hsl(197 53% 36% / 0.45);
+  --tool-text: hsl(197 45% 12%);
+  --tool-text-secondary: hsl(197 30% 28%);
+  --tool-badge-bg: hsl(197 53% 36%);
+  --tool-badge-text: hsl(0 0% 100%);
+  --tool-stat-border: hsl(197 53% 36% / 0.5);
+}
+
+.dark .tools-day-counter-page {
+  --tool-page-bg: hsl(197 50% 8%);
+  --tool-surface: hsl(197 38% 17%);
+  --tool-surface-muted: hsl(197 35% 22%);
+  --tool-surface-inset: hsl(197 32% 14%);
+  --tool-border: hsl(197 28% 34%);
+  --tool-border-strong: hsl(191 46% 69% / 0.55);
+  --tool-text: hsl(0 0% 98%);
+  --tool-text-secondary: hsl(197 15% 80%);
+  --tool-badge-bg: hsl(44 54% 52%);
+  --tool-badge-text: hsl(197 53% 10%);
+  --tool-stat-border: hsl(191 46% 69% / 0.55);
+}
+
+.tools-day-counter-page {
+  background: var(--tool-page-bg);
+  color: var(--tool-text);
+}
+
+.tools-day-counter-surface {
+  background: var(--tool-surface) !important;
+  border: 2px solid var(--tool-border) !important;
+  color: var(--tool-text) !important;
+}
+
+.tools-day-counter-surface-muted {
+  background: var(--tool-surface-muted) !important;
+  border: 1px solid var(--tool-border) !important;
+  color: var(--tool-text) !important;
+}
+
+.tools-day-counter-page strong {
+  color: var(--tool-text);
+}
+
+.tools-day-counter-text-secondary {
+  color: var(--tool-text-secondary);
+}
+
+.tools-day-counter-badge {
+  background: var(--tool-badge-bg);
+  color: var(--tool-badge-text);
+}
+
+.tools-day-counter-date-empty {
+  background: var(--tool-surface-muted);
+  border: 2px dashed var(--tool-border);
+  color: var(--tool-text-secondary);
+}
+
+.tools-day-counter-date-filled {
+  background: hsl(197 53% 36% / 0.1);
+  border: 2px solid var(--tool-border-strong);
+  color: var(--tool-text);
+}
+
+.dark .tools-day-counter-date-filled {
+  background: hsl(191 46% 69% / 0.12);
+}
+
+.tools-day-counter-date-filled .tools-day-counter-date-label {
+  color: hsl(197 53% 30%);
+  font-weight: 700;
+}
+
+.dark .tools-day-counter-date-filled .tools-day-counter-date-label {
+  color: hsl(191 46% 75%);
+}
+
+.tools-day-counter-stat-box {
+  background: var(--tool-surface);
+  border: 2px solid var(--tool-stat-border);
+}
+
+.tools-day-counter-stat-value {
+  color: hsl(197 53% 30%);
+}
+
+.dark .tools-day-counter-stat-value {
+  color: hsl(191 46% 75%);
+}
+
+.tools-day-counter-timeline-header {
+  background: var(--tool-surface-muted);
+  border-bottom: 2px solid var(--tool-border);
+}
+
+.tools-day-counter-timeline-body {
+  background: var(--tool-surface-inset);
+}
+
+.tools-day-counter-day-weekend {
+  border-left: 4px solid hsl(197 53% 36%);
+  background: hsl(197 40% 94%);
+}
+
+.dark .tools-day-counter-day-weekend {
+  border-left-color: hsl(191 46% 69%);
+  background: hsl(197 35% 20%);
+}
+
+.tools-day-counter-calendar-wrap {
+  background: var(--tool-surface-muted);
+  border: 2px solid var(--tool-border);
+}
+
+.tools-day-counter-empty-state {
+  color: var(--tool-text-secondary);
+}
+
+.tools-day-counter-outline-btn {
+  border: 2px solid var(--tool-border) !important;
+  color: var(--tool-text) !important;
+  background: transparent !important;
+}
+
+/* Flatpickr dentro del contador de días */
+.tools-day-counter-page .flatpickr-calendar {
+  background: var(--tool-surface) !important;
+  border: 2px solid var(--tool-border) !important;
+}
+
+.tools-day-counter-page .flatpickr-months,
+.tools-day-counter-page .flatpickr-weekdays,
+.tools-day-counter-page .flatpickr-days {
+  background: var(--tool-surface);
+}
+
+.tools-day-counter-page .flatpickr-months {
+  border-bottom: 2px solid var(--tool-border);
+}
+
+.tools-day-counter-page .flatpickr-month,
+.tools-day-counter-page .flatpickr-current-month .flatpickr-monthDropdown-months {
+  color: var(--tool-text);
+  font-weight: 700;
+}
+
+.tools-day-counter-page .flatpickr-weekday {
+  color: var(--tool-text-secondary);
+  font-weight: 700;
+}
+
+.tools-day-counter-page .flatpickr-day {
+  color: var(--tool-text);
+  font-weight: 600;
+}
+
+.tools-day-counter-page .flatpickr-day:hover {
+  background: hsl(197 53% 36% / 0.18) !important;
+  border-color: hsl(197 53% 36% / 0.55) !important;
+}
+
+.dark .tools-day-counter-page .flatpickr-day:hover {
+  background: hsl(191 46% 69% / 0.22) !important;
+  border-color: hsl(191 46% 69% / 0.65) !important;
+}
+
+.tools-day-counter-page .flatpickr-day.selected,
+.tools-day-counter-page .flatpickr-day.selected:hover {
+  background: var(--tool-badge-bg) !important;
+  border-color: var(--tool-badge-bg) !important;
+  color: var(--tool-badge-text) !important;
+}
+
+.tools-day-counter-page .flatpickr-day.today {
+  border: 2px solid var(--tool-border-strong);
+  background: hsl(197 53% 36% / 0.1);
+}
+
+.dark .tools-day-counter-page .flatpickr-day.today {
+  background: hsl(191 46% 69% / 0.15);
+}
+
+.tools-day-counter-page .flatpickr-prev-month,
+.tools-day-counter-page .flatpickr-next-month {
+  fill: var(--tool-text);
+}
+
+.tools-day-counter-page .scrollbar-thin::-webkit-scrollbar-track {
+  background: var(--tool-surface-muted);
+}
+
+.tools-day-counter-page .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--tool-border-strong);
+}

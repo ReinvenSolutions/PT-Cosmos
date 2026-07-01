@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { FileText, Users, BarChart3, LogOut, Plane, Zap, MapPin, Camera, UserCog, GraduationCap, BookOpen, Library } from "lucide-react";
+import { FileText, Users, BarChart3, LogOut, Plane, Zap, MapPin, Camera, UserCog, GraduationCap, BookOpen, Library, Calendar, Coins } from "lucide-react";
 import { GlobalTrmAdminMenuItem } from "@/components/global-trm-admin-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,6 +37,7 @@ import { useState, useRef, useEffect } from "react";
 import { AvatarCropInline } from "@/components/avatar-crop-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
+import { canUseMilesCalculator, normalizeMilesProgramsAllowed } from "@shared/milesCalculator";
 
 function getInitials(name?: string | null, username?: string): string {
   if (name && name.trim()) {
@@ -281,6 +282,8 @@ export function AppSidebar() {
         "/mis-clientes",
         "/cotizacion",
         "/cotizacion-express",
+        "/herramientas/contador-dias",
+        "/herramientas/cotizador-millas",
       ].forEach(prefetchRoute);
     }, 1500);
     return () => clearTimeout(t);
@@ -323,6 +326,18 @@ export function AppSidebar() {
     ],
   };
 
+  const herramientasItems = [
+    { title: "Contador de días", url: "/herramientas/contador-dias", icon: Calendar },
+    ...(isAdmin || canUseMilesCalculator(normalizeMilesProgramsAllowed(user?.milesProgramsAllowed))
+      ? [{ title: "Calculadora de millas", url: "/herramientas/cotizador-millas", icon: Coins }]
+      : []),
+  ];
+
+  const herramientasSection = {
+    label: "Herramientas",
+    items: herramientasItems,
+  };
+
   const cotizacionesItems = [
     { title: "Nueva cotización", url: "/", icon: Plane },
     { title: "Cotización express", url: "/cotizacion-express", icon: Zap },
@@ -346,14 +361,15 @@ export function AppSidebar() {
   };
 
   const sections = isAdmin
-    ? [adminSection, adminCotizacionesSection, contenidoSection]
+    ? [adminSection, adminCotizacionesSection, herramientasSection, contenidoSection]
     : isProvider
-      ? [providerPlansSection, providerCotizacionesSection]
-      : [advisorSection, contenidoSection];
+      ? [providerPlansSection, providerCotizacionesSection, herramientasSection]
+      : [advisorSection, herramientasSection, contenidoSection];
 
   const isMenuActive = (url: string) => {
     if (url === "/tutoriales") return location.startsWith("/tutoriales");
     if (url === "/mis-clientes") return location === "/mis-clientes";
+    if (url.startsWith("/herramientas/")) return location === url;
     if (url === "/admin/tutoriales")
       return location === "/admin/tutoriales" || location.startsWith("/admin/tutoriales/curso/");
     if (url === "/admin/tutoriales/metricas") return location === "/admin/tutoriales/metricas";

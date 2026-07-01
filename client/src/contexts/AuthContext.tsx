@@ -9,6 +9,13 @@ export interface User {
   avatarUrl?: string | null;
   role: string;
   discountPercentage?: string | number | null;
+  milesMarkupType?: string | null;
+  milesMarkupValue?: string | number | null;
+  milesMarkupTypeLifemiles?: string | null;
+  milesMarkupValueLifemiles?: string | number | null;
+  milesMarkupTypeSmiles?: string | null;
+  milesMarkupValueSmiles?: string | number | null;
+  milesProgramsAllowed?: string | null;
   createdAt: string;
 }
 

@@ -6,6 +6,8 @@ import { generatePublicQuotePDF } from "./publicPdfGenerator";
 import passport from "./auth";
 import { requireAuth, requireRole, requireRoles, requirePlanManagers } from "./middleware";
 import { ROLES, QUOTE_USER_ROLES } from "@shared/roles";
+import { toolItinerarySchema } from "@shared/toolItinerary";
+import { z } from "zod";
 import {
   assertCanEditPlan,
   assertCanDeletePlan,
@@ -32,7 +34,7 @@ import { users as usersTable } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, insertQuoteDestinationSchema, type User } from "@shared/schema";
 import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
-import { z } from "zod";
+import { MILES_MARKUP_TYPES, MILES_PROGRAMS_ALLOWED, canUseLifeMiles, canUseSmiles } from "@shared/milesCalculator";
 import validator from "validator";
 import multer from "multer";
 import { handleFileUpload, getImageBuffer, handlePlanDescriptiveAudioUpload, destinationNameToBucketSlug } from "./upload";
@@ -216,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const schema = z.object({ to: z.string().email() });
     const { to } = schema.parse(req.body);
     if (!isEmailConfigured()) {
-      return res.status(400).json({ message: "SMTP no configurado. Define SMTP_USER y SMTP_PASS en Railway." });
+      return res.status(400).json({ message: "Brevo API no configurada. Define BREVO_API_KEY en Railway." });
     }
     const ok = await sendEmail({
       to,
@@ -1203,6 +1205,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(rest);
   }));
 
+  app.patch("/api/admin/users/:id/miles-settings", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const schema = z.object({
+      milesProgramsAllowed: z.enum(MILES_PROGRAMS_ALLOWED),
+      milesMarkupTypeLifemiles: z.enum(MILES_MARKUP_TYPES).optional(),
+      milesMarkupValueLifemiles: z
+        .number({ invalid_type_error: "El valor de LifeMiles debe ser un número" })
+        .min(0, "El valor de LifeMiles no puede ser negativo")
+        .optional(),
+      milesMarkupTypeSmiles: z.enum(MILES_MARKUP_TYPES).optional(),
+      milesMarkupValueSmiles: z
+        .number({ invalid_type_error: "El valor de Smiles debe ser un número" })
+        .min(0, "El valor de Smiles no puede ser negativo")
+        .optional(),
+    });
+    const parsed = schema.parse(req.body);
+    const { milesProgramsAllowed } = parsed;
+
+    let milesMarkupTypeLifemiles = parsed.milesMarkupTypeLifemiles ?? "none";
+    let milesMarkupValueLifemiles = parsed.milesMarkupValueLifemiles ?? 0;
+    let milesMarkupTypeSmiles = parsed.milesMarkupTypeSmiles ?? "none";
+    let milesMarkupValueSmiles = parsed.milesMarkupValueSmiles ?? 0;
+
+    if (!canUseLifeMiles(milesProgramsAllowed)) {
+      milesMarkupTypeLifemiles = "none";
+      milesMarkupValueLifemiles = 0;
+    }
+    if (!canUseSmiles(milesProgramsAllowed)) {
+      milesMarkupTypeSmiles = "none";
+      milesMarkupValueSmiles = 0;
+    }
+
+    if (milesMarkupTypeLifemiles === "percentage" && milesMarkupValueLifemiles > 100) {
+      throw new ValidationError("El porcentaje de LifeMiles no puede superar 100%");
+    }
+    if (milesMarkupTypeSmiles === "percentage" && milesMarkupValueSmiles > 100) {
+      throw new ValidationError("El porcentaje de Smiles no puede superar 100%");
+    }
+
+    const existing = await storage.findUserById(req.params.id);
+    if (!existing) throw new NotFoundError("Usuario");
+    if (existing.role !== ROLES.AGENCY && existing.role !== ROLES.PROVIDER) {
+      throw new ValidationError("Solo se puede configurar el cotizador de millas para agencias y proveedores");
+    }
+    const updated = await storage.updateUserByAdmin(req.params.id, {
+      milesProgramsAllowed,
+      milesMarkupTypeLifemiles,
+      milesMarkupValueLifemiles: milesMarkupValueLifemiles.toFixed(2),
+      milesMarkupTypeSmiles,
+      milesMarkupValueSmiles: milesMarkupValueSmiles.toFixed(2),
+      milesMarkupType: "none",
+      milesMarkupValue: "0.00",
+    });
+    const { passwordHash, ...rest } = updated;
+    logger.info("Admin updated user miles settings", {
+      userId: req.params.id,
+      milesProgramsAllowed,
+      milesMarkupTypeLifemiles,
+      milesMarkupValueLifemiles,
+      milesMarkupTypeSmiles,
+      milesMarkupValueSmiles,
+    });
+    res.json(rest);
+  }));
+
   app.delete("/api/admin/users/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const currentUser = req.user as User;
     if (currentUser.id === req.params.id) {
@@ -1762,35 +1828,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.get("/api/settings/global-trm", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
-    const baseTrm = await storage.getGlobalTrmBase();
+    const [baseTrm, usdPer1000LifeMiles, usdPer1000Smiles] = await Promise.all([
+      storage.getGlobalTrmBase(),
+      storage.getGlobalUsdPer1000LifeMiles(),
+      storage.getGlobalUsdPer1000Smiles(),
+    ]);
     res.json({
       baseTrm,
       effectiveTrm: effectiveTrmFromBase(baseTrm),
       surchargeCop: TRM_EFFECTIVE_SURCHARGE_COP,
+      usdPer1000LifeMiles,
+      usdPer1000Smiles,
     });
   }));
 
   app.put("/api/admin/settings/global-trm", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const bodySchema = z.object({
-      baseTrm: z.union([z.number(), z.string()]).nullable(),
+      baseTrm: z.union([z.number(), z.string()]).nullable().optional(),
+      usdPer1000LifeMiles: z.union([z.number(), z.string()]).optional(),
+      usdPer1000Smiles: z.union([z.number(), z.string()]).optional(),
     });
-    const { baseTrm: raw } = bodySchema.parse(req.body);
+    const { baseTrm: rawBaseTrm, usdPer1000LifeMiles: rawLifeMiles, usdPer1000Smiles: rawSmiles } =
+      bodySchema.parse(req.body);
 
-    if (raw === null || raw === "") {
-      await storage.setGlobalTrmBase(null);
-    } else {
-      const n = typeof raw === "string" ? parseFloat(raw) : raw;
-      if (!Number.isFinite(n) || n <= 0) {
-        return res.status(400).json({ message: "La TRM base debe ser un número mayor que cero." });
+    if (rawBaseTrm !== undefined) {
+      if (rawBaseTrm === null || rawBaseTrm === "") {
+        await storage.setGlobalTrmBase(null);
+      } else {
+        const n = typeof rawBaseTrm === "string" ? parseFloat(rawBaseTrm) : rawBaseTrm;
+        if (!Number.isFinite(n) || n <= 0) {
+          return res.status(400).json({ message: "La TRM base debe ser un número mayor que cero." });
+        }
+        await storage.setGlobalTrmBase(n);
       }
-      await storage.setGlobalTrmBase(n);
     }
 
-    const baseTrm = await storage.getGlobalTrmBase();
+    if (rawLifeMiles !== undefined) {
+      const n = typeof rawLifeMiles === "string" ? parseFloat(rawLifeMiles) : rawLifeMiles;
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ message: "La tasa LifeMiles debe ser un número mayor que cero." });
+      }
+      await storage.setGlobalUsdPer1000LifeMiles(n);
+    }
+
+    if (rawSmiles !== undefined) {
+      const n = typeof rawSmiles === "string" ? parseFloat(rawSmiles) : rawSmiles;
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ message: "La tasa Smiles debe ser un número mayor que cero." });
+      }
+      await storage.setGlobalUsdPer1000Smiles(n);
+    }
+
+    const [baseTrm, usdPer1000LifeMiles, usdPer1000Smiles] = await Promise.all([
+      storage.getGlobalTrmBase(),
+      storage.getGlobalUsdPer1000LifeMiles(),
+      storage.getGlobalUsdPer1000Smiles(),
+    ]);
     res.json({
       baseTrm,
       effectiveTrm: effectiveTrmFromBase(baseTrm),
       surchargeCop: TRM_EFFECTIVE_SURCHARGE_COP,
+      usdPer1000LifeMiles,
+      usdPer1000Smiles,
     });
   }));
 
@@ -2003,6 +2102,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     res.status(201).json(log);
+  }));
+
+  // Herramientas: contador de días (itinerario 25 días por usuario)
+  app.get("/api/tools/itinerary", requireAuth, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const itinerary = await storage.getToolItinerary(user.id);
+
+    if (!itinerary) {
+      return res.json({ startDate: "", days: {} });
+    }
+
+    res.json(itinerary);
+  }));
+
+  app.post("/api/tools/itinerary", requireAuth, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const validated = toolItinerarySchema.parse(req.body);
+    const saved = await storage.saveToolItinerary(user.id, validated);
+    res.json(saved);
+  }));
+
+  app.delete("/api/tools/itinerary", requireAuth, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const deleted = await storage.deleteToolItinerary(user.id);
+
+    if (!deleted) {
+      throw new NotFoundError("No hay itinerario para eliminar");
+    }
+
+    res.json({ success: true, message: "Itinerario eliminado" });
   }));
 
   registerTutorialRoutes(app);
