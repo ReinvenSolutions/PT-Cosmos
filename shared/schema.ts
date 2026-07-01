@@ -166,6 +166,18 @@ export const users = pgTable("users", {
   twoFactorEnabled: boolean("two_factor_enabled").default(true),
   /** Descuento % sobre porción terrestre en cotizaciones (solo agencias/proveedores; asignado por super_admin) */
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0").notNull(),
+  /** @deprecated Usar milesMarkupTypeLifemiles / milesMarkupTypeSmiles */
+  milesMarkupType: text("miles_markup_type").default("none").notNull(),
+  /** @deprecated Usar milesMarkupValueLifemiles / milesMarkupValueSmiles */
+  milesMarkupValue: decimal("miles_markup_value", { precision: 12, scale: 2 }).default("0").notNull(),
+  /** Recargo LifeMiles: none | percentage | fixed */
+  milesMarkupTypeLifemiles: text("miles_markup_type_lifemiles").default("none").notNull(),
+  milesMarkupValueLifemiles: decimal("miles_markup_value_lifemiles", { precision: 12, scale: 2 }).default("0").notNull(),
+  /** Recargo Smiles: none | percentage | fixed */
+  milesMarkupTypeSmiles: text("miles_markup_type_smiles").default("none").notNull(),
+  milesMarkupValueSmiles: decimal("miles_markup_value_smiles", { precision: 12, scale: 2 }).default("0").notNull(),
+  /** Programas habilitados: none | lifemiles | smiles | both */
+  milesProgramsAllowed: text("miles_programs_allowed").default("both").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -1,17 +1,13 @@
 /**
- * Servicio de email con Brevo (SMTP + API fallback)
- * SMTP: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
- * API: BREVO_API_KEY (fallback si SMTP falla en Railway)
- * Remitente por defecto: info@cosmosviajes.com
+ * Servicio de email con Brevo API
+ * BREVO_API_KEY: autenticación (requerida)
+ * SMTP_FROM / SMTP_FROM_NAME: remitente (opcionales, con defaults)
  */
 
-import nodemailer from "nodemailer";
 import { formatUSD } from "@shared/schema";
 import { ROLE_LABELS } from "@shared/roles";
 import { logger } from "./logger";
 
-const BREVO_SMTP_HOST = "smtp-relay.brevo.com";
-const BREVO_SMTP_PORT = 587;
 const DEFAULT_FROM = "info@cosmosviajes.com";
 const DEFAULT_FROM_NAME = "Cosmos Viajes";
 
@@ -23,33 +19,8 @@ interface EmailOptions {
   replyTo?: string;
 }
 
-function getTransporter() {
-  const host = process.env.SMTP_HOST || BREVO_SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || String(BREVO_SMTP_PORT), 10);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (!user || !pass) {
-    return null;
-  }
-
-  logger.info(`[Email] Transporter: host=${host} port=${port}`);
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-    connectionTimeout: 15_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
-}
-
 export function isEmailConfigured(): boolean {
-  return !!(process.env.SMTP_USER && process.env.SMTP_PASS) || !!process.env.BREVO_API_KEY;
+  return !!process.env.BREVO_API_KEY;
 }
 
 async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
@@ -76,6 +47,7 @@ async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
         subject: options.subject,
         htmlContent: options.html,
         textContent: options.text,
+        replyTo: options.replyTo ? { email: options.replyTo } : undefined,
       }),
     });
 
@@ -116,50 +88,13 @@ async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  // En producción (Railway): usar solo API Brevo (SMTP suele dar timeout)
-  if (process.env.NODE_ENV === "production" && process.env.BREVO_API_KEY) {
-    logger.info("[Email] Producción: usando API Brevo directamente");
-    return sendViaBrevoAPI(options);
+  if (!process.env.BREVO_API_KEY) {
+    logger.warn("[Email] BREVO_API_KEY no configurada.");
+    return false;
   }
 
-  // En desarrollo: intentar SMTP primero, fallback a API
-  const transporter = getTransporter();
-  if (transporter) {
-    try {
-      await transporter.verify();
-      logger.info("[Email] Conexión SMTP verificada OK");
-    } catch (verifyError) {
-      const err = verifyError as Error & { code?: string };
-      logger.warn("[Email] SMTP no disponible, usando API Brevo", { message: err.message, code: err.code });
-      return sendViaBrevoAPI(options);
-    }
-
-    try {
-      const fromEmail = process.env.SMTP_FROM || DEFAULT_FROM;
-      const fromName = process.env.SMTP_FROM_NAME || DEFAULT_FROM_NAME;
-      const info = await transporter.sendMail({
-        from: `"${fromName}" <${fromEmail}>`,
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
-        text: options.text,
-        replyTo: options.replyTo || fromEmail,
-      });
-      logger.info("[Email] Enviado correctamente", { to: options.to, messageId: info.messageId });
-      return true;
-    } catch (error) {
-      const err = error as Error & { code?: string };
-      logger.warn("[Email] Error SMTP, intentando API Brevo", { message: err.message, code: err.code });
-      return sendViaBrevoAPI(options);
-    }
-  }
-
-  if (process.env.BREVO_API_KEY) {
-    return sendViaBrevoAPI(options);
-  }
-
-  logger.warn("[Email] Ni SMTP ni API configurados. Define BREVO_API_KEY (producción) o SMTP_USER/SMTP_PASS.");
-  return false;
+  logger.info("[Email] Enviando vía Brevo API");
+  return sendViaBrevoAPI(options);
 }
 
 /* Identidad visual Cosmos Viajes: teal #205567, oro #C6A242, aqua #8CC7D5 */

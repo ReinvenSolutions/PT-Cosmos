@@ -43,6 +43,14 @@ import {
   type InsertTutorialLesson,
   type TutorialLessonProgress,
 } from "@shared/schema";
+import { toolItineraries, type ToolItinerary } from "@shared/toolItinerary";
+import {
+  DEFAULT_USD_PER_1000_LIFEMILES,
+  DEFAULT_USD_PER_1000_SMILES,
+  GLOBAL_USD_PER_1000_LIFEMILES_SETTING_KEY,
+  GLOBAL_USD_PER_1000_SMILES_SETTING_KEY,
+  parseUsdPer1000Miles,
+} from "@shared/milesCalculator";
 import { GLOBAL_TRM_BASE_SETTING_KEY } from "@shared/trm";
 import { db } from "./db";
 import { eq, or, sql, desc, asc, count, inArray, and } from "drizzle-orm";
@@ -84,7 +92,7 @@ export interface IStorage {
   createUser(data: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<Pick<User, "name" | "avatarUrl">>): Promise<User>;
   listUsers(): Promise<Omit<User, "passwordHash">[]>;
-  updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; approvalStatus: string; passwordHash: string; twoFactorEnabled: boolean; discountPercentage: string }>): Promise<User>;
+  updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; approvalStatus: string; passwordHash: string; twoFactorEnabled: boolean; discountPercentage: string; milesMarkupType: string; milesMarkupValue: string; milesMarkupTypeLifemiles: string; milesMarkupValueLifemiles: string; milesMarkupTypeSmiles: string; milesMarkupValueSmiles: string; milesProgramsAllowed: string }>): Promise<User>;
   countPendingApprovalUsers(): Promise<number>;
   deleteUser(id: string): Promise<void>;
   countQuotesByUser(userId: string): Promise<number>;
@@ -144,6 +152,10 @@ export interface IStorage {
   setAppSetting(key: string, value: string): Promise<void>;
   getGlobalTrmBase(): Promise<number | null>;
   setGlobalTrmBase(baseTrm: number | null): Promise<void>;
+  getGlobalUsdPer1000LifeMiles(): Promise<number>;
+  setGlobalUsdPer1000LifeMiles(value: number): Promise<void>;
+  getGlobalUsdPer1000Smiles(): Promise<number>;
+  setGlobalUsdPer1000Smiles(value: number): Promise<void>;
 
   getTutorialCourse(id: string): Promise<TutorialCourse | undefined>;
   listTutorialCoursesAdmin(): Promise<TutorialCourse[]>;
@@ -205,6 +217,10 @@ export interface IStorage {
       totalViews: number;
     }>;
   }>;
+
+  getToolItinerary(userId: string): Promise<ToolItinerary | undefined>;
+  saveToolItinerary(userId: string, itinerary: ToolItinerary): Promise<ToolItinerary>;
+  deleteToolItinerary(userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -456,6 +472,13 @@ export class DatabaseStorage implements IStorage {
       approvalStatus: users.approvalStatus,
       twoFactorEnabled: users.twoFactorEnabled,
       discountPercentage: users.discountPercentage,
+      milesMarkupType: users.milesMarkupType,
+      milesMarkupValue: users.milesMarkupValue,
+      milesMarkupTypeLifemiles: users.milesMarkupTypeLifemiles,
+      milesMarkupValueLifemiles: users.milesMarkupValueLifemiles,
+      milesMarkupTypeSmiles: users.milesMarkupTypeSmiles,
+      milesMarkupValueSmiles: users.milesMarkupValueSmiles,
+      milesProgramsAllowed: users.milesProgramsAllowed,
       createdAt: users.createdAt,
     }).from(users).orderBy(users.createdAt);
     return result;
@@ -469,7 +492,7 @@ export class DatabaseStorage implements IStorage {
     return Number(result[0]?.count ?? 0);
   }
 
-  async updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; approvalStatus: string; passwordHash: string; twoFactorEnabled: boolean; discountPercentage: string }>): Promise<User> {
+  async updateUserByAdmin(id: string, data: Partial<{ name: string; username: string; email: string | null; role: string; isActive: boolean; approvalStatus: string; passwordHash: string; twoFactorEnabled: boolean; discountPercentage: string; milesMarkupType: string; milesMarkupValue: string; milesMarkupTypeLifemiles: string; milesMarkupValueLifemiles: string; milesMarkupTypeSmiles: string; milesMarkupValueSmiles: string; milesProgramsAllowed: string }>): Promise<User> {
     const updates: Record<string, unknown> = {};
     if (data.name !== undefined) updates.name = data.name;
     if (data.username !== undefined) updates.username = data.username;
@@ -480,6 +503,13 @@ export class DatabaseStorage implements IStorage {
     if (data.passwordHash !== undefined) updates.passwordHash = data.passwordHash;
     if (data.twoFactorEnabled !== undefined) updates.twoFactorEnabled = data.twoFactorEnabled;
     if (data.discountPercentage !== undefined) updates.discountPercentage = data.discountPercentage;
+    if (data.milesMarkupType !== undefined) updates.milesMarkupType = data.milesMarkupType;
+    if (data.milesMarkupValue !== undefined) updates.milesMarkupValue = data.milesMarkupValue;
+    if (data.milesMarkupTypeLifemiles !== undefined) updates.milesMarkupTypeLifemiles = data.milesMarkupTypeLifemiles;
+    if (data.milesMarkupValueLifemiles !== undefined) updates.milesMarkupValueLifemiles = data.milesMarkupValueLifemiles;
+    if (data.milesMarkupTypeSmiles !== undefined) updates.milesMarkupTypeSmiles = data.milesMarkupTypeSmiles;
+    if (data.milesMarkupValueSmiles !== undefined) updates.milesMarkupValueSmiles = data.milesMarkupValueSmiles;
+    if (data.milesProgramsAllowed !== undefined) updates.milesProgramsAllowed = data.milesProgramsAllowed;
     if (Object.keys(updates).length === 0) {
       const u = await this.findUserById(id);
       if (!u) throw new Error("Usuario no encontrado");
@@ -1317,6 +1347,32 @@ export class DatabaseStorage implements IStorage {
     await this.setAppSetting(GLOBAL_TRM_BASE_SETTING_KEY, String(baseTrm));
   }
 
+  async getGlobalUsdPer1000LifeMiles(): Promise<number> {
+    const raw = await this.getAppSetting(GLOBAL_USD_PER_1000_LIFEMILES_SETTING_KEY);
+    return parseUsdPer1000Miles(raw, DEFAULT_USD_PER_1000_LIFEMILES);
+  }
+
+  async setGlobalUsdPer1000LifeMiles(value: number): Promise<void> {
+    if (!Number.isFinite(value) || value <= 0) {
+      await db.delete(appSettings).where(eq(appSettings.key, GLOBAL_USD_PER_1000_LIFEMILES_SETTING_KEY));
+      return;
+    }
+    await this.setAppSetting(GLOBAL_USD_PER_1000_LIFEMILES_SETTING_KEY, String(value));
+  }
+
+  async getGlobalUsdPer1000Smiles(): Promise<number> {
+    const raw = await this.getAppSetting(GLOBAL_USD_PER_1000_SMILES_SETTING_KEY);
+    return parseUsdPer1000Miles(raw, DEFAULT_USD_PER_1000_SMILES);
+  }
+
+  async setGlobalUsdPer1000Smiles(value: number): Promise<void> {
+    if (!Number.isFinite(value) || value <= 0) {
+      await db.delete(appSettings).where(eq(appSettings.key, GLOBAL_USD_PER_1000_SMILES_SETTING_KEY));
+      return;
+    }
+    await this.setAppSetting(GLOBAL_USD_PER_1000_SMILES_SETTING_KEY, String(value));
+  }
+
   async getTutorialCourse(id: string): Promise<TutorialCourse | undefined> {
     const [row] = await db.select().from(tutorialCourses).where(eq(tutorialCourses.id, id)).limit(1);
     return row;
@@ -1639,6 +1695,57 @@ export class DatabaseStorage implements IStorage {
       byLesson,
       byUser,
     };
+  }
+
+  async getToolItinerary(userId: string): Promise<ToolItinerary | undefined> {
+    const result = await db
+      .select()
+      .from(toolItineraries)
+      .where(eq(toolItineraries.userId, userId))
+      .limit(1);
+
+    if (result.length === 0) return undefined;
+
+    const record = result[0];
+    return {
+      startDate: record.startDate,
+      days: record.days as Record<string, ToolItinerary["days"][string]>,
+    };
+  }
+
+  async saveToolItinerary(userId: string, itinerary: ToolItinerary): Promise<ToolItinerary> {
+    const existing = await db
+      .select()
+      .from(toolItineraries)
+      .where(eq(toolItineraries.userId, userId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db
+        .update(toolItineraries)
+        .set({
+          startDate: itinerary.startDate,
+          days: itinerary.days,
+          updatedAt: new Date(),
+        })
+        .where(eq(toolItineraries.userId, userId));
+    } else {
+      await db.insert(toolItineraries).values({
+        userId,
+        startDate: itinerary.startDate,
+        days: itinerary.days,
+      });
+    }
+
+    return itinerary;
+  }
+
+  async deleteToolItinerary(userId: string): Promise<boolean> {
+    const existing = await this.getToolItinerary(userId);
+    if (!existing) return false;
+
+    await db.delete(toolItineraries).where(eq(toolItineraries.userId, userId));
+    return true;
   }
 }
 

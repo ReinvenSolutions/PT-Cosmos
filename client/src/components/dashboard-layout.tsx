@@ -60,7 +60,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       location === "/" ||
       location === "/cotizacion" ||
       location === "/cotizacion-express" ||
-      location.startsWith("/tutoriales");
+      location.startsWith("/tutoriales") ||
+      location.startsWith("/herramientas");
 
     return (
         <SidebarProvider>

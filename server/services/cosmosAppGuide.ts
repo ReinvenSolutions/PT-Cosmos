@@ -15,6 +15,8 @@ Herramienta interna para agencias, proveedores y administradores de Cosmos Mayor
 - **Mis cotizaciones** (/advisor): listado de cotizaciones guardadas; abrir, editar, generar PDF.
 - **Mis clientes** (/mis-clientes): clientes propios y su historial de cotizaciones.
 - **Academia digital** (/tutoriales): cursos y lecciones de capacitación.
+- **Contador de días** (/herramientas/contador-dias): itinerario fijo de 25 días con eventos por día (guardado por usuario).
+- **Cotizador de millas** (/herramientas/cotizador-millas): cotización de vuelos con LifeMiles o Smiles.
 
 ### Menú — Proveedor (además de cotizaciones)
 - **Administrar planes** (/admin/plans): crear y editar solo tus planes; importar desde PDF/Word con COSMO (IA).
