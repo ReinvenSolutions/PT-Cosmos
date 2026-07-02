@@ -112,10 +112,19 @@ export default function ToolsMilesCalculator() {
   const rawBaseTotal =
     tripType === "ida-y-vuelta" ? outbound.baseTotal + inbound.baseTotal : outbound.baseTotal;
 
-  const { baseTotal, markupAmount, finalTotal } = useMemo(
+  const { finalTotal } = useMemo(
     () => applyMilesMarkup(rawBaseTotal, markupType, markupValue),
     [rawBaseTotal, markupType, markupValue],
   );
+
+  const segmentTotalWithMarkup = (segmentBase: number) => {
+    if (rawBaseTotal <= 0) return 0;
+    if (markupType === "none" || markupValue <= 0) return segmentBase;
+    return (segmentBase / rawBaseTotal) * finalTotal;
+  };
+
+  const outboundDisplayTotal = segmentTotalWithMarkup(outbound.baseTotal);
+  const inboundDisplayTotal = segmentTotalWithMarkup(inbound.baseTotal);
 
   const handleMilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const numericValue = parseNumber(e.target.value);
@@ -140,9 +149,6 @@ export default function ToolsMilesCalculator() {
     setTaxReturn(numericValue);
     setTaxReturnDisplay(formatNumber(numericValue));
   };
-
-  const usdPer1000 =
-    milesProgram === "LIFE MILES" ? usdPer1000MilesLifeMiles : usdPer1000MilesSmiles;
 
   if (!hasMilesAccess) {
     return (
@@ -170,22 +176,6 @@ export default function ToolsMilesCalculator() {
           <p className="text-base text-muted-foreground">
             {milesProgram === "LIFE MILES" ? "Canal Millas / Avianca" : "GOL - SMILES"}
           </p>
-          <div className="mt-4 inline-flex items-start gap-2 text-left text-xs text-muted-foreground bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg px-4 py-3 max-w-xl mx-auto">
-            <Calculator className="text-primary flex-shrink-0 mt-0.5" size={14} />
-            <div className="space-y-0.5">
-              <p>
-                Millas COP = (Millas ÷ 1,000) × ${usdPer1000.toFixed(2)} USD × TRM{" "}
-                {effectiveTrm > 0 ? `$${effectiveTrm.toLocaleString("es-CO")}` : "del sistema"}
-              </p>
-              <p>Total base = (Millas COP + Impuesto) × Pasajeros</p>
-              {!isSuperAdmin && markupType !== "none" && markupValue > 0 && (
-                <p>
-                  Recargo:{" "}
-                  {markupType === "percentage" ? `${markupValue}%` : `$${markupValue.toLocaleString("es-CO")} COP fijos`}
-                </p>
-              )}
-            </div>
-          </div>
         </header>
 
         <Card className="mb-6 backdrop-blur-sm">
@@ -295,9 +285,8 @@ export default function ToolsMilesCalculator() {
           onTaxChange={handleTaxChange}
           milesInCop={outbound.milesInCop}
           tax={tax}
-          baseTotal={outbound.baseTotal}
+          displayTotal={outboundDisplayTotal}
           passengers={passengers}
-          tripType={tripType}
           milesProgram={milesProgram}
           milesTestId="input-miles"
           taxTestId="input-tax"
@@ -314,9 +303,8 @@ export default function ToolsMilesCalculator() {
             onTaxChange={handleTaxReturnChange}
             milesInCop={inbound.milesInCop}
             tax={taxReturn}
-            baseTotal={inbound.baseTotal}
+            displayTotal={inboundDisplayTotal}
             passengers={passengers}
-            tripType={tripType}
             milesProgram={milesProgram}
             milesTestId="input-miles-return"
             taxTestId="input-tax-return"
@@ -326,33 +314,16 @@ export default function ToolsMilesCalculator() {
           />
         )}
 
-        <Card className="mb-6 border-primary/20 backdrop-blur-sm">
-          <CardContent className="p-5 sm:p-6">
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal calculado</span>
-                <span className="font-medium">{formatCurrency(baseTotal)}</span>
-              </div>
-              {markupAmount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Recargo (
-                    {markupType === "percentage" ? `${markupValue}%` : "tarifa fija"})
-                  </span>
-                  <span className="font-medium text-green-600">+{formatCurrency(markupAmount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-center pt-3 border-t border-border">
-                <span className="text-lg font-bold text-foreground">
-                  Total final{passengers > 1 ? ` (${passengers} pax)` : ""}
-                </span>
-                <span className="text-2xl font-bold text-primary" data-testid="text-final-total">
-                  {formatCurrency(finalTotal)}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mb-6 rounded-lg bg-primary px-5 py-4 sm:px-6 sm:py-5">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-bold text-primary-foreground">
+              Total{passengers > 1 ? ` (${passengers} pax)` : ""}
+            </span>
+            <span className="text-2xl font-bold text-primary-foreground" data-testid="text-final-total">
+              {formatCurrency(finalTotal)}
+            </span>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center text-sm">
           <div className="flex flex-col items-center gap-1 rounded-lg border border-border/60 bg-card/40 backdrop-blur-sm p-4">
@@ -385,9 +356,8 @@ function FlightSegmentCard({
   onTaxChange,
   milesInCop,
   tax,
-  baseTotal,
+  displayTotal,
   passengers,
-  tripType,
   milesProgram,
   milesTestId,
   taxTestId,
@@ -402,9 +372,8 @@ function FlightSegmentCard({
   onTaxChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   milesInCop: number;
   tax: number;
-  baseTotal: number;
+  displayTotal: number;
   passengers: number;
-  tripType: string;
   milesProgram: MilesProgram;
   milesTestId: string;
   taxTestId: string;
@@ -467,13 +436,12 @@ function FlightSegmentCard({
             <div className="rounded-lg bg-primary px-4 py-3">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-medium text-primary-foreground">
-                  {tripType === "ida-y-vuelta" ? `Total ${title}` : "Total del vuelo"}
-                  {passengers > 1 ? ` (${passengers} pax)` : ""}
+                  Total{passengers > 1 ? ` (${passengers} pax)` : ""}
                 </span>
                 <Plane className="text-primary-foreground/80" size={16} />
               </div>
               <span data-testid={totalTestId} className="text-xl font-bold text-primary-foreground">
-                {formatCurrency(baseTotal)}
+                {formatCurrency(displayTotal)}
               </span>
             </div>
           </div>
