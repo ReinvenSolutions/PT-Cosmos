@@ -4,11 +4,11 @@ import { useLocation } from "wouter";
 import { type Destination } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MapPin, Clock, ArrowRight, AlertCircle, Info, Building2, UtensilsCrossed, Star, Stethoscope, Landmark, ExternalLink, BookOpen } from "lucide-react";
+import { Clock, ArrowRight, AlertCircle, Info, Building2, UtensilsCrossed, Star, Stethoscope, Landmark, ExternalLink, BookOpen } from "lucide-react";
+import { useHomeSearch } from "@/contexts/home-search-context";
 import { getDestinationImage } from "@/lib/destination-images";
 import { useToast } from "@/hooks/use-toast";
 import { GroupDiscountBanner } from "@/components/group-discount-banner";
@@ -32,7 +32,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("internacional");
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const { searchQuery } = useHomeSearch();
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -218,39 +218,12 @@ export default function Home() {
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       <GroupDiscountBanner />
 
-      <div className="bg-background/80 backdrop-blur-sm border-b border-border/50 py-3 px-4 shadow-sm">
-        <div className="container mx-auto max-w-lg">
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="Buscar destinos por nombre o país..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-12 w-full border-2 pl-12 text-base shadow-sm"
-              data-testid="input-search-destinations"
-            />
-            <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          </div>
-        </div>
-      </div>
-
-
       <main className="flex-1 overflow-y-auto bg-gradient-to-b from-accent/50 to-background">
-        <div className="container mx-auto px-4 py-12 lg:py-16">
+        <div className="container mx-auto px-4 py-4 md:py-6">
           <section
-            className="mb-5 md:mb-7 rounded-2xl border-2 border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card/90 to-background shadow-md ring-1 ring-primary/10 p-4 sm:p-5"
+            className="mb-4 md:mb-6 rounded-2xl border-2 border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card/90 to-background shadow-md ring-1 ring-primary/10 p-4 sm:p-5"
             aria-label="Enlaces a servicios externos"
           >
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-4">
-              <div>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">
-                  Servicios externos
-                </h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Accesos directos a asistencia médica y pagos
-                </p>
-              </div>
-            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <a
                 href={MEDICAL_ASSISTANCE_PORTAL_URL}
@@ -369,11 +342,7 @@ export default function Home() {
           )}
 
           <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full tabs-category">
-            <p className="text-sm text-muted-foreground mb-4 max-w-3xl">
-              <strong className="text-foreground">Clic en la tarjeta</strong> para seleccionar o quitar un plan en tu combinación.
-              Usa <strong className="text-foreground">«Ficha del plan»</strong> para abrir el itinerario completo, galerías y precios sin descargar el PDF.
-            </p>
-            <TabsList className="grid w-full grid-cols-3 mb-8 h-12">
+            <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
               <TabsTrigger value="nacional" data-testid="tab-nacional">
                 Colombia
               </TabsTrigger>
@@ -385,7 +354,7 @@ export default function Home() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value={selectedCategory} className="mt-8">
+            <TabsContent value={selectedCategory} className="mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {destinationsLoading ? (
                   Array.from({ length: 9 }, (_, i) => (

@@ -25,6 +25,7 @@ import { storage } from "../storage";
 import { getOrSetCache } from "../utils/cache";
 import { htmlToPlainText } from "../utils/sanitize";
 import { COSMOS_APP_GUIDE } from "./cosmosAppGuide";
+import { getCosmosAssistantConfig } from "./cosmosAssistantConfigService";
 
 export type CosmosChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -321,6 +322,12 @@ export async function buildCosmosSystemContext(opts: {
         ? "El usuario es proveedor (gestiona sus propios planes, cotizaciones y clientes; solo ve sus propios datos)."
         : "El usuario es agencia de viajes (cotizaciones, mis clientes y academia; solo ve sus propias cotizaciones y clientes).";
 
+  const cosmosConfig = await getCosmosAssistantConfig();
+  const strategicContextPlain = htmlToPlainText(cosmosConfig.strategicContext);
+  const strategicBlock = strategicContextPlain
+    ? `## Contexto estratégico de Cosmos Mayorista (información prioritaria del equipo)\n${strategicContextPlain}`
+    : "";
+
   return `
 ${COSMOS_APP_GUIDE}
 
@@ -328,7 +335,7 @@ ${COSMOS_APP_GUIDE}
 ${formatAgencyContext()}
 
 ---
-${roleNote}
+${strategicBlock ? `${strategicBlock}\n\n---\n` : ""}${roleNote}
 ${trmBlock}
 
 ## Catálogo de planes activos (${catalog.length})

@@ -18,6 +18,11 @@ import { ForbiddenError } from "./errors/AppError";
 import { authLimiter, publicPdfLimiter, apiLimiter, cosmosChatLimiter } from "./rateLimiter";
 import { handleCosmosChat } from "./handlers/cosmosChat";
 import { isOpenAIConfigured } from "./services/openaiClient";
+import {
+  getCosmosAssistantConfig,
+  setCosmosAssistantConfig,
+} from "./services/cosmosAssistantConfigService";
+import { cosmosAssistantConfigSchema } from "@shared/cosmosAssistantConfig";
 import { userRateLimiter } from "./middleware/userRateLimiter";
 import { asyncHandler } from "./utils/asyncHandler";
 import { logger } from "./logger";
@@ -1842,6 +1847,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       usdPer1000Smiles,
       brlPerUsd,
     });
+  }));
+
+  app.get("/api/admin/cosmos-config", requireRole("super_admin"), asyncHandler(async (_req, res) => {
+    const config = await getCosmosAssistantConfig();
+    res.json(config);
+  }));
+
+  app.put("/api/admin/cosmos-config", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const body = cosmosAssistantConfigSchema.parse(req.body);
+    const saved = await setCosmosAssistantConfig(body);
+    res.json(saved);
   }));
 
   app.put("/api/admin/settings/global-trm", requireRole("super_admin"), asyncHandler(async (req, res) => {

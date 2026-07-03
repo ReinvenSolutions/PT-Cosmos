@@ -2,6 +2,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CosmosFooter } from "@/components/cosmos-footer";
 import { CosmosChatWidget } from "@/components/cosmos-chat-widget";
+import { HomeHeaderSearch } from "@/components/home-header-search";
+import { HomeSearchProvider } from "@/contexts/home-search-context";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
@@ -55,6 +57,7 @@ function HeaderTrmBadge() {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
     const [location] = useLocation();
 
+    const isHome = location === "/";
     const isQuoteExpress = location === "/cotizacion-express";
     const isFullWidthPage =
       location === "/" ||
@@ -64,6 +67,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       location.startsWith("/herramientas");
 
     return (
+        <HomeSearchProvider>
         <SidebarProvider>
             <div className="flex min-h-screen w-full">
                 <AppSidebar />
@@ -71,7 +75,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <header className="header-glass header-warm sticky top-0 z-10 hidden md:block overflow-hidden">
                         <div className="container mx-auto px-6 py-4 relative">
                             <div className="flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex items-center gap-3 min-w-0 shrink-0">
                                 {isQuoteExpress ? (
                                     <h1 className="text-xl md:text-2xl font-bold tracking-tight">
                                         <span className="bg-gradient-to-r from-primary via-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cotización</span>
@@ -84,28 +88,36 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                                     </h1>
                                 )}
                                 </div>
+                                {isHome && <HomeHeaderSearch />}
                                 <HeaderTrmBadge />
                             </div>
                         </div>
                     </header>
 
                     {/* Mobile Header */}
-                    <div className="md:hidden sticky top-0 z-10 flex h-14 items-center header-glass header-warm px-4 overflow-hidden gap-2">
-                        <SidebarTrigger className="mr-1 h-8 w-8 rounded-lg shrink-0" />
-                        <div className="flex-1 min-w-0">
-                            {isQuoteExpress ? (
-                                <h2 className="text-base font-bold tracking-tight">
-                                    <span className="bg-gradient-to-r from-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cotización</span>
-                                    <span className="font-medium text-muted-foreground"> Express</span>
-                                </h2>
-                            ) : (
-                                <h2 className="text-base font-bold tracking-tight">
-                                    <span className="bg-gradient-to-r from-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cosmos</span>
-                                    <span className="font-medium text-muted-foreground"> Mayorista</span>
-                                </h2>
-                            )}
+                    <div className="md:hidden sticky top-0 z-10 header-glass header-warm px-4 overflow-hidden">
+                        <div className="flex h-14 items-center gap-2">
+                            <SidebarTrigger className="mr-1 h-8 w-8 rounded-lg shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                {isQuoteExpress ? (
+                                    <h2 className="text-base font-bold tracking-tight">
+                                        <span className="bg-gradient-to-r from-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cotización</span>
+                                        <span className="font-medium text-muted-foreground"> Express</span>
+                                    </h2>
+                                ) : (
+                                    <h2 className="text-base font-bold tracking-tight">
+                                        <span className="bg-gradient-to-r from-primary to-[hsl(191,46%,55%)] bg-clip-text text-transparent">Cosmos</span>
+                                        <span className="font-medium text-muted-foreground"> Mayorista</span>
+                                    </h2>
+                                )}
+                            </div>
+                            <HeaderTrmBadge />
                         </div>
-                        <HeaderTrmBadge />
+                        {isHome && (
+                            <div className="pb-3">
+                                <HomeHeaderSearch className="max-w-none" />
+                            </div>
+                        )}
                     </div>
 
                     <div className={`flex-1 min-h-0 ${isFullWidthPage ? "p-0" : "p-4 md:p-8"}`}>
@@ -116,5 +128,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
             <CosmosChatWidget />
         </SidebarProvider>
+        </HomeSearchProvider>
     );
 }

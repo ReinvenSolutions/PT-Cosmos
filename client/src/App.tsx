@@ -37,6 +37,7 @@ const Tutoriales = lazy(() => import("@/pages/tutoriales"));
 const AdminTutorials = lazy(() => import("@/pages/admin-tutorials"));
 const AdminTutorialCourseForm = lazy(() => import("@/pages/admin-tutorial-course-form"));
 const AdminTutorialsMetricas = lazy(() => import("@/pages/admin-tutorials-metricas"));
+const AdminCosmosConfig = lazy(() => import("@/pages/admin-cosmos-config"));
 const ToolsDayCounter = lazy(() => import("@/pages/tools-day-counter"));
 const ToolsMilesCalculator = lazy(() => import("@/pages/tools-miles-calculator"));
 
@@ -141,6 +142,9 @@ function AppRoutes() {
       </Route>
       <Route path="/admin/tutoriales">
         <ProtectedRoute component={AdminTutorials} allowedRoles={["super_admin"]} />
+      </Route>
+      <Route path="/admin/cosmos">
+        <ProtectedRoute component={AdminCosmosConfig} allowedRoles={["super_admin"]} />
       </Route>
       <Route path="/tutoriales/curso/:courseId/leccion/:lessonId">
         <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "agency"]} />
