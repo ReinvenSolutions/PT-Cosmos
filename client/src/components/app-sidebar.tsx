@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { FileText, Users, BarChart3, LogOut, Plane, Zap, MapPin, Camera, UserCog, GraduationCap, BookOpen, Library, Calendar, Coins } from "lucide-react";
+import { FileText, Users, BarChart3, LogOut, Plane, Zap, MapPin, Camera, UserCog, GraduationCap, BookOpen, Library, Calendar, Coins, Bot } from "lucide-react";
 import { GlobalTrmAdminMenuItem } from "@/components/global-trm-admin-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -276,6 +276,7 @@ export function AppSidebar() {
         "/admin/plans",
         "/admin/tutoriales",
         "/admin/tutoriales/metricas",
+        "/admin/cosmos",
         "/admin/clients",
         "/admin/users",
         "/advisor",
@@ -323,6 +324,7 @@ export function AppSidebar() {
       { title: "Usuarios", url: "/admin/users", icon: UserCog },
       { title: "Academia (cursos)", url: "/admin/tutoriales", icon: BookOpen },
       { title: "Academia (métricas)", url: "/admin/tutoriales/metricas", icon: Library },
+      { title: "Asistente Cosmos", url: "/admin/cosmos", icon: Bot },
     ],
   };
 

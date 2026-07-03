@@ -23,7 +23,9 @@ import { ensureUserApprovalStatusColumn } from "./ensure-user-approval-status";
 import { ensureUserDiscountColumn } from "./ensure-user-discount-column";
 import { ensureDestinationAgencyColumns } from "./ensure-destination-agency-columns";
 import { ensureDestinationPlanTaxesColumn } from "./ensure-destination-plan-taxes-column";
+import { ensureCosmosAssistantNotesColumn } from "./ensure-cosmos-assistant-notes-column";
 import { ensureUserRoleRename } from "./ensure-user-role-rename";
+import { ensureUserMilesColumns } from "./ensure-user-miles-columns";
 import { ensureClientsUserIdColumn } from "./ensure-clients-user-id";
 import { ensureToolItinerariesTable } from "./ensure-tool-itineraries-table";
 import { seedDatabaseIfEmpty } from "./seed";
@@ -158,7 +160,9 @@ app.use((req, res, next) => {
     await ensureUserDiscountColumn(pool);
     await ensureDestinationAgencyColumns(pool);
     await ensureDestinationPlanTaxesColumn(pool);
+    await ensureCosmosAssistantNotesColumn(pool);
     await ensureUserRoleRename(pool);
+    await ensureUserMilesColumns(pool);
     await ensureClientsUserIdColumn(pool);
     await ensureToolItinerariesTable(pool);
 

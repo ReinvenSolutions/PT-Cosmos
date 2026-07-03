@@ -30,7 +30,23 @@ const MIGRATIONS = [
   "0016_quote_connection_flight.sql",
   "0017_tutorial_academy.sql",
   "0018_destinations_bloqueos.sql",
+  "0019_destinations_descriptive_audio.sql",
+  "0020_destinations_recommendations.sql",
+  "0021_user_approval_status.sql",
+  "0022_destinations_agency.sql",
+  "0023_user_discount_percentage.sql",
+  "0024_quote_taxes_and_fees.sql",
+  "0025_destination_plan_taxes.sql",
+  "0026_enable_rls_new_tables.sql",
+  "0027_destinations_cosmos_assistant_notes.sql",
+  "0028_rename_user_roles.sql",
+  "0029_clients_user_id.sql",
+  "0030_tool_itineraries.sql",
+  "0031_user_miles_settings.sql",
+  "0032_per_program_miles_markup.sql",
 ];
+
+const SKIPPABLE_ERROR_CODES = new Set(["42701", "42P07", "42710", "42P16"]);
 
 async function main() {
   const client = await pool.connect();
@@ -39,24 +55,18 @@ async function main() {
 
     for (const filename of MIGRATIONS) {
       const sqlPath = join(process.cwd(), "migrations", filename);
-      const sql = readFileSync(sqlPath, "utf-8");
-      const statements = sql
-        .split(";")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0 && !s.startsWith("--"));
+      const sql = readFileSync(sqlPath, "utf-8").trim();
+      if (!sql) continue;
 
-      for (const stmt of statements) {
-        const fullSql = stmt + ";";
-        try {
-          await client.query(fullSql);
-          console.log(`  ✓ ${filename}`);
-        } catch (err: unknown) {
-          const e = err as { code?: string; message?: string };
-          if (e?.code === "42701") {
-            console.log(`  ⏭ ${filename} (columna ya existe)`);
-          } else {
-            throw err;
-          }
+      try {
+        await client.query(sql);
+        console.log(`  ✓ ${filename}`);
+      } catch (err: unknown) {
+        const e = err as { code?: string; message?: string };
+        if (e?.code && SKIPPABLE_ERROR_CODES.has(e.code)) {
+          console.log(`  ⏭ ${filename} (ya aplicado: ${e.code})`);
+        } else {
+          throw err;
         }
       }
     }
