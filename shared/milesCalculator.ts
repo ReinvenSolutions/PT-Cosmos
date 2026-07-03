@@ -9,11 +9,21 @@ export const MILES_PROGRAMS_ALLOWED = ["none", "lifemiles", "smiles", "both"] as
 
 export const DEFAULT_USD_PER_1000_LIFEMILES = 16.9;
 export const DEFAULT_USD_PER_1000_SMILES = 4.3;
+/** Tasa de cambio BRL por USD (1 USD = N BRL). Usada para convertir impuestos Smiles a USD. */
+export const DEFAULT_BRL_PER_USD = 5.3;
 
 export const GLOBAL_USD_PER_1000_LIFEMILES_SETTING_KEY = "miles_usd_per_1000_lifemiles";
 export const GLOBAL_USD_PER_1000_SMILES_SETTING_KEY = "miles_usd_per_1000_smiles";
+export const GLOBAL_BRL_PER_USD_SETTING_KEY = "smiles_brl_per_usd";
 
 export function parseUsdPer1000Miles(raw: string | null | undefined, fallback: number): number {
+  if (raw == null || raw === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return n;
+}
+
+export function parseBrlPerUsd(raw: string | null | undefined, fallback: number): number {
   if (raw == null || raw === "") return fallback;
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return fallback;
@@ -89,27 +99,46 @@ export type MilesProgram = "LIFE MILES" | "SMILES";
 export function calculateMilesSegmentCop(params: {
   program: MilesProgram;
   miles: number;
-  taxCop: number;
+  /** Impuesto en COP (LifeMiles) o en BRL (Smiles), según el programa. */
+  taxAmount: number;
   usdPer1000LifeMiles: number;
   usdPer1000Smiles: number;
   effectiveTrm: number;
-}): { milesInCop: number; subtotalPerPax: number } {
-  const { program, miles, taxCop, usdPer1000LifeMiles, usdPer1000Smiles, effectiveTrm } = params;
+  /** 1 USD = N BRL. Solo aplica a Smiles. */
+  brlPerUsd?: number;
+}): { milesInCop: number; taxInCop: number; subtotalPerPax: number } {
+  const {
+    program,
+    miles,
+    taxAmount,
+    usdPer1000LifeMiles,
+    usdPer1000Smiles,
+    effectiveTrm,
+    brlPerUsd,
+  } = params;
   const safeMiles = Number.isFinite(miles) ? miles : 0;
-  const safeTax = Number.isFinite(taxCop) ? taxCop : 0;
+  const safeTax = Number.isFinite(taxAmount) ? taxAmount : 0;
   const safeTrm = Number.isFinite(effectiveTrm) && effectiveTrm > 0 ? effectiveTrm : 0;
 
-  let milesInCop = 0;
   if (program === "LIFE MILES") {
     const milesInUsd = (safeMiles * usdPer1000LifeMiles) / 1000;
-    milesInCop = milesInUsd * safeTrm;
-  } else {
-    const milesInUsd = (safeMiles / 1000) * usdPer1000Smiles;
-    milesInCop = milesInUsd * safeTrm;
+    const milesInCop = milesInUsd * safeTrm;
+    return {
+      milesInCop,
+      taxInCop: safeTax,
+      subtotalPerPax: milesInCop + safeTax,
+    };
   }
+
+  const safeBrlPerUsd = Number.isFinite(brlPerUsd) && brlPerUsd! > 0 ? brlPerUsd! : 0;
+  const milesInUsd = (safeMiles / 1000) * usdPer1000Smiles;
+  const taxInUsd = safeBrlPerUsd > 0 ? Math.round((safeTax / safeBrlPerUsd) * 1000) / 1000 : 0;
+  const milesInCop = milesInUsd * safeTrm;
+  const taxInCop = taxInUsd * safeTrm;
 
   return {
     milesInCop,
-    subtotalPerPax: milesInCop + safeTax,
+    taxInCop,
+    subtotalPerPax: milesInCop + taxInCop,
   };
 }

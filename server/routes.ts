@@ -1828,10 +1828,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.get("/api/settings/global-trm", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
-    const [baseTrm, usdPer1000LifeMiles, usdPer1000Smiles] = await Promise.all([
+    const [baseTrm, usdPer1000LifeMiles, usdPer1000Smiles, brlPerUsd] = await Promise.all([
       storage.getGlobalTrmBase(),
       storage.getGlobalUsdPer1000LifeMiles(),
       storage.getGlobalUsdPer1000Smiles(),
+      storage.getGlobalBrlPerUsd(),
     ]);
     res.json({
       baseTrm,
@@ -1839,6 +1840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       surchargeCop: TRM_EFFECTIVE_SURCHARGE_COP,
       usdPer1000LifeMiles,
       usdPer1000Smiles,
+      brlPerUsd,
     });
   }));
 
@@ -1847,8 +1849,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       baseTrm: z.union([z.number(), z.string()]).nullable().optional(),
       usdPer1000LifeMiles: z.union([z.number(), z.string()]).optional(),
       usdPer1000Smiles: z.union([z.number(), z.string()]).optional(),
+      brlPerUsd: z.union([z.number(), z.string()]).optional(),
     });
-    const { baseTrm: rawBaseTrm, usdPer1000LifeMiles: rawLifeMiles, usdPer1000Smiles: rawSmiles } =
+    const { baseTrm: rawBaseTrm, usdPer1000LifeMiles: rawLifeMiles, usdPer1000Smiles: rawSmiles, brlPerUsd: rawBrlPerUsd } =
       bodySchema.parse(req.body);
 
     if (rawBaseTrm !== undefined) {
@@ -1879,10 +1882,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.setGlobalUsdPer1000Smiles(n);
     }
 
-    const [baseTrm, usdPer1000LifeMiles, usdPer1000Smiles] = await Promise.all([
+    if (rawBrlPerUsd !== undefined) {
+      const n = typeof rawBrlPerUsd === "string" ? parseFloat(rawBrlPerUsd) : rawBrlPerUsd;
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ message: "La tasa BRL/USD debe ser un número mayor que cero." });
+      }
+      await storage.setGlobalBrlPerUsd(n);
+    }
+
+    const [baseTrm, usdPer1000LifeMiles, usdPer1000Smiles, brlPerUsd] = await Promise.all([
       storage.getGlobalTrmBase(),
       storage.getGlobalUsdPer1000LifeMiles(),
       storage.getGlobalUsdPer1000Smiles(),
+      storage.getGlobalBrlPerUsd(),
     ]);
     res.json({
       baseTrm,
@@ -1890,6 +1902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       surchargeCop: TRM_EFFECTIVE_SURCHARGE_COP,
       usdPer1000LifeMiles,
       usdPer1000Smiles,
+      brlPerUsd,
     });
   }));
 
