@@ -18,11 +18,12 @@ import {
   normalizeMilesProgramsAllowed,
   DEFAULT_USD_PER_1000_LIFEMILES,
   DEFAULT_USD_PER_1000_SMILES,
+  DEFAULT_BRL_PER_USD,
   type MilesProgram,
 } from "@shared/milesCalculator";
 
 function roundToTens(value: number): number {
-  return Math.ceil(value / 10000) * 10000;
+  return Math.round(value / 10) * 10;
 }
 
 function formatCurrency(value: number): string {
@@ -82,6 +83,7 @@ export default function ToolsMilesCalculator() {
     surchargeCop: number;
     usdPer1000LifeMiles: number;
     usdPer1000Smiles: number;
+    brlPerUsd: number;
   }>({
     queryKey: ["/api/settings/global-trm"],
   });
@@ -89,21 +91,23 @@ export default function ToolsMilesCalculator() {
   const effectiveTrm = trmData?.effectiveTrm ?? 0;
   const usdPer1000MilesLifeMiles = trmData?.usdPer1000LifeMiles ?? DEFAULT_USD_PER_1000_LIFEMILES;
   const usdPer1000MilesSmiles = trmData?.usdPer1000Smiles ?? DEFAULT_USD_PER_1000_SMILES;
+  const brlPerUsd = trmData?.brlPerUsd ?? DEFAULT_BRL_PER_USD;
 
   const { type: markupType, value: markupValue } = isSuperAdmin
     ? { type: "none" as const, value: 0 }
     : resolveMilesProgramMarkup(milesProgram, user ?? {});
 
   const calcSegment = (segmentMiles: number, segmentTax: number) => {
-    const { milesInCop, subtotalPerPax } = calculateMilesSegmentCop({
+    const { milesInCop, taxInCop, subtotalPerPax } = calculateMilesSegmentCop({
       program: milesProgram,
       miles: segmentMiles,
-      taxCop: segmentTax,
+      taxAmount: segmentTax,
       usdPer1000LifeMiles: usdPer1000MilesLifeMiles,
       usdPer1000Smiles: usdPer1000MilesSmiles,
       effectiveTrm,
+      brlPerUsd: milesProgram === "SMILES" ? brlPerUsd : undefined,
     });
-    return { milesInCop, baseTotal: subtotalPerPax * passengers };
+    return { milesInCop, taxInCop, baseTotal: subtotalPerPax * passengers };
   };
 
   const outbound = calcSegment(miles, tax);
@@ -284,7 +288,7 @@ export default function ToolsMilesCalculator() {
           onMilesChange={handleMilesChange}
           onTaxChange={handleTaxChange}
           milesInCop={outbound.milesInCop}
-          tax={tax}
+          taxInCop={outbound.taxInCop}
           displayTotal={outboundDisplayTotal}
           passengers={passengers}
           milesProgram={milesProgram}
@@ -302,7 +306,7 @@ export default function ToolsMilesCalculator() {
             onMilesChange={handleMilesReturnChange}
             onTaxChange={handleTaxReturnChange}
             milesInCop={inbound.milesInCop}
-            tax={taxReturn}
+            taxInCop={inbound.taxInCop}
             displayTotal={inboundDisplayTotal}
             passengers={passengers}
             milesProgram={milesProgram}
@@ -341,6 +345,11 @@ export default function ToolsMilesCalculator() {
                 ? `$ ${effectiveTrm.toLocaleString("es-CO")} COP/USD`
                 : "Configura la TRM en Administración"}
             </span>
+            {milesProgram === "SMILES" && (
+              <span className="text-muted-foreground text-xs">
+                BRL/USD: {brlPerUsd.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+              </span>
+            )}
           </div>
         </div>
       </main>
@@ -355,7 +364,7 @@ function FlightSegmentCard({
   onMilesChange,
   onTaxChange,
   milesInCop,
-  tax,
+  taxInCop,
   displayTotal,
   passengers,
   milesProgram,
@@ -371,7 +380,7 @@ function FlightSegmentCard({
   onMilesChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTaxChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   milesInCop: number;
-  tax: number;
+  taxInCop: number;
   displayTotal: number;
   passengers: number;
   milesProgram: MilesProgram;
@@ -381,6 +390,8 @@ function FlightSegmentCard({
   totalTestId: string;
   flipPlane?: boolean;
 }) {
+  const isSmiles = milesProgram === "SMILES";
+
   return (
     <Card className="mb-6 backdrop-blur-sm">
       <CardContent className="p-5 sm:p-6">
@@ -416,14 +427,18 @@ function FlightSegmentCard({
               <Label htmlFor={taxTestId} className="block text-sm font-medium text-foreground mb-2">
                 <div className="flex items-center">
                   <Receipt className="text-primary mr-2" size={16} />
-                  Impuesto (COP)
+                  Impuesto ({isSmiles ? "BRL" : "COP"})
                 </div>
               </Label>
               <Input
                 type="text"
                 id={taxTestId}
                 data-testid={taxTestId}
-                placeholder="Ingrese el impuesto (ej: 150,000)"
+                placeholder={
+                  isSmiles
+                    ? "Ingrese el impuesto en reales (ej: 546)"
+                    : "Ingrese el impuesto (ej: 150,000)"
+                }
                 value={taxDisplay}
                 onChange={onTaxChange}
               />
@@ -432,7 +447,10 @@ function FlightSegmentCard({
 
           <div className="space-y-3">
             <ResultRow label="Valor en Millas" value={formatCurrency(milesInCop)} testId={milesValueTestId} />
-            <ResultRow label="Impuesto" value={formatCurrency(tax)} />
+            <ResultRow
+              label={isSmiles ? "Impuesto (convertido)" : "Impuesto"}
+              value={formatCurrency(taxInCop)}
+            />
             <div className="rounded-lg bg-primary px-4 py-3">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-medium text-primary-foreground">

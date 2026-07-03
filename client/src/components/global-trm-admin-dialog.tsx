@@ -19,6 +19,7 @@ import { TRM_EFFECTIVE_SURCHARGE_COP, effectiveTrmFromBase } from "@shared/trm";
 import {
   DEFAULT_USD_PER_1000_LIFEMILES,
   DEFAULT_USD_PER_1000_SMILES,
+  DEFAULT_BRL_PER_USD,
 } from "@shared/milesCalculator";
 
 type GlobalTrmResponse = {
@@ -27,12 +28,14 @@ type GlobalTrmResponse = {
   surchargeCop: number;
   usdPer1000LifeMiles: number;
   usdPer1000Smiles: number;
+  brlPerUsd: number;
 };
 
 type SavePayload = {
   baseTrm: number | null;
   usdPer1000LifeMiles: number;
   usdPer1000Smiles: number;
+  brlPerUsd: number;
 };
 
 export function GlobalTrmAdminMenuItem() {
@@ -41,6 +44,7 @@ export function GlobalTrmAdminMenuItem() {
   const [inputValue, setInputValue] = useState("");
   const [lifeMilesRate, setLifeMilesRate] = useState(String(DEFAULT_USD_PER_1000_LIFEMILES));
   const [smilesRate, setSmilesRate] = useState(String(DEFAULT_USD_PER_1000_SMILES));
+  const [brlPerUsdRate, setBrlPerUsdRate] = useState(String(DEFAULT_BRL_PER_USD));
 
   const { data, isLoading } = useQuery<GlobalTrmResponse>({
     queryKey: ["/api/settings/global-trm"],
@@ -52,8 +56,9 @@ export function GlobalTrmAdminMenuItem() {
       setInputValue(data.baseTrm != null ? String(data.baseTrm) : "");
       setLifeMilesRate(String(data.usdPer1000LifeMiles ?? DEFAULT_USD_PER_1000_LIFEMILES));
       setSmilesRate(String(data.usdPer1000Smiles ?? DEFAULT_USD_PER_1000_SMILES));
+      setBrlPerUsdRate(String(data.brlPerUsd ?? DEFAULT_BRL_PER_USD));
     }
-  }, [open, data?.baseTrm, data?.usdPer1000LifeMiles, data?.usdPer1000Smiles]);
+  }, [open, data?.baseTrm, data?.usdPer1000LifeMiles, data?.usdPer1000Smiles, data?.brlPerUsd]);
 
   const saveMutation = useMutation({
     mutationFn: async (payload: SavePayload) => {
@@ -113,10 +118,21 @@ export function GlobalTrmAdminMenuItem() {
       return;
     }
 
+    const brlPerUsd = parseFloat(brlPerUsdRate.replace(/,/g, ""));
+    if (!Number.isFinite(brlPerUsd) || brlPerUsd <= 0) {
+      toast({
+        title: "Tasa BRL/USD inválida",
+        description: "Ingresa cuántos reales equivalen a 1 USD (ej. 5.3).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     saveMutation.mutate({
       baseTrm,
       usdPer1000LifeMiles: lifeMiles,
       usdPer1000Smiles: smiles,
+      brlPerUsd,
     });
   };
 
@@ -200,6 +216,21 @@ export function GlobalTrmAdminMenuItem() {
                 onChange={(e) => setSmilesRate(e.target.value)}
                 disabled={isLoading || saveMutation.isPending}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="global-brl-per-usd">BRL por USD — Smiles (impuestos)</Label>
+              <Input
+                id="global-brl-per-usd"
+                type="text"
+                inputMode="decimal"
+                placeholder={String(DEFAULT_BRL_PER_USD)}
+                value={brlPerUsdRate}
+                onChange={(e) => setBrlPerUsdRate(e.target.value)}
+                disabled={isLoading || saveMutation.isPending}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cuántos reales brasileños equivalen a 1 USD. Se usa para convertir impuestos BRL a dólares.
+              </p>
             </div>
           </div>
         </div>

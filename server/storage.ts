@@ -47,9 +47,12 @@ import { toolItineraries, type ToolItinerary } from "@shared/toolItinerary";
 import {
   DEFAULT_USD_PER_1000_LIFEMILES,
   DEFAULT_USD_PER_1000_SMILES,
+  DEFAULT_BRL_PER_USD,
   GLOBAL_USD_PER_1000_LIFEMILES_SETTING_KEY,
   GLOBAL_USD_PER_1000_SMILES_SETTING_KEY,
+  GLOBAL_BRL_PER_USD_SETTING_KEY,
   parseUsdPer1000Miles,
+  parseBrlPerUsd,
 } from "@shared/milesCalculator";
 import { GLOBAL_TRM_BASE_SETTING_KEY } from "@shared/trm";
 import { db } from "./db";
@@ -156,6 +159,8 @@ export interface IStorage {
   setGlobalUsdPer1000LifeMiles(value: number): Promise<void>;
   getGlobalUsdPer1000Smiles(): Promise<number>;
   setGlobalUsdPer1000Smiles(value: number): Promise<void>;
+  getGlobalBrlPerUsd(): Promise<number>;
+  setGlobalBrlPerUsd(value: number): Promise<void>;
 
   getTutorialCourse(id: string): Promise<TutorialCourse | undefined>;
   listTutorialCoursesAdmin(): Promise<TutorialCourse[]>;
@@ -1371,6 +1376,19 @@ export class DatabaseStorage implements IStorage {
       return;
     }
     await this.setAppSetting(GLOBAL_USD_PER_1000_SMILES_SETTING_KEY, String(value));
+  }
+
+  async getGlobalBrlPerUsd(): Promise<number> {
+    const raw = await this.getAppSetting(GLOBAL_BRL_PER_USD_SETTING_KEY);
+    return parseBrlPerUsd(raw, DEFAULT_BRL_PER_USD);
+  }
+
+  async setGlobalBrlPerUsd(value: number): Promise<void> {
+    if (!Number.isFinite(value) || value <= 0) {
+      await db.delete(appSettings).where(eq(appSettings.key, GLOBAL_BRL_PER_USD_SETTING_KEY));
+      return;
+    }
+    await this.setAppSetting(GLOBAL_BRL_PER_USD_SETTING_KEY, String(value));
   }
 
   async getTutorialCourse(id: string): Promise<TutorialCourse | undefined> {
