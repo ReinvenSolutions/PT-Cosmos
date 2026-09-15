@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import express from "express";
 import { generatePublicQuotePDF } from "./publicPdfGenerator";
 import passport from "./auth";
-import { requireAuth, requireRole, requireRoles, requirePlanManagers } from "./middleware";
+import { requireAuth, requireRole, requireRoles, requirePlanManagers, requireModule } from "./middleware";
 import { ROLES, QUOTE_USER_ROLES } from "@shared/roles";
 import { toolItinerarySchema } from "@shared/toolItinerary";
 import { z } from "zod";
@@ -39,7 +39,13 @@ import { users as usersTable } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinationSchema, insertQuoteDestinationSchema, type User } from "@shared/schema";
 import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
-import { MILES_MARKUP_TYPES, MILES_PROGRAMS_ALLOWED, canUseLifeMiles, canUseSmiles } from "@shared/milesCalculator";
+import { MILES_MARKUP_TYPES, MILES_PROGRAMS_ALLOWED, canUseLifeMiles, canUseMilesCalculator, canUseSmiles, normalizeMilesProgramsAllowed } from "@shared/milesCalculator";
+import {
+  defaultEnabledModulesForRole,
+  normalizeEnabledModules,
+  reconcileMilesModuleAccess,
+  USER_MODULES,
+} from "@shared/modules";
 import validator from "validator";
 import multer from "multer";
 import { handleFileUpload, getImageBuffer, handlePlanDescriptiveAudioUpload, destinationNameToBucketSlug } from "./upload";
@@ -67,6 +73,7 @@ import {
 import {
   resolveTwoFactorEmail,
   maskEmail,
+  canExposeDevTwoFactorCode,
   TWO_FACTOR_CODE_EXPIRY_MINUTES,
 } from "./utils/twoFactorEmail";
 
@@ -294,6 +301,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!emailSent) {
         logger.error("[2FA] No se pudo enviar el correo", { userId: user.id, emailTo });
+        if (canExposeDevTwoFactorCode()) {
+          logger.warn("[2FA] Fallback de desarrollo: código visible en la UI", { userId: user.id, code });
+          return res.json({
+            needs2FA: true,
+            tempToken,
+            emailMasked,
+            devCode: code,
+            message: `Brevo bloqueó el envío desde esta IP. En desarrollo puedes usar este código: ${code}`,
+          });
+        }
         return res.status(503).json({
           message: `No pudimos enviar el código a ${emailMasked}. Verifica que el correo sea correcto o contacta al administrador.`,
         });
@@ -376,6 +393,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!emailSent) {
       logger.error("[2FA] No se pudo reenviar el correo", { userId: user.id, emailTo });
+      if (canExposeDevTwoFactorCode()) {
+        logger.warn("[2FA] Fallback de desarrollo (reenvío): código visible en la UI", { userId: user.id, code });
+        return res.json({
+          tempToken: newTempToken,
+          emailMasked,
+          devCode: code,
+          message: `Brevo bloqueó el envío desde esta IP. En desarrollo puedes usar este código: ${code}`,
+        });
+      }
       return res.status(503).json({
         message: `No pudimos enviar el código a ${emailMasked}. Revisa spam o contacta al administrador.`,
       });
@@ -449,6 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       role: "agency",
       approvalStatus: USER_APPROVAL_PENDING,
       twoFactorEnabled: true,
+      enabledModules: defaultEnabledModulesForRole("agency"),
     });
 
     const newUser = await storage.createUser(userData);
@@ -1120,6 +1147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       isActive: true,
       approvalStatus: USER_APPROVAL_APPROVED,
       twoFactorEnabled: true,
+      enabledModules: defaultEnabledModulesForRole(validated.role),
     });
     const newUser = await storage.createUser(userData);
     const { passwordHash, ...rest } = newUser;
@@ -1261,6 +1289,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       milesMarkupValueSmiles: milesMarkupValueSmiles.toFixed(2),
       milesMarkupType: "none",
       milesMarkupValue: "0.00",
+      enabledModules: {
+        ...normalizeEnabledModules(existing.enabledModules),
+        milesCalculator: canUseMilesCalculator(milesProgramsAllowed),
+      },
     });
     const { passwordHash, ...rest } = updated;
     logger.info("Admin updated user miles settings", {
@@ -1270,6 +1302,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       milesMarkupValueLifemiles,
       milesMarkupTypeSmiles,
       milesMarkupValueSmiles,
+    });
+    res.json(rest);
+  }));
+
+  app.patch("/api/admin/users/:id/modules", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const schema = z.object({
+      enabledModules: z.object({
+        quote: z.boolean(),
+        quoteExpress: z.boolean(),
+        dayCounter: z.boolean(),
+        milesCalculator: z.boolean(),
+        academy: z.boolean(),
+      }),
+      milesProgramsAllowed: z.enum(MILES_PROGRAMS_ALLOWED).optional(),
+    });
+    const parsed = schema.parse(req.body);
+    const existing = await storage.findUserById(req.params.id);
+    if (!existing) throw new NotFoundError("Usuario");
+    if (existing.role === ROLES.SUPER_ADMIN) {
+      throw new ValidationError("El super admin siempre tiene acceso a todos los módulos");
+    }
+
+    const milesProgramsAllowed =
+      parsed.milesProgramsAllowed ??
+      normalizeMilesProgramsAllowed(existing.milesProgramsAllowed);
+    const { enabledModules } = reconcileMilesModuleAccess(
+      normalizeEnabledModules(parsed.enabledModules),
+      milesProgramsAllowed,
+    );
+    const updates: {
+      enabledModules: typeof enabledModules;
+      milesProgramsAllowed?: string;
+    } = { enabledModules };
+
+    if (parsed.milesProgramsAllowed !== undefined) {
+      updates.milesProgramsAllowed = milesProgramsAllowed;
+    }
+
+    const updated = await storage.updateUserByAdmin(req.params.id, updates);
+    const { passwordHash, ...rest } = updated;
+    logger.info("Admin updated user modules", {
+      userId: req.params.id,
+      enabledModules,
+      milesProgramsAllowed: updates.milesProgramsAllowed,
     });
     res.json(rest);
   }));
@@ -2134,7 +2210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Herramientas: contador de días (itinerario 25 días por usuario)
-  app.get("/api/tools/itinerary", requireAuth, asyncHandler(async (req, res) => {
+  app.get("/api/tools/itinerary", requireAuth, requireModule(USER_MODULES.DAY_COUNTER), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const itinerary = await storage.getToolItinerary(user.id);
 
@@ -2145,14 +2221,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(itinerary);
   }));
 
-  app.post("/api/tools/itinerary", requireAuth, asyncHandler(async (req, res) => {
+  app.post("/api/tools/itinerary", requireAuth, requireModule(USER_MODULES.DAY_COUNTER), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const validated = toolItinerarySchema.parse(req.body);
     const saved = await storage.saveToolItinerary(user.id, validated);
     res.json(saved);
   }));
 
-  app.delete("/api/tools/itinerary", requireAuth, asyncHandler(async (req, res) => {
+  app.delete("/api/tools/itinerary", requireAuth, requireModule(USER_MODULES.DAY_COUNTER), asyncHandler(async (req, res) => {
     const user = req.user as User;
     const deleted = await storage.deleteToolItinerary(user.id);
 

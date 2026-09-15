@@ -1,10 +1,11 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { storage } from "./storage";
-import { requireAuth, requireRole, requireRoles } from "./middleware";
+import { requireAuth, requireRole, requireModule } from "./middleware";
 import { asyncHandler } from "./utils/asyncHandler";
 import { NotFoundError } from "./errors/AppError";
 import type { User } from "@shared/schema";
+import { USER_MODULES } from "@shared/modules";
 
 const courseBody = z.object({
   title: z.string().min(1).max(300),
@@ -27,7 +28,7 @@ const lessonUpdateBody = lessonBody.omit({ courseId: true }).partial().extend({
 });
 
 export function registerTutorialRoutes(app: Express) {
-  const tutorAccess = requireRoles(["agency", "super_admin"]);
+  const tutorAccess = requireModule(USER_MODULES.ACADEMY);
 
   app.get(
     "/api/tutorials/courses",

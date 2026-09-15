@@ -50,3 +50,8 @@ export function maskEmail(email: string): string {
   const visible = Math.min(2, local.length);
   return `${local.slice(0, visible)}${"*".repeat(Math.max(1, local.length - visible))}@${domain}`;
 }
+
+/** En local, si Brevo bloquea la IP, devolvemos el código 2FA para no quedar fuera. */
+export function canExposeDevTwoFactorCode(): boolean {
+  return process.env.NODE_ENV === "development";
+}

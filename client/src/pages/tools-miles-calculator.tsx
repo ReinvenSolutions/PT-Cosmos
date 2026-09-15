@@ -8,11 +8,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plane, Calculator, Users, Coins, Receipt } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLES } from "@shared/roles";
+import { canAccessMilesCalculator } from "@shared/modules";
 import {
   applyMilesMarkup,
   calculateMilesSegmentCop,
   canUseLifeMiles,
-  canUseMilesCalculator,
   canUseSmiles,
   resolveMilesProgramMarkup,
   normalizeMilesProgramsAllowed,
@@ -47,10 +47,10 @@ export default function ToolsMilesCalculator() {
   const { user } = useAuth();
 
   const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
+  const hasMilesAccess = canAccessMilesCalculator(user);
   const programsAllowed = isSuperAdmin
     ? "both"
     : normalizeMilesProgramsAllowed(user?.milesProgramsAllowed);
-  const hasMilesAccess = isSuperAdmin || canUseMilesCalculator(programsAllowed);
   const showLifeMiles = canUseLifeMiles(programsAllowed);
   const showSmiles = canUseSmiles(programsAllowed);
 

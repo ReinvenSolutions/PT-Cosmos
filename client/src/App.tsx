@@ -9,6 +9,8 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { QUOTE_USER_ROLES } from "@shared/roles";
+import { canAccessMilesCalculator, canAccessModule, USER_MODULES, type UserModuleId } from "@shared/modules";
+import { getPostLoginPath } from "@/lib/authUtils";
 
 const RouteLoadingFallback = () => (
   <div className="min-h-[40vh] flex items-center justify-center" aria-label="Cargando sección">
@@ -43,10 +45,14 @@ const ToolsMilesCalculator = lazy(() => import("@/pages/tools-miles-calculator")
 
 function ProtectedRoute({
   component: Component,
-  allowedRoles
+  allowedRoles,
+  requiredModule,
+  requireMilesAccess,
 }: {
   component: React.ComponentType;
   allowedRoles?: string[];
+  requiredModule?: UserModuleId;
+  requireMilesAccess?: boolean;
 }) {
   const { user, isLoading } = useAuth();
 
@@ -63,7 +69,15 @@ function ProtectedRoute({
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Redirect to="/dashboard" />;
+    return <Redirect to={getPostLoginPath(user.role)} />;
+  }
+
+  if (requiredModule && !canAccessModule(user, requiredModule)) {
+    return <Redirect to={getPostLoginPath(user.role)} />;
+  }
+
+  if (requireMilesAccess && !canAccessMilesCalculator(user)) {
+    return <Redirect to={getPostLoginPath(user.role)} />;
   }
 
   return (
@@ -147,13 +161,13 @@ function AppRoutes() {
         <ProtectedRoute component={AdminCosmosConfig} allowedRoles={["super_admin"]} />
       </Route>
       <Route path="/tutoriales/curso/:courseId/leccion/:lessonId">
-        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "agency"]} />
+        <ProtectedRoute component={Tutoriales} allowedRoles={[...QUOTE_USER_ROLES]} requiredModule={USER_MODULES.ACADEMY} />
       </Route>
       <Route path="/tutoriales/curso/:courseId">
-        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "agency"]} />
+        <ProtectedRoute component={Tutoriales} allowedRoles={[...QUOTE_USER_ROLES]} requiredModule={USER_MODULES.ACADEMY} />
       </Route>
       <Route path="/tutoriales">
-        <ProtectedRoute component={Tutoriales} allowedRoles={["super_admin", "agency"]} />
+        <ProtectedRoute component={Tutoriales} allowedRoles={[...QUOTE_USER_ROLES]} requiredModule={USER_MODULES.ACADEMY} />
       </Route>
       <Route path="/advisor/quotes/:id/edit">
         <ProtectedRoute component={QuoteEdit} allowedRoles={[...QUOTE_USER_ROLES]} />
@@ -165,22 +179,22 @@ function AppRoutes() {
         <ProtectedRoute component={AdvisorDashboard} allowedRoles={[...QUOTE_USER_ROLES]} />
       </Route>
       <Route path="/cotizacion">
-        <ProtectedRoute component={QuoteSummary} allowedRoles={[...QUOTE_USER_ROLES]} />
+        <ProtectedRoute component={QuoteSummary} allowedRoles={[...QUOTE_USER_ROLES]} requiredModule={USER_MODULES.QUOTE} />
       </Route>
       <Route path="/cotizacion-express">
-        <ProtectedRoute component={QuoteExpress} allowedRoles={[...QUOTE_USER_ROLES]} />
+        <ProtectedRoute component={QuoteExpress} allowedRoles={[...QUOTE_USER_ROLES]} requiredModule={USER_MODULES.QUOTE_EXPRESS} />
       </Route>
       <Route path="/herramientas/contador-dias">
-        <ProtectedRoute component={ToolsDayCounter} allowedRoles={[...QUOTE_USER_ROLES]} />
+        <ProtectedRoute component={ToolsDayCounter} allowedRoles={[...QUOTE_USER_ROLES]} requiredModule={USER_MODULES.DAY_COUNTER} />
       </Route>
       <Route path="/herramientas/cotizador-millas">
-        <ProtectedRoute component={ToolsMilesCalculator} allowedRoles={[...QUOTE_USER_ROLES]} />
+        <ProtectedRoute component={ToolsMilesCalculator} allowedRoles={[...QUOTE_USER_ROLES]} requireMilesAccess />
       </Route>
       <Route path="/plan/:id">
-        <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "agency", "provider"]} />
+        <ProtectedRoute component={PlanDetail} allowedRoles={["super_admin", "agency", "provider"]} requiredModule={USER_MODULES.QUOTE} />
       </Route>
       <Route path="/">
-        <ProtectedRoute component={Home} allowedRoles={["super_admin", "agency", "provider"]} />
+        <ProtectedRoute component={Home} allowedRoles={["super_admin", "agency", "provider"]} requiredModule={USER_MODULES.QUOTE} />
       </Route>
       <Route component={NotFound} />
     </Switch>

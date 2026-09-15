@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import type { QuoteFeesConfig } from "./quoteFees";
 import type { PlanTax } from "./planTaxes";
+import type { EnabledModules } from "./modules";
 
 export const destinations = pgTable(
   "destinations",
@@ -178,6 +179,8 @@ export const users = pgTable("users", {
   milesMarkupValueSmiles: decimal("miles_markup_value_smiles", { precision: 12, scale: 2 }).default("0").notNull(),
   /** Programas habilitados: none | lifemiles | smiles | both */
   milesProgramsAllowed: text("miles_programs_allowed").default("both").notNull(),
+  /** Módulos visibles para el usuario. Super admin ignora este campo. */
+  enabledModules: json("enabled_modules").$type<EnabledModules | null>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

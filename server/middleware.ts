@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import type { User as DbUser } from "@shared/schema";
 import { PLAN_MANAGER_ROLES } from "@shared/roles";
+import { canAccessModule, type ModuleAccessUser, type UserModuleId } from "@shared/modules";
 
 declare global {
   namespace Express {
@@ -10,6 +10,8 @@ declare global {
       passwordHash: string;
       role: string;
       createdAt: Date | null;
+      enabledModules?: unknown;
+      milesProgramsAllowed?: string | null;
     }
   }
 }
@@ -45,6 +47,21 @@ export function requireRoles(roles: string[]) {
     const user = req.user as Express.User;
     if (!roles.includes(user.role)) {
       return res.status(403).json({ message: "No autorizado" });
+    }
+
+    next();
+  };
+}
+
+export function requireModule(moduleId: UserModuleId) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    const user = req.user as ModuleAccessUser;
+    if (!canAccessModule(user, moduleId)) {
+      return res.status(403).json({ message: "Módulo no habilitado" });
     }
 
     next();
