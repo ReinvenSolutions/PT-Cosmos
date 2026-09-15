@@ -19,15 +19,26 @@ interface EmailOptions {
   replyTo?: string;
 }
 
+export type EmailSendFailure = {
+  ok: false;
+  status?: number;
+  code?: string;
+  message?: string;
+};
+
+export type EmailSendResult =
+  | { ok: true; messageId?: string }
+  | EmailSendFailure;
+
 export function isEmailConfigured(): boolean {
   return !!process.env.BREVO_API_KEY;
 }
 
-async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
+async function sendViaBrevoAPI(options: EmailOptions): Promise<EmailSendResult> {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
     logger.warn("[Email] Brevo API key no configurada");
-    return false;
+    return { ok: false, message: "BREVO_API_KEY no configurada" };
   }
 
   const fromEmail = process.env.SMTP_FROM || DEFAULT_FROM;
@@ -53,13 +64,15 @@ async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let code: string | undefined;
       let parsedMessage = errorText;
       try {
         const parsed = JSON.parse(errorText) as { message?: string; code?: string };
         parsedMessage = parsed.message || errorText;
+        code = parsed.code;
         logger.error("[Email] Brevo API error", {
           status: response.status,
-          code: parsed.code,
+          code,
           message: parsedMessage,
           to: options.to,
         });
@@ -70,7 +83,7 @@ async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
           to: options.to,
         });
       }
-      return false;
+      return { ok: false, status: response.status, code, message: parsedMessage };
     }
 
     const result = await response.json();
@@ -78,23 +91,26 @@ async function sendViaBrevoAPI(options: EmailOptions): Promise<boolean> {
       to: options.to,
       messageId: result.messageId,
     });
-    return true;
+    return { ok: true, messageId: result.messageId };
   } catch (error) {
-    logger.error("[Email] Error llamando Brevo API", {
-      error: (error as Error).message,
-    });
-    return false;
+    const message = (error as Error).message;
+    logger.error("[Email] Error llamando Brevo API", { error: message });
+    return { ok: false, message };
   }
 }
 
-export async function sendEmail(options: EmailOptions): Promise<boolean> {
+export async function sendEmailResult(options: EmailOptions): Promise<EmailSendResult> {
   if (!process.env.BREVO_API_KEY) {
     logger.warn("[Email] BREVO_API_KEY no configurada.");
-    return false;
+    return { ok: false, message: "BREVO_API_KEY no configurada" };
   }
 
   logger.info("[Email] Enviando vía Brevo API");
   return sendViaBrevoAPI(options);
+}
+
+export async function sendEmail(options: EmailOptions): Promise<boolean> {
+  return (await sendEmailResult(options)).ok;
 }
 
 /* Identidad visual Cosmos Viajes: teal #205567, oro #C6A242, aqua #8CC7D5 */

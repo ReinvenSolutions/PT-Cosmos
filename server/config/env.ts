@@ -24,6 +24,7 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
   SMTP_FROM_NAME: z.string().optional(),
+  BREVO_API_KEY: z.string().optional(),
 });
 
 function validateEnv() {

@@ -60,6 +60,7 @@ import type { DestinationInput } from "./types";
 import { getLoginBlockMessage, USER_APPROVAL_APPROVED, USER_APPROVAL_DENIED, USER_APPROVAL_PENDING } from "./utils/userAccess";
 import {
   sendEmail,
+  sendEmailResult,
   isEmailConfigured,
   generateNewUserNotificationHtml,
   generateWelcomeEmailHtml,
@@ -74,6 +75,7 @@ import {
   resolveTwoFactorEmail,
   maskEmail,
   canExposeDevTwoFactorCode,
+  twoFactorSendFailureMessage,
   TWO_FACTOR_CODE_EXPIRY_MINUTES,
 } from "./utils/twoFactorEmail";
 
@@ -292,15 +294,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresMinutes: TWO_FACTOR_CODE_EXPIRY_MINUTES,
       });
 
-      const emailSent = await sendEmail({
+      const emailSent = await sendEmailResult({
         to: emailTo,
         subject: "Código de verificación - Cosmos Viajes",
         html: generate2FACodeEmailHtml(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
         text: generate2FACodeEmailText(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
       });
 
-      if (!emailSent) {
-        logger.error("[2FA] No se pudo enviar el correo", { userId: user.id, emailTo });
+      if (!emailSent.ok) {
+        logger.error("[2FA] No se pudo enviar el correo", {
+          userId: user.id,
+          emailTo,
+          status: emailSent.status,
+          code: emailSent.code,
+          message: emailSent.message,
+        });
         if (canExposeDevTwoFactorCode()) {
           logger.warn("[2FA] Fallback de desarrollo: código visible en la UI", { userId: user.id, code });
           return res.json({
@@ -312,7 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         return res.status(503).json({
-          message: `No pudimos enviar el código a ${emailMasked}. Verifica que el correo sea correcto o contacta al administrador.`,
+          message: twoFactorSendFailureMessage(emailMasked, emailSent),
         });
       }
 
@@ -384,15 +392,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     logger.info("[2FA] Reenviando código", { userId: user.id, emailTo, emailMasked });
 
-    const emailSent = await sendEmail({
+    const emailSent = await sendEmailResult({
       to: emailTo,
       subject: "Código de verificación - Cosmos Viajes",
       html: generate2FACodeEmailHtml(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
       text: generate2FACodeEmailText(code, user.name ?? undefined, TWO_FACTOR_CODE_EXPIRY_MINUTES),
     });
 
-    if (!emailSent) {
-      logger.error("[2FA] No se pudo reenviar el correo", { userId: user.id, emailTo });
+    if (!emailSent.ok) {
+      logger.error("[2FA] No se pudo reenviar el correo", {
+        userId: user.id,
+        emailTo,
+        status: emailSent.status,
+        code: emailSent.code,
+        message: emailSent.message,
+      });
       if (canExposeDevTwoFactorCode()) {
         logger.warn("[2FA] Fallback de desarrollo (reenvío): código visible en la UI", { userId: user.id, code });
         return res.json({
@@ -403,7 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       return res.status(503).json({
-        message: `No pudimos enviar el código a ${emailMasked}. Revisa spam o contacta al administrador.`,
+        message: twoFactorSendFailureMessage(emailMasked, emailSent),
       });
     }
 
