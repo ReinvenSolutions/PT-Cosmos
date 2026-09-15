@@ -55,3 +55,29 @@ export function maskEmail(email: string): string {
 export function canExposeDevTwoFactorCode(): boolean {
   return process.env.NODE_ENV === "development";
 }
+
+export type TwoFactorEmailFailure = {
+  code?: string;
+  message?: string;
+};
+
+/** Brevo con lista de IPs autorizadas rechaza Railway (IP dinámica). */
+export function isBrevoUnauthorisedIpFailure(failure: TwoFactorEmailFailure): boolean {
+  const blob = `${failure.code ?? ""} ${failure.message ?? ""}`.toLowerCase();
+  return (
+    blob.includes("unrecognised ip") ||
+    blob.includes("unrecognized ip") ||
+    blob.includes("authorised_ips") ||
+    blob.includes("authorized_ips")
+  );
+}
+
+export function twoFactorSendFailureMessage(
+  emailMasked: string,
+  failure?: TwoFactorEmailFailure,
+): string {
+  if (failure && isBrevoUnauthorisedIpFailure(failure)) {
+    return `No pudimos enviar el código a ${emailMasked} porque Brevo bloqueó la IP del servidor. Desactiva las IPs autorizadas en https://app.brevo.com/security/authorised_ips (Railway no tiene IP fija).`;
+  }
+  return `No pudimos enviar el código a ${emailMasked}. Verifica que el correo sea correcto o contacta al administrador.`;
+}

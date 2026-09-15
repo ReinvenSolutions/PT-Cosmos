@@ -1,51 +1,48 @@
 # Configurar Brevo para correos (2FA, recuperación, bienvenida)
 
-## ⚠️ Usar SMTP Key, NO la API Key
+## Usar la API Key (REST), no SMTP
 
-Brevo tiene dos tipos de credenciales. **Este proyecto usa SMTP**, no la API REST.
+Este proyecto envía correos con la **API de Brevo**. SMTP en Railway suele dar timeout.
 
 | Tipo | Uso | ¿Funciona aquí? |
 |------|-----|-----------------|
-| **SMTP Key** | Envío por SMTP (nodemailer) | ✅ Sí |
-| **API Key** | Llamadas REST a Brevo | ❌ No se usa |
+| **API Key** (`xkeysib-...`) | Llamadas REST a Brevo | ✅ Sí |
+| **SMTP Key** | Envío por SMTP | ❌ No se usa en producción |
+
+## ⚠️ No actives IPs autorizadas
+
+Si en Brevo activas [IPs autorizadas](https://app.brevo.com/security/authorised_ips), **el login de producción se rompe**: Railway no tiene IP fija y Brevo rechaza el envío del código 2FA.
+
+- Deja esa lista **desactivada** (o vacía).
+- No agregues solo tu IP de casa/oficina: eso bloquea Railway.
 
 ## Pasos en Brevo
 
 1. Entra a [Brevo](https://app.brevo.com) → **Configuración** (engranaje)
-2. **SMTP y API** → pestaña **SMTP**
-3. Genera una **clave SMTP** (o usa la existente)
-4. Copia esa clave
+2. **SMTP y API** → pestaña **API Keys**
+3. Crea o copia una **API Key** (empieza por `xkeysib-`)
+4. Confirma que el remitente `info@cosmosviajes.com` esté verificado
 
-## Variables en tu `.env`
+## Variables en Railway / `.env`
 
 ```env
-SMTP_HOST=smtp-relay.brevo.com
-SMTP_PORT=587
-SMTP_USER=info@cosmosviajes.com
-SMTP_PASS=xxxxxxxx
+BREVO_API_KEY=xkeysib-xxxxxxxx
 SMTP_FROM=info@cosmosviajes.com
 SMTP_FROM_NAME=Cosmos Viajes
 ```
-
-- **SMTP_USER**: Email de tu cuenta Brevo (remitente)
-- **SMTP_PASS**: La **clave SMTP** que generaste (no la API key)
 
 ## Verificar
 
 Al iniciar el servidor verás en consola:
 
-- `Email: ✓` → Configurado correctamente
-- `Email: ✗ (SMTP_USER/SMTP_PASS en .env)` → Faltan o son incorrectas
-
-## Si usaste la API Key por error
-
-La API Key de Brevo no sirve para SMTP. Debes generar la clave SMTP en la sección indicada.
+- `Email: ✓` → `BREVO_API_KEY` está definida
+- `Email: ✗ (BREVO_API_KEY en .env)` → Falta la API key
 
 ## Si el correo no llega (Railway, etc.)
 
-1. **Prueba puerto 465**: En Railway, cambia `SMTP_PORT=465`. Algunos entornos tienen problemas con 587.
-2. **Revisa logs**: Railway → Logs. Busca `[Email]` o `[2FA]`. Si ves "Error al enviar" con `code` o `response`, eso indica el fallo.
-3. **Spam**: Revisa carpeta de spam y filtros.
+1. **IPs autorizadas**: desactívalas en https://app.brevo.com/security/authorised_ips
+2. **Revisa logs**: Railway → Logs. Busca `[Email]` o `[2FA]`. Un `unauthorized` con "unrecognised IP" confirma el bloqueo de IP.
+3. **Spam**: revisa carpeta de spam y filtros.
 
 ## Probar que funciona
 
