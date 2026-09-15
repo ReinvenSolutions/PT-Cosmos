@@ -26,6 +26,7 @@ import { ensureDestinationPlanTaxesColumn } from "./ensure-destination-plan-taxe
 import { ensureCosmosAssistantNotesColumn } from "./ensure-cosmos-assistant-notes-column";
 import { ensureUserRoleRename } from "./ensure-user-role-rename";
 import { ensureUserMilesColumns } from "./ensure-user-miles-columns";
+import { ensureUserEnabledModulesColumn } from "./ensure-user-enabled-modules";
 import { ensureClientsUserIdColumn } from "./ensure-clients-user-id";
 import { ensureToolItinerariesTable } from "./ensure-tool-itineraries-table";
 import { seedDatabaseIfEmpty } from "./seed";
@@ -163,6 +164,7 @@ app.use((req, res, next) => {
     await ensureCosmosAssistantNotesColumn(pool);
     await ensureUserRoleRename(pool);
     await ensureUserMilesColumns(pool);
+    await ensureUserEnabledModulesColumn(pool);
     await ensureClientsUserIdColumn(pool);
     await ensureToolItinerariesTable(pool);
 

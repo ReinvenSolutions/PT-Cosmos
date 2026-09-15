@@ -52,6 +52,13 @@ export function canUseSmiles(programs: MilesProgramsAllowed): boolean {
   return programs === "smiles" || programs === "both";
 }
 
+export function milesProgramsFromFlags(lifeMiles: boolean, smiles: boolean): MilesProgramsAllowed {
+  if (lifeMiles && smiles) return "both";
+  if (lifeMiles) return "lifemiles";
+  if (smiles) return "smiles";
+  return "none";
+}
+
 export function resolveMilesProgramMarkup(
   program: MilesProgram,
   settings: {

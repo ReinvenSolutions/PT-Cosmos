@@ -30,6 +30,7 @@ export default function Login() {
   const [tempToken, setTempToken] = useState("");
   const [code2FA, setCode2FA] = useState("");
   const [twoFactorEmailHint, setTwoFactorEmailHint] = useState("");
+  const [devTwoFactorCode, setDevTwoFactorCode] = useState("");
   const [codeError, setCodeError] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const { user, isLoading: authLoading, login, verify2FA, resend2FA } = useAuth();
@@ -52,9 +53,11 @@ export default function Login() {
       if ("needs2FA" in result && result.needs2FA) {
         setTempToken(result.tempToken);
         setTwoFactorEmailHint(result.emailMasked || "");
+        setDevTwoFactorCode(result.devCode || "");
+        if (result.devCode) setCode2FA(result.devCode);
         setStep("2fa");
         toast({
-          title: "Código enviado",
+          title: result.devCode ? "Código de desarrollo" : "Código enviado",
           description: result.message || "Revisa tu correo para el código de verificación.",
         });
       } else if ("user" in result) {
@@ -97,6 +100,7 @@ export default function Login() {
     setTempToken("");
     setCode2FA("");
     setTwoFactorEmailHint("");
+    setDevTwoFactorCode("");
     setCodeError(false);
     setResendCooldown(0);
   };
@@ -114,9 +118,11 @@ export default function Login() {
       const result = await resend2FA(tempToken, username);
       setTempToken(result.tempToken);
       if (result.emailMasked) setTwoFactorEmailHint(result.emailMasked);
+      setDevTwoFactorCode(result.devCode || "");
+      if (result.devCode) setCode2FA(result.devCode);
       setResendCooldown(60);
       toast({
-        title: "Código reenviado",
+        title: result.devCode ? "Código de desarrollo" : "Código reenviado",
         description: result.message || "Revisa tu correo, incluida la carpeta de spam.",
       });
     } catch (error: unknown) {
@@ -208,9 +214,16 @@ export default function Login() {
                       " a tu correo"
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Revisa también spam o correo no deseado. El código vence en 10 minutos.
-                  </p>
+                  {devTwoFactorCode ? (
+                    <p className="text-sm font-medium text-foreground bg-muted rounded-md px-3 py-2">
+                      Brevo no pudo enviar el correo desde esta IP. Código de desarrollo:{" "}
+                      <span className="tracking-[0.3em] font-mono">{devTwoFactorCode}</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Revisa también spam o correo no deseado. El código vence en 10 minutos.
+                    </p>
+                  )}
                 </div>
                 <TwoFactorInput
                   value={code2FA}

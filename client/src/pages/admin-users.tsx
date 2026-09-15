@@ -54,6 +54,7 @@ import {
   Building2,
   Percent,
   Coins,
+  LayoutGrid,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,9 +65,18 @@ import {
   canUseLifeMiles,
   canUseSmiles,
   formatMilesMarkupShort,
+  milesProgramsFromFlags,
   normalizeMilesMarkupType,
   normalizeMilesProgramsAllowed,
 } from "@shared/milesCalculator";
+import {
+  USER_MODULE_DEFS,
+  USER_MODULES,
+  defaultEnabledModulesForRole,
+  normalizeEnabledModules,
+  reconcileMilesModuleAccess,
+  type EnabledModules,
+} from "@shared/modules";
 
 interface AdminUser {
   id: string;
@@ -85,6 +95,7 @@ interface AdminUser {
   milesMarkupTypeSmiles?: string | null;
   milesMarkupValueSmiles?: string | number | null;
   milesProgramsAllowed?: string | null;
+  enabledModules?: EnabledModules | null;
   createdAt: string;
 }
 
@@ -117,6 +128,18 @@ function generateRandomWord(): string {
   return CONFIRM_WORDS[Math.floor(Math.random() * CONFIRM_WORDS.length)];
 }
 
+function modulesSummary(user: AdminUser): string {
+  if (user.role === ROLE_IDS.SUPER_ADMIN) return "Todos";
+  const programs = normalizeMilesProgramsAllowed(user.milesProgramsAllowed);
+  const mods = reconcileMilesModuleAccess(
+    normalizeEnabledModules(user.enabledModules),
+    programs,
+  ).enabledModules;
+  const off = USER_MODULE_DEFS.filter((mod) => !mods[mod.id]).map((mod) => mod.label);
+  if (off.length === 0) return "Todos";
+  return `Off: ${off.join(", ")}`;
+}
+
 function milesSettingsSummary(user: AdminUser): string {
   const programs = normalizeMilesProgramsAllowed(user.milesProgramsAllowed);
   if (programs === "none") return "Ninguno";
@@ -137,6 +160,14 @@ function milesSettingsSummary(user: AdminUser): string {
   return parts.join(" · ");
 }
 
+function userContactLine(user: AdminUser): string {
+  const email = user.email?.trim();
+  if (!email || email.toLowerCase() === user.username.toLowerCase()) {
+    return user.username;
+  }
+  return `${user.username} · ${email}`;
+}
+
 export default function AdminUsers() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -147,6 +178,7 @@ export default function AdminUsers() {
   const [deleteUser, setDeleteUser] = useState<AdminUser | null>(null);
   const [discountUser, setDiscountUser] = useState<AdminUser | null>(null);
   const [milesSettingsUser, setMilesSettingsUser] = useState<AdminUser | null>(null);
+  const [modulesUser, setModulesUser] = useState<AdminUser | null>(null);
   const [confirmWord, setConfirmWord] = useState("");
   const [randomWord, setRandomWord] = useState("");
 
@@ -285,6 +317,33 @@ export default function AdminUsers() {
     },
   });
 
+  const modulesMutation = useMutation({
+    mutationFn: ({
+      id,
+      enabledModules,
+      milesProgramsAllowed,
+    }: {
+      id: string;
+      enabledModules: EnabledModules;
+      milesProgramsAllowed: MilesProgramsAllowed;
+    }) =>
+      apiRequest("PATCH", `/api/admin/users/${id}/modules`, {
+        enabledModules,
+        milesProgramsAllowed,
+      }),
+    onSuccess: () => {
+      invalidateUserLists();
+      setModulesUser(null);
+      toast({
+        title: "Módulos actualizados",
+        description: "El menú del usuario se actualizará al recargar la plataforma.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleOpenDelete = (user: AdminUser) => {
     setDeleteUser(user);
     setConfirmWord("");
@@ -315,67 +374,67 @@ export default function AdminUsers() {
   const pendingCount = users?.filter((u) => u.approvalStatus === "pending").length ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Usuarios</h1>
-          <p className="text-muted-foreground">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
+          <p className="text-sm text-muted-foreground">
             Gestiona usuarios, roles y permisos del sistema.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
           <UserPlus className="mr-2 h-4 w-4" />
           Nuevo Usuario
         </Button>
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Listado de Usuarios</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-base">Listado de Usuarios</CardTitle>
               <CardDescription>
                 {users?.length || 0} usuarios registrados
                 {pendingCount > 0 ? ` · ${pendingCount} pendiente${pendingCount === 1 ? "" : "s"} de aprobación` : ""}.
               </CardDescription>
             </div>
-            <div className="relative w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <div className="relative w-52 shrink-0 lg:w-64">
+              <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar por nombre, usuario o email..."
-                className="pl-8"
+                placeholder="Buscar nombre, usuario o email..."
+                className="h-8 pl-8"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
+        <CardContent className="px-2 pb-2 pt-0 md:px-4">
+          <Table className="[&_th]:h-9 [&_th]:px-3 [&_th]:text-xs [&_td]:px-3 [&_td]:py-2">
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
                 <TableHead>Usuario</TableHead>
-                <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Descuento</TableHead>
-                <TableHead>Cotizador millas</TableHead>
-                <TableHead>Aprobación</TableHead>
+                <TableHead>Millas</TableHead>
+                <TableHead>Módulos</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="w-10 text-right">
+                  <span className="sr-only">Acciones</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Cargando usuarios...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No se encontraron usuarios.
                   </TableCell>
                 </TableRow>
@@ -383,6 +442,9 @@ export default function AdminUsers() {
                 filteredUsers?.map((user) => {
                   const approval = approvalStatusLabel(user.approvalStatus);
                   const isPending = user.approvalStatus === "pending";
+                  const contactLine = userContactLine(user);
+                  const discountValue = Number(user.discountPercentage ?? 0);
+                  const milesSummary = milesSettingsSummary(user);
                   return (
                   <TableRow
                     key={user.id}
@@ -391,93 +453,129 @@ export default function AdminUsers() {
                       isPending && "bg-amber-500/5"
                     )}
                   >
-                    <TableCell className="font-medium">{user.name || "—"}</TableCell>
-                    <TableCell>{user.username}</TableCell>
-                    <TableCell>{user.email || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.role === "super_admin" ? "default" : "secondary"}>
+                    <TableCell className="max-w-[220px]">
+                      <div className="min-w-0">
+                        <div
+                          className="truncate font-medium leading-tight"
+                          title={user.name || user.username}
+                        >
+                          {user.name || "—"}
+                        </div>
+                        <div
+                          className="mt-0.5 truncate text-xs text-muted-foreground leading-tight"
+                          title={contactLine}
+                        >
+                          {contactLine}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Badge
+                        variant={user.role === "super_admin" ? "default" : "secondary"}
+                        className="px-1.5 py-0 text-[11px]"
+                      >
                         {ROLES.find((r) => r.value === user.role)?.label ?? user.role}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {user.role === ROLE_IDS.AGENCY || user.role === ROLE_IDS.PROVIDER ? (
                         <button
                           type="button"
                           onClick={() => setDiscountUser(user)}
-                          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                         >
-                          <Percent className="h-3.5 w-3.5" />
-                          {Number(user.discountPercentage ?? 0) > 0
-                            ? `${Number(user.discountPercentage)}%`
-                            : "Sin descuento"}
+                          <Percent className="h-3 w-3" />
+                          {discountValue > 0 ? `${discountValue}%` : "0%"}
                         </button>
                       ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {user.role === ROLE_IDS.AGENCY || user.role === ROLE_IDS.PROVIDER ? (
                         <button
                           type="button"
                           onClick={() => setMilesSettingsUser(user)}
-                          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          title={milesSummary}
                         >
-                          <Coins className="h-3.5 w-3.5" />
-                          {milesSettingsSummary(user)}
+                          <Coins className="h-3 w-3" />
+                          {milesSummary}
                         </button>
                       ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={approval.variant} className={isPending ? "border-amber-500/50 text-amber-700 dark:text-amber-400" : ""}>
-                        {isPending && <Clock className="mr-1 h-3 w-3" />}
-                        {approval.label}
-                      </Badge>
+                    <TableCell className="max-w-[180px]">
+                      {user.role === ROLE_IDS.SUPER_ADMIN ? (
+                        <span className="text-xs text-muted-foreground">Todos</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setModulesUser(user)}
+                          className="inline-flex max-w-full items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          title={modulesSummary(user)}
+                        >
+                          <LayoutGrid className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{modulesSummary(user)}</span>
+                        </button>
+                      )}
                     </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={user.isActive}
-                        onCheckedChange={(checked) =>
-                          toggleActiveMutation.mutate({ id: user.id, isActive: checked })
-                        }
-                        disabled={
-                          toggleActiveMutation.isPending ||
-                          currentUser?.id === user.id ||
-                          isPending
-                        }
-                      />
-                      <span className="ml-2 text-sm text-muted-foreground">
-                        {user.isActive ? "Activo" : "Inactivo"}
-                      </span>
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={approval.variant}
+                          className={cn(
+                            "px-1.5 py-0 text-[11px]",
+                            isPending && "border-amber-500/50 text-amber-700 dark:text-amber-400"
+                          )}
+                        >
+                          {isPending && <Clock className="mr-1 h-3 w-3" />}
+                          {approval.label}
+                        </Badge>
+                        <Switch
+                          checked={user.isActive}
+                          onCheckedChange={(checked) =>
+                            toggleActiveMutation.mutate({ id: user.id, isActive: checked })
+                          }
+                          disabled={
+                            toggleActiveMutation.isPending ||
+                            currentUser?.id === user.id ||
+                            isPending
+                          }
+                          aria-label={user.isActive ? "Activo" : "Inactivo"}
+                          title={user.isActive ? "Activo" : "Inactivo"}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       {isPending ? (
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-1">
                           <Button
                             size="sm"
                             variant="default"
+                            className="h-8 px-2"
                             onClick={() => approveMutation.mutate(user.id)}
                             disabled={approveMutation.isPending || denyMutation.isPending}
                           >
-                            <CheckCircle2 className="mr-1 h-4 w-4" />
+                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
                             Aprobar
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-destructive hover:text-destructive"
+                            className="h-8 px-2 text-destructive hover:text-destructive"
                             onClick={() => denyMutation.mutate(user.id)}
                             disabled={approveMutation.isPending || denyMutation.isPending}
                           >
-                            <XCircle className="mr-1 h-4 w-4" />
+                            <XCircle className="mr-1 h-3.5 w-3.5" />
                             Denegar
                           </Button>
                         </div>
                       ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -496,6 +594,12 @@ export default function AdminUsers() {
                             <DropdownMenuItem onClick={() => setMilesSettingsUser(user)}>
                               <Coins className="mr-2 h-4 w-4" />
                               Cotizador de millas
+                            </DropdownMenuItem>
+                          )}
+                          {user.role !== ROLE_IDS.SUPER_ADMIN && (
+                            <DropdownMenuItem onClick={() => setModulesUser(user)}>
+                              <LayoutGrid className="mr-2 h-4 w-4" />
+                              Módulos
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
@@ -546,6 +650,15 @@ export default function AdminUsers() {
           milesSettingsMutation.mutate({ id: milesSettingsUser.id, ...data })
         }
         isSubmitting={milesSettingsMutation.isPending}
+      />
+
+      <ModulesDialog
+        user={modulesUser}
+        onOpenChange={(open) => !open && setModulesUser(null)}
+        onSubmit={(data) =>
+          modulesUser && modulesMutation.mutate({ id: modulesUser.id, ...data })
+        }
+        isSubmitting={modulesMutation.isPending}
       />
 
       {/* Edit User Dialog */}
@@ -606,6 +719,158 @@ export default function AdminUsers() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function ModuleSwitchRow({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+  nested,
+}: {
+  id: string;
+  label: string;
+  description?: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  nested?: boolean;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between gap-4 rounded-lg border p-3", nested && "ml-6 border-dashed")}>
+      <div className="min-w-0">
+        <Label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </Label>
+        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
+
+function ModulesDialog({
+  user,
+  onOpenChange,
+  onSubmit,
+  isSubmitting,
+}: {
+  user: AdminUser | null;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { enabledModules: EnabledModules; milesProgramsAllowed: MilesProgramsAllowed }) => void;
+  isSubmitting: boolean;
+}) {
+  const [enabledModules, setEnabledModules] = useState<EnabledModules>(defaultEnabledModulesForRole("agency"));
+  const [lifeMilesOn, setLifeMilesOn] = useState(true);
+  const [smilesOn, setSmilesOn] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const programs = normalizeMilesProgramsAllowed(user.milesProgramsAllowed);
+    const reconciled = reconcileMilesModuleAccess(
+      normalizeEnabledModules(user.enabledModules ?? defaultEnabledModulesForRole(user.role)),
+      programs,
+    );
+    setEnabledModules(reconciled.enabledModules);
+    setLifeMilesOn(canUseLifeMiles(programs));
+    setSmilesOn(canUseSmiles(programs));
+  }, [user]);
+
+  if (!user) return null;
+
+  const toggleModule = (id: keyof EnabledModules, checked: boolean) => {
+    if (id === USER_MODULES.MILES_CALCULATOR) {
+      setEnabledModules((current) => ({ ...current, milesCalculator: checked }));
+      if (checked && !lifeMilesOn && !smilesOn) {
+        setLifeMilesOn(true);
+        setSmilesOn(true);
+      }
+      return;
+    }
+    setEnabledModules((current) => ({ ...current, [id]: checked }));
+  };
+
+  const toggleLifeMiles = (checked: boolean) => {
+    setLifeMilesOn(checked);
+    if (!checked && !smilesOn) {
+      setEnabledModules((current) => ({ ...current, milesCalculator: false }));
+    }
+  };
+
+  const toggleSmiles = (checked: boolean) => {
+    setSmilesOn(checked);
+    if (!checked && !lifeMilesOn) {
+      setEnabledModules((current) => ({ ...current, milesCalculator: false }));
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const milesProgramsAllowed = milesProgramsFromFlags(lifeMilesOn, smilesOn);
+    const reconciled = reconcileMilesModuleAccess(enabledModules, milesProgramsAllowed);
+    onSubmit({
+      enabledModules: reconciled.enabledModules,
+      milesProgramsAllowed: reconciled.milesProgramsAllowed,
+    });
+  };
+
+  return (
+    <Dialog open={!!user} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Módulos del usuario</DialogTitle>
+          <DialogDescription>
+            Elige qué ve <strong>{user.name || user.username}</strong> en el menú. Las rutas de los
+            módulos apagados también quedan bloqueadas.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {USER_MODULE_DEFS.map((mod) => (
+            <div key={mod.id} className="space-y-2">
+              <ModuleSwitchRow
+                id={`module-${mod.id}`}
+                label={mod.label}
+                description={mod.description}
+                checked={enabledModules[mod.id]}
+                onCheckedChange={(checked) => toggleModule(mod.id, checked)}
+              />
+              {mod.id === USER_MODULES.MILES_CALCULATOR && enabledModules.milesCalculator ? (
+                <div className="space-y-2">
+                  <ModuleSwitchRow
+                    nested
+                    id="module-lifemiles"
+                    label="LifeMiles"
+                    description="Calculadora de millas LifeMiles"
+                    checked={lifeMilesOn}
+                    onCheckedChange={toggleLifeMiles}
+                  />
+                  <ModuleSwitchRow
+                    nested
+                    id="module-smiles"
+                    label="Smiles"
+                    description="Calculadora de millas Smiles"
+                    checked={smilesOn}
+                    onCheckedChange={toggleSmiles}
+                  />
+                  <p className="ml-6 text-xs text-muted-foreground">
+                    Tiene que quedar al menos una calculadora encendida. Si apagas las dos, el módulo se apaga.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ))}
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Guardar módulos
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -680,7 +945,8 @@ function MilesSettingsDialog({
   }) => void;
   isSubmitting: boolean;
 }) {
-  const [milesProgramsAllowed, setMilesProgramsAllowed] = useState<MilesProgramsAllowed>("both");
+  const [lifeMilesOn, setLifeMilesOn] = useState(true);
+  const [smilesOn, setSmilesOn] = useState(true);
   const [lifemilesMarkupType, setLifemilesMarkupType] = useState<MilesMarkupType>("none");
   const [lifemilesMarkupValue, setLifemilesMarkupValue] = useState("0");
   const [smilesMarkupType, setSmilesMarkupType] = useState<MilesMarkupType>("none");
@@ -688,7 +954,9 @@ function MilesSettingsDialog({
 
   useEffect(() => {
     if (user) {
-      setMilesProgramsAllowed(normalizeMilesProgramsAllowed(user.milesProgramsAllowed));
+      const programs = normalizeMilesProgramsAllowed(user.milesProgramsAllowed);
+      setLifeMilesOn(canUseLifeMiles(programs));
+      setSmilesOn(canUseSmiles(programs));
       setLifemilesMarkupType(
         (user.milesMarkupTypeLifemiles as MilesMarkupType) ??
           (user.milesMarkupType as MilesMarkupType) ??
@@ -710,8 +978,9 @@ function MilesSettingsDialog({
 
   if (!user) return null;
 
-  const showLifeMilesMarkup = canUseLifeMiles(milesProgramsAllowed);
-  const showSmilesMarkup = canUseSmiles(milesProgramsAllowed);
+  const milesProgramsAllowed = milesProgramsFromFlags(lifeMilesOn, smilesOn);
+  const showLifeMilesMarkup = lifeMilesOn;
+  const showSmilesMarkup = smilesOn;
 
   const parseMarkupValue = (type: MilesMarkupType, raw: string): number | null => {
     const value = parseFloat(raw);
@@ -754,21 +1023,24 @@ function MilesSettingsDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Programas habilitados</Label>
-            <Select
-              value={milesProgramsAllowed}
-              onValueChange={(v) => setMilesProgramsAllowed(v as MilesProgramsAllowed)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Ninguno (sin acceso)</SelectItem>
-                <SelectItem value="both">LifeMiles y Smiles</SelectItem>
-                <SelectItem value="lifemiles">Solo LifeMiles</SelectItem>
-                <SelectItem value="smiles">Solo Smiles</SelectItem>
-              </SelectContent>
-            </Select>
+            <p className="text-sm font-medium">Programas habilitados</p>
+            <ModuleSwitchRow
+              id="miles-lifemiles"
+              label="LifeMiles"
+              checked={lifeMilesOn}
+              onCheckedChange={setLifeMilesOn}
+            />
+            <ModuleSwitchRow
+              id="miles-smiles"
+              label="Smiles"
+              checked={smilesOn}
+              onCheckedChange={setSmilesOn}
+            />
+            {!lifeMilesOn && !smilesOn ? (
+              <p className="text-xs text-muted-foreground">
+                Si ambas están apagadas, el módulo de millas también se apaga.
+              </p>
+            ) : null}
           </div>
           {showLifeMilesMarkup && (
             <MilesMarkupSection

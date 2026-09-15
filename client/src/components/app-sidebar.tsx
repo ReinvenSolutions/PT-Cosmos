@@ -37,7 +37,7 @@ import { useState, useRef, useEffect } from "react";
 import { AvatarCropInline } from "@/components/avatar-crop-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-import { canUseMilesCalculator, normalizeMilesProgramsAllowed } from "@shared/milesCalculator";
+import { canAccessMilesCalculator, canAccessModule, USER_MODULES } from "@shared/modules";
 
 function getInitials(name?: string | null, username?: string): string {
   if (name && name.trim()) {
@@ -328,11 +328,15 @@ export function AppSidebar() {
     ],
   };
 
+  const hasQuote = canAccessModule(user, USER_MODULES.QUOTE);
+  const hasQuoteExpress = canAccessModule(user, USER_MODULES.QUOTE_EXPRESS);
+  const hasDayCounter = canAccessModule(user, USER_MODULES.DAY_COUNTER);
+  const hasMiles = canAccessMilesCalculator(user);
+  const hasAcademy = canAccessModule(user, USER_MODULES.ACADEMY);
+
   const herramientasItems = [
-    { title: "Contador de días", url: "/herramientas/contador-dias", icon: Calendar },
-    ...(isAdmin || canUseMilesCalculator(normalizeMilesProgramsAllowed(user?.milesProgramsAllowed))
-      ? [{ title: "Calculadora de millas", url: "/herramientas/cotizador-millas", icon: Coins }]
-      : []),
+    ...(hasDayCounter ? [{ title: "Contador de días", url: "/herramientas/contador-dias", icon: Calendar }] : []),
+    ...(hasMiles ? [{ title: "Calculadora de millas", url: "/herramientas/cotizador-millas", icon: Coins }] : []),
   ];
 
   const herramientasSection = {
@@ -341,8 +345,8 @@ export function AppSidebar() {
   };
 
   const cotizacionesItems = [
-    { title: "Nueva cotización", url: "/", icon: Plane },
-    { title: "Cotización express", url: "/cotizacion-express", icon: Zap },
+    ...(hasQuote ? [{ title: "Nueva cotización", url: "/", icon: Plane }] : []),
+    ...(hasQuoteExpress ? [{ title: "Cotización express", url: "/cotizacion-express", icon: Zap }] : []),
   ];
 
   const misClientesItem = { title: "Mis clientes", url: "/mis-clientes", icon: Users };
@@ -362,11 +366,13 @@ export function AppSidebar() {
     items: cotizacionesItems,
   };
 
-  const sections = isAdmin
-    ? [adminSection, adminCotizacionesSection, herramientasSection, contenidoSection]
-    : isProvider
-      ? [providerPlansSection, providerCotizacionesSection, herramientasSection]
-      : [advisorSection, herramientasSection, contenidoSection];
+  const sections = (
+    isAdmin
+      ? [adminSection, adminCotizacionesSection, herramientasSection, contenidoSection]
+      : isProvider
+        ? [providerPlansSection, providerCotizacionesSection, herramientasSection, ...(hasAcademy ? [contenidoSection] : [])]
+        : [advisorSection, herramientasSection, ...(hasAcademy ? [contenidoSection] : [])]
+  ).filter((section) => section.items.length > 0);
 
   const isMenuActive = (url: string) => {
     if (url === "/tutoriales") return location.startsWith("/tutoriales");

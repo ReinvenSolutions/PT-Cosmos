@@ -44,6 +44,7 @@ const MIGRATIONS = [
   "0030_tool_itineraries.sql",
   "0031_user_miles_settings.sql",
   "0032_per_program_miles_markup.sql",
+  "0033_user_enabled_modules.sql",
 ];
 
 const SKIPPABLE_ERROR_CODES = new Set(["42701", "42P07", "42710", "42P16"]);
