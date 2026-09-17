@@ -24,6 +24,7 @@ import { ensureUserDiscountColumn } from "./ensure-user-discount-column";
 import { ensureDestinationAgencyColumns } from "./ensure-destination-agency-columns";
 import { ensureDestinationPlanTaxesColumn } from "./ensure-destination-plan-taxes-column";
 import { ensureCosmosAssistantNotesColumn } from "./ensure-cosmos-assistant-notes-column";
+import { ensureCosmosSessionsTables } from "./ensure-cosmos-sessions-tables";
 import { ensureUserRoleRename } from "./ensure-user-role-rename";
 import { ensureUserMilesColumns } from "./ensure-user-miles-columns";
 import { ensureUserEnabledModulesColumn } from "./ensure-user-enabled-modules";
@@ -31,6 +32,7 @@ import { ensureClientsUserIdColumn } from "./ensure-clients-user-id";
 import { ensureToolItinerariesTable } from "./ensure-tool-itineraries-table";
 import { seedDatabaseIfEmpty } from "./seed";
 import { startPriceTierExpirationScheduler } from "./services/expirePriceTiers";
+import { startCosmosAgentIfNeeded } from "./startCosmosAgent";
 
 /** Aplica migración 0008 (auth tokens, 2FA) si no existe. No bloquea el arranque. */
 function runAuthMigrationInBackground(pool: InstanceType<typeof Pool>) {
@@ -62,8 +64,8 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Needed for inline styles and Google Fonts
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      mediaSrc: ["'self'", "blob:", "https:"],
-      connectSrc: ["'self'"],
+      mediaSrc: ["'self'", "blob:", "https:", "mediastream:"],
+      connectSrc: ["'self'", "wss:", "https://*.livekit.cloud", "https://livekit.cloud"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"], // Allow Google Fonts
       // Sin esto, default-src 'self' bloquea iframes de YouTube (Academia digital, lecciones con video)
       frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
@@ -82,7 +84,7 @@ app.use(compression({
     return compression.filter(req, res);
   },
   level: 3,
-  threshold: 10240,
+  threshold: 1024,
 }));
 
 // Limit request body size to prevent DoS attacks
@@ -90,32 +92,34 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: false, limit: '5mb' }));
 
 const PgSession = ConnectPgSimple(session);
+const sessionMiddleware = session({
+  store: new PgSession({
+    pool,
+    tableName: "sessions",
+    createTableIfMissing: true,
+  }),
+  secret: env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: env.NODE_ENV === "production",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 24 * 60 * 60 * 1000,
+  },
+  proxy: env.NODE_ENV === "production",
+});
 
-app.use(
-  session({
-    store: new PgSession({
-      pool,
-      tableName: "sessions",
-      createTableIfMissing: true,
-    }),
-    secret: env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: env.NODE_ENV === "production",
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
-      // Domain should not be set - let the browser handle it automatically
-      // This ensures cookies work on custom domains
-    },
-    // Ensure session is saved on every response
-    proxy: env.NODE_ENV === "production",
-  })
-);
+function apiOnly(middleware: express.RequestHandler): express.RequestHandler {
+  return (req, res, next) => {
+    if (!req.path.startsWith("/api")) return next();
+    return middleware(req, res, next);
+  };
+}
 
-app.use(passport.initialize());
-app.use(passport.session());
+app.use(apiOnly(sessionMiddleware));
+app.use(apiOnly(passport.initialize()));
+app.use(apiOnly(passport.session()));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -162,6 +166,7 @@ app.use((req, res, next) => {
     await ensureDestinationAgencyColumns(pool);
     await ensureDestinationPlanTaxesColumn(pool);
     await ensureCosmosAssistantNotesColumn(pool);
+    await ensureCosmosSessionsTables(pool);
     await ensureUserRoleRename(pool);
     await ensureUserMilesColumns(pool);
     await ensureUserEnabledModulesColumn(pool);
@@ -215,6 +220,7 @@ app.use((req, res, next) => {
       const dbSource = dbUrl.includes("supabase.co") ? "Supabase" : dbUrl.includes("neon.tech") ? "Neon" : "PostgreSQL";
       const emailStatus = isEmailConfigured() ? "Email: ✓" : "Email: ✗ (BREVO_API_KEY en .env)";
       logger.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode | BD: ${dbSource} | ${emailStatus}`);
+      startCosmosAgentIfNeeded();
     });
   } catch (err) {
     logger.error("❌ Error fatal al iniciar el servidor", { err });

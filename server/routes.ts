@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import express from "express";
 import { generatePublicQuotePDF } from "./publicPdfGenerator";
 import passport from "./auth";
-import { requireAuth, requireRole, requireRoles, requirePlanManagers, requireModule } from "./middleware";
+import { requireAuth, requireRole, requireRoles, requirePlanManagers, requireModule, requireCosmosVoice } from "./middleware";
 import { ROLES, QUOTE_USER_ROLES } from "@shared/roles";
 import { toolItinerarySchema } from "@shared/toolItinerary";
 import { z } from "zod";
@@ -15,9 +15,16 @@ import {
   resolveAgencyDisplayName,
 } from "./utils/planAccess";
 import { ForbiddenError } from "./errors/AppError";
-import { authLimiter, publicPdfLimiter, apiLimiter, cosmosChatLimiter } from "./rateLimiter";
+import { authLimiter, publicPdfLimiter, apiLimiter, cosmosChatLimiter, cosmosVoiceLimiter } from "./rateLimiter";
 import { handleCosmosChat } from "./handlers/cosmosChat";
+import { handleCosmosVoiceToken } from "./handlers/cosmosVoiceToken";
+import {
+  handleCosmosSessionStats,
+  handleGetCosmosSessionMessages,
+  handleListCosmosSessions,
+} from "./handlers/cosmosSessions";
 import { isOpenAIConfigured } from "./services/openaiClient";
+import { isLiveKitConfigured } from "./services/livekit";
 import {
   getCosmosAssistantConfig,
   setCosmosAssistantConfig,
@@ -28,10 +35,10 @@ import { asyncHandler } from "./utils/asyncHandler";
 import { logger } from "./logger";
 import { quoteService } from "./services/quoteService";
 import { ValidationError, NotFoundError } from "./errors/AppError";
-import { getOrSetCache, CacheKeys, clearDestinationCache } from "./utils/cache";
+import { getOrSetCache, CacheKeys, clearDestinationCache, warmHotCaches } from "./utils/cache";
 import { pruneExpiredPriceTiers, todayYmdInColombia } from "@shared/priceTiers";
 import { expirePriceTiers } from "./services/expirePriceTiers";
-import { stripInternalDestinationFields, stripInternalDestinationFieldsList, stripInternalFieldsFromQuoteDestinations } from "./utils/destinationPublic";
+import { stripInternalDestinationFields, stripInternalFieldsFromQuoteDestinations, toPublicQuoteCatalogList } from "./utils/destinationPublic";
 import { sanitizeCosmosAssistantNotes } from "./utils/sanitize";
 import { db } from "./db";
 import { sql, eq, and, ne } from "drizzle-orm";
@@ -41,6 +48,8 @@ import { insertUserSchema, insertClientSchema, insertQuoteSchema, insertDestinat
 import { effectiveTrmFromBase, TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
 import { MILES_MARKUP_TYPES, MILES_PROGRAMS_ALLOWED, canUseLifeMiles, canUseMilesCalculator, canUseSmiles, normalizeMilesProgramsAllowed } from "@shared/milesCalculator";
 import {
+  canAccessCosmos,
+  canAccessCosmosVoice,
   defaultEnabledModulesForRole,
   normalizeEnabledModules,
   reconcileMilesModuleAccess,
@@ -980,17 +989,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/destinations", asyncHandler(async (req, res) => {
     const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
     const cacheKey = CacheKeys.destinations(isActive);
-    const destinations = await getOrSetCache(cacheKey, () => storage.getDestinations({ isActive }));
-    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
-    res.json(stripInternalDestinationFieldsList(destinations));
+    const destinations = await getOrSetCache(cacheKey, async () =>
+      toPublicQuoteCatalogList(await storage.getDestinations({ isActive })),
+    );
+    res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=120");
+    res.json(destinations);
   }));
 
   app.get("/api/destinations-previews", asyncHandler(async (req, res) => {
     const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
     const cacheKey = CacheKeys.destinationsPreviews(isActive);
     const data = await getOrSetCache(cacheKey, () => storage.getDestinationsWithPreviews({ isActive }));
-    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
-    res.json(stripInternalDestinationFieldsList(data));
+    res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=120");
+    res.json(data);
   }));
 
   app.get("/api/destinations/:id", asyncHandler(async (req, res) => {
@@ -1328,6 +1339,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dayCounter: z.boolean(),
         milesCalculator: z.boolean(),
         academy: z.boolean(),
+        cosmos: z.boolean(),
+        cosmosVoice: z.boolean(),
       }),
       milesProgramsAllowed: z.enum(MILES_PROGRAMS_ALLOWED).optional(),
     });
@@ -1911,15 +1924,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(stats);
   }));
 
-  app.get("/api/cosmos/status", requireRoles([...QUOTE_USER_ROLES]), (_req, res) => {
-    res.json({ available: isOpenAIConfigured(), name: "Cosmos" });
+  app.get("/api/cosmos/status", requireRoles([...QUOTE_USER_ROLES]), (req, res) => {
+    const user = req.user as User;
+    const hasCosmos = canAccessCosmos(user);
+    const hasVoice = canAccessCosmosVoice(user);
+    res.json({
+      available: hasCosmos && isOpenAIConfigured(),
+      voiceAvailable: hasCosmos && hasVoice && isOpenAIConfigured() && isLiveKitConfigured(),
+      name: "Cosmos",
+    });
   });
 
   app.post(
     "/api/cosmos/chat",
     requireRoles([...QUOTE_USER_ROLES]),
+    requireModule(USER_MODULES.COSMOS),
     cosmosChatLimiter,
     asyncHandler(handleCosmosChat)
+  );
+
+  app.post(
+    "/api/cosmos/voice/token",
+    requireRoles([...QUOTE_USER_ROLES]),
+    requireModule(USER_MODULES.COSMOS),
+    requireCosmosVoice,
+    cosmosVoiceLimiter,
+    asyncHandler(handleCosmosVoiceToken)
+  );
+
+  app.get(
+    "/api/admin/cosmos-sessions/stats",
+    requireRole("super_admin"),
+    asyncHandler(handleCosmosSessionStats)
+  );
+  app.get(
+    "/api/admin/cosmos-sessions",
+    requireRole("super_admin"),
+    asyncHandler(handleListCosmosSessions)
+  );
+  app.get(
+    "/api/admin/cosmos-sessions/:id",
+    requireRole("super_admin"),
+    asyncHandler(handleGetCosmosSessionMessages)
   );
 
   app.get("/api/settings/global-trm", requireRoles([...QUOTE_USER_ROLES]), asyncHandler(async (req, res) => {
@@ -2254,6 +2300,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   registerTutorialRoutes(app);
+
+  warmHotCaches(
+    () => storage.getDestinationsWithPreviews({ isActive: true }),
+    async () => toPublicQuoteCatalogList(await storage.getDestinations({ isActive: true })),
+  );
 
   const httpServer = createServer(app);
   return httpServer;

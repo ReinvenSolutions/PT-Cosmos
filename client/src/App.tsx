@@ -7,7 +7,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { QUOTE_USER_ROLES } from "@shared/roles";
 import { canAccessMilesCalculator, canAccessModule, USER_MODULES, type UserModuleId } from "@shared/modules";
 import { getPostLoginPath } from "@/lib/authUtils";
@@ -42,6 +41,9 @@ const AdminTutorialsMetricas = lazy(() => import("@/pages/admin-tutorials-metric
 const AdminCosmosConfig = lazy(() => import("@/pages/admin-cosmos-config"));
 const ToolsDayCounter = lazy(() => import("@/pages/tools-day-counter"));
 const ToolsMilesCalculator = lazy(() => import("@/pages/tools-miles-calculator"));
+const DashboardLayout = lazy(() =>
+  import("@/components/dashboard-layout").then((m) => ({ default: m.DashboardLayout })),
+);
 
 function ProtectedRoute({
   component: Component,
@@ -81,11 +83,13 @@ function ProtectedRoute({
   }
 
   return (
-    <DashboardLayout>
-      <Suspense fallback={<RouteLoadingFallback />}>
-        <Component />
-      </Suspense>
-    </DashboardLayout>
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <DashboardLayout>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Component />
+        </Suspense>
+      </DashboardLayout>
+    </Suspense>
   );
 }
 
@@ -122,6 +126,9 @@ function AppRoutes() {
     <Router>
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center" aria-label="Cargando"><Loader2 className="h-10 w-10 animate-spin text-muted-foreground" /></div>}>
     <Switch>
+      <Route path="/index.html">
+        <Redirect to="/" />
+      </Route>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
@@ -11,10 +11,16 @@
         document.documentElement.classList.toggle('dark', theme === 'dark');
       })();
     </script>
+    <style>
+      html, body, #root { min-height: 100%; margin: 0; }
+      html:not(.dark) { background: #e8eef0; }
+      html.dark { background: #0d171b; }
+    </style>
     <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: blob: https:; worker-src 'self' blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="dns-prefetch" href="https://himyxbrdsnxryetlogzk.supabase.co">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>

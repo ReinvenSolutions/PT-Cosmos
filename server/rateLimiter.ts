@@ -30,6 +30,14 @@ export const cosmosChatLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+export const cosmosVoiceLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDevelopment ? 80 : 20,
+  message: "Demasiadas sesiones de voz de Cosmos. Espera un momento e intenta de nuevo.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // General API rate limiter
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

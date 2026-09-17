@@ -38,7 +38,8 @@ Cada plan incluye: nombre, país, duración, descripción, precio base USD, esca
 3. Pasajeros y precio por tramo/fecha.
 4. Vuelos, equipaje, upgrades (Turquía, Italia, etc.) si aplican.
 5. TRM para precio en COP.
-6. Guardar cotización y generar **PDF** para el cliente.
+6. Guardar cotización (asociada a un cliente) y generar **PDF** para el cliente. Cosmos puede guardar el borrador si el asesor lo pide; si pide una cotización nueva, debe preguntar si guarda la actual.
+7. Si sales a la ficha de un plan (/plan/:id) el borrador se conserva: al volver a /cotizacion reaparecen fecha, pax, vuelos, PVP, etc.
 
 ### Detalle de plan (/plan/:id)
 Itinerario completo, hoteles, qué incluye/no incluye, mapa, galerías, audio descriptivo descargable.

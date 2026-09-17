@@ -41,6 +41,11 @@ export async function getOrSetCache<T>(
 }
 
 // Clear cache for a destination when it's updated
+export function warmHotCaches(fetchPreviews: () => Promise<unknown>, fetchCatalog: () => Promise<unknown>) {
+  void getOrSetCache(CacheKeys.destinationsPreviews(true), fetchPreviews).catch(() => {});
+  void getOrSetCache(CacheKeys.destinations(true), fetchCatalog).catch(() => {});
+}
+
 export function clearDestinationCache(destinationId: string) {
   cache.del(CacheKeys.destination(destinationId));
   cache.del(CacheKeys.itinerary(destinationId));

@@ -44,6 +44,7 @@ import {
   type TutorialLessonProgress,
 } from "@shared/schema";
 import type { EnabledModules } from "@shared/modules";
+import { toDestinationCardPreview, type DestinationCardPreview } from "@shared/destinationCatalog";
 import { toolItineraries, type ToolItinerary } from "@shared/toolItinerary";
 import {
   DEFAULT_USD_PER_1000_LIFEMILES,
@@ -72,7 +73,7 @@ import { ValidationError } from "./errors/AppError";
 export interface IStorage {
   getDestinations(params?: { isActive?: boolean; createdByUserId?: string }): Promise<Destination[]>;
   getDestination(id: string): Promise<Destination | undefined>;
-  getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<Array<Destination & { hotels: Hotel[]; itinerary: ItineraryDay[] }>>;
+  getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<DestinationCardPreview[]>;
   createDestination(data: InsertDestination): Promise<Destination>;
   updateDestination(id: string, data: Partial<InsertDestination>): Promise<Destination>;
   deleteDestination(id: string): Promise<void>;
@@ -267,38 +268,40 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  /** Destinos activos con hoteles e itinerario en una sola operación (evita N+1 requests) */
-  async getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<
-    Array<Destination & { hotels: Hotel[]; itinerary: ItineraryDay[] }>
-  > {
+  /** Catálogo de home: columnas de tarjeta + estrellas/comidas, sin itinerarios ni galerías. */
+  async getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<DestinationCardPreview[]> {
     const dests = await this.getDestinations(params ?? { isActive: true });
     if (dests.length === 0) return [];
 
     const ids = dests.map((d) => d.id);
-    const [allHotels, allItinerary] = await Promise.all([
-      db.select().from(hotels).where(inArray(hotels.destinationId, ids)),
-      db.select().from(itineraryDays).where(inArray(itineraryDays.destinationId, ids)).orderBy(itineraryDays.dayNumber),
+    const [hotelCats, mealRows] = await Promise.all([
+      db
+        .select({ destinationId: hotels.destinationId, category: hotels.category })
+        .from(hotels)
+        .where(inArray(hotels.destinationId, ids)),
+      db
+        .select({ destinationId: itineraryDays.destinationId, meals: itineraryDays.meals })
+        .from(itineraryDays)
+        .where(inArray(itineraryDays.destinationId, ids)),
     ]);
 
-    const hotelsByDest = new Map<string, Hotel[]>();
-    for (const h of allHotels) {
+    const hotelsByDest = new Map<string, Array<{ category: string | null }>>();
+    for (const h of hotelCats) {
       const list = hotelsByDest.get(h.destinationId) ?? [];
-      list.push(h);
+      list.push({ category: h.category });
       hotelsByDest.set(h.destinationId, list);
     }
 
-    const itineraryByDest = new Map<string, ItineraryDay[]>();
-    for (const d of allItinerary) {
+    const itineraryByDest = new Map<string, Array<{ meals: string[] | null }>>();
+    for (const d of mealRows) {
       const list = itineraryByDest.get(d.destinationId) ?? [];
-      list.push(d);
+      list.push({ meals: d.meals });
       itineraryByDest.set(d.destinationId, list);
     }
 
-    return dests.map((dest) => ({
-      ...dest,
-      hotels: hotelsByDest.get(dest.id) ?? [],
-      itinerary: itineraryByDest.get(dest.id) ?? [],
-    }));
+    return dests.map((dest) =>
+      toDestinationCardPreview(dest, hotelsByDest.get(dest.id) ?? [], itineraryByDest.get(dest.id) ?? []),
+    );
   }
 
   async getItineraryDays(destinationId: string): Promise<ItineraryDay[]> {

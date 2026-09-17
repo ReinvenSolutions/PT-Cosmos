@@ -3,6 +3,55 @@ import { DAVIVIENDA_CARD_COMMISSION_PERCENT } from "./externalServices";
 
 export const COSMOS_ASSISTANT_CONFIG_KEY = "cosmos_assistant_config";
 
+/** Voces TTS de OpenAI compatibles con el agente de voz (LiveKit). */
+export const COSMOS_TTS_VOICES = [
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "fable",
+  "nova",
+  "onyx",
+  "sage",
+  "shimmer",
+] as const;
+
+export type CosmosTtsVoice = (typeof COSMOS_TTS_VOICES)[number];
+
+export const cosmosTtsVoiceSchema = z.enum(COSMOS_TTS_VOICES);
+
+export const COSMOS_TTS_VOICE_OPTIONS: {
+  value: CosmosTtsVoice;
+  label: string;
+  description: string;
+}[] = [
+  { value: "nova", label: "Nova", description: "Femenina, brillante (por defecto)" },
+  { value: "coral", label: "Coral", description: "Femenina, cercana" },
+  { value: "shimmer", label: "Shimmer", description: "Femenina, suave" },
+  { value: "sage", label: "Sage", description: "Neutra, profesional" },
+  { value: "alloy", label: "Alloy", description: "Neutra, clara" },
+  { value: "ballad", label: "Ballad", description: "Cálida, narrativa" },
+  { value: "echo", label: "Echo", description: "Masculina, serena" },
+  { value: "onyx", label: "Onyx", description: "Masculina, profunda" },
+  { value: "ash", label: "Ash", description: "Masculina, grave" },
+  { value: "fable", label: "Fable", description: "Expresiva; menos natural en español" },
+];
+
+/** Código ISO para Whisper / transcripción. */
+export const COSMOS_STT_LANGUAGE = "es";
+
+/** Modelo TTS con instrucciones de acento (tts-1 no las respeta). */
+export const COSMOS_TTS_MODEL = "gpt-4o-mini-tts";
+
+/** Instrucciones de síntesis: el modelo TTS las sigue mejor en inglés. */
+export const COSMOS_TTS_INSTRUCTIONS =
+  "Speak exclusively in fluent Latin American Spanish, Colombian accent, using natural conversational tú. Warm, clear, professional. Never switch to English, even for a single phrase. Pronounce Spanish with Spanish phonetics (not English). Read numbers, prices, dates and currencies in Spanish (dólares, pesos). Keep destination names in their Spanish form when that is how Colombians say them (Turquía, Dubái, Egipto).";
+
+/** Solo lo aceptan gpt-transcribe / gpt-live-transcribe. El STT por defecto de LiveKit (gpt-realtime-whisper) lo rechaza y cierra la sesión. */
+export const COSMOS_STT_PROMPT =
+  "Transcribe en español latino de Colombia. Conversación de agencia de viajes: planes, cotizaciones, TRM, destinos, pasajeros, bloqueos.";
+
 export const cosmosAssistantConfigSchema = z.object({
   identity: z.string().min(1).max(2000),
   personality: z.string().min(1).max(4000),
@@ -11,11 +60,13 @@ export const cosmosAssistantConfigSchema = z.object({
   strategicContext: z.string().max(50000),
   temperature: z.number().min(0).max(1),
   maxTokens: z.number().int().min(200).max(4000),
+  voice: cosmosTtsVoiceSchema,
 });
 
 export type CosmosAssistantConfig = z.infer<typeof cosmosAssistantConfigSchema>;
 
-export const DEFAULT_COSMOS_ASSISTANT_RULES = `1. Responde SOLO con información del contexto (planes, precios, itinerarios, inclusiones, tooltips de tarjetas, recomendaciones PDF, contacto de la agencia, pagos, asistencia médica, app). Si no está en el contexto, dilo con honestidad y sugiere qué puede hacer en la app o contactar al equipo operativo.
+export const DEFAULT_COSMOS_ASSISTANT_RULES = `0. **Idioma**: responde SIEMPRE en español latino de Colombia (tuteo). Nunca uses inglés, aunque el usuario hable o escriba en inglés, la transcripción venga en inglés o los nombres de herramientas estén en inglés. Explica términos técnicos en español.
+1. Responde SOLO con información del contexto (planes, precios, itinerarios, inclusiones, tooltips de tarjetas, recomendaciones PDF, contacto de la agencia, pagos, asistencia médica, app). Si no está en el contexto, dilo con honestidad y sugiere qué puede hacer en la app o contactar al equipo operativo.
 2. Para precios: indica USD del plan y menciona que el valor en COP depende de la TRM del cotizador si aplica.
 3. Para soporte técnico: da pasos numerados y la ruta del menú (ej. "Nueva cotización" en el sidebar).
 4. No inventes planes, fechas, hoteles ni políticas.
@@ -35,13 +86,14 @@ export const DEFAULT_COSMOS_ASSISTANT_CONFIG: CosmosAssistantConfig = {
   identity:
     "Eres **Cosmos**, el asistente virtual de Cosmos Mayorista dentro de la plataforma ViajeRapido.",
   personality:
-    "Personalidad: cálido, profesional, paciente y orientado a servicio. Respuestas claras y útiles, sin rodeos innecesarios. Usa español de Colombia.",
+    "Personalidad: cálido, profesional, paciente y orientado a servicio. Respuestas claras y útiles, sin rodeos innecesarios. Habla siempre en español latino de Colombia (tuteo), de forma fluida y natural. Nunca respondas en inglés.",
   userGreetingHint:
     "SIEMPRE dirígete por su nombre en la primera frase cuando sea natural (ej. \"Hola {firstName},\" o \"{firstName}, con gusto te explico...\").",
   rules: DEFAULT_COSMOS_ASSISTANT_RULES,
   strategicContext: "",
   temperature: 0.55,
   maxTokens: 1200,
+  voice: "nova",
 };
 
 export type CosmosAssistantConfigResponse = CosmosAssistantConfig & {
@@ -62,6 +114,9 @@ export function mergeCosmosAssistantConfig(
     temperature:
       partial.temperature ?? DEFAULT_COSMOS_ASSISTANT_CONFIG.temperature,
     maxTokens: partial.maxTokens ?? DEFAULT_COSMOS_ASSISTANT_CONFIG.maxTokens,
+    voice: cosmosTtsVoiceSchema.safeParse(partial.voice).success
+      ? (partial.voice as CosmosTtsVoice)
+      : DEFAULT_COSMOS_ASSISTANT_CONFIG.voice,
   };
 }
 
