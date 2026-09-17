@@ -1015,3 +1015,23 @@
       0 0 0 1px hsl(191 46% 60% / 0.2);
   }
 }
+
+@keyframes cosmos-highlight-pulse {
+  0% { box-shadow: 0 0 0 0 hsl(24 95% 48% / 0.55); }
+  70% { box-shadow: 0 0 0 10px hsl(24 95% 48% / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(24 95% 48% / 0); }
+}
+
+.cosmos-highlighted {
+  outline: 2px solid hsl(24 95% 48%);
+  outline-offset: 4px;
+  border-radius: 12px;
+  animation: cosmos-highlight-pulse 1.2s ease-out 2;
+}
+
+input.cosmos-highlighted,
+button.cosmos-highlighted,
+textarea.cosmos-highlighted {
+  border-radius: 8px;
+  outline-offset: 2px;
+}

@@ -74,6 +74,7 @@ import {
   USER_MODULES,
   defaultEnabledModulesForRole,
   normalizeEnabledModules,
+  reconcileCosmosModuleAccess,
   reconcileMilesModuleAccess,
   type EnabledModules,
 } from "@shared/modules";
@@ -136,6 +137,7 @@ function modulesSummary(user: AdminUser): string {
     programs,
   ).enabledModules;
   const off = USER_MODULE_DEFS.filter((mod) => !mods[mod.id]).map((mod) => mod.label);
+  if (mods.cosmos && !mods.cosmosVoice) off.push("Cosmos voz");
   if (off.length === 0) return "Todos";
   return `Off: ${off.join(", ")}`;
 }
@@ -336,7 +338,7 @@ export default function AdminUsers() {
       setModulesUser(null);
       toast({
         title: "Módulos actualizados",
-        description: "El menú del usuario se actualizará al recargar la plataforma.",
+        description: "Los cambios se aplican al recargar la plataforma.",
       });
     },
     onError: (err: Error) => {
@@ -788,6 +790,10 @@ function ModulesDialog({
       }
       return;
     }
+    if (id === USER_MODULES.COSMOS) {
+      setEnabledModules((current) => reconcileCosmosModuleAccess({ ...current, cosmos: checked }));
+      return;
+    }
     setEnabledModules((current) => ({ ...current, [id]: checked }));
   };
 
@@ -810,7 +816,7 @@ function ModulesDialog({
     const milesProgramsAllowed = milesProgramsFromFlags(lifeMilesOn, smilesOn);
     const reconciled = reconcileMilesModuleAccess(enabledModules, milesProgramsAllowed);
     onSubmit({
-      enabledModules: reconciled.enabledModules,
+      enabledModules: reconcileCosmosModuleAccess(reconciled.enabledModules),
       milesProgramsAllowed: reconciled.milesProgramsAllowed,
     });
   };
@@ -821,8 +827,8 @@ function ModulesDialog({
         <DialogHeader>
           <DialogTitle>Módulos del usuario</DialogTitle>
           <DialogDescription>
-            Elige qué ve <strong>{user.name || user.username}</strong> en el menú. Las rutas de los
-            módulos apagados también quedan bloqueadas.
+            Elige qué ve <strong>{user.name || user.username}</strong>. Las rutas de los
+            módulos apagados quedan bloqueadas. Cosmos aparece como asistente, no en el menú.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -856,6 +862,20 @@ function ModulesDialog({
                   <p className="ml-6 text-xs text-muted-foreground">
                     Tiene que quedar al menos una calculadora encendida. Si apagas las dos, el módulo se apaga.
                   </p>
+                </div>
+              ) : null}
+              {mod.id === USER_MODULES.COSMOS && enabledModules.cosmos ? (
+                <div className="space-y-2">
+                  <ModuleSwitchRow
+                    nested
+                    id="module-cosmos-voice"
+                    label="Voz"
+                    description="Hablar con Cosmos. Si está apagado, solo chat de texto."
+                    checked={enabledModules.cosmosVoice}
+                    onCheckedChange={(checked) =>
+                      setEnabledModules((current) => ({ ...current, cosmosVoice: checked }))
+                    }
+                  />
                 </div>
               ) : null}
             </div>

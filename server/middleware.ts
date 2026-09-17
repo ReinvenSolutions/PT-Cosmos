@@ -1,6 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
 import { PLAN_MANAGER_ROLES } from "@shared/roles";
-import { canAccessModule, type ModuleAccessUser, type UserModuleId } from "@shared/modules";
+import {
+  canAccessCosmosVoice,
+  canAccessModule,
+  type ModuleAccessUser,
+  type UserModuleId,
+} from "@shared/modules";
 
 declare global {
   namespace Express {
@@ -66,6 +71,19 @@ export function requireModule(moduleId: UserModuleId) {
 
     next();
   };
+}
+
+export function requireCosmosVoice(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "No autenticado" });
+  }
+
+  const user = req.user as ModuleAccessUser;
+  if (!canAccessCosmosVoice(user)) {
+    return res.status(403).json({ message: "Voz de Cosmos no habilitada" });
+  }
+
+  next();
 }
 
 /** Super admin o proveedor (gestión de planes con reglas de propiedad en las rutas). */

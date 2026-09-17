@@ -1,15 +1,21 @@
 import type { Request, Response } from "express";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { User } from "@shared/schema";
-import {
-  applyCosmosConfigTemplates,
-  buildCosmosUserGreetingLine,
-  type CosmosAssistantConfig,
-} from "@shared/cosmosAssistantConfig";
+import type OpenAI from "openai";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { CosmosAssistantConfig } from "@shared/cosmosAssistantConfig";
 import { getOpenAIClient, isOpenAIConfigured } from "../services/openaiClient";
 import { buildCosmosSystemContext, type CosmosChatMessage } from "../services/cosmosKnowledge";
 import { getCosmosAssistantConfig } from "../services/cosmosAssistantConfigService";
+import { buildCosmosSystemPrompt } from "../services/cosmosBrain";
+import { executeCosmosTool, openaiCosmosToolsForRole, type CosmosToolContext } from "../services/cosmosTools";
+import {
+  appendCosmosSessionMessage,
+  ensureCosmosSession,
+} from "../services/cosmosSessionService";
 import { logger } from "../logger";
+import { parseCosmosClientAction, cosmosScreenContextSchema, parseCosmosCaseBrief, type CosmosClientAction } from "@shared/cosmosAgent";
 
 const chatBodySchema = z.object({
   messages: z
@@ -22,40 +28,107 @@ const chatBodySchema = z.object({
     .min(1)
     .max(24),
   currentPlanId: z.string().uuid().optional(),
+  sessionId: z.string().uuid().optional(),
+  screen: cosmosScreenContextSchema.optional(),
 });
 
-function displayName(user: User): string {
-  const name = user.name?.trim();
-  if (name) return name.split(/\s+/)[0];
-  return user.username;
+function writeSse(res: Response, payload: Record<string, unknown>) {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  const flushable = res as Response & { flush?: () => void };
+  flushable.flush?.();
 }
 
-function buildSystemPrompt(user: User, knowledge: string, config: CosmosAssistantConfig): string {
-  const firstName = displayName(user);
-  const roleLabel =
-    user.role === "super_admin"
-      ? "administrador"
-      : user.role === "provider"
-        ? "proveedor"
-        : "agencia";
+type StreamedToolCall = { id: string; name: string; arguments: string };
 
-  const identity = applyCosmosConfigTemplates(config.identity);
-  const personality = applyCosmosConfigTemplates(config.personality);
-  const rules = applyCosmosConfigTemplates(config.rules);
-  const greeting = buildCosmosUserGreetingLine(firstName, roleLabel, config.userGreetingHint);
+async function runToolLoop(
+  client: OpenAI,
+  seed: ChatCompletionMessageParam[],
+  config: CosmosAssistantConfig,
+  toolCtx: CosmosToolContext,
+  onAction: (action: CosmosClientAction) => void,
+  onContent: (text: string) => void
+): Promise<{ content: string; actions: CosmosClientAction[] }> {
+  const messages: ChatCompletionMessageParam[] = [...seed];
+  const actions: CosmosClientAction[] = [];
 
-  return `${identity}
+  for (let round = 0; round < 4; round++) {
+    const stream = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      temperature: config.temperature,
+      max_tokens: config.maxTokens,
+      tools: openaiCosmosToolsForRole(toolCtx.userRole),
+      tool_choice: "auto",
+      stream: true,
+    });
 
-${personality}
+    let content = "";
+    let mode: "unknown" | "tools" | "text" = "unknown";
+    const toolCalls: StreamedToolCall[] = [];
 
-${greeting}
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      if (!delta) continue;
+      const toolDeltas = delta.tool_calls ?? [];
+      if (mode === "unknown") {
+        if (toolDeltas.length) mode = "tools";
+        else if (typeof delta.content === "string" && delta.content.length) mode = "text";
+      }
+      if (mode === "tools" && toolDeltas.length) {
+        for (const tc of toolDeltas) {
+          const idx = tc.index ?? toolCalls.length;
+          if (!toolCalls[idx]) toolCalls[idx] = { id: "", name: "", arguments: "" };
+          if (tc.id) toolCalls[idx].id = tc.id;
+          if (tc.function?.name) toolCalls[idx].name += tc.function.name;
+          if (tc.function?.arguments) toolCalls[idx].arguments += tc.function.arguments;
+        }
+      }
+      if (mode === "text" && typeof delta.content === "string" && delta.content) {
+        content += delta.content;
+        onContent(delta.content);
+      }
+    }
 
-Reglas:
-${rules}
+    const functionCalls = toolCalls.filter((tc) => tc.name);
+    if (functionCalls.length) {
+      messages.push({
+        role: "assistant",
+        content: content || null,
+        tool_calls: functionCalls.map((tc) => ({
+          id: tc.id,
+          type: "function" as const,
+          function: { name: tc.name, arguments: tc.arguments || "{}" },
+        })),
+      });
 
-Contexto actualizado de la base de datos y la aplicación:
+      for (const call of functionCalls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.arguments || "{}") as Record<string, unknown>;
+        } catch {
+          args = {};
+        }
+        const executed = await executeCosmosTool(call.name, args, toolCtx);
+        if (executed.action) {
+          actions.push(executed.action);
+          onAction(executed.action);
+        }
+        messages.push({
+          role: "tool",
+          tool_call_id: call.id,
+          content: executed.result,
+        });
+      }
+      continue;
+    }
 
-${knowledge}`;
+    return { content: content.trim(), actions };
+  }
+
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  const lastContent =
+    lastAssistant && typeof lastAssistant.content === "string" ? lastAssistant.content.trim() : "";
+  return { content: lastContent, actions };
 }
 
 export async function handleCosmosChat(req: Request, res: Response): Promise<void> {
@@ -68,7 +141,7 @@ export async function handleCosmosChat(req: Request, res: Response): Promise<voi
   }
 
   const user = req.user as User;
-  const { messages, currentPlanId } = chatBodySchema.parse(req.body);
+  const { messages, currentPlanId, sessionId: clientSessionId, screen } = chatBodySchema.parse(req.body);
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   if (!lastUser) {
     res.status(400).json({ message: "Se requiere al menos un mensaje del usuario." });
@@ -81,19 +154,38 @@ export async function handleCosmosChat(req: Request, res: Response): Promise<voi
     return;
   }
 
+  const sessionId = clientSessionId ?? randomUUID();
   const history = messages.slice(0, -1) as CosmosChatMessage[];
+  const session = await ensureCosmosSession({
+    id: sessionId,
+    userId: user.id,
+    channel: "text",
+    currentPlanId: currentPlanId ?? screen?.planId ?? null,
+  });
+  const brief = parseCosmosCaseBrief((session.metadata as Record<string, unknown> | null)?.brief);
+  const toolCtx: CosmosToolContext = {
+    userId: user.id,
+    userRole: user.role,
+    userName: user.name ?? user.username,
+    sessionId,
+    screen,
+    enabledModules: user.enabledModules,
+    milesProgramsAllowed: user.milesProgramsAllowed,
+  };
   const [knowledge, cosmosConfig] = await Promise.all([
     buildCosmosSystemContext({
       userMessage: lastUser.content,
       history,
-      currentPlanId,
+      currentPlanId: currentPlanId ?? screen?.planId,
       userRole: user.role,
+      screen,
+      brief,
     }),
     getCosmosAssistantConfig(),
   ]);
 
-  const openaiMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-    { role: "system", content: buildSystemPrompt(user, knowledge, cosmosConfig) },
+  const openaiMessages: ChatCompletionMessageParam[] = [
+    { role: "system", content: buildCosmosSystemPrompt({ user, knowledge, config: cosmosConfig, channel: "text" }) },
     ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
   ];
 
@@ -101,23 +193,28 @@ export async function handleCosmosChat(req: Request, res: Response): Promise<voi
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders?.();
+  writeSse(res, { sessionId });
 
   try {
-    const stream = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: openaiMessages,
-      temperature: cosmosConfig.temperature,
-      max_tokens: cosmosConfig.maxTokens,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) {
-        res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+    const { content } = await runToolLoop(
+      client,
+      openaiMessages,
+      cosmosConfig,
+      toolCtx,
+      (action) => {
+        if (parseCosmosClientAction(action)) writeSse(res, { action });
+      },
+      (text) => {
+        if (text) writeSse(res, { content: text });
       }
-    }
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    );
+    await Promise.all([
+      appendCosmosSessionMessage({ sessionId, role: "user", content: lastUser.content }),
+      content
+        ? appendCosmosSessionMessage({ sessionId, role: "assistant", content })
+        : Promise.resolve(),
+    ]);
+    writeSse(res, { done: true, sessionId });
     res.end();
   } catch (err) {
     logger.error("Cosmos chat stream error", { err, userId: user.id });
@@ -125,7 +222,7 @@ export async function handleCosmosChat(req: Request, res: Response): Promise<voi
       res.status(500).json({ message: "Error al generar la respuesta de Cosmos." });
       return;
     }
-    res.write(`data: ${JSON.stringify({ error: "Error al generar la respuesta." })}\n\n`);
+    writeSse(res, { error: "Error al generar la respuesta." });
     res.end();
   }
 }

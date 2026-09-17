@@ -33,11 +33,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef, useEffect } from "react";
-import { AvatarCropInline } from "@/components/avatar-crop-dialog";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 import { canAccessMilesCalculator, canAccessModule, USER_MODULES } from "@shared/modules";
+import { COSMOS_SIDEBAR_TARGET_BY_PATH } from "@shared/cosmosNavigation";
+
+const AvatarCropInline = lazy(() =>
+  import("@/components/avatar-crop-dialog").then((m) => ({ default: m.AvatarCropInline })),
+);
 
 function getInitials(name?: string | null, username?: string): string {
   if (name && name.trim()) {
@@ -162,6 +166,7 @@ function ProfileSection({
           onPointerDownOutside={cropImageSrc ? (e) => e.preventDefault() : undefined}
         >
           {cropImageSrc ? (
+            <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando recorte…</p>}>
             <AvatarCropInline
               imageSrc={cropImageSrc}
               onComplete={handleCropComplete}
@@ -170,6 +175,7 @@ function ProfileSection({
                 setCropImageSrc(null);
               }}
             />
+            </Suspense>
           ) : (
             <>
               <DialogHeader>
@@ -265,38 +271,32 @@ export function AppSidebar() {
   const { user, logout, updateProfile } = useAuth();
   const [location, navigate] = useLocation();
   const { state, isMobile } = useSidebar();
+  const isAdmin = user?.role === "super_admin";
+  const isProvider = user?.role === "provider";
 
-  // Prefetch rutas en segundo plano tras cargar (no compite con la carga inicial)
   useEffect(() => {
-    const t = setTimeout(() => {
-      [
-        "/",
-        "/tutoriales",
-        "/admin/dashboard",
-        "/admin/plans",
-        "/admin/tutoriales",
-        "/admin/tutoriales/metricas",
-        "/admin/cosmos",
-        "/admin/clients",
-        "/admin/users",
-        "/advisor",
-        "/mis-clientes",
-        "/cotizacion",
-        "/cotizacion-express",
-        "/herramientas/contador-dias",
-        "/herramientas/cotizador-millas",
-      ].forEach(prefetchRoute);
-    }, 1500);
-    return () => clearTimeout(t);
-  }, []);
+    const paths = isAdmin
+      ? ["/admin/dashboard", "/admin/plans", "/admin/users"]
+      : isProvider
+        ? ["/admin/plans"]
+        : ["/", "/advisor", "/cotizacion", "/mis-clientes"];
+    const run = () => paths.forEach(prefetchRoute);
+    const win = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (typeof win.requestIdleCallback === "function") {
+      const id = win.requestIdleCallback(run, { timeout: 4000 });
+      return () => win.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(run, 3500);
+    return () => window.clearTimeout(t);
+  }, [isAdmin, isProvider]);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
-
-  const isAdmin = user?.role === "super_admin";
-  const isProvider = user?.role === "provider";
 
   const { data: pendingApprovalData } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/users/pending-approval-count"],
@@ -397,6 +397,7 @@ export function AppSidebar() {
           isActive={isMenuActive(item.url)}
           tooltip={item.title}
           data-testid={`sidebar-${item.title.toLowerCase().replace(/ /g, "-")}`}
+          data-cosmos-target={COSMOS_SIDEBAR_TARGET_BY_PATH[item.url]}
           className="rounded-lg px-3 py-2.5 text-[13px] data-[active=true]:font-medium [&>svg]:opacity-70 [&>svg]:size-[18px] [&>svg]:shrink-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&_span]:hidden"
         >
           <Link href={item.url} className="flex items-center gap-3 [&>svg]:transition-all [&>svg]:duration-300 group-data-[collapsible=icon]:gap-0" onMouseEnter={() => prefetchRoute(item.url)}>

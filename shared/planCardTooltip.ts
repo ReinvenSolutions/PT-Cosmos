@@ -1,13 +1,18 @@
-import type { Destination } from "@shared/schema";
+type PlanCardDestination = {
+  name: string;
+  country: string;
+  category?: string | null;
+  cardTooltip?: string | null;
+};
 
 /** Texto del tooltip de tarjeta: prioriza cardTooltip de BD; si no hay, usa reglas por defecto. */
-export function getPlanCardTooltip(dest: Destination, catalog: Destination[] = []): string {
+export function getPlanCardTooltip(dest: PlanCardDestination, catalog: PlanCardDestination[] = []): string {
   const custom = dest.cardTooltip?.trim();
   if (custom) return custom;
   return getPlanCardTooltipFallback(dest, catalog);
 }
 
-function getPlanCardTooltipFallback(dest: Destination, catalog: Destination[]): string {
+function getPlanCardTooltipFallback(dest: PlanCardDestination, catalog: PlanCardDestination[]): string {
   if (dest.name === "Lo Mejor de Cusco + Lima") {
     return "Salidas diarias, programa incluye todas las actividades de interes para los dias de viaje. Cualquier cambio, bajo solicitud. Incluye impuestos. Acompañamiento de guia, solo en actividades. Requiere vuelos internos para el 4to dia; se recomienda sea antes de las 07:00am, tienen incluida actividad el primer dia de llegada a CUZ.";
   }

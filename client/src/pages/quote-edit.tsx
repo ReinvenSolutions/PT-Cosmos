@@ -9,8 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Upload, X, Save, Star, Download } from "lucide-react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatUSD, formatDate } from "@shared/schema";
@@ -401,25 +399,8 @@ export default function QuoteEdit() {
     );
   }
 
-  const style = {
-    "--sidebar-width": "20rem",
-    "--sidebar-width-icon": "4rem",
-  };
-
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1">
-          <header className="flex items-center gap-4 p-4 border-b">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold">Editar Cotización</h1>
-            </div>
-          </header>
-
-          <main className="flex-1 overflow-auto p-6">
-            <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
               <div className="flex items-center justify-between">
                 <Button
                   variant="outline"
@@ -997,9 +978,5 @@ export default function QuoteEdit() {
                 </CardContent>
               </Card>
             </div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
   );
 }

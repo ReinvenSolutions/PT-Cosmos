@@ -1,15 +1,44 @@
+import { lazy, Suspense, useEffect, useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CosmosFooter } from "@/components/cosmos-footer";
-import { CosmosChatWidget } from "@/components/cosmos-chat-widget";
 import { HomeHeaderSearch } from "@/components/home-header-search";
 import { HomeSearchProvider } from "@/contexts/home-search-context";
+import { CosmosHighlightHost } from "@/components/cosmos-highlight-host";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { TRM_EFFECTIVE_SURCHARGE_COP } from "@shared/trm";
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
+}
+
+const CosmosChatWidget = lazy(() =>
+  import("@/components/cosmos-chat-widget").then((m) => ({ default: m.CosmosChatWidget })),
+);
+
+function DeferredCosmosChat() {
+    const [ready, setReady] = useState(false);
+
+    useEffect(() => {
+        const win = window as Window & {
+            requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+            cancelIdleCallback?: (id: number) => void;
+        };
+        if (typeof win.requestIdleCallback === "function") {
+            const id = win.requestIdleCallback(() => setReady(true), { timeout: 2500 });
+            return () => win.cancelIdleCallback?.(id);
+        }
+        const t = window.setTimeout(() => setReady(true), 1200);
+        return () => window.clearTimeout(t);
+    }, []);
+
+    if (!ready) return null;
+    return (
+        <Suspense fallback={null}>
+            <CosmosChatWidget />
+        </Suspense>
+    );
 }
 
 function HeaderTrmBadge() {
@@ -43,7 +72,7 @@ function HeaderTrmBadge() {
     }
 
     return (
-        <div className="text-right text-xs md:text-sm shrink-0" title={`Base ${base.toLocaleString("es-CO")} + ${delta} COP`}>
+        <div className="text-right text-xs md:text-sm shrink-0" data-cosmos-target="app.trm" title={`Base ${base.toLocaleString("es-CO")} + ${delta} COP`}>
             <div className="text-muted-foreground font-medium">TRM aplicable</div>
             <div className="font-bold tabular-nums text-foreground">
                 $ {effective.toLocaleString("es-CO", { maximumFractionDigits: 0 })}{" "}
@@ -88,7 +117,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                                     </h1>
                                 )}
                                 </div>
-                                {isHome && <HomeHeaderSearch />}
+                                {isHome && (
+                                  <div data-cosmos-target="catalog.search" className="flex-1 max-w-xl">
+                                    <HomeHeaderSearch />
+                                  </div>
+                                )}
                                 <HeaderTrmBadge />
                             </div>
                         </div>
@@ -114,7 +147,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                             <HeaderTrmBadge />
                         </div>
                         {isHome && (
-                            <div className="pb-3">
+                            <div className="pb-3" data-cosmos-target="catalog.search">
                                 <HomeHeaderSearch className="max-w-none" />
                             </div>
                         )}
@@ -126,7 +159,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <CosmosFooter />
                 </main>
             </div>
-            <CosmosChatWidget />
+            <DeferredCosmosChat />
+            <CosmosHighlightHost />
         </SidebarProvider>
         </HomeSearchProvider>
     );

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { type Destination } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,18 +14,14 @@ import { GroupDiscountBanner } from "@/components/group-discount-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/optimized-image";
 import { clearHomeBuilderSelection } from "@/lib/home-selection-storage";
+import { COSMOS_QUOTE_RESET_EVENT } from "@/lib/cosmos-actions";
 import { cn } from "@/lib/utils";
 import { getPlanCardTooltip } from "@shared/planCardTooltip";
+import type { DestinationCardPreview } from "@shared/destinationCatalog";
 import {
   DAVIVIENDA_PAYMENTS_URL,
   MEDICAL_ASSISTANCE_PORTAL_URL,
 } from "@shared/externalServices";
-
-interface DestinationDetail {
-  destination: Destination;
-  hotels: any[];
-  itinerary: any[];
-}
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -36,13 +31,12 @@ export default function Home() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const { toast } = useToast();
 
-  type DestinationWithPreviews = Destination & { hotels: any[]; itinerary: any[] };
   const {
-    data: destinationsWithPreviews = [],
+    data: destinations = [],
     isLoading: destinationsLoading,
     isError: destinationsQueryError,
     error: destinationsQueryErr,
-  } = useQuery<DestinationWithPreviews[]>({
+  } = useQuery<DestinationCardPreview[]>({
     queryKey: ["/api/destinations-previews?isActive=true"],
   });
 
@@ -51,22 +45,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (destinationsWithPreviews.length === 0) return;
-    const validIds = new Set(destinationsWithPreviews.map((d) => d.id));
-    setSelectedDestinations((prev) => prev.filter((id) => validIds.has(id)));
-  }, [destinationsWithPreviews]);
+    const onReset = () => setSelectedDestinations([]);
+    window.addEventListener(COSMOS_QUOTE_RESET_EVENT, onReset);
+    return () => window.removeEventListener(COSMOS_QUOTE_RESET_EVENT, onReset);
+  }, []);
 
-  const destinations = destinationsWithPreviews;
-  const destinationDetails: Record<string, DestinationDetail> = Object.fromEntries(
-    destinationsWithPreviews.map((d) => [
-      d.id,
-      { destination: d, hotels: d.hotels ?? [], itinerary: d.itinerary ?? [] },
-    ])
-  );
+  useEffect(() => {
+    if (destinations.length === 0) return;
+    const validIds = new Set(destinations.map((d) => d.id));
+    setSelectedDestinations((prev) => prev.filter((id) => validIds.has(id)));
+  }, [destinations]);
 
   const selectedDests = selectedDestinations
     .map((id) => destinations.find((d) => d.id === id))
-    .filter((d): d is DestinationWithPreviews => !!d);
+    .filter((d): d is DestinationCardPreview => !!d);
 
   const hasTurkeyDestinations = selectedDests.some(
     (d) =>
@@ -88,67 +80,7 @@ export default function Home() {
     (hasTurkeyDestinations && !hasTurkeyEsencial) ||
     selectedDestinations.length > 0;
 
-  /** Parsea la categoría del hotel para obtener las estrellas. Soporta: "5*", "4 estrellas", "3*", etc. */
-  const parseHotelCategoryToStars = (category: string | null | undefined): number | null => {
-    if (!category?.trim()) return null;
-    const s = category.trim().toLowerCase();
-    // Formato "5*", "4*", "3*"
-    const asteriskMatch = s.match(/^(\d)\s*\*?$/);
-    if (asteriskMatch) return Math.min(5, Math.max(1, parseInt(asteriskMatch[1])));
-    // Formato "5 estrellas", "4 estrellas", "3 stars"
-    const wordMatch = s.match(/(\d)\s*(?:estrellas?|stars?)/);
-    if (wordMatch) return Math.min(5, Math.max(1, parseInt(wordMatch[1])));
-    // Formato "X*" dentro del texto
-    const inlineMatch = s.match(/(\d)\s*\*/);
-    if (inlineMatch) return Math.min(5, Math.max(1, parseInt(inlineMatch[1])));
-    return null;
-  };
-
-  const getHotelStars = (destId: string): number => {
-    const details = destinationDetails[destId];
-    if (!details?.hotels?.length) return 4;
-
-    const starCounts = details.hotels
-      .map((hotel) => parseHotelCategoryToStars(hotel.category))
-      .filter((n): n is number => n !== null);
-    if (starCounts.length === 0) return 4;
-
-    return Math.max(...starCounts, 1);
-  };
-
-  const getMealsInfo = (destId: string): { breakfasts: number; lunches: number; dinners: number; total: number } => {
-    const dest = destinations.find(d => d.id === destId);
-
-    const details = destinationDetails[destId];
-    if (!details || !details.itinerary || details.itinerary.length === 0) {
-      const nights = dest?.nights || 0;
-      return { breakfasts: nights, lunches: 0, dinners: 0, total: nights };
-    }
-
-    let breakfasts = 0;
-    let lunches = 0;
-    let dinners = 0;
-
-    details.itinerary.forEach((day: any) => {
-      if (day.meals && Array.isArray(day.meals)) {
-        day.meals.forEach((meal: string) => {
-          const lowerMeal = meal.toLowerCase();
-          if (lowerMeal.includes('desayuno') || lowerMeal.includes('breakfast')) breakfasts++;
-          // No usar "comida" suelto: coincide con "sin comidas", "bebidas en comidas", etc.
-          if (lowerMeal.includes('almuerzo') || lowerMeal.includes('lunch')) lunches++;
-          if (lowerMeal.includes('cena') || lowerMeal.includes('dinner')) dinners++;
-        });
-      }
-    });
-
-    if (breakfasts === 0 && dest?.nights) {
-      breakfasts = dest.nights;
-    }
-
-    return { breakfasts, lunches, dinners, total: breakfasts + lunches + dinners };
-  };
-
-  const getTooltipForCard = (dest: Destination): string => getPlanCardTooltip(dest, destinations);
+  const getTooltipForCard = (dest: DestinationCardPreview): string => getPlanCardTooltip(dest, destinations);
 
   const filteredDestinations = destinations.filter((dest) => {
     const matchesCategory =
@@ -165,7 +97,7 @@ export default function Home() {
     return matchesCategory && matchesSearch;
   });
 
-  const isBloqueoAgotado = (dest: Destination) =>
+  const isBloqueoAgotado = (dest: DestinationCardPreview) =>
     !!dest.isBloqueo && dest.bloqueoCuposDisponibles != null && dest.bloqueoCuposDisponibles <= 0;
 
   const toggleDestination = (destId: string) => {
@@ -373,8 +305,8 @@ export default function Home() {
                   const isExpanded = expandedCard === dest.id;
                   const imageUrl = getDestinationImage(dest);
                   const basePrice = dest.basePrice ? parseFloat(dest.basePrice) : 0;
-                  const hotelStars = getHotelStars(dest.id);
-                  const mealsInfo = getMealsInfo(dest.id);
+                  const hotelStars = dest.hotelStars;
+                  const mealsInfo = dest.meals;
                   const tooltipText = getTooltipForCard(dest);
                   const agotado = isBloqueoAgotado(dest);
 
@@ -396,7 +328,7 @@ export default function Home() {
                           <OptimizedImage
                             src={imageUrl}
                             alt={dest.name}
-                            priority={idx < 6}
+                            priority={idx < 3}
                             containerClassName="aspect-video w-full"
                             imageClassName="object-cover"
                           />
@@ -468,7 +400,7 @@ export default function Home() {
                             <span className="font-medium">{dest.duration} Días / {dest.nights} Noches</span>
                           </div>
 
-                          {dest.priceTiers && dest.priceTiers.length > 0 && !dest.isBloqueo && dest.name !== "Turquía Esencial" && dest.name !== "Tour Cusco Aventura" && (
+                          {dest.hasDynamicPricing && !dest.isBloqueo && dest.name !== "Turquía Esencial" && dest.name !== "Tour Cusco Aventura" && (
                             <Badge className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs">
                               PRECIO DINÁMICO
                             </Badge>

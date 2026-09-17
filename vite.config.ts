@@ -5,7 +5,13 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    include: ["react", "react-dom", "react/jsx-runtime"],
+    include: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "wouter",
+      "@tanstack/react-query",
+    ],
   },
   resolve: {
     dedupe: ["react", "react-dom"],
@@ -18,13 +24,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom"],
-          "query-vendor": ["@tanstack/react-query"],
-          "dnd-vendor": ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
-          "recharts": ["recharts"],
+        manualChunks(id) {
+          if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/")) {
+            return "react-vendor";
+          }
+          if (id.includes("@tanstack/react-query")) return "query-vendor";
+          if (id.includes("livekit") || id.includes("@livekit")) return "livekit";
+          if (id.includes("framer-motion") || id.includes("/motion/")) return "motion";
+          if (id.includes("recharts")) return "recharts";
+          if (id.includes("@dnd-kit")) return "dnd-vendor";
+          if (id.includes("react-easy-crop")) return "cropper";
         },
       },
     },

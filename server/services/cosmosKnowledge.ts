@@ -21,6 +21,8 @@ import {
   isTurkeyPlan,
   parseTaxInclusionStatus,
 } from "@shared/planCosmosHints";
+import { upgradesForPlan } from "@shared/cosmosQuoteUpgrades";
+import type { CosmosScreenContext } from "@shared/cosmosAgent";
 import { storage } from "../storage";
 import { getOrSetCache } from "../utils/cache";
 import { htmlToPlainText } from "../utils/sanitize";
@@ -38,6 +40,7 @@ type FullPlan = Destination & {
 
 const COSMOS_CATALOG_CACHE = "cosmos:catalog";
 const COSMOS_CATALOG_TTL = 600;
+const COSMOS_PLAN_DETAIL_TTL = 180;
 const MAX_DETAIL_PLANS = 4;
 
 function normalize(s: string): string {
@@ -60,6 +63,25 @@ async function fetchFullPlan(id: string): Promise<FullPlan | null> {
   return { ...destination, itinerary, hotels, inclusions, exclusions };
 }
 
+async function getCachedPlanDetail(id: string, catalog: Destination[]): Promise<string | null> {
+  return getOrSetCache(
+    `cosmos:plan-detail:${id}`,
+    async () => {
+      const plan = await fetchFullPlan(id);
+      return plan ? formatPlanDetail(plan, catalog) : null;
+    },
+    COSMOS_PLAN_DETAIL_TTL
+  );
+}
+
+function formatCatalogLine(d: Destination): string {
+  const upgrades = upgradesForPlan(d);
+  const upgradeBit = upgrades.length
+    ? ` — mejoras: ${upgrades.map((u) => `[${u.code}] ${u.name} USD ${u.price}`).join("; ")}`
+    : "";
+  return `- [${d.id}] ${d.name} (${d.country}) — ${d.duration}d/${d.nights}n — USD ${d.basePrice || "?"}${d.isBloqueo ? " [bloqueo]" : ""}${d.isPromotion ? " [promo]" : ""}${upgradeBit}`;
+}
+
 function formatPriceTiers(d: Destination): string {
   const tiers = Array.isArray(d.priceTiers) ? d.priceTiers : [];
   if (!tiers.length) return "Sin escalas de precio por fecha registradas.";
@@ -74,7 +96,7 @@ function formatPriceTiers(d: Destination): string {
 }
 
 function formatUpgrades(d: Destination): string {
-  const upgrades = Array.isArray(d.upgrades) ? d.upgrades : [];
+  const upgrades = upgradesForPlan(d);
   if (!upgrades.length) return "";
   return (
     "\nUpgrades opcionales:\n" +
@@ -146,7 +168,7 @@ ${days || "  (sin itinerario)"}
 `.trim();
 }
 
-async function getActiveCatalog(): Promise<Destination[]> {
+export async function getActiveCatalog(): Promise<Destination[]> {
   return getOrSetCache(
     COSMOS_CATALOG_CACHE,
     () => storage.getDestinations({ isActive: true }),
@@ -173,6 +195,12 @@ function scorePlanMatch(text: string, plan: Destination): number {
   if (asksTurkey && isTurkeyPlan(plan)) score += 20;
   if ((hay.includes("combin") || hay.includes("mezcl")) && isTurkeyPlan(plan)) score += 12;
   if ((hay.includes("impuesto") || hay.includes("tax")) && isTurkeyPlan(plan)) score += 15;
+  if (
+    (hay.includes("mejora") || hay.includes("upgrade")) &&
+    upgradesForPlan(plan).length > 0
+  ) {
+    score += 8;
+  }
   return score;
 }
 
@@ -180,9 +208,10 @@ function pickRelevantPlanIds(
   userMessage: string,
   history: CosmosChatMessage[],
   catalog: Destination[],
-  currentPlanId?: string
+  currentPlanId?: string,
+  extraIds: string[] = []
 ): string[] {
-  const ids = new Set<string>();
+  const ids = new Set<string>(extraIds.filter(Boolean));
   if (currentPlanId) ids.add(currentPlanId);
 
   const recentUserText = [
@@ -256,36 +285,33 @@ URL: ${MEDICAL_ASSISTANCE_PORTAL_URL}
 `.trim();
 }
 
-function formatCatalogTooltipsAndRecommendations(catalog: Destination[]): string {
-  if (!catalog.length) return "(ningún plan activo)";
-
-  return catalog
-    .map((d) => {
-      const tooltip = getPlanCardTooltip(d, catalog);
-      const taxStatus = parseTaxInclusionStatus(tooltip, d.description);
-      const rec = d.recommendations?.trim();
-      const recBlock = rec ? `\n  Recomendaciones PDF:\n  ${rec.split("\n").join("\n  ")}` : "\n  Recomendaciones PDF: (sin texto registrado)";
-      return `- **${d.name}** (${d.country})\n  Impuestos: ${formatTaxStatusLabel(taxStatus)}\n  Tooltip tarjeta: ${tooltip}${recBlock}`;
-    })
-    .join("\n\n");
+function formatScreenContext(screen?: CosmosScreenContext): string {
+  if (!screen?.path) return "";
+  const draft = screen.quoteDraft;
+  const upgrades =
+    draft?.selectedUpgrades && Object.keys(draft.selectedUpgrades).length
+      ? ` mejoras=${Object.entries(draft.selectedUpgrades)
+          .map(([id, code]) => `${id}:${code || "ninguna"}`)
+          .join(",")}`
+      : "";
+  const draftLine = draft
+    ? `Borrador: planes=${(draft.planIds ?? []).join(",") || "—"} fecha=${draft.startDate || "—"} pax=${draft.passengers ?? "—"} origen=${draft.originCity || "—"} vuelos=${draft.flightsCost || "—"} ${draft.flightsCurrency || ""} asistencia=${draft.assistanceCost || "—"} ${draft.assistanceCurrency || ""} PVP=${draft.finalPrice || "—"} ${draft.finalPriceCurrency || ""} pagoMin=${draft.minPayment || "—"} archivo=${draft.customFilename || "—"}${upgrades}`
+    : "Borrador: (vacío)";
+  const hasDraft = (draft?.planIds?.length ?? 0) > 0;
+  const resumeHint = hasDraft
+    ? screen.path.startsWith("/cotizacion")
+      ? "Hay una cotización en curso en pantalla. Si pide una NUEVA, pregunta si guardar o empezar limpia."
+      : "Hay una cotización en curso (los datos están en el borrador). Si pide volver a ella, usa resume_quote. Si pide una NUEVA, pregunta si guardar o empezar limpia."
+    : "No hay borrador de cotización.";
+  return `## Pantalla actual
+Ruta: ${screen.path}${screen.planId ? ` · planId=${screen.planId}` : ""}${screen.quoteId ? ` · quoteId=${screen.quoteId}` : ""}${screen.courseId ? ` · courseId=${screen.courseId}` : ""}
+${draftLine}
+${resumeHint}`;
 }
 
-function formatAllCosmosAssistantNotes(catalog: Destination[]): string {
-  const blocks = catalog
-    .map((plan) => {
-      const notes = plan.cosmosAssistantNotes?.trim();
-      if (!notes) return null;
-      const plain = htmlToPlainText(notes);
-      if (!plain) return null;
-      return `### ${plan.name} (${plan.country}) [id=${plan.id}]\n${plain}`;
-    })
-    .filter((block): block is string => Boolean(block));
-
-  if (!blocks.length) {
-    return "(ningún plan con notas internas para Cosmos)";
-  }
-
-  return blocks.join("\n\n---\n\n");
+function formatBriefContext(brief?: Record<string, unknown> | null): string {
+  if (!brief || !Object.keys(brief).length) return "";
+  return `## Brief del caso (sesión)\n${JSON.stringify(brief)}`;
 }
 
 export async function buildCosmosSystemContext(opts: {
@@ -293,20 +319,27 @@ export async function buildCosmosSystemContext(opts: {
   history: CosmosChatMessage[];
   currentPlanId?: string;
   userRole: string;
+  screen?: CosmosScreenContext;
+  brief?: Record<string, unknown> | null;
 }): Promise<string> {
   const catalog = await getActiveCatalog();
-  const relevantIds = pickRelevantPlanIds(opts.userMessage, opts.history, catalog, opts.currentPlanId);
-
-  const catalogLines = catalog.map(
-    (d) =>
-      `- [${d.id}] ${d.name} (${d.country}) — ${d.duration}d/${d.nights}n — USD ${d.basePrice || "?"}${d.isBloqueo ? " [bloqueo]" : ""}${d.isPromotion ? " [promo]" : ""}`
+  const extraIds = [
+    ...(opts.screen?.planId ? [opts.screen.planId] : []),
+    ...(opts.screen?.quoteDraft?.planIds ?? []),
+  ];
+  const relevantIds = pickRelevantPlanIds(
+    opts.userMessage,
+    opts.history,
+    catalog,
+    opts.currentPlanId,
+    extraIds
   );
 
-  const detailBlocks: string[] = [];
-  for (const id of relevantIds) {
-    const plan = await fetchFullPlan(id);
-    if (plan) detailBlocks.push(formatPlanDetail(plan, catalog));
-  }
+  const catalogLines = catalog.map(formatCatalogLine);
+
+  const detailBlocks = (
+    await Promise.all(relevantIds.map((id) => getCachedPlanDetail(id, catalog)))
+  ).filter((block): block is string => Boolean(block));
 
   const baseTrm = await storage.getGlobalTrmBase();
   const effectiveTrm = effectiveTrmFromBase(baseTrm);
@@ -328,6 +361,9 @@ export async function buildCosmosSystemContext(opts: {
     ? `## Contexto estratégico de Cosmos Mayorista (información prioritaria del equipo)\n${strategicContextPlain}`
     : "";
 
+  const screenBlock = formatScreenContext(opts.screen);
+  const briefBlock = formatBriefContext(opts.brief);
+
   return `
 ${COSMOS_APP_GUIDE}
 
@@ -337,6 +373,7 @@ ${formatAgencyContext()}
 ---
 ${strategicBlock ? `${strategicBlock}\n\n---\n` : ""}${roleNote}
 ${trmBlock}
+${screenBlock ? `\n${screenBlock}\n` : ""}${briefBlock ? `\n${briefBlock}\n` : ""}
 
 ## Catálogo de planes activos (${catalog.length})
 ${catalogLines.join("\n") || "(ningún plan activo)"}
@@ -344,13 +381,91 @@ ${catalogLines.join("\n") || "(ningún plan activo)"}
 ---
 ${formatCombinationRules(catalog)}
 
-## Tooltips de tarjetas y recomendaciones — todos los planes activos
-${formatCatalogTooltipsAndRecommendations(catalog)}
-
----
-## Notas internas de Cosmos por plan (contexto obligatorio; NO publicar en respuestas como texto del PDF ni del catálogo)
-${formatAllCosmosAssistantNotes(catalog)}
-
-${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo, tooltips, recomendaciones y notas internas anteriores. Si necesitas itinerario, inclusiones o precios ampliados de un plan concreto, menciona el nombre del plan o país."}
+${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo. Si necesitas itinerario, inclusiones o precios de un plan concreto, usa get_plan_details."}
 `.trim();
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type CosmosPlanSummary = {
+  id: string;
+  name: string;
+  country: string;
+  duration: number;
+  nights: number;
+  basePrice: string | null;
+  isBloqueo: boolean | null;
+  isPromotion: boolean | null;
+};
+
+export async function searchCatalogPlans(query: string, limit = 8): Promise<CosmosPlanSummary[]> {
+  const catalog = await getActiveCatalog();
+  const scored = catalog
+    .map((p) => ({ plan: p, score: scorePlanMatch(query, p) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const hay = normalize(query);
+  const fallback = !scored.length
+    ? catalog.filter(
+        (p) =>
+          (hay.length > 2 && normalize(p.name).includes(hay)) ||
+          (hay.length > 2 && normalize(p.country).includes(hay))
+      )
+    : [];
+
+  const picked = (scored.length ? scored.map((s) => s.plan) : fallback).slice(0, limit);
+  return picked.map((p) => ({
+    id: p.id,
+    name: p.name,
+    country: p.country,
+    duration: p.duration,
+    nights: p.nights,
+    basePrice: p.basePrice,
+    isBloqueo: p.isBloqueo,
+    isPromotion: p.isPromotion,
+  }));
+}
+
+export async function resolveCatalogPlanId(queryOrId: string): Promise<CosmosPlanSummary | null> {
+  const trimmed = queryOrId.trim();
+  if (!trimmed) return null;
+  if (UUID_RE.test(trimmed)) {
+    const catalog = await getActiveCatalog();
+    const found = catalog.find((p) => p.id === trimmed);
+    if (!found) return null;
+    return {
+      id: found.id,
+      name: found.name,
+      country: found.country,
+      duration: found.duration,
+      nights: found.nights,
+      basePrice: found.basePrice,
+      isBloqueo: found.isBloqueo,
+      isPromotion: found.isPromotion,
+    };
+  }
+  const matches = await searchCatalogPlans(trimmed, 1);
+  return matches[0] ?? null;
+}
+
+export async function getPlanDetailText(planId: string): Promise<string | null> {
+  const catalog = await getActiveCatalog();
+  return getCachedPlanDetail(planId, catalog);
+}
+
+export async function getTrmSummary(): Promise<{
+  baseTrm: number | null;
+  effectiveTrm: number | null;
+  surcharge: number;
+  summary: string;
+}> {
+  const baseTrm = await storage.getGlobalTrmBase();
+  const effectiveTrm = effectiveTrmFromBase(baseTrm);
+  const summary =
+    baseTrm != null
+      ? `TRM cotizador: base ${baseTrm.toLocaleString("es-CO")} COP/USD + ${TRM_EFFECTIVE_SURCHARGE_COP} = efectiva ${effectiveTrm?.toLocaleString("es-CO")} COP/USD.`
+      : "TRM cotizador: no configurada (admin debe definir TRM global).";
+  return { baseTrm, effectiveTrm, surcharge: TRM_EFFECTIVE_SURCHARGE_COP, summary };
 }

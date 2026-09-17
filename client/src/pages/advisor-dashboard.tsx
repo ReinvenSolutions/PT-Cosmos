@@ -5,8 +5,6 @@ import { prefetchRoute } from "@/lib/route-prefetch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Plus, FileText, Trash2, Search, Edit } from "lucide-react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 import { useState } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -80,30 +78,17 @@ export default function AdvisorDashboard() {
     return matchesSearch && matchesClient;
   }) || [];
 
-  const style = {
-    "--sidebar-width": "20rem",
-    "--sidebar-width-icon": "4rem",
-  };
-
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1">
-          <header className="flex items-center gap-4 p-4 border-b">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold">Mis Cotizaciones</h1>
-            </div>
-            <Link href="/">
-              <Button data-testid="button-new-quote">
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva Cotización
-              </Button>
-            </Link>
-          </header>
-
-          <main className="flex-1 overflow-auto p-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold">Mis Cotizaciones</h1>
+        <Link href="/">
+          <Button data-testid="button-new-quote">
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Cotización
+          </Button>
+        </Link>
+      </div>
             {quotes && quotes.length > 0 && (
               <div className="mb-6 space-y-4">
                 <div className="relative max-w-md">
@@ -122,8 +107,8 @@ export default function AdvisorDashboard() {
 
             {isLoading ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 6 }).map((i) => (
-                  <Card key={i}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Card key={`quote-skeleton-${i}`}>
                     <CardHeader>
                       <Skeleton className="h-6 w-3/4" />
                       <Skeleton className="h-4 w-1/2 mt-2" />
@@ -229,7 +214,6 @@ export default function AdvisorDashboard() {
                 </CardContent>
               </Card>
             )}
-          </main>
           
           <AlertDialog open={deleteQuoteId !== null} onOpenChange={(open) => !open && setDeleteQuoteId(null)}>
             <AlertDialogContent>
@@ -252,8 +236,6 @@ export default function AdvisorDashboard() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </div>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 }

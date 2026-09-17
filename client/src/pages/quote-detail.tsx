@@ -3,8 +3,6 @@ import { useLocation, useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, User, Mail, Phone, Calendar, Users, Plane, Image as ImageIcon, Edit } from "lucide-react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 import { formatUSD, formatDate } from "@shared/schema";
 
 interface Destination {
@@ -131,25 +129,8 @@ export default function QuoteDetail() {
     );
   }
 
-  const style = {
-    "--sidebar-width": "20rem",
-    "--sidebar-width-icon": "4rem",
-  };
-
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1">
-          <header className="flex items-center gap-4 p-4 border-b">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold">Detalles de Cotización</h1>
-            </div>
-          </header>
-
-          <main className="flex-1 overflow-auto p-6">
-            <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
               <div className="flex items-center justify-between">
                 <Link href="/advisor">
                   <Button variant="outline" data-testid="button-back">
@@ -370,9 +351,5 @@ export default function QuoteDetail() {
                 </CardContent>
               </Card>
             </div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
   );
 }

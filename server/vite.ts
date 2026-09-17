@@ -54,7 +54,11 @@ export async function setupVite(app: Express, server: Server) {
     if (req.path.startsWith("/api/")) {
       return res.status(404).json({ message: "Endpoint no encontrado", path: req.path });
     }
-    const url = req.originalUrl;
+    // Vite trata el HTML como JSON si la URL termina en .json y revienta el transform.
+    if (/\.json(?:$|\?)/i.test(req.originalUrl) || req.path.endsWith(".json")) {
+      return res.status(404).json({ message: "No encontrado", path: req.originalUrl });
+    }
+    const url = req.path === "/index.html" ? "/" : req.originalUrl;
 
     try {
       const clientTemplate = path.resolve(
@@ -88,10 +92,22 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      index: false,
+      maxAge: "1y",
+      immutable: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    }),
+  );
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

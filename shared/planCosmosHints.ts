@@ -9,7 +9,7 @@ function normalizeText(s: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-export function isTurkeyPlan(dest: Destination): boolean {
+export function isTurkeyPlan(dest: Pick<Destination, "name" | "country">): boolean {
   const n = normalizeText(dest.name);
   const c = normalizeText(dest.country);
   return n.includes("turquia") || c.includes("turquia");

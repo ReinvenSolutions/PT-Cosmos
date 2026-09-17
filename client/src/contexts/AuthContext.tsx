@@ -1,6 +1,7 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { getPostLoginPath } from "@/lib/authUtils";
 
 export interface User {
   id: string;
@@ -22,6 +23,8 @@ export interface User {
     dayCounter?: boolean;
     milesCalculator?: boolean;
     academy?: boolean;
+    cosmos?: boolean;
+    cosmosVoice?: boolean;
   } | null;
   createdAt: string;
 }
@@ -40,12 +43,48 @@ interface AuthContextType {
   updateProfile: (data: { name?: string; avatarUrl?: string | null }) => Promise<void>;
 }
 
+const AUTH_CACHE_KEY = "cosmos-auth-user";
+
+function readAuthCache(): User | null {
+  try {
+    const raw = sessionStorage.getItem(AUTH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as User;
+    return parsed?.id && parsed?.role ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthCache(user: User | null) {
+  try {
+    if (user) sessionStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(user));
+    else sessionStorage.removeItem(AUTH_CACHE_KEY);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function prefetchAfterAuth(queryClient: ReturnType<typeof useQueryClient>, user: User) {
+  void queryClient.prefetchQuery({ queryKey: ["/api/settings/global-trm"] });
+  if (user.role === "agency" || user.role === "super_admin") {
+    void queryClient.prefetchQuery({ queryKey: ["/api/destinations-previews?isActive=true"] });
+    void queryClient.prefetchQuery({ queryKey: ["/api/destinations?isActive=true"] });
+  }
+  const path = getPostLoginPath(user.role);
+  if (path === "/") void import("@/pages/home");
+  else if (path === "/advisor") void import("@/pages/advisor-dashboard");
+  else if (path === "/admin/dashboard") void import("@/pages/admin-dashboard");
+  else if (path === "/admin/plans") void import("@/pages/admin-plans");
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
-  
-  const { data, isLoading } = useQuery<{ user: User } | null>({
+  const cachedUser = useMemo(() => readAuthCache(), []);
+
+  const { data, isLoading, isFetched } = useQuery<{ user: User } | null>({
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
@@ -55,6 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refetchOnReconnect: false,
   });
 
+  useEffect(() => {
+    if (!isFetched) return;
+    const user = data?.user ?? null;
+    writeAuthCache(user);
+    if (user) prefetchAfterAuth(queryClient, user);
+  }, [data, isFetched, queryClient]);
+
   const loginMutation = useMutation({
     mutationFn: async ({ username, password }: { username: string; password: string }) => {
       const response = await apiRequest("POST", "/api/auth/login", { username, password });
@@ -63,7 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onSuccess: (data: LoginResult) => {
       if ("user" in data) {
         queryClient.setQueryData(["/api/auth/me"], data);
-        // No invalidate: ya tenemos el user; evita refetch que puede colgar
+        writeAuthCache(data.user);
+        prefetchAfterAuth(queryClient, data.user);
       }
     },
   });
@@ -75,6 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     onSuccess: (data: { user: User }) => {
       queryClient.setQueryData(["/api/auth/me"], data);
+      writeAuthCache(data.user);
+      prefetchAfterAuth(queryClient, data.user);
     },
   });
 
@@ -85,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/me"], null);
       queryClient.clear();
+      writeAuthCache(null);
     },
   });
 
@@ -117,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["/api/auth/me"], data);
+      if (data?.user) writeAuthCache(data.user);
     },
   });
 
@@ -127,8 +178,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: data?.user || null,
-        isLoading,
+        user: data?.user ?? (!isFetched ? cachedUser : null),
+        isLoading: isLoading && !cachedUser && !data?.user,
         login,
         verify2FA,
         resend2FA,

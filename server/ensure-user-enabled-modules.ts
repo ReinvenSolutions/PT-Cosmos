@@ -2,9 +2,9 @@ import type { Pool } from "pg";
 import { logger } from "./logger";
 
 const DEFAULT_MODULES =
-  '{"quote":true,"quoteExpress":true,"dayCounter":true,"milesCalculator":true,"academy":true}';
+  '{"quote":true,"quoteExpress":true,"dayCounter":true,"milesCalculator":true,"academy":true,"cosmos":false,"cosmosVoice":false}';
 const PROVIDER_MODULES =
-  '{"quote":true,"quoteExpress":true,"dayCounter":true,"milesCalculator":true,"academy":false}';
+  '{"quote":true,"quoteExpress":true,"dayCounter":true,"milesCalculator":true,"academy":false,"cosmos":false,"cosmosVoice":false}';
 
 /** Permisos de módulos por usuario (idempotente). */
 export async function ensureUserEnabledModulesColumn(pool: InstanceType<typeof Pool>): Promise<void> {

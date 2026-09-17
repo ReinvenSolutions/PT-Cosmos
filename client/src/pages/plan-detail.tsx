@@ -207,8 +207,20 @@ function PlanHeroGalleryCarousel({
 
 export default function PlanDetail() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [tab, setTab] = useState("itinerario");
   const [, params] = useRoute("/plan/:id");
   const id = params?.id;
+
+  useEffect(() => {
+    const onHighlight = (event: Event) => {
+      const target = (event as CustomEvent<{ target?: string }>).detail?.target;
+      if (target === "plan.itinerary") setTab("itinerario");
+      if (target === "plan.hotels") setTab("hoteles");
+      if (target === "plan.prices") setTab("precios");
+    };
+    window.addEventListener("cosmos-highlight", onHighlight);
+    return () => window.removeEventListener("cosmos-highlight", onHighlight);
+  }, []);
 
   const { data: plan, isLoading, isError, error } = useQuery<PlanDetailPayload>({
     queryKey: id ? ["/api/destinations", id] : ["/api/destinations", "__none"],
@@ -455,7 +467,7 @@ export default function PlanDetail() {
                   <span className="font-medium capitalize">{plan.category || "plan"}</span>
                 </span>
               </div>
-              <div className="text-right">
+              <div className="text-right" data-cosmos-target="plan.prices">
                 <div className="text-xs font-medium uppercase text-muted-foreground">
                   {plan.isBloqueo ? "Precio fijo" : "Precio desde"}
                 </div>
@@ -474,7 +486,7 @@ export default function PlanDetail() {
           </div>
         </div>
 
-        <Tabs defaultValue="itinerario" className="w-full">
+        <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto sm:h-11 gap-1 p-1">
             <TabsTrigger value="itinerario" className="text-xs sm:text-sm gap-1">
               <CalendarDays className="h-3.5 w-3.5 hidden sm:inline" />
@@ -494,7 +506,7 @@ export default function PlanDetail() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="itinerario" className="mt-6 space-y-4">
+          <TabsContent value="itinerario" className="mt-6 space-y-4" data-cosmos-target="plan.itinerary">
             {sortedItinerary.length === 0 ? (
               <Card variant="glass">
                 <CardContent className="py-10 text-center text-muted-foreground text-sm">
@@ -570,7 +582,7 @@ export default function PlanDetail() {
             )}
           </TabsContent>
 
-          <TabsContent value="hoteles" className="mt-6">
+          <TabsContent value="hoteles" className="mt-6" data-cosmos-target="plan.hotels">
             {(!plan.hotels || plan.hotels.length === 0) ? (
               <Card variant="glass">
                 <CardContent className="py-10 text-center text-muted-foreground text-sm">
@@ -726,7 +738,7 @@ export default function PlanDetail() {
             )}
           </TabsContent>
 
-          <TabsContent value="precios" className="mt-6 space-y-6">
+          <TabsContent value="precios" className="mt-6 space-y-6" data-cosmos-target="plan.prices">
             <Card variant="glass">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -835,7 +847,7 @@ export default function PlanDetail() {
             )}
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <Card variant="glass">
+              <Card variant="glass" data-cosmos-target="plan.inclusions">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2 text-emerald-800 dark:text-emerald-200">
                     <ListChecks className="h-4 w-4" />
@@ -856,7 +868,7 @@ export default function PlanDetail() {
                   )}
                 </CardContent>
               </Card>
-              <Card variant="glass">
+              <Card variant="glass" data-cosmos-target="plan.exclusions">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2 text-amber-900 dark:text-amber-200">
                     <ListX className="h-4 w-4" />

@@ -179,7 +179,7 @@ export const users = pgTable("users", {
   milesMarkupValueSmiles: decimal("miles_markup_value_smiles", { precision: 12, scale: 2 }).default("0").notNull(),
   /** Programas habilitados: none | lifemiles | smiles | both */
   milesProgramsAllowed: text("miles_programs_allowed").default("both").notNull(),
-  /** Módulos visibles para el usuario. Super admin ignora este campo. */
+  /** Módulos visibles para el usuario (incluye Cosmos chat/voz). Super admin ignora este campo. */
   enabledModules: json("enabled_modules").$type<EnabledModules | null>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -403,6 +403,46 @@ export const insertTutorialLessonProgressSchema = createInsertSchema(tutorialLes
 });
 export type InsertTutorialLessonProgress = z.infer<typeof insertTutorialLessonProgressSchema>;
 export type TutorialLessonProgress = typeof tutorialLessonProgress.$inferSelect;
+
+export const cosmosSessions = pgTable(
+  "cosmos_sessions",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull(),
+    roomName: text("room_name"),
+    currentPlanId: varchar("current_plan_id"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    metadata: json("metadata").$type<Record<string, unknown> | null>(),
+  },
+  (t) => [
+    index("cosmos_sessions_user_idx").on(t.userId),
+    index("cosmos_sessions_started_idx").on(t.startedAt),
+    index("cosmos_sessions_channel_idx").on(t.channel),
+  ],
+);
+
+export type CosmosSession = typeof cosmosSessions.$inferSelect;
+
+export const cosmosSessionMessages = pgTable(
+  "cosmos_session_messages",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    sessionId: varchar("session_id")
+      .notNull()
+      .references(() => cosmosSessions.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    toolName: text("tool_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("cosmos_session_messages_session_idx").on(t.sessionId)],
+);
+
+export type CosmosSessionMessage = typeof cosmosSessionMessages.$inferSelect;
 
 export function formatUSD(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;

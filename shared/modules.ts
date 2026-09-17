@@ -11,6 +11,8 @@ export const USER_MODULES = {
   DAY_COUNTER: "dayCounter",
   MILES_CALCULATOR: "milesCalculator",
   ACADEMY: "academy",
+  COSMOS: "cosmos",
+  COSMOS_VOICE: "cosmosVoice",
 } as const;
 
 export type UserModuleId = (typeof USER_MODULES)[keyof typeof USER_MODULES];
@@ -23,7 +25,70 @@ export const USER_MODULE_IDS: UserModuleId[] = [
   USER_MODULES.DAY_COUNTER,
   USER_MODULES.MILES_CALCULATOR,
   USER_MODULES.ACADEMY,
+  USER_MODULES.COSMOS,
+  USER_MODULES.COSMOS_VOICE,
 ];
+
+function foldModuleAlias(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s_-]+/g, "");
+}
+
+/** Nombres que Cosmos (y el admin) pueden dictar para un módulo. */
+const USER_MODULE_ALIASES: Record<string, UserModuleId> = {
+  quote: USER_MODULES.QUOTE,
+  cotizacion: USER_MODULES.QUOTE,
+  cotizador: USER_MODULES.QUOTE,
+  nuevacotizacion: USER_MODULES.QUOTE,
+  quoteexpress: USER_MODULES.QUOTE_EXPRESS,
+  express: USER_MODULES.QUOTE_EXPRESS,
+  cotizadorexpress: USER_MODULES.QUOTE_EXPRESS,
+  daycounter: USER_MODULES.DAY_COUNTER,
+  contador: USER_MODULES.DAY_COUNTER,
+  contadordedias: USER_MODULES.DAY_COUNTER,
+  milescalculator: USER_MODULES.MILES_CALCULATOR,
+  millas: USER_MODULES.MILES_CALCULATOR,
+  calculadora: USER_MODULES.MILES_CALCULATOR,
+  calculadorademillas: USER_MODULES.MILES_CALCULATOR,
+  academy: USER_MODULES.ACADEMY,
+  academia: USER_MODULES.ACADEMY,
+  tutoriales: USER_MODULES.ACADEMY,
+  cosmos: USER_MODULES.COSMOS,
+  asistente: USER_MODULES.COSMOS,
+  cosmosasistente: USER_MODULES.COSMOS,
+  cosmosvoice: USER_MODULES.COSMOS_VOICE,
+  voz: USER_MODULES.COSMOS_VOICE,
+  cosmosvoz: USER_MODULES.COSMOS_VOICE,
+};
+
+export function resolveUserModuleId(raw: string): UserModuleId | null {
+  const folded = foldModuleAlias(raw);
+  return USER_MODULE_ALIASES[folded] ?? null;
+}
+
+export function resolveUserModuleIds(raw: string[]): { ids: UserModuleId[]; unknown: string[] } {
+  const ids: UserModuleId[] = [];
+  const unknown: string[] = [];
+  for (const item of raw) {
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const id = resolveUserModuleId(trimmed);
+    if (!id) {
+      unknown.push(trimmed);
+      continue;
+    }
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return { ids, unknown };
+}
+
+export function userModuleLabel(id: UserModuleId): string {
+  if (id === USER_MODULES.COSMOS_VOICE) return "Cosmos voz";
+  return USER_MODULE_DEFS.find((mod) => mod.id === id)?.label ?? id;
+}
 
 export const USER_MODULE_DEFS: Array<{
   id: UserModuleId;
@@ -55,6 +120,11 @@ export const USER_MODULE_DEFS: Array<{
     label: "Academia",
     description: "Cursos y tutoriales",
   },
+  {
+    id: USER_MODULES.COSMOS,
+    label: "Cosmos asistente",
+    description: "Asistente de IA en chat. Opcionalmente también por voz.",
+  },
 ];
 
 export const DEFAULT_ENABLED_MODULES: EnabledModules = {
@@ -63,6 +133,8 @@ export const DEFAULT_ENABLED_MODULES: EnabledModules = {
   dayCounter: true,
   milesCalculator: true,
   academy: true,
+  cosmos: false,
+  cosmosVoice: false,
 };
 
 /** Proveedores no tenían Academia por rol; el super admin la enciende si corresponde. */
@@ -79,8 +151,9 @@ export function normalizeEnabledModules(raw: unknown): EnabledModules {
   const obj = raw as Record<string, unknown>;
   for (const id of USER_MODULE_IDS) {
     if (obj[id] === false) result[id] = false;
+    else if (obj[id] === true) result[id] = true;
   }
-  return result;
+  return reconcileCosmosModuleAccess(result);
 }
 
 export type ModuleAccessUser = {
@@ -100,6 +173,26 @@ export function canAccessMilesCalculator(user: ModuleAccessUser | null | undefin
   if (user.role === ROLES.SUPER_ADMIN) return true;
   if (!canAccessModule(user, USER_MODULES.MILES_CALCULATOR)) return false;
   return canUseMilesCalculator(normalizeMilesProgramsAllowed(user.milesProgramsAllowed));
+}
+
+export function canAccessCosmos(user: ModuleAccessUser | null | undefined): boolean {
+  return canAccessModule(user, USER_MODULES.COSMOS);
+}
+
+/** Voz solo si el módulo Cosmos está encendido y el switch de voz también. */
+export function canAccessCosmosVoice(user: ModuleAccessUser | null | undefined): boolean {
+  if (!user) return false;
+  if (user.role === ROLES.SUPER_ADMIN) return true;
+  const mods = normalizeEnabledModules(user.enabledModules);
+  return mods.cosmos && mods.cosmosVoice;
+}
+
+/** Si Cosmos está apagado, la voz no puede quedar encendida sola. */
+export function reconcileCosmosModuleAccess(enabledModules: EnabledModules): EnabledModules {
+  if (!enabledModules.cosmos && enabledModules.cosmosVoice) {
+    return { ...enabledModules, cosmosVoice: false };
+  }
+  return enabledModules;
 }
 
 /**

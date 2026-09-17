@@ -64,6 +64,25 @@ import {
   remapConnectionSegmentsByEdgeOrder,
   type ConnectionSegmentImages,
 } from "@shared/quoteCombination";
+import {
+  formatCosmosQuoteMoney,
+  type CosmosMoneyCurrency,
+  type CosmosQuotePatch,
+} from "@shared/cosmosAgent";
+import {
+  COSMOS_QUOTE_RESET_EVENT,
+  COSMOS_QUOTE_SAVE_EVENT,
+  isQuoteDraftCleared,
+  takeCosmosQuoteCommand,
+  type CosmosQuoteSaveCommand,
+  clearQuoteDraft,
+} from "@/lib/cosmos-actions";
+import {
+  applySelectedUpgradesMap,
+  isGranTourEuropaName,
+  isItaliaTuristicaName,
+  isTurkeyEsencialName,
+} from "@shared/cosmosQuoteUpgrades";
 
 // WhatsApp Icon Component
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -257,6 +276,19 @@ export default function QuoteSummary() {
   const [isPDFComplete, setIsPDFComplete] = useState(false);
   const pdfCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const quoteSessionHydratedRef = useRef(false);
+  const afterSaveRef = useRef<"advisor" | "reset">("advisor");
+  const handleSaveQuoteRef = useRef<(overrides?: CosmosQuoteSaveCommand) => Promise<void>>(
+    async () => undefined,
+  );
+  const destinationsRef = useRef<Destination[]>([]);
+  const pendingUpgradePatchRef = useRef<Record<string, string> | null>(null);
+  const appliedUpgradePatchKeyRef = useRef("");
+  const quoteMoneyRef = useRef({
+    flightsCurrency: "USD" as CosmosMoneyCurrency,
+    assistanceCurrency: "USD" as CosmosMoneyCurrency,
+    finalCurrency: "USD" as CosmosMoneyCurrency,
+    finalPrice: "",
+  });
 
   const destinationSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -269,9 +301,54 @@ export default function QuoteSummary() {
   const [newClientEmail, setNewClientEmail] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
 
+  quoteMoneyRef.current = {
+    flightsCurrency: inputCurrencyFlights,
+    assistanceCurrency: inputCurrencyAssistance,
+    finalCurrency: inputCurrencyFinal,
+    finalPrice,
+  };
+
   const { data: destinations = [], isLoading: destinationsLoading } = useQuery<Destination[]>({
     queryKey: ["/api/destinations?isActive=true"],
   });
+  destinationsRef.current = destinations;
+
+  const applyUpgradePatch = useCallback((map: Record<string, string>) => {
+    pendingUpgradePatchRef.current = {
+      ...(pendingUpgradePatchRef.current ?? {}),
+      ...map,
+    };
+    const dests = destinationsRef.current;
+    const pending = pendingUpgradePatchRef.current;
+    const key = `${JSON.stringify(pending)}|${dests.map((d) => d.id).sort().join(",")}`;
+    if (!dests.length || appliedUpgradePatchKeyRef.current === key) return;
+    appliedUpgradePatchKeyRef.current = key;
+    const split = applySelectedUpgradesMap(pending, dests);
+    if (split.turkeyUpgrade !== undefined) setTurkeyUpgrade(split.turkeyUpgrade);
+    if (split.italiaUpgrade !== undefined) setItaliaUpgrade(split.italiaUpgrade);
+    if (split.granTourUpgrade !== undefined) setGranTourUpgrade(split.granTourUpgrade);
+    setOtherDestUpgrades((prev) => {
+      const next = { ...prev };
+      for (const dest of dests) {
+        if (
+          isTurkeyEsencialName(dest.name) ||
+          isItaliaTuristicaName(dest.name) ||
+          isGranTourEuropaName(dest.name)
+        ) {
+          delete next[dest.id];
+        }
+      }
+      for (const [id, code] of Object.entries(split.otherDestUpgrades)) {
+        if (!code) delete next[id];
+        else next[id] = code;
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (pendingUpgradePatchRef.current) applyUpgradePatch(pendingUpgradePatchRef.current);
+  }, [destinations, applyUpgradePatch]);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/admin/clients"],
@@ -313,11 +390,23 @@ export default function QuoteSummary() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      setShowSaveDialog(false);
+      const afterSave = afterSaveRef.current;
+      afterSaveRef.current = "advisor";
+      if (afterSave === "reset") {
+        clearQuoteDraft();
+        toast({
+          title: "Cotización guardada",
+          description: "La guardé. Empezamos una cotización nueva.",
+        });
+        window.dispatchEvent(new CustomEvent(COSMOS_QUOTE_RESET_EVENT));
+        setLocation("/");
+        return;
+      }
       toast({
         title: "Cotización guardada",
         description: "La cotización se ha guardado exitosamente",
       });
-      setShowSaveDialog(false);
       setLocation("/advisor");
     },
     onError: (error: any) => {
@@ -331,13 +420,29 @@ export default function QuoteSummary() {
 
   useEffect(() => {
     const savedData = sessionStorage.getItem("quoteData");
-    if (savedData) {
-      const parsed = JSON.parse(savedData) as {
-        destinations: string[];
-        startDate?: string;
-        connectionFlightSegments?: Array<{ images?: string[] }>;
-      };
+    const applyPrefill = (parsed: {
+      destinations?: string[];
+      startDate?: string;
+      passengers?: number;
+      originCity?: string;
+      connectionFlightSegments?: Array<{ images?: string[] }>;
+      flightsCost?: string;
+      flightsCurrency?: string;
+      assistanceCost?: string;
+      assistanceCurrency?: string;
+      finalPrice?: string;
+      finalPriceCurrency?: string;
+      minPayment?: string;
+      minPaymentPercent?: number;
+      customFilename?: string;
+      turkeyUpgrade?: string;
+      italiaUpgrade?: string;
+      granTourUpgrade?: string;
+      otherDestUpgrades?: Record<string, string>;
+      selectedUpgrades?: Record<string, string>;
+    }) => {
       const { destinations: destIds, startDate: start, connectionFlightSegments: savedSegs } = parsed;
+      if (!Array.isArray(destIds) || !destIds.length) return false;
       setSelectedDestinations(destIds);
 
       if (Array.isArray(savedSegs) && savedSegs.length > 0) {
@@ -346,18 +451,192 @@ export default function QuoteSummary() {
         );
       }
 
-      // Parsear fecha en zona horaria local para evitar problemas de UTC
       if (start) {
         const [year, month, day] = start.split("-").map(Number);
         setStartDate(new Date(year, month - 1, day));
       } else {
         setStartDate(undefined);
       }
+      if (typeof parsed.passengers === "number" && parsed.passengers >= 1) {
+        setPassengers(parsed.passengers);
+      }
+      if (typeof parsed.originCity === "string") {
+        setOriginCity(parsed.originCity);
+      }
+      if (parsed.flightsCurrency === "USD" || parsed.flightsCurrency === "COP") {
+        setInputCurrencyFlights(parsed.flightsCurrency);
+      }
+      if (typeof parsed.flightsCost === "string") setFlightsCost(parsed.flightsCost.replace(/,/g, ""));
+      if (parsed.assistanceCurrency === "USD" || parsed.assistanceCurrency === "COP") {
+        setInputCurrencyAssistance(parsed.assistanceCurrency);
+      }
+      if (typeof parsed.assistanceCost === "string") setAssistanceCost(parsed.assistanceCost.replace(/,/g, ""));
+      if (parsed.finalPriceCurrency === "USD" || parsed.finalPriceCurrency === "COP") {
+        setInputCurrencyFinal(parsed.finalPriceCurrency);
+      }
+      if (typeof parsed.finalPrice === "string") setFinalPrice(parsed.finalPrice.replace(/,/g, ""));
+      if (typeof parsed.minPayment === "string" && parsed.minPayment.trim()) {
+        setMinPayment(parsed.minPayment.replace(/,/g, ""));
+      } else if (typeof parsed.minPaymentPercent === "number" && parsed.finalPrice) {
+        const raw = parseFloat(String(parsed.finalPrice).replace(/,/g, "")) || 0;
+        if (raw > 0) {
+          const currency =
+            parsed.finalPriceCurrency === "COP" || parsed.finalPriceCurrency === "USD"
+              ? parsed.finalPriceCurrency
+              : "USD";
+          setMinPayment(formatCosmosQuoteMoney(raw * (parsed.minPaymentPercent / 100), currency));
+        }
+      }
+      if (typeof parsed.customFilename === "string") setCustomFilename(parsed.customFilename);
+      if (typeof parsed.turkeyUpgrade === "string") setTurkeyUpgrade(parsed.turkeyUpgrade);
+      if (typeof parsed.italiaUpgrade === "string") setItaliaUpgrade(parsed.italiaUpgrade);
+      if (typeof parsed.granTourUpgrade === "string") setGranTourUpgrade(parsed.granTourUpgrade);
+      if (parsed.otherDestUpgrades && typeof parsed.otherDestUpgrades === "object") {
+        setOtherDestUpgrades(parsed.otherDestUpgrades);
+      }
+      if (parsed.selectedUpgrades && Object.keys(parsed.selectedUpgrades).length) {
+        applyUpgradePatch(parsed.selectedUpgrades);
+      }
       quoteSessionHydratedRef.current = true;
-    } else {
-      setLocation("/");
+      return true;
+    };
+
+    if (savedData) {
+      try {
+        if (applyPrefill(JSON.parse(savedData))) return;
+      } catch {
+        /* ignore */
+      }
     }
-  }, [setLocation]);
+    setLocation("/");
+  }, [setLocation, applyUpgradePatch]);
+
+  useEffect(() => {
+    const onPrefill = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        destinations?: string[];
+        startDate?: string;
+        passengers?: number;
+        originCity?: string;
+        replace?: boolean;
+      }>).detail;
+      if (!detail?.destinations?.length) return;
+      if (detail.replace) {
+        setConnectionSegments([]);
+        setPassengers(typeof detail.passengers === "number" && detail.passengers >= 1 ? detail.passengers : 1);
+        setOriginCity(typeof detail.originCity === "string" ? detail.originCity : "");
+        setFlightsCost("");
+        setAssistanceCost("");
+        setFinalPrice("");
+        setMinPayment("");
+        setCustomFilename("");
+        setTurkeyUpgrade("");
+        setItaliaUpgrade("");
+        setGranTourUpgrade("");
+        setOtherDestUpgrades({});
+        setInputCurrencyFlights("USD");
+        setInputCurrencyAssistance("USD");
+        setInputCurrencyFinal("USD");
+      }
+      setSelectedDestinations(detail.destinations);
+      if (detail.startDate) {
+        const [year, month, day] = detail.startDate.split("-").map(Number);
+        setStartDate(new Date(year, month - 1, day));
+      } else if (detail.replace) {
+        setStartDate(undefined);
+      }
+      if (!detail.replace && typeof detail.passengers === "number" && detail.passengers >= 1) {
+        setPassengers(detail.passengers);
+      }
+      if (!detail.replace && typeof detail.originCity === "string") {
+        setOriginCity(detail.originCity);
+      }
+      quoteSessionHydratedRef.current = true;
+    };
+    const onPatch = (event: Event) => {
+      const detail = (event as CustomEvent<CosmosQuotePatch>).detail;
+      if (!detail) return;
+      if (detail.planIds?.length) setSelectedDestinations(detail.planIds);
+      if (detail.startDate) {
+        const [year, month, day] = detail.startDate.split("-").map(Number);
+        setStartDate(new Date(year, month - 1, day));
+      }
+      if (typeof detail.passengers === "number" && detail.passengers >= 1) {
+        setPassengers(detail.passengers);
+      }
+      if (typeof detail.originCity === "string") {
+        setOriginCity(detail.originCity);
+      }
+      const latest = quoteMoneyRef.current;
+      const flightsCurrency = detail.flightsCurrency ?? latest.flightsCurrency;
+      const assistanceCurrency = detail.assistanceCurrency ?? latest.assistanceCurrency;
+      const finalCurrency = detail.finalPriceCurrency ?? latest.finalCurrency;
+      if (detail.flightsCurrency) setInputCurrencyFlights(detail.flightsCurrency);
+      if (detail.assistanceCurrency) setInputCurrencyAssistance(detail.assistanceCurrency);
+      if (detail.finalPriceCurrency) setInputCurrencyFinal(detail.finalPriceCurrency);
+      if (detail.flightsCost != null) {
+        setFlightsCost(formatCosmosQuoteMoney(detail.flightsCost, flightsCurrency));
+      }
+      if (detail.assistanceCost != null) {
+        setAssistanceCost(formatCosmosQuoteMoney(detail.assistanceCost, assistanceCurrency));
+      }
+      const nextFinalPrice =
+        detail.finalPrice != null
+          ? formatCosmosQuoteMoney(detail.finalPrice, finalCurrency)
+          : latest.finalPrice;
+      if (detail.finalPrice != null) setFinalPrice(nextFinalPrice);
+      if (detail.minPayment != null) {
+        setMinPayment(formatCosmosQuoteMoney(detail.minPayment, finalCurrency));
+      } else if (detail.minPaymentPercent != null) {
+        const raw = parseFloat(nextFinalPrice.replace(/,/g, "")) || 0;
+        if (raw > 0) {
+          setMinPayment(formatCosmosQuoteMoney(raw * (detail.minPaymentPercent / 100), finalCurrency));
+        }
+      }
+      if (typeof detail.customFilename === "string" && detail.customFilename.trim()) {
+        setCustomFilename(detail.customFilename.trim());
+      }
+      if (detail.selectedUpgrades && Object.keys(detail.selectedUpgrades).length) {
+        applyUpgradePatch(detail.selectedUpgrades);
+      }
+      quoteSessionHydratedRef.current = true;
+    };
+    const runSaveCommand = (command: CosmosQuoteSaveCommand) => {
+      const trySave = (attempt = 0) => {
+        if (quoteSessionHydratedRef.current || attempt > 24) {
+          void handleSaveQuoteRef.current(command);
+          return;
+        }
+        window.setTimeout(() => trySave(attempt + 1), 50);
+      };
+      trySave();
+    };
+    const onSave = (event: Event) => {
+      const detail = (event as CustomEvent<CosmosQuoteSaveCommand>).detail;
+      if (!detail || detail.type !== "save") return;
+      runSaveCommand(detail);
+    };
+    const onReset = () => {
+      quoteSessionHydratedRef.current = false;
+      setSelectedDestinations([]);
+    };
+    window.addEventListener("cosmos-quote-prefill", onPrefill);
+    window.addEventListener("cosmos-quote-patch", onPatch);
+    window.addEventListener(COSMOS_QUOTE_SAVE_EVENT, onSave);
+    window.addEventListener(COSMOS_QUOTE_RESET_EVENT, onReset);
+    const pending = takeCosmosQuoteCommand();
+    if (pending?.type === "save") {
+      window.setTimeout(() => runSaveCommand(pending), 50);
+    } else if (pending?.type === "reset") {
+      onReset();
+    }
+    return () => {
+      window.removeEventListener("cosmos-quote-prefill", onPrefill);
+      window.removeEventListener("cosmos-quote-patch", onPatch);
+      window.removeEventListener(COSMOS_QUOTE_SAVE_EVENT, onSave);
+      window.removeEventListener(COSMOS_QUOTE_RESET_EVENT, onReset);
+    };
+  }, [applyUpgradePatch]);
 
   useEffect(() => {
     const need = Math.max(0, selectedDestinations.length - 1);
@@ -375,6 +654,7 @@ export default function QuoteSummary() {
 
   const writeQuoteSession = useCallback(() => {
     try {
+      if (isQuoteDraftCleared()) return;
       const raw = sessionStorage.getItem("quoteData");
       const base = raw ? JSON.parse(raw) : {};
       const formatLocalDate = (date: Date) => {
@@ -390,12 +670,36 @@ export default function QuoteSummary() {
           destinations: selectedDestinations,
           startDate: startDate ? formatLocalDate(startDate) : base.startDate ?? "",
           connectionFlightSegments: connectionSegments,
+          passengers,
+          originCity,
+          flightsCost,
+          flightsCurrency: inputCurrencyFlights,
+          assistanceCost,
+          assistanceCurrency: inputCurrencyAssistance,
+          finalPrice,
+          finalPriceCurrency: inputCurrencyFinal,
+          minPayment,
+          customFilename,
+          turkeyUpgrade,
+          italiaUpgrade,
+          granTourUpgrade,
+          otherDestUpgrades,
+          selectedUpgrades: (() => {
+            const map: Record<string, string> = { ...otherDestUpgrades };
+            for (const dest of destinations) {
+              if (!selectedDestinations.includes(dest.id)) continue;
+              if (isTurkeyEsencialName(dest.name) && turkeyUpgrade) map[dest.id] = turkeyUpgrade;
+              else if (isItaliaTuristicaName(dest.name) && italiaUpgrade) map[dest.id] = italiaUpgrade;
+              else if (isGranTourEuropaName(dest.name) && granTourUpgrade) map[dest.id] = granTourUpgrade;
+            }
+            return Object.keys(map).length ? map : undefined;
+          })(),
         }),
       );
     } catch {
       /* ignore */
     }
-  }, [selectedDestinations, startDate, connectionSegments]);
+  }, [selectedDestinations, startDate, connectionSegments, passengers, originCity, flightsCost, inputCurrencyFlights, assistanceCost, inputCurrencyAssistance, finalPrice, inputCurrencyFinal, minPayment, customFilename, turkeyUpgrade, italiaUpgrade, granTourUpgrade, otherDestUpgrades, destinations]);
 
   useEffect(() => {
     if (!quoteSessionHydratedRef.current) return;
@@ -988,36 +1292,59 @@ export default function QuoteSummary() {
     window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, "_blank");
   };
 
-  const handleSaveQuote = async () => {
-    let clientIdToUse = selectedClientId;
+  const handleSaveQuote = async (overrides?: CosmosQuoteSaveCommand) => {
+    if (overrides?.thenReset) afterSaveRef.current = "reset";
 
-    if (activeTab === "new") {
-      if (!newClientName || !newClientEmail) {
+    let clientIdToUse = overrides?.clientId || selectedClientId;
+    const createNew =
+      !overrides?.clientId &&
+      Boolean(overrides?.clientName && overrides?.clientEmail);
+
+    if (!clientIdToUse && overrides?.clientName && !createNew) {
+      const hay = overrides.clientName.trim().toLowerCase();
+      const matched = clients.filter(
+        (c) =>
+          c.name.toLowerCase().includes(hay) ||
+          c.email.toLowerCase() === hay ||
+          (overrides.clientEmail && c.email.toLowerCase() === overrides.clientEmail.trim().toLowerCase()),
+      );
+      if (matched.length === 1) clientIdToUse = matched[0].id;
+    }
+
+    if (createNew || activeTab === "new") {
+      const name = overrides?.clientName || newClientName;
+      const email = overrides?.clientEmail || newClientEmail;
+      if (!name || !email) {
+        setShowSaveDialog(true);
         toast({
           title: "Datos incompletos",
           description: "Por favor completa el nombre y correo del cliente",
           variant: "destructive",
         });
+        afterSaveRef.current = "advisor";
         return;
       }
 
       try {
         const newClient = await createClientMutation.mutateAsync({
-          name: newClientName,
-          email: newClientEmail,
+          name,
+          email,
           phone: newClientPhone || null,
         });
         clientIdToUse = newClient.id;
       } catch (error) {
+        afterSaveRef.current = "advisor";
         return; // Error handled in mutation
       }
     } else {
       if (!clientIdToUse) {
+        setShowSaveDialog(true);
         toast({
           title: "Cliente requerido",
-          description: "Por favor, selecciona un cliente",
+          description: "Elige el cliente para guardar esta cotización",
           variant: "destructive",
         });
+        afterSaveRef.current = "advisor";
         return;
       }
     }
@@ -1028,6 +1355,7 @@ export default function QuoteSummary() {
         description: "Por favor, selecciona una fecha de inicio",
         variant: "destructive",
       });
+      afterSaveRef.current = "advisor";
       return;
     }
 
@@ -1118,7 +1446,12 @@ export default function QuoteSummary() {
       })),
     };
 
-    await saveQuoteMutation.mutateAsync(quoteData);
+    try {
+      await saveQuoteMutation.mutateAsync(quoteData);
+    } catch {
+      afterSaveRef.current = "advisor";
+      return;
+    }
 
     // Track saved quote
     trackQuote({
@@ -1134,6 +1467,7 @@ export default function QuoteSummary() {
       }
     });
   };
+  handleSaveQuoteRef.current = handleSaveQuote;
 
   const handleExportPDF = async () => {
     // Prevent concurrent PDF generation
@@ -1363,7 +1697,7 @@ export default function QuoteSummary() {
           </p>
         </div>
 
-        <Card className="mb-6">
+        <Card className="mb-6" data-cosmos-target="quote.plans">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="w-5 h-5" />
@@ -1517,6 +1851,7 @@ export default function QuoteSummary() {
                     </Badge>
                   )}
                 </label>
+                <div data-cosmos-target="quote.dates">
                 <DatePicker
                   date={startDate}
                   onDateChange={setStartDate}
@@ -1545,9 +1880,15 @@ export default function QuoteSummary() {
                       : undefined
                   }
                 />
-                {bloqueoPlan && maxBloqueoPax != null && maxBloqueoPax > 0 && (
-                  <div className="mt-3 space-y-1">
-                    <Label className="text-sm">Pasajeros (máx. {maxBloqueoPax} cupos)</Label>
+                </div>
+                <div className="mt-3 space-y-1" data-cosmos-target="quote.passengers">
+                  <Label className="text-sm">
+                    Pasajeros
+                    {bloqueoPlan && maxBloqueoPax != null && maxBloqueoPax > 0
+                      ? ` (máx. ${maxBloqueoPax} cupos)`
+                      : ""}
+                  </Label>
+                  {bloqueoPlan && maxBloqueoPax != null && maxBloqueoPax > 0 ? (
                     <Select
                       value={String(passengers)}
                       onValueChange={(v) => setPassengers(Math.min(maxBloqueoPax, Math.max(1, parseInt(v, 10) || 1)))}
@@ -1563,8 +1904,21 @@ export default function QuoteSummary() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                )}
+                  ) : (
+                    <Input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={passengers}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10);
+                        setPassengers(Number.isFinite(n) ? Math.min(50, Math.max(1, n)) : 1);
+                      }}
+                      className="w-40"
+                      data-testid="input-passengers"
+                    />
+                  )}
+                </div>
 
                 {!bloqueoPdfOnly &&
                   selectedDestinations.length > 0 &&
@@ -1613,7 +1967,7 @@ export default function QuoteSummary() {
         </Card>
 
         {!bloqueoPdfOnly && hasTurkeyEsencial && (turkeyUpgrades.length > 0 ? (
-          <Card className="mb-6 border-orange-200">
+          <Card className="mb-6 border-orange-200" data-cosmos-target="quote.upgrades">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-price-accent">
                 <Star className="w-5 h-5" />
@@ -1655,7 +2009,7 @@ export default function QuoteSummary() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="mb-6 border-orange-200">
+          <Card className="mb-6 border-orange-200" data-cosmos-target="quote.upgrades">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-price-accent">
                 <Star className="w-5 h-5" />
@@ -1716,7 +2070,7 @@ export default function QuoteSummary() {
         ))}
 
         {!bloqueoPdfOnly && hasItaliaTuristica && italiaUpgrades.length > 0 && (
-          <Card className="mb-6 border-primary/30">
+          <Card className="mb-6 border-primary/30" data-cosmos-target="quote.upgrades">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-primary">
                 <Star className="w-5 h-5" />
@@ -1759,7 +2113,7 @@ export default function QuoteSummary() {
         )}
 
         {!bloqueoPdfOnly && destsWithUpgradesOther.map((dest) => (
-          <Card key={dest.id} className="mb-6 border-primary/30">
+          <Card key={dest.id} className="mb-6 border-primary/30" data-cosmos-target="quote.upgrades">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-primary">
                 <Star className="w-5 h-5" />
@@ -1807,7 +2161,7 @@ export default function QuoteSummary() {
         ))}
 
         {!bloqueoPdfOnly && hasGranTourEuropa && granTourUpgrades.length > 0 && (
-          <Card className="mb-6 border-purple-200">
+          <Card className="mb-6 border-purple-200" data-cosmos-target="quote.upgrades">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-purple-600">
                 <Star className="w-5 h-5" />
@@ -1868,13 +2222,14 @@ export default function QuoteSummary() {
               onChange={(e) => setOriginCity(e.target.value.toUpperCase())}
               className="text-lg font-semibold"
               data-testid="input-origin-city"
+              data-cosmos-target="quote.origin"
             />
           </CardContent>
         </Card>
         )}
 
         {!bloqueoPdfOnly && (
-        <Card className="mb-6">
+        <Card className="mb-6" data-cosmos-target="quote.flights">
           <CardHeader>
             <CardTitle>Vuelos de Ida</CardTitle>
           </CardHeader>
@@ -2115,7 +2470,7 @@ export default function QuoteSummary() {
             <p className="text-sm text-muted-foreground mb-3">
               Ingresa los valores en USD por defecto. Al cambiar a COP, el monto se convierte automáticamente con la TRM del sistema.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-cosmos-target="quote.costs">
               <div>
                 <Label>Vuelos</Label>
                 <div className="flex items-center gap-2 mt-1">
@@ -2141,6 +2496,8 @@ export default function QuoteSummary() {
                     value={formatNumber(flightsCost)}
                     onChange={(e) => setFlightsCost(e.target.value.replace(/,/g, ""))}
                     className="text-lg font-semibold"
+                    data-testid="input-flights-cost"
+                    data-cosmos-target="quote.flightsCost"
                   />
                 </div>
                 {systemEffectiveTrm > 0 && (
@@ -2177,6 +2534,8 @@ export default function QuoteSummary() {
                     value={formatNumber(assistanceCost)}
                     onChange={(e) => setAssistanceCost(e.target.value.replace(/,/g, ""))}
                     className="text-lg font-semibold"
+                    data-testid="input-assistance-cost"
+                    data-cosmos-target="quote.assistanceCost"
                   />
                 </div>
                 {systemEffectiveTrm > 0 && (
@@ -2205,7 +2564,7 @@ export default function QuoteSummary() {
         </Card>
 
         {hasPlanTaxes && (
-          <Card className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 dark:from-amber-950/50 dark:to-orange-950/50 dark:border-amber-700/60">
+          <Card className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 dark:from-amber-950/50 dark:to-orange-950/50 dark:border-amber-700/60" data-cosmos-target="quote.taxes">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Receipt className="w-5 h-5" />
@@ -2295,7 +2654,7 @@ export default function QuoteSummary() {
         </Card>
 
         <Card className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 dark:from-purple-950/50 dark:to-pink-950/50 dark:border-purple-700/60">
-          <CardHeader>
+          <CardHeader data-cosmos-target="quote.trm">
             <CardTitle className="flex items-center gap-2 text-foreground">
               <DollarSign className="w-5 h-5" />
               Precio Final de Venta PVP
@@ -2329,6 +2688,7 @@ export default function QuoteSummary() {
                 onChange={(e) => setFinalPrice(e.target.value.replace(/,/g, ""))}
                 className="text-lg font-semibold"
                 data-testid="input-final-price"
+                data-cosmos-target="quote.pvp"
               />
             </div>
             {systemEffectiveTrm > 0 && (
@@ -2535,6 +2895,7 @@ export default function QuoteSummary() {
                 onChange={(e) => setMinPayment(e.target.value.replace(/,/g, ""))}
                 className="text-lg font-semibold"
                 data-testid="input-min-payment"
+                data-cosmos-target="quote.minPayment"
               />
             </div>
 
@@ -2597,6 +2958,7 @@ export default function QuoteSummary() {
               onChange={(e) => setCustomFilename(e.target.value)}
               className="text-lg"
               data-testid="input-custom-filename"
+              data-cosmos-target="quote.filename"
             />
           </CardContent>
         </Card>
@@ -2630,6 +2992,7 @@ export default function QuoteSummary() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => setShowSaveDialog(true)}
                 data-testid="button-save-quote"
+                data-cosmos-target="quote.save"
               >
                 <Save className="w-5 h-5 mr-2" />
                 Guardar Cotización
