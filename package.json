@@ -9,7 +9,9 @@
   },
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/index.ts",
-    "build": "vite build && cp -r public/images dist/public/ && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --minify",
+    "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --minify",
+    "build:agent": "esbuild server/agents/cosmos.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/cosmos-agent.js --minify",
+    "build": "vite build && cp -r public/images dist/public/ && npm run build:server && npm run build:agent",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:generate": "drizzle-kit generate",
@@ -30,7 +32,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "cosmos:agent": "tsx server/agents/cosmos.ts dev",
-    "cosmos:agent:start": "tsx server/agents/cosmos.ts start"
+    "cosmos:agent:start": "node dist/cosmos-agent.js start"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

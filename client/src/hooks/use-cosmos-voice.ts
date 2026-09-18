@@ -215,7 +215,7 @@ export function useCosmosVoice({ currentPlanId, screen, onAction, onTranscript }
           if (roomRef.current !== nextRoom) return;
           if (!findAgentParticipant(nextRoom)) {
             setError(
-              "No se pudo abrir la voz. En local hace falta el proceso `npm run cosmos:agent`."
+              "No se pudo abrir la voz. El worker de Cosmos no se unió a la sala."
             );
             setState("error");
             void stop();

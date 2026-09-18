@@ -685,9 +685,17 @@ export function CosmosChatWidget() {
                     type="button"
                     size="icon"
                     variant="outline"
-                    className="shrink-0 h-10 w-10 rounded-xl"
-                    disabled={!available || !voiceAvailable}
+                    className={cn(
+                      "shrink-0 h-10 w-10 rounded-xl",
+                      !voiceAvailable && "opacity-60"
+                    )}
+                    disabled={!available}
                     onClick={() => {
+                      if (!voiceAvailable) {
+                        setError(voiceHint);
+                        return;
+                      }
+                      setError(null);
                       setOpen(true);
                       setVoiceWanted(true);
                     }}
@@ -708,6 +716,9 @@ export function CosmosChatWidget() {
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
+              {showVoice && !voiceAvailable && (
+                <p className="text-[10px] text-muted-foreground px-0.5 leading-snug">{voiceHint}</p>
+              )}
             </div>
           </motion.div>
         )}
