@@ -1928,9 +1928,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = req.user as User;
     const hasCosmos = canAccessCosmos(user);
     const hasVoice = canAccessCosmosVoice(user);
+    const openai = isOpenAIConfigured();
+    const livekit = isLiveKitConfigured();
+    let voiceDisabledReason: "openai" | "livekit" | "module" | null = null;
+    if (!openai) voiceDisabledReason = "openai";
+    else if (!hasVoice) voiceDisabledReason = "module";
+    else if (!livekit) voiceDisabledReason = "livekit";
     res.json({
-      available: hasCosmos && isOpenAIConfigured(),
-      voiceAvailable: hasCosmos && hasVoice && isOpenAIConfigured() && isLiveKitConfigured(),
+      available: hasCosmos && openai,
+      voiceAvailable: hasCosmos && hasVoice && openai && livekit,
+      voiceDisabledReason,
       name: "Cosmos",
     });
   });
