@@ -3,7 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  cosmosAgentHealthPort,
   getCosmosAgentAutostartSkipReason,
+  probeCosmosAgentHealth,
   resolveCosmosAgentSpawn,
 } from "../startCosmosAgent";
 
@@ -74,5 +76,16 @@ describe("startCosmosAgent", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it("elige un puerto de health distinto al de Express", async () => {
+    process.env.PORT = "5000";
+    delete process.env.COSMOS_AGENT_PORT;
+    expect(cosmosAgentHealthPort()).toBe(8091);
+    process.env.PORT = "8091";
+    expect(cosmosAgentHealthPort()).toBe(8092);
+    const health = await probeCosmosAgentHealth();
+    expect(health.ok).toBe(false);
+    expect(health.port).toBe(8092);
   });
 });

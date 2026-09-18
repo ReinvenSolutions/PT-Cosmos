@@ -12,7 +12,7 @@
     "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --minify",
     "build:agent": "esbuild server/agents/cosmos.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/cosmos-agent.js --minify",
     "build": "vite build && cp -r public/images dist/public/ && npm run build:server && npm run build:agent",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "NODE_ENV=production node scripts/start-production.mjs",
     "check": "tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

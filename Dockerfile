@@ -1,23 +1,24 @@
-# Use Node.js 22 as base image
-FROM node:22-slim
+# Native addons (LiveKit rtc-node + onnxruntime) need glibc + libstdc++.
+# node:slim without these libs makes the voice job throw "error in entry function".
+FROM node:22-bookworm-slim
 
-# Set working directory
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libstdc++6 \
+    libgcc-s1 \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies
 RUN npm ci --only=production=false
 
-# Copy the rest of the application
 COPY . .
 
-# Build the application
 RUN npm run build
 
-# Expose the port Railway will use
 EXPOSE 5000
 
-# Start the application
 CMD ["npm", "start"]

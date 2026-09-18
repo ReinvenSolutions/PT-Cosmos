@@ -363,106 +363,136 @@ function createTools(job: JobContext, toolCtx: CosmosToolContext, userIdentity: 
 
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
-    proc.userData.vad = await silero.VAD.load();
+    try {
+      proc.userData.vad = await silero.VAD.load();
+    } catch (err) {
+      logger.error("Cosmos voice: falló la carga de VAD en prewarm", {
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+      throw err;
+    }
   },
   entry: async (ctx: JobContext) => {
-    await ctx.connect();
+    const step = (name: string) => logger.info(`Cosmos voice: ${name}`);
+    try {
+      step("job iniciado");
+      if (!process.env.OPENAI_API_KEY?.trim()) {
+        throw new Error("Falta OPENAI_API_KEY en el worker de voz");
+      }
+      if (!ctx.proc.userData.vad) {
+        step("cargando VAD");
+        ctx.proc.userData.vad = await silero.VAD.load();
+      }
+      step("conectando a la sala");
+      await ctx.connect();
+      step("conectado a la sala");
 
-    const rawMetadata = jobMetadataString(ctx);
-    const metadata = parseCosmosVoiceJobMetadata(rawMetadata);
-    if (!metadata) {
-      logger.error("Cosmos voice: metadata de job inválida", {
-        raw: rawMetadata.slice(0, 800),
-      });
-      ctx.shutdown("metadata inválida");
-      return;
-    }
+      const rawMetadata = jobMetadataString(ctx);
+      const metadata = parseCosmosVoiceJobMetadata(rawMetadata);
+      if (!metadata) {
+        logger.error("Cosmos voice: metadata de job inválida", {
+          raw: rawMetadata.slice(0, 800),
+        });
+        ctx.shutdown("metadata inválida");
+        return;
+      }
 
-    const user = await storage.findUserById(metadata.userId);
-    const toolCtx: CosmosToolContext = {
-      userId: metadata.userId,
-      userRole: metadata.userRole,
-      userName: metadata.userName,
-      sessionId: metadata.sessionId,
-      screen: metadata.screen,
-      enabledModules: user?.enabledModules,
-      milesProgramsAllowed: user?.milesProgramsAllowed,
-    };
-    const [knowledge, cosmosConfig, sessionRow] = await Promise.all([
-      buildCosmosSystemContext({
-        userMessage: metadata.currentPlanId || metadata.screen?.planId ? "plan en pantalla" : "hola",
-        history: [],
-        currentPlanId: metadata.currentPlanId ?? metadata.screen?.planId,
+      const user = await storage.findUserById(metadata.userId);
+      const toolCtx: CosmosToolContext = {
+        userId: metadata.userId,
         userRole: metadata.userRole,
-        screen: metadata.screen,
-      }),
-      getCosmosAssistantConfig(),
-      getCosmosSessionById(metadata.sessionId),
-    ]);
-    const sessionBrief = parseCosmosCaseBrief(
-      (sessionRow?.metadata as Record<string, unknown> | null)?.brief
-    );
-    const knowledgeWithBrief = sessionBrief
-      ? `${knowledge}\n\n## Brief del caso (sesión)\n${JSON.stringify(sessionBrief)}`
-      : knowledge;
-
-    const instructions = buildCosmosSystemPrompt({
-      user: { name: metadata.userName, username: metadata.userName, role: metadata.userRole },
-      knowledge: knowledgeWithBrief,
-      config: cosmosConfig,
-      channel: metadata.channel,
-    });
-
-    const session = new voice.AgentSession({
-      stt: new openai.STT({
-        language: COSMOS_STT_LANGUAGE,
-        detectLanguage: false,
-      }),
-      llm: new openai.LLM({
-        model: "gpt-4o-mini",
-        temperature: cosmosConfig.temperature,
-      }),
-      tts: new openai.TTS({
-        model: COSMOS_TTS_MODEL,
-        voice: cosmosConfig.voice,
-        instructions: COSMOS_TTS_INSTRUCTIONS,
-      }),
-      vad: ctx.proc.userData.vad as InstanceType<typeof silero.VAD>,
-    });
-
-    session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (event) => {
-      if (!(event.item instanceof ChatMessage)) return;
-      const content = event.item.textContent?.trim();
-      if (!content) return;
-      const role = event.item.role === "assistant" ? "assistant" : "user";
-      void appendCosmosSessionMessage({
+        userName: metadata.userName,
         sessionId: metadata.sessionId,
-        role,
-        content,
+        screen: metadata.screen,
+        enabledModules: user?.enabledModules,
+        milesProgramsAllowed: user?.milesProgramsAllowed,
+      };
+      step("cargando contexto");
+      const [knowledge, cosmosConfig, sessionRow] = await Promise.all([
+        buildCosmosSystemContext({
+          userMessage: metadata.currentPlanId || metadata.screen?.planId ? "plan en pantalla" : "hola",
+          history: [],
+          currentPlanId: metadata.currentPlanId ?? metadata.screen?.planId,
+          userRole: metadata.userRole,
+          screen: metadata.screen,
+        }),
+        getCosmosAssistantConfig(),
+        getCosmosSessionById(metadata.sessionId),
+      ]);
+      const sessionBrief = parseCosmosCaseBrief(
+        (sessionRow?.metadata as Record<string, unknown> | null)?.brief
+      );
+      const knowledgeWithBrief = sessionBrief
+        ? `${knowledge}\n\n## Brief del caso (sesión)\n${JSON.stringify(sessionBrief)}`
+        : knowledge;
+
+      const instructions = buildCosmosSystemPrompt({
+        user: { name: metadata.userName, username: metadata.userName, role: metadata.userRole },
+        knowledge: knowledgeWithBrief,
+        config: cosmosConfig,
+        channel: metadata.channel,
       });
-    });
 
-    session.on(voice.AgentSessionEventTypes.SessionUsageUpdated, (ev) => {
-      void updateCosmosSessionMetadata(metadata.sessionId, {
-        usage: JSON.parse(JSON.stringify(ev.usage)),
+      const session = new voice.AgentSession({
+        stt: new openai.STT({
+          language: COSMOS_STT_LANGUAGE,
+          detectLanguage: false,
+        }),
+        llm: new openai.LLM({
+          model: "gpt-4o-mini",
+          temperature: cosmosConfig.temperature,
+        }),
+        tts: new openai.TTS({
+          model: COSMOS_TTS_MODEL,
+          voice: cosmosConfig.voice,
+          instructions: COSMOS_TTS_INSTRUCTIONS,
+        }),
+        vad: ctx.proc.userData.vad as InstanceType<typeof silero.VAD>,
       });
-    });
 
-    ctx.addShutdownCallback(async () => {
-      await endCosmosSession(metadata.sessionId);
-    });
+      session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (event) => {
+        if (!(event.item instanceof ChatMessage)) return;
+        const content = event.item.textContent?.trim();
+        if (!content) return;
+        const role = event.item.role === "assistant" ? "assistant" : "user";
+        void appendCosmosSessionMessage({
+          sessionId: metadata.sessionId,
+          role,
+          content,
+        });
+      });
 
-    await session.start({
-      agent: voice.Agent.create({
-        instructions,
-        tools: createTools(ctx, toolCtx, metadata.userIdentity),
-      }),
-      room: ctx.room,
-    });
+      session.on(voice.AgentSessionEventTypes.SessionUsageUpdated, (ev) => {
+        void updateCosmosSessionMetadata(metadata.sessionId, {
+          usage: JSON.parse(JSON.stringify(ev.usage)),
+        });
+      });
 
-    await session.generateReply({
-      instructions: `Saluda a ${metadata.userName} en español latino de Colombia, en una frase corta, y ofrece ayuda con planes o cotizaciones. No uses inglés.`,
-    });
+      ctx.addShutdownCallback(async () => {
+        await endCosmosSession(metadata.sessionId);
+      });
+
+      step("iniciando AgentSession");
+      await session.start({
+        agent: voice.Agent.create({
+          instructions,
+          tools: createTools(ctx, toolCtx, metadata.userIdentity),
+        }),
+        room: ctx.room,
+      });
+
+      step("saludando");
+      await session.generateReply({
+        instructions: `Saluda a ${metadata.userName} en español latino de Colombia, en una frase corta, y ofrece ayuda con planes o cotizaciones. No uses inglés.`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      console.error("COSMOS_VOICE_ENTRY_ERROR", message, stack);
+      logger.error("Cosmos voice: error en entry", { message, stack });
+      throw err;
+    }
   },
 });
 
@@ -484,10 +514,12 @@ if (!invokedAsJobWorker) {
       wsURL: process.env.LIVEKIT_URL,
       apiKey: process.env.LIVEKIT_API_KEY,
       apiSecret: process.env.LIVEKIT_API_SECRET,
-      // En el mismo contenedor que Express: 1 proceso idle, puerto distinto a PORT.
+      // Mismo contenedor que Express: 1 idle, health solo en localhost, nunca marcar FULL por CPU.
       numIdleProcesses: 1,
       initializeProcessTimeout: 60_000,
-      loadThreshold: 0.95,
+      loadFunc: async () => 0.1,
+      loadThreshold: 0.9,
+      host: "127.0.0.1",
       port: cosmosAgentHealthPort(),
     })
   );
