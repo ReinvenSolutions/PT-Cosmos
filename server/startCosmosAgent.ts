@@ -6,6 +6,9 @@ import { logger } from "./logger";
 
 let worker: ChildProcess | null = null;
 let exitHookInstalled = false;
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
+let restartAttempt = 0;
+let stopping = false;
 
 export type CosmosAgentSpawnSpec = {
   command: string;
@@ -48,6 +51,18 @@ export function resolveCosmosAgentSpawn(cwd = process.cwd()): CosmosAgentSpawnSp
   };
 }
 
+function scheduleCosmosAgentRestart(): void {
+  if (stopping || restartTimer) return;
+  restartAttempt += 1;
+  const delayMs = Math.min(30_000, 2000 * 2 ** Math.min(restartAttempt - 1, 4));
+  logger.warn("Reintentando worker de voz de Cosmos", { attempt: restartAttempt, delayMs });
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    startCosmosAgentIfNeeded();
+  }, delayMs);
+  restartTimer.unref?.();
+}
+
 export function startCosmosAgentIfNeeded(): void {
   const skipReason = getCosmosAgentAutostartSkipReason();
   if (skipReason) {
@@ -57,10 +72,16 @@ export function startCosmosAgentIfNeeded(): void {
   if (worker && worker.exitCode === null && !worker.killed) return;
 
   const spec = resolveCosmosAgentSpawn();
+  const webPort = Number(process.env.PORT);
+  const agentPort = Number(process.env.COSMOS_AGENT_PORT) || (webPort === 8091 ? 8092 : 8091);
   worker = spawn(spec.command, spec.args, {
     cwd: process.cwd(),
     stdio: ["ignore", "inherit", "inherit"],
-    env: { ...process.env, COSMOS_AGENT_CHILD: "1" },
+    env: {
+      ...process.env,
+      COSMOS_AGENT_CHILD: "1",
+      COSMOS_AGENT_PORT: String(agentPort),
+    },
     // npm suele ser un script de shell; node/tsx no lo necesitan.
     shell: spec.viaNpm,
   });
@@ -72,29 +93,39 @@ export function startCosmosAgentIfNeeded(): void {
       args: spec.args,
     });
     worker = null;
+    scheduleCosmosAgentRestart();
   });
 
   worker.on("exit", (code, signal) => {
-    if (signal !== "SIGTERM" && code !== 0 && code !== null) {
+    worker = null;
+    if (stopping || signal === "SIGTERM") return;
+    if (code !== 0 && code !== null) {
       logger.warn("El worker de voz de Cosmos se detuvo", { code, signal });
     }
-    worker = null;
+    scheduleCosmosAgentRestart();
   });
 
   if (!exitHookInstalled) {
     exitHookInstalled = true;
-    process.on("exit", () => {
+    const stop = () => {
+      stopping = true;
+      if (restartTimer) {
+        clearTimeout(restartTimer);
+        restartTimer = null;
+      }
       if (!worker?.pid) return;
       try {
         worker.kill("SIGTERM");
       } catch {
         /* ignore */
       }
-    });
+    };
+    process.on("exit", stop);
   }
 
   logger.info("🎙️ Cosmos voz: worker LiveKit iniciado junto al servidor", {
     command: spec.command,
     args: spec.args,
+    agentPort,
   });
 }

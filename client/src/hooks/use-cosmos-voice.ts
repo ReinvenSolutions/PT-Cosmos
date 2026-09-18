@@ -220,7 +220,7 @@ export function useCosmosVoice({ currentPlanId, screen, onAction, onTranscript }
             setState("error");
             void stop();
           }
-        }, 20000);
+        }, 40000);
         nextRoom.once(RoomEvent.ParticipantConnected, (p) => {
           if (p.isAgent || p.attributes["lk.agent.state"] !== undefined) {
             window.clearTimeout(timeout);

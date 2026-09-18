@@ -366,14 +366,17 @@ export default defineAgent({
     proc.userData.vad = await silero.VAD.load();
   },
   entry: async (ctx: JobContext) => {
-    const metadata = parseCosmosVoiceJobMetadata(jobMetadataString(ctx));
+    await ctx.connect();
+
+    const rawMetadata = jobMetadataString(ctx);
+    const metadata = parseCosmosVoiceJobMetadata(rawMetadata);
     if (!metadata) {
-      logger.error("Cosmos voice: metadata de job inválida");
+      logger.error("Cosmos voice: metadata de job inválida", {
+        raw: rawMetadata.slice(0, 800),
+      });
       ctx.shutdown("metadata inválida");
       return;
     }
-
-    await ctx.connect();
 
     const user = await storage.findUserById(metadata.userId);
     const toolCtx: CosmosToolContext = {
@@ -463,9 +466,29 @@ export default defineAgent({
   },
 });
 
-cli.runApp(
-  new ServerOptions({
-    agent: fileURLToPath(import.meta.url),
-    agentName: COSMOS_LIVEKIT_AGENT_NAME,
-  })
-);
+/** El job worker importa este archivo; no debe volver a parsear el CLI ni salir. */
+const invokedAsJobWorker = /job_proc/.test(process.argv[1] ?? "");
+
+function cosmosAgentHealthPort(): number {
+  const explicit = Number(process.env.COSMOS_AGENT_PORT);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const webPort = Number(process.env.PORT);
+  return webPort === 8091 ? 8092 : 8091;
+}
+
+if (!invokedAsJobWorker) {
+  cli.runApp(
+    new ServerOptions({
+      agent: fileURLToPath(import.meta.url),
+      agentName: COSMOS_LIVEKIT_AGENT_NAME,
+      wsURL: process.env.LIVEKIT_URL,
+      apiKey: process.env.LIVEKIT_API_KEY,
+      apiSecret: process.env.LIVEKIT_API_SECRET,
+      // En el mismo contenedor que Express: 1 proceso idle, puerto distinto a PORT.
+      numIdleProcesses: 1,
+      initializeProcessTimeout: 60_000,
+      loadThreshold: 0.95,
+      port: cosmosAgentHealthPort(),
+    })
+  );
+}
