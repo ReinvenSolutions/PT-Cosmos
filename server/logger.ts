@@ -1,4 +1,9 @@
+import { existsSync, mkdirSync } from "fs";
 import winston from "winston";
+
+if (!existsSync("logs")) {
+  mkdirSync("logs", { recursive: true });
+}
 
 const logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug");
 
@@ -43,11 +48,5 @@ logger.add(
     ),
   })
 );
-
-// Create logs directory if it doesn't exist
-import { existsSync, mkdirSync } from "fs";
-if (!existsSync("logs")) {
-  mkdirSync("logs", { recursive: true });
-}
 
 export default logger;

@@ -25,6 +25,7 @@ import {
 } from "./handlers/cosmosSessions";
 import { isOpenAIConfigured } from "./services/openaiClient";
 import { isLiveKitConfigured } from "./services/livekit";
+import { probeCosmosAgentHealth } from "./startCosmosAgent";
 import {
   getCosmosAssistantConfig,
   setCosmosAssistantConfig,
@@ -1924,7 +1925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(stats);
   }));
 
-  app.get("/api/cosmos/status", requireRoles([...QUOTE_USER_ROLES]), (req, res) => {
+  app.get("/api/cosmos/status", requireRoles([...QUOTE_USER_ROLES]), async (req, res) => {
     const user = req.user as User;
     const hasCosmos = canAccessCosmos(user);
     const hasVoice = canAccessCosmosVoice(user);
@@ -1934,10 +1935,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!openai) voiceDisabledReason = "openai";
     else if (!hasVoice) voiceDisabledReason = "module";
     else if (!livekit) voiceDisabledReason = "livekit";
+    const voiceWorker = livekit
+      ? await probeCosmosAgentHealth()
+      : { ok: false, detail: "livekit off", port: 0 };
     res.json({
       available: hasCosmos && openai,
       voiceAvailable: hasCosmos && hasVoice && openai && livekit,
       voiceDisabledReason,
+      voiceWorker,
       name: "Cosmos",
     });
   });

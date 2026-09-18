@@ -72,8 +72,7 @@ export function startCosmosAgentIfNeeded(): void {
   if (worker && worker.exitCode === null && !worker.killed) return;
 
   const spec = resolveCosmosAgentSpawn();
-  const webPort = Number(process.env.PORT);
-  const agentPort = Number(process.env.COSMOS_AGENT_PORT) || (webPort === 8091 ? 8092 : 8091);
+  const agentPort = cosmosAgentHealthPort();
   worker = spawn(spec.command, spec.args, {
     cwd: process.cwd(),
     stdio: ["ignore", "inherit", "inherit"],
@@ -128,4 +127,32 @@ export function startCosmosAgentIfNeeded(): void {
     args: spec.args,
     agentPort,
   });
+}
+
+export function cosmosAgentHealthPort(): number {
+  const explicit = Number(process.env.COSMOS_AGENT_PORT);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const webPort = Number(process.env.PORT);
+  return webPort === 8091 ? 8092 : 8091;
+}
+
+export async function probeCosmosAgentHealth(): Promise<{
+  ok: boolean;
+  detail: string;
+  port: number;
+}> {
+  const port = cosmosAgentHealthPort();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    const detail = (await res.text()).slice(0, 200);
+    return { ok: res.ok, detail, port };
+  } catch (err) {
+    return {
+      ok: false,
+      detail: err instanceof Error ? err.message : "unreachable",
+      port,
+    };
+  }
 }
