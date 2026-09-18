@@ -7,10 +7,9 @@ let exitHookInstalled = false;
 
 function shouldAutostartCosmosAgent(): boolean {
   if (process.env.COSMOS_AGENT_CHILD === "1") return false;
+  if (process.env.NODE_ENV === "test") return false;
   const autostart = process.env.COSMOS_AGENT_AUTOSTART?.trim().toLowerCase();
   if (autostart === "0" || autostart === "false") return false;
-  if (process.env.NODE_ENV === "production" || process.env.NODE_ENV === "test") return false;
-  if (process.env.RAILWAY_ENVIRONMENT) return false;
   return isLiveKitConfigured();
 }
 
@@ -19,7 +18,8 @@ export function startCosmosAgentIfNeeded(): void {
   if (worker && worker.exitCode === null && !worker.killed) return;
 
   const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
-  worker = spawn(npmCmd, ["run", "cosmos:agent"], {
+  const script = process.env.NODE_ENV === "production" ? "cosmos:agent:start" : "cosmos:agent";
+  worker = spawn(npmCmd, ["run", script], {
     cwd: process.cwd(),
     stdio: ["ignore", "inherit", "inherit"],
     env: { ...process.env, COSMOS_AGENT_CHILD: "1" },

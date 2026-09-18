@@ -266,6 +266,9 @@ export function CosmosChatWidget() {
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [voiceAvailable, setVoiceAvailable] = useState(false);
+  const [voiceDisabledReason, setVoiceDisabledReason] = useState<
+    "openai" | "livekit" | "module" | null
+  >(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -305,10 +308,11 @@ export function CosmosChatWidget() {
     let cancelled = false;
     fetch("/api/cosmos/status", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { available: false }))
-      .then((data: { available?: boolean; voiceAvailable?: boolean }) => {
+      .then((data: { available?: boolean; voiceAvailable?: boolean; voiceDisabledReason?: "openai" | "livekit" | "module" | null }) => {
         if (!cancelled) {
           setAvailable(Boolean(data.available));
           setVoiceAvailable(Boolean(data.voiceAvailable));
+          setVoiceDisabledReason(data.voiceDisabledReason ?? null);
         }
       })
       .catch(() => {
@@ -539,7 +543,15 @@ export function CosmosChatWidget() {
     [addProposal, applyAction]
   );
 
-  const showVoice = voiceAvailable && canAccessCosmosVoice(user);
+  const showVoice = canAccessCosmosVoice(user);
+  const voiceHint =
+    voiceDisabledReason === "livekit"
+      ? "Falta LIVEKIT_URL, LIVEKIT_API_KEY y LIVEKIT_API_SECRET en Railway"
+      : voiceDisabledReason === "module"
+        ? "Activa Cosmos voz en Admin → Usuarios"
+        : voiceDisabledReason === "openai"
+          ? "Falta OPENAI_API_KEY en el servidor"
+          : "Hablar con Cosmos";
 
   useEffect(() => {
     if (!user || !canAccessCosmos(user) || available === false) {
@@ -674,13 +686,13 @@ export function CosmosChatWidget() {
                     size="icon"
                     variant="outline"
                     className="shrink-0 h-10 w-10 rounded-xl"
-                    disabled={!available}
+                    disabled={!available || !voiceAvailable}
                     onClick={() => {
                       setOpen(true);
                       setVoiceWanted(true);
                     }}
                     aria-label="Hablar con Cosmos"
-                    title="Hablar con Cosmos"
+                    title={voiceHint}
                   >
                     <Mic className="h-4 w-4" />
                   </Button>
