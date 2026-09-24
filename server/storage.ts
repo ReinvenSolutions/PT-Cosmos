@@ -29,7 +29,9 @@ import {
   type QuoteDestination,
   type InsertQuoteDestination,
   destinationImages,
+  destinationAvailability,
   type DestinationImage,
+  type DestinationAvailability,
   quoteLogs,
   type QuoteLog,
   type InsertQuoteLog,
@@ -80,6 +82,7 @@ export interface IStorage {
   countQuotesByDestination(destinationId: string): Promise<number>;
 
   getItineraryDays(destinationId: string): Promise<ItineraryDay[]>;
+  listItineraryDaysForDestinations(destinationIds: string[]): Promise<ItineraryDay[]>;
   replaceItineraryDays(destinationId: string, days: Omit<InsertItineraryDay, "destinationId">[]): Promise<void>;
 
   getHotels(destinationId: string): Promise<Hotel[]>;
@@ -93,6 +96,13 @@ export interface IStorage {
 
   getDestinationImages(destinationId: string): Promise<DestinationImage[]>;
   replaceDestinationImages(destinationId: string, images: Omit<{ imageUrl: string; displayOrder?: number }, "destinationId">[]): Promise<void>;
+
+  getDestinationAvailability(destinationId: string): Promise<DestinationAvailability[]>;
+  getAvailabilityForDestinations(destinationIds: string[]): Promise<DestinationAvailability[]>;
+  replaceDestinationAvailability(
+    destinationId: string,
+    days: { date: string; slots: number; price: string | null }[],
+  ): Promise<void>;
 
   createUser(data: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<Pick<User, "name" | "avatarUrl">>): Promise<User>;
@@ -268,9 +278,32 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  /** Catálogo de home: columnas de tarjeta + estrellas/comidas, sin itinerarios ni galerías. */
+  /** Catálogo de home: solo columnas de tarjeta + estrellas/comidas, sin textos ni galerías. */
   async getDestinationsWithPreviews(params?: { isActive?: boolean }): Promise<DestinationCardPreview[]> {
-    const dests = await this.getDestinations(params ?? { isActive: true });
+    const filters = [];
+    if (params?.isActive !== undefined) {
+      filters.push(eq(destinations.isActive, params.isActive));
+    }
+    const columns = {
+      id: destinations.id,
+      name: destinations.name,
+      country: destinations.country,
+      duration: destinations.duration,
+      nights: destinations.nights,
+      imageUrl: destinations.imageUrl,
+      basePrice: destinations.basePrice,
+      category: destinations.category,
+      isBloqueo: destinations.isBloqueo,
+      bloqueoSalidaFecha: destinations.bloqueoSalidaFecha,
+      bloqueoCuposDisponibles: destinations.bloqueoCuposDisponibles,
+      agencyDisplayName: destinations.agencyDisplayName,
+      cardTooltip: destinations.cardTooltip,
+      priceTiers: destinations.priceTiers,
+    };
+    const base = db.select(columns).from(destinations).orderBy(destinations.displayOrder, destinations.name);
+    const dests = filters.length
+      ? await base.where(filters.length === 1 ? filters[0] : and(...filters))
+      : await base;
     if (dests.length === 0) return [];
 
     const ids = dests.map((d) => d.id);
@@ -334,6 +367,15 @@ export class DatabaseStorage implements IStorage {
     return uniqueDays;
   }
 
+  async listItineraryDaysForDestinations(destinationIds: string[]): Promise<ItineraryDay[]> {
+    if (!destinationIds.length) return [];
+    return db
+      .select()
+      .from(itineraryDays)
+      .where(inArray(itineraryDays.destinationId, destinationIds))
+      .orderBy(itineraryDays.destinationId, itineraryDays.dayNumber);
+  }
+
   async getHotels(destinationId: string): Promise<Hotel[]> {
     return db
       .select()
@@ -363,6 +405,42 @@ export class DatabaseStorage implements IStorage {
       .from(destinationImages)
       .where(eq(destinationImages.destinationId, destinationId))
       .orderBy(destinationImages.displayOrder);
+  }
+
+  async getDestinationAvailability(destinationId: string): Promise<DestinationAvailability[]> {
+    return db
+      .select()
+      .from(destinationAvailability)
+      .where(eq(destinationAvailability.destinationId, destinationId))
+      .orderBy(asc(destinationAvailability.date));
+  }
+
+  async getAvailabilityForDestinations(destinationIds: string[]): Promise<DestinationAvailability[]> {
+    if (destinationIds.length === 0) return [];
+    return db
+      .select()
+      .from(destinationAvailability)
+      .where(inArray(destinationAvailability.destinationId, destinationIds))
+      .orderBy(asc(destinationAvailability.date));
+  }
+
+  async replaceDestinationAvailability(
+    destinationId: string,
+    days: { date: string; slots: number; price: string | null }[],
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(destinationAvailability).where(eq(destinationAvailability.destinationId, destinationId));
+      if (days.length > 0) {
+        await tx.insert(destinationAvailability).values(
+          days.map((day) => ({
+            destinationId,
+            date: day.date,
+            slots: day.slots,
+            price: day.price,
+          })),
+        );
+      }
+    });
   }
 
   async createDestination(data: InsertDestination): Promise<Destination> {
@@ -402,6 +480,7 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(hotels).where(eq(hotels.destinationId, id));
       await tx.delete(inclusions).where(eq(inclusions.destinationId, id));
       await tx.delete(exclusions).where(eq(exclusions.destinationId, id));
+      await tx.delete(destinationAvailability).where(eq(destinationAvailability.destinationId, id));
       await tx.delete(destinations).where(eq(destinations.id, id));
     });
   }
@@ -800,6 +879,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: quotes.createdAt,
         updatedAt: quotes.updatedAt,
         domesticFlightImages: quotes.domesticFlightImages,
+        domesticFlightImagesByDestination: quotes.domesticFlightImagesByDestination,
         client: clients,
       })
       .from(quotes)
@@ -822,6 +902,7 @@ export class DatabaseStorage implements IStorage {
       returnCabinBaggage: r.returnCabinBaggage,
       returnHoldBaggage: r.returnHoldBaggage,
       domesticFlightImages: r.domesticFlightImages,
+      domesticFlightImagesByDestination: r.domesticFlightImagesByDestination,
       domesticCabinBaggage: r.domesticCabinBaggage,
       domesticHoldBaggage: r.domesticHoldBaggage,
       connectionFlightImages: r.connectionFlightImages,
@@ -863,6 +944,7 @@ export class DatabaseStorage implements IStorage {
         returnCabinBaggage: quotes.returnCabinBaggage,
         returnHoldBaggage: quotes.returnHoldBaggage,
         domesticFlightImages: quotes.domesticFlightImages,
+        domesticFlightImagesByDestination: quotes.domesticFlightImagesByDestination,
         domesticCabinBaggage: quotes.domesticCabinBaggage,
         domesticHoldBaggage: quotes.domesticHoldBaggage,
         connectionFlightImages: quotes.connectionFlightImages,
@@ -906,6 +988,7 @@ export class DatabaseStorage implements IStorage {
       returnCabinBaggage: r.returnCabinBaggage,
       returnHoldBaggage: r.returnHoldBaggage,
       domesticFlightImages: r.domesticFlightImages,
+      domesticFlightImagesByDestination: r.domesticFlightImagesByDestination,
       domesticCabinBaggage: r.domesticCabinBaggage,
       domesticHoldBaggage: r.domesticHoldBaggage,
       connectionFlightImages: r.connectionFlightImages,
@@ -968,6 +1051,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: quotes.createdAt,
         updatedAt: quotes.updatedAt,
         domesticFlightImages: quotes.domesticFlightImages,
+        domesticFlightImagesByDestination: quotes.domesticFlightImagesByDestination,
         client: clients,
       })
       .from(quotes)
@@ -1010,6 +1094,7 @@ export class DatabaseStorage implements IStorage {
       returnCabinBaggage: quoteResult[0].returnCabinBaggage,
       returnHoldBaggage: quoteResult[0].returnHoldBaggage,
       domesticFlightImages: quoteResult[0].domesticFlightImages,
+      domesticFlightImagesByDestination: quoteResult[0].domesticFlightImagesByDestination,
       domesticCabinBaggage: quoteResult[0].domesticCabinBaggage,
       domesticHoldBaggage: quoteResult[0].domesticHoldBaggage,
       connectionFlightImages: quoteResult[0].connectionFlightImages,

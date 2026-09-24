@@ -25,11 +25,14 @@ import { ensureDestinationAgencyColumns } from "./ensure-destination-agency-colu
 import { ensureDestinationPlanTaxesColumn } from "./ensure-destination-plan-taxes-column";
 import { ensureCosmosAssistantNotesColumn } from "./ensure-cosmos-assistant-notes-column";
 import { ensureCosmosSessionsTables } from "./ensure-cosmos-sessions-tables";
+import { ensureCosmosStrategicContextsTable } from "./ensure-cosmos-strategic-contexts";
 import { ensureUserRoleRename } from "./ensure-user-role-rename";
 import { ensureUserMilesColumns } from "./ensure-user-miles-columns";
 import { ensureUserEnabledModulesColumn } from "./ensure-user-enabled-modules";
 import { ensureClientsUserIdColumn } from "./ensure-clients-user-id";
 import { ensureToolItinerariesTable } from "./ensure-tool-itineraries-table";
+import { ensureDestinationAvailabilityTable } from "./ensure-destination-availability";
+import { ensureInternalFlightPlacementColumns } from "./ensure-internal-flight-placement";
 import { seedDatabaseIfEmpty } from "./seed";
 import { startPriceTierExpirationScheduler } from "./services/expirePriceTiers";
 import { startCosmosAgentIfNeeded } from "./startCosmosAgent";
@@ -61,12 +64,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Needed for inline styles and Google Fonts
+      styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       mediaSrc: ["'self'", "blob:", "https:", "mediastream:"],
       connectSrc: ["'self'", "wss:", "https://*.livekit.cloud", "https://livekit.cloud"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"], // Allow Google Fonts
+      fontSrc: ["'self'"],
       // Sin esto, default-src 'self' bloquea iframes de YouTube (Academia digital, lecciones con video)
       frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
     },
@@ -167,11 +170,14 @@ app.use((req, res, next) => {
     await ensureDestinationPlanTaxesColumn(pool);
     await ensureCosmosAssistantNotesColumn(pool);
     await ensureCosmosSessionsTables(pool);
+    await ensureCosmosStrategicContextsTable(pool);
     await ensureUserRoleRename(pool);
     await ensureUserMilesColumns(pool);
     await ensureUserEnabledModulesColumn(pool);
     await ensureClientsUserIdColumn(pool);
     await ensureToolItinerariesTable(pool);
+    await ensureDestinationAvailabilityTable(pool);
+    await ensureInternalFlightPlacementColumns(pool);
 
     const server = await registerRoutes(app);
     startPriceTierExpirationScheduler();

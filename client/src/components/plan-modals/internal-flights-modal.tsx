@@ -504,7 +504,7 @@ export function InternalFlightsModal({
         <DialogHeader>
           <DialogTitle>Vuelos del plan</DialogTitle>
           <DialogDescription>
-            Por cada imagen elige si corresponde a ida, regreso o conexión/vuelo interno. El orden y el tipo definen cómo se arma el PDF en cotizaciones (especialmente en planes bloqueo).
+            Por cada imagen elige si corresponde a ida, regreso o conexión/vuelo interno. El interno se imprime en el itinerario (después del día que configures en el plan), no junto a la ida.
           </DialogDescription>
         </DialogHeader>
         <div

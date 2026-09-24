@@ -91,8 +91,15 @@ function createTools(job: JobContext, toolCtx: CosmosToolContext, userIdentity: 
       execute: async ({ query }) => run("search_plans", { query }),
     }),
     llm.tool({
+      name: "search_activities",
+      description:
+        "Actividades y recomendaciones de cualquier plan, aunque no esté abierto. Úsala si preguntan qué hacer, un lugar o recomendaciones.",
+      parameters: z.object({ query: z.string(), plan: z.string().optional() }),
+      execute: async ({ query, plan }) => run("search_activities", { query, plan }),
+    }),
+    llm.tool({
       name: "get_plan_details",
-      description: "Detalle de un plan.",
+      description: "Detalle de un plan, esté o no en pantalla.",
       parameters: z.object({ plan: z.string() }),
       execute: async ({ plan }) => run("get_plan_details", { plan }),
     }),
@@ -473,12 +480,41 @@ export default defineAgent({
         await endCosmosSession(metadata.sessionId);
       });
 
+      const voiceHistory: { role: "user" | "assistant"; content: string }[] = [];
+      const agent = voice.Agent.create({
+        instructions,
+        tools: createTools(ctx, toolCtx, metadata.userIdentity),
+      });
+
+      session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (event) => {
+        if (!event.isFinal) return;
+        const text = event.transcript?.trim();
+        if (!text) return;
+        void (async () => {
+          const knowledge = await buildCosmosSystemContext({
+            userMessage: text,
+            history: voiceHistory,
+            currentPlanId: metadata.currentPlanId ?? metadata.screen?.planId,
+            userRole: metadata.userRole,
+            screen: metadata.screen,
+            brief: sessionBrief,
+          });
+          voiceHistory.push({ role: "user", content: text });
+          if (voiceHistory.length > 8) voiceHistory.shift();
+          await agent.updateInstructions(
+            buildCosmosSystemPrompt({
+              user: { name: metadata.userName, username: metadata.userName, role: metadata.userRole },
+              knowledge,
+              config: cosmosConfig,
+              channel: metadata.channel,
+            })
+          );
+        })();
+      });
+
       step("iniciando AgentSession");
       await session.start({
-        agent: voice.Agent.create({
-          instructions,
-          tools: createTools(ctx, toolCtx, metadata.userIdentity),
-        }),
+        agent,
         room: ctx.room,
       });
 

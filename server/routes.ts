@@ -31,6 +31,17 @@ import {
   setCosmosAssistantConfig,
 } from "./services/cosmosAssistantConfigService";
 import { cosmosAssistantConfigSchema } from "@shared/cosmosAssistantConfig";
+import { cosmosStrategicContextWriteSchema } from "@shared/cosmosStrategicContexts";
+import {
+  clampInternalFlightAfterDay,
+  planNeedsInternalFlightAfterDay,
+} from "@shared/internalFlightPlacement";
+import {
+  createCosmosStrategicContext,
+  deleteCosmosStrategicContext,
+  listCosmosStrategicContexts,
+  updateCosmosStrategicContext,
+} from "./services/cosmosStrategicContextService";
 import { userRateLimiter } from "./middleware/userRateLimiter";
 import { asyncHandler } from "./utils/asyncHandler";
 import { logger } from "./logger";
@@ -123,6 +134,7 @@ const publicQuotePdfSchema = z.object({
   domesticFlightImages: z.array(z.string()).optional(),
   domesticCabinBaggage: z.boolean().optional(),
   domesticHoldBaggage: z.boolean().optional(),
+  domesticFlightImagesByDestination: z.record(z.string(), z.array(z.string())).optional(),
   connectionFlightImages: z.array(z.string()).optional(),
   connectionFlightSegments: z
     .array(z.object({ images: z.array(z.string()) }))
@@ -159,6 +171,7 @@ const createQuoteSchema = z.object({
   returnHoldBaggage: z.boolean().optional(),
   domesticCabinBaggage: z.boolean().optional(),
   domesticHoldBaggage: z.boolean().optional(),
+  domesticFlightImagesByDestination: z.record(z.string(), z.array(z.string())).nullable().optional(),
   connectionFlightImages: z.array(z.string()).nullable().optional(),
   connectionCabinBaggage: z.boolean().optional(),
   connectionHoldBaggage: z.boolean().optional(),
@@ -185,6 +198,31 @@ const createQuoteSchema = z.object({
     .nullable()
     .optional(),
 });
+
+function assertInternalFlightAfterDay(validated: {
+  hasInternalOrConnectionFlight?: boolean | null;
+  isBloqueo?: boolean | null;
+  internalFlights?: Array<{ flightRole?: string; imageUrl?: string }> | null;
+  itinerary?: unknown[] | null;
+  internalFlightAfterDay?: number | null;
+}) {
+  if (!planNeedsInternalFlightAfterDay(validated)) return;
+  const itineraryLen = validated.itinerary?.length ?? 0;
+  if (itineraryLen === 0) {
+    throw new ValidationError(
+      "Define el itinerario para indicar después de qué día va el vuelo interno en el PDF.",
+    );
+  }
+  const day = clampInternalFlightAfterDay(validated.internalFlightAfterDay, itineraryLen);
+  if (
+    validated.internalFlightAfterDay == null ||
+    day !== validated.internalFlightAfterDay
+  ) {
+    throw new ValidationError(
+      `Indica después de qué día del itinerario (1 a ${itineraryLen}) se muestra el vuelo interno en el PDF.`,
+    );
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint (before rate limiting)
@@ -838,6 +876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       originCity, outboundFlightImages, returnFlightImages, includeFlights,
       outboundCabinBaggage, outboundHoldBaggage, returnCabinBaggage, returnHoldBaggage,
       domesticFlightImages, domesticCabinBaggage, domesticHoldBaggage,
+      domesticFlightImagesByDestination,
       connectionFlightImages, connectionFlightSegments, connectionCabinBaggage, connectionHoldBaggage,
       turkeyUpgrade, italiaUpgrade, granTourUpgrade, selectedUpgrades: reqSelectedUpgrades, trm, grandTotalCOP, finalPrice, finalPriceCOP, finalPriceCurrency,
       customFilename, minPayment, minPaymentCOP
@@ -931,6 +970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       domesticFlightImages: domesticFlightImages || undefined,
       domesticCabinBaggage: domesticCabinBaggage ?? false,
       domesticHoldBaggage: domesticHoldBaggage ?? false,
+      domesticFlightImagesByDestination: domesticFlightImagesByDestination || undefined,
       connectionFlightImages: connectionFlightImages || undefined,
       connectionFlightSegments: connectionFlightSegments?.length
         ? connectionFlightSegments
@@ -991,7 +1031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
     const cacheKey = CacheKeys.destinations(isActive);
     const destinations = await getOrSetCache(cacheKey, async () =>
-      toPublicQuoteCatalogList(await storage.getDestinations({ isActive })),
+      attachAvailability(toPublicQuoteCatalogList(await storage.getDestinations({ isActive }))),
     );
     res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=120");
     res.json(destinations);
@@ -1015,15 +1055,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       throw new NotFoundError("Destination");
     }
 
-    const [itinerary, hotels, inclusions, exclusions, images] = await Promise.all([
+    const [itinerary, hotels, inclusions, exclusions, images, availability] = await Promise.all([
       getOrSetCache(CacheKeys.itinerary(req.params.id), () => storage.getItineraryDays(req.params.id)),
       getOrSetCache(CacheKeys.hotels(req.params.id), () => storage.getHotels(req.params.id)),
       getOrSetCache(CacheKeys.inclusions(req.params.id), () => storage.getInclusions(req.params.id)),
       getOrSetCache(CacheKeys.exclusions(req.params.id), () => storage.getExclusions(req.params.id)),
       getOrSetCache(CacheKeys.images(req.params.id), () => storage.getDestinationImages(req.params.id)),
+      storage.getDestinationAvailability(req.params.id),
     ]);
 
-    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=120");
     res.json({
       ...stripInternalDestinationFields(destination),
       itinerary,
@@ -1031,6 +1072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       inclusions,
       exclusions,
       images,
+      availability: toPublicAvailability(availability),
     });
   }));
 
@@ -1389,6 +1431,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Schema para plan completo (destino + entidades relacionadas)
+  const availabilityDaySchema = z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    slots: z.number().int().min(0),
+    price: z.union([z.string(), z.number(), z.null()]).optional(),
+  });
+  const normalizeAvailabilityDays = (days: z.infer<typeof availabilityDaySchema>[]) => {
+    const byDate = new Map<string, { date: string; slots: number; price: string | null }>();
+    for (const day of days) {
+      let price: string | null = null;
+      if (day.price != null && String(day.price).trim() !== "") {
+        const amount = Number(day.price);
+        if (!Number.isFinite(amount) || amount < 0) {
+          throw new ValidationError(`Precio inválido para la fecha ${day.date}`);
+        }
+        price = amount.toFixed(2);
+      }
+      byDate.set(day.date, { date: day.date, slots: day.slots, price });
+    }
+    return Array.from(byDate.values());
+  };
+  const toPublicAvailability = (
+    rows: { date: string; slots: number; price: string | null }[],
+  ) => rows.map((row) => ({ date: row.date, slots: row.slots, price: row.price }));
+  const attachAvailability = async <T extends { id: string }>(items: T[]) => {
+    const rows = await storage.getAvailabilityForDestinations(items.map((item) => item.id));
+    const byId = new Map<string, { date: string; slots: number; price: string | null }[]>();
+    for (const row of rows) {
+      const list = byId.get(row.destinationId) ?? [];
+      list.push({ date: row.date, slots: row.slots, price: row.price });
+      byId.set(row.destinationId, list);
+    }
+    return items.map((item) => ({ ...item, availability: byId.get(item.id) ?? [] }));
+  };
+
   const priceTierSchema = z.object({
     startDate: z.string().optional(),
     endDate: z.string(),
@@ -1432,6 +1508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requiresExtraDay: z.boolean().optional(),
     allowedDays: z.array(z.string()).nullable().optional(),
     priceTiers: z.array(priceTierSchema).nullable().optional(),
+    availability: z.array(availabilityDaySchema).optional(),
     upgrades: z.array(upgradeSchema).nullable().optional(),
     itinerary: z.array(z.object({
       dayNumber: z.number().int().min(1),
@@ -1469,6 +1546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     recommendations: z.string().nullable().optional(),
     cosmosAssistantNotes: z.string().max(50000).nullable().optional(),
     hasInternalOrConnectionFlight: z.boolean().optional(),
+    internalFlightAfterDay: z.number().int().nullable().optional(),
     hotelGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     adicionalesGalleryImageUrls: z.array(z.string().url()).nullable().optional(),
     descriptiveAudioUrl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
@@ -1500,14 +1578,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const dest = await storage.getDestination(req.params.id);
     if (!dest) throw new NotFoundError("Destination");
     if (!canEditPlan(user, dest)) throw new ForbiddenError("No tienes permiso para ver este plan");
-    const [itinerary, hotels, inclusions, exclusions, images] = await Promise.all([
+    const [itinerary, hotels, inclusions, exclusions, images, availability] = await Promise.all([
       storage.getItineraryDays(req.params.id),
       storage.getHotels(req.params.id),
       storage.getInclusions(req.params.id),
       storage.getExclusions(req.params.id),
       storage.getDestinationImages(req.params.id),
+      storage.getDestinationAvailability(req.params.id),
     ]);
-    res.json({ ...dest, itinerary, hotels, inclusions, exclusions, images });
+    res.json({
+      ...dest,
+      itinerary,
+      hotels,
+      inclusions,
+      exclusions,
+      images,
+      availability: toPublicAvailability(availability),
+    });
+  }));
+
+  app.get("/api/admin/destinations/:id/availability", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const dest = await storage.getDestination(req.params.id);
+    if (!dest) throw new NotFoundError("Destination");
+    if (!canEditPlan(user, dest)) throw new ForbiddenError("No tienes permiso para ver este plan");
+    const rows = await storage.getDestinationAvailability(req.params.id);
+    res.json(toPublicAvailability(rows));
+  }));
+
+  app.put("/api/admin/destinations/:id/availability", requirePlanManagers, asyncHandler(async (req, res) => {
+    const user = req.user as User;
+    const dest = await storage.getDestination(req.params.id);
+    if (!dest) throw new NotFoundError("Destination");
+    assertCanEditPlan(user, dest);
+    if (dest.isBloqueo) {
+      throw new ValidationError("Los planes bloqueo usan la fecha y los cupos del bloqueo.");
+    }
+    const body = z.object({ days: z.array(availabilityDaySchema) }).parse(req.body);
+    const days = normalizeAvailabilityDays(body.days);
+    await storage.replaceDestinationAvailability(req.params.id, days);
+    clearDestinationCache(req.params.id);
+    res.json(days);
   }));
 
   app.post("/api/admin/destinations", requirePlanManagers, asyncHandler(async (req, res) => {
@@ -1528,6 +1639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new ValidationError("Un bloqueo requiere al menos un vuelo cargado (pestaña con vuelos internos/conexión).");
       }
     }
+    assertInternalFlightAfterDay(validated);
     const destData = {
       name: validated.name,
       country: validated.country,
@@ -1549,6 +1661,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       priceTiers: resolvePriceTiersForSave(validated.priceTiers, isBloqueo),
       upgrades: validated.upgrades ?? null,
       hasInternalOrConnectionFlight: validated.hasInternalOrConnectionFlight ?? false,
+      internalFlightAfterDay: planNeedsInternalFlightAfterDay(validated)
+        ? validated.internalFlightAfterDay ?? null
+        : null,
       internalFlights: validated.internalFlights ?? null,
       medicalAssistanceInfo: validated.medicalAssistanceInfo ?? null,
       medicalAssistanceImageUrl: validated.medicalAssistanceImageUrl ?? null,
@@ -1602,23 +1717,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validated.inclusions?.length ? storage.replaceInclusions(destId, validated.inclusions) : Promise.resolve(),
         validated.exclusions?.length ? storage.replaceExclusions(destId, validated.exclusions) : Promise.resolve(),
         validImages.length > 0 ? storage.replaceDestinationImages(destId, validImages) : Promise.resolve(),
+        !isBloqueo && validated.availability
+          ? storage.replaceDestinationAvailability(destId, normalizeAvailabilityDays(validated.availability))
+          : Promise.resolve(),
       ]);
 
       clearDestinationCache(destId);
       logger.info("Destination created", { destinationId: destId, name: destination.name });
 
       // Obtener datos completos en paralelo
-      const [full, itinerary, hotels, inclusions, exclusions, images] = await Promise.all([
+      const [full, itinerary, hotels, inclusions, exclusions, images, availability] = await Promise.all([
         storage.getDestination(destId),
         storage.getItineraryDays(destId),
         storage.getHotels(destId),
         storage.getInclusions(destId),
         storage.getExclusions(destId),
         storage.getDestinationImages(destId),
+        storage.getDestinationAvailability(destId),
       ]);
 
       if (!full) throw new NotFoundError("Destination");
-      res.status(201).json({ ...full, itinerary, hotels, inclusions, exclusions, images });
+      res.status(201).json({
+        ...full,
+        itinerary,
+        hotels,
+        inclusions,
+        exclusions,
+        images,
+        availability: toPublicAvailability(availability),
+      });
     } catch (error: any) {
       logger.error("Error creating destination", { error: error?.message, stack: error?.stack });
       if (error.code === "23505") {
@@ -1658,6 +1785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ) {
       throw new ValidationError("La fecha de salida del bloqueo no se puede modificar una vez definida.");
     }
+    assertInternalFlightAfterDay(validated);
     const validImages = validated.images?.filter((img) => img?.imageUrl && String(img.imageUrl).trim().length > 0) ?? [];
 
     // Asegurar que el bucket del plan existe antes de guardar imágenes
@@ -1769,6 +1897,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       priceTiers: resolvePriceTiersForSave(validated.priceTiers, isBloqueo),
       upgrades: validated.upgrades ?? null,
       hasInternalOrConnectionFlight: validated.hasInternalOrConnectionFlight ?? false,
+      internalFlightAfterDay: planNeedsInternalFlightAfterDay(validated)
+        ? validated.internalFlightAfterDay ?? null
+        : null,
       internalFlights: validated.internalFlights ?? null,
       medicalAssistanceInfo: validated.medicalAssistanceInfo ?? null,
       medicalAssistanceImageUrl: validated.medicalAssistanceImageUrl ?? null,
@@ -1799,22 +1930,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       storage.replaceInclusions(id, validated.inclusions ?? []),
       storage.replaceExclusions(id, validated.exclusions ?? []),
       storage.replaceDestinationImages(id, validImages),
+      !isBloqueo && validated.availability
+        ? storage.replaceDestinationAvailability(id, normalizeAvailabilityDays(validated.availability))
+        : Promise.resolve(),
     ]);
 
     clearDestinationCache(id);
     logger.info("Destination updated", { destinationId: id });
 
-    const [full, itinerary, hotels, inclusions, exclusions, images] = await Promise.all([
+    const [full, itinerary, hotels, inclusions, exclusions, images, availability] = await Promise.all([
       storage.getDestination(id),
       storage.getItineraryDays(id),
       storage.getHotels(id),
       storage.getInclusions(id),
       storage.getExclusions(id),
       storage.getDestinationImages(id),
+      storage.getDestinationAvailability(id),
     ]);
 
     if (!full) throw new NotFoundError("Destination");
-    res.json({ ...full, itinerary, hotels, inclusions, exclusions, images });
+    res.json({
+      ...full,
+      itinerary,
+      hotels,
+      inclusions,
+      exclusions,
+      images,
+      availability: toPublicAvailability(availability),
+    });
   }));
 
   const reorderDestinationsSchema = z.object({
@@ -2004,8 +2147,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/cosmos-config", requireRole("super_admin"), asyncHandler(async (req, res) => {
     const body = cosmosAssistantConfigSchema.parse(req.body);
-    const saved = await setCosmosAssistantConfig(body);
+    const contexts = await listCosmosStrategicContexts();
+    const saved = await setCosmosAssistantConfig(
+      contexts.length > 0 ? { ...body, strategicContext: "" } : body
+    );
     res.json(saved);
+  }));
+
+  app.get("/api/admin/cosmos-contexts", requireRole("super_admin"), asyncHandler(async (_req, res) => {
+    res.json(await listCosmosStrategicContexts());
+  }));
+
+  app.post("/api/admin/cosmos-contexts", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const body = cosmosStrategicContextWriteSchema.parse(req.body);
+    const created = await createCosmosStrategicContext(body);
+    res.status(201).json(created);
+  }));
+
+  app.put("/api/admin/cosmos-contexts/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    const body = cosmosStrategicContextWriteSchema.parse(req.body);
+    const updated = await updateCosmosStrategicContext(req.params.id, body);
+    res.json(updated);
+  }));
+
+  app.delete("/api/admin/cosmos-contexts/:id", requireRole("super_admin"), asyncHandler(async (req, res) => {
+    await deleteCosmosStrategicContext(req.params.id);
+    res.json({ ok: true });
   }));
 
   app.put("/api/admin/settings/global-trm", requireRole("super_admin"), asyncHandler(async (req, res) => {
@@ -2184,6 +2351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       domesticFlightImages: quote.domesticFlightImages || undefined,
       domesticCabinBaggage: quote.domesticCabinBaggage ?? false,
       domesticHoldBaggage: quote.domesticHoldBaggage ?? false,
+      domesticFlightImagesByDestination: quote.domesticFlightImagesByDestination || undefined,
       connectionFlightImages: quote.connectionFlightImages || undefined,
       connectionFlightSegments: (quote.connectionFlightSegments as Array<{ images: string[] }> | null) || undefined,
       connectionCabinBaggage: quote.connectionCabinBaggage ?? false,
@@ -2315,7 +2483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   warmHotCaches(
     () => storage.getDestinationsWithPreviews({ isActive: true }),
-    async () => toPublicQuoteCatalogList(await storage.getDestinations({ isActive: true })),
+    async () => attachAvailability(toPublicQuoteCatalogList(await storage.getDestinations({ isActive: true }))),
   );
 
   const httpServer = createServer(app);

@@ -45,6 +45,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { CountryFlags } from "@/lib/countryFlags";
 
 const CONFIRM_WORDS = [
   "ELIMINAR", "BORRAR", "CONFIRMAR", "PERMANENTE", "ADIOS", "DESTRUIR",
@@ -136,6 +137,7 @@ function SortableRow({
           <OptimizedImage
             src={img}
             alt={dest.name}
+            preset="thumb"
             containerClassName="h-12 w-12 rounded overflow-hidden"
             imageClassName="object-cover"
           />
@@ -145,7 +147,13 @@ function SortableRow({
           </div>
         )}
       </TableCell>
-      <TableCell className="font-medium">{dest.name}</TableCell>
+      <TableCell>
+        <div className="font-medium leading-tight">{dest.name}</div>
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CountryFlags country={dest.country} />
+          <span>{dest.country}</span>
+        </div>
+      </TableCell>
       {showAgencyColumn && (
         <TableCell>
           {dest.agencyDisplayName ? (
@@ -157,20 +165,25 @@ function SortableRow({
           )}
         </TableCell>
       )}
-      <TableCell>{dest.country}</TableCell>
-      <TableCell>{dest.duration} días</TableCell>
+      <TableCell className="text-muted-foreground">{dest.duration} días · {dest.nights} noches</TableCell>
       <TableCell>
         {dest.basePrice ? formatUSD(dest.basePrice) : "—"}
       </TableCell>
       <TableCell>
-        {isToggling ? (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Guardando..." />
-        ) : (
-          <Switch
-            checked={dest.isActive}
-            onCheckedChange={(checked) => onToggleActive(dest.id, checked)}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {isToggling ? (
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Guardando..." />
+          ) : (
+            <Switch
+              checked={dest.isActive}
+              onCheckedChange={(checked) => onToggleActive(dest.id, checked)}
+              aria-label={dest.isActive ? "Ocultar del catálogo" : "Mostrar en el catálogo"}
+            />
+          )}
+          <Badge variant={dest.isActive ? "default" : "secondary"} className="hidden sm:inline-flex">
+            {dest.isActive ? "Visible" : "Oculto"}
+          </Badge>
+        </div>
       </TableCell>
       <TableCell className="text-right space-x-2">
         <Button
@@ -207,6 +220,7 @@ export default function AdminPlans() {
   const showAgencyColumn = isSuperAdmin;
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden">("all");
   const [deleteTarget, setDeleteTarget] = useState<Destination | null>(null);
   const [confirmWord, setConfirmWord] = useState("");
   const [randomWord, setRandomWord] = useState("");
@@ -215,13 +229,17 @@ export default function AdminPlans() {
     queryKey: ["/api/admin/destinations"],
   });
 
-  const filteredPlans = destinations.filter(
-    (d) =>
-      d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.country.toLowerCase().includes(search.toLowerCase())
-  );
+  const query = search.trim().toLowerCase();
+  const activeCount = destinations.filter((d) => d.isActive).length;
+  const hiddenCount = destinations.length - activeCount;
+  const filteredPlans = destinations.filter((d) => {
+    const matchesQuery = !query || d.name.toLowerCase().includes(query) || d.country.toLowerCase().includes(query);
+    const matchesStatus =
+      statusFilter === "all" || (statusFilter === "active" ? d.isActive : !d.isActive);
+    return matchesQuery && matchesStatus;
+  });
 
-  const canReorder = search.trim() === "";
+  const canReorder = query === "" && statusFilter === "all";
   const sortablePlans = canReorder ? filteredPlans : filteredPlans;
 
   const deleteMutation = useMutation({
@@ -358,33 +376,59 @@ export default function AdminPlans() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {isProvider ? "Mis planes" : "Admin Planes"}
+            {isProvider ? "Mis planes" : "Planes"}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="mt-1 max-w-xl text-muted-foreground">
             {isProvider
-              ? "Crea y edita tus planes. Solo tú puedes modificar los que hayas creado; aparecerán en el catálogo con el nombre de tu proveedor."
-              : "Crea, edita y elimina planes turísticos. Los planes de proveedor se marcan con su nombre en el catálogo."}
+              ? "Crea y edita tus planes. Solo tú puedes modificar los que hayas creado."
+              : "Publica, ordena y actualiza los viajes del catálogo."}
           </p>
         </div>
         <Button onClick={() => setLocation("/admin/plans/new")} onMouseEnter={() => prefetchRoute("/admin/plans/new")}>
           <Plus className="mr-2 h-4 w-4" />
-          Nuevo Plan
+          Nuevo plan
         </Button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {(
+          [
+            { id: "all" as const, label: "Todos", value: destinations.length },
+            { id: "active" as const, label: "Visibles", value: activeCount },
+            { id: "hidden" as const, label: "Ocultos", value: hiddenCount },
+          ]
+        ).map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setStatusFilter(item.id)}
+            className={cn(
+              "rounded-xl border px-3 py-3 text-left transition-colors",
+              statusFilter === item.id
+                ? "border-primary bg-primary/10 shadow-sm"
+                : "border-border bg-card hover:bg-muted/50"
+            )}
+          >
+            <div className="text-2xl font-semibold tabular-nums">{item.value}</div>
+            <div className="text-xs text-muted-foreground">{item.label}</div>
+          </button>
+        ))}
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <CardTitle>Listado de Planes</CardTitle>
+              <CardTitle>Catálogo</CardTitle>
               <CardDescription>
-                {destinations.length} plan(es) en total. Solo los activos aparecen en el catálogo.
-                {!canReorder && search.trim() && (
-                  <span className="block mt-1 text-amber-600 dark:text-amber-500">
-                    Desactiva el filtro para reordenar arrastrando las filas.
+                {filteredPlans.length} de {destinations.length} plan{destinations.length === 1 ? "" : "es"}.
+                Solo los visibles aparecen en el catálogo.
+                {!canReorder && (
+                  <span className="mt-1 block text-amber-600 dark:text-amber-500">
+                    Quita la búsqueda y el filtro para reordenar arrastrando.
                   </span>
                 )}
               </CardDescription>
@@ -422,6 +466,7 @@ export default function AdminPlans() {
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -429,7 +474,6 @@ export default function AdminPlans() {
                   <TableHead className="w-[80px]">Imagen</TableHead>
                   <TableHead>Plan</TableHead>
                   {showAgencyColumn && <TableHead>Proveedor</TableHead>}
-                  <TableHead>País</TableHead>
                   <TableHead>Duración</TableHead>
                   <TableHead>Precio base</TableHead>
                   <TableHead>Estado</TableHead>
@@ -444,7 +488,6 @@ export default function AdminPlans() {
                         <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                         <TableCell><Skeleton className="h-12 w-12 rounded" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-10" /></TableCell>
@@ -454,14 +497,15 @@ export default function AdminPlans() {
                   </>
                 ) : isError ? (
                   <TableRow>
-                    <TableCell colSpan={showAgencyColumn ? 9 : 8} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={showAgencyColumn ? 8 : 7} className="text-center py-6 text-muted-foreground">
                       Corrige el error indicado arriba y recarga la página.
                     </TableCell>
                   </TableRow>
                 ) : filteredPlans.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={showAgencyColumn ? 9 : 8} className="text-center py-8 text-muted-foreground">
-                      No se encontraron planes.
+                    <TableCell colSpan={showAgencyColumn ? 8 : 7} className="py-12 text-center">
+                      <p className="font-medium">No hay planes con ese criterio</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Prueba con otro nombre, país o filtro.</p>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -486,6 +530,7 @@ export default function AdminPlans() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </DndContext>
         </CardContent>
       </Card>

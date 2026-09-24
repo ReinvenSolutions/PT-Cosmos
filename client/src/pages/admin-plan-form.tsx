@@ -15,6 +15,8 @@ import { CosmoProcessingDialog } from "@/components/cosmo-processing-dialog";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { apiRequest, queryClient, invalidatePublicDestinationQueries, invalidateAdminDestinationQueries } from "@/lib/queryClient";
 import { normalizePriceTiers, normalizeTierPrice } from "@shared/priceTiers";
+import type { AvailabilityDay } from "@shared/availability";
+import { AvailabilityEditor } from "@/components/availability-calendar";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -28,7 +30,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PLAN_EDITOR_SECTIONS, PlanSectionNav, planSectionNeighbors } from "@/components/plan-section-nav";
+import { Badge } from "@/components/ui/badge";
 import {
   DndContext,
   closestCenter,
@@ -40,13 +44,13 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { FlightImageGallery } from "@/components/flight-image-gallery";
 import { ImageUploadZone } from "@/components/image-upload-zone";
 import { MedicalAssistanceGallery } from "@/components/medical-assistance-gallery";
 import { ItineraryMapGallery } from "@/components/itinerary-map-gallery";
 import { InternalFlightsModal, type InternalFlightItem } from "@/components/plan-modals";
 import { createEmptyPlanTax, type PlanTax } from "@shared/planTaxes";
 import { PLAN_MANAGER_ROLES } from "@shared/roles";
+import { planNeedsInternalFlightAfterDay } from "@shared/internalFlightPlacement";
 
 type ItineraryDay = {
   dayNumber: number;
@@ -88,8 +92,8 @@ const DAY_OPTIONS = [
 ];
 
 // Alternancia de filas: Color A y Color B que se repiten (Día 1→A, 2→B, 3→A, 4→B...)
-const ROW_COLOR_A = "bg-slate-200/70 dark:bg-slate-600/40";
-const ROW_COLOR_B = "bg-white dark:bg-slate-800/50";
+const ROW_COLOR_A = "bg-muted/50";
+const ROW_COLOR_B = "bg-background";
 
 /** Misma tipografía y tamaño en todos los campos de texto largo de la pestaña Básico */
 const BASIC_TAB_TEXTAREA_CLASS =
@@ -198,9 +202,12 @@ function AdminPlanForm() {
   const [isActive, setIsActive] = useState(true);
   const [allowedDays, setAllowedDays] = useState<string[]>([]);
   const [priceTiers, setPriceTiers] = useState<PriceTier[]>([]);
+  const [availabilityDays, setAvailabilityDays] = useState<AvailabilityDay[]>([]);
   const [bulkPriceInput, setBulkPriceInput] = useState("");
+  const [priceQuery, setPriceQuery] = useState("");
   const [bulkExcludeFlightDays, setBulkExcludeFlightDays] = useState(false);
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
+  const [openUpgradeIndex, setOpenUpgradeIndex] = useState<number | null>(null);
   const [planTaxes, setPlanTaxes] = useState<PlanTax[]>([]);
   const [itinerary, setItinerary] = useState<ItineraryDay[]>([]);
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -222,14 +229,16 @@ function AdminPlanForm() {
   const [recommendations, setRecommendations] = useState("");
   const [cosmosAssistantNotes, setCosmosAssistantNotes] = useState("");
   const [hasInternalOrConnectionFlight, setHasInternalOrConnectionFlight] = useState(false);
+  const [internalFlightAfterDay, setInternalFlightAfterDay] = useState<number | "">("");
   const [requiresExtraDay, setRequiresExtraDay] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingHotelGallery, setUploadingHotelGallery] = useState(false);
   const [uploadingAdicionalesGallery, setUploadingAdicionalesGallery] = useState(false);
-  const [uploadingInternalFlight, setUploadingInternalFlight] = useState(false);
   const [uploadingMainImage, setUploadingMainImage] = useState(false);
   const [galleryDialogOpen, setGalleryDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("basico");
+  const [openItineraryIndex, setOpenItineraryIndex] = useState<number | null>(null);
+  const [openHotelIndex, setOpenHotelIndex] = useState<number | null>(null);
   const [dragGallery, setDragGallery] = useState(false);
   const [dragHotelGallery, setDragHotelGallery] = useState(false);
   const [dragAdicionalesGallery, setDragAdicionalesGallery] = useState(false);
@@ -268,6 +277,7 @@ function AdminPlanForm() {
     isActive?: boolean;
     allowedDays?: string[] | null;
     priceTiers?: PriceTier[] | null;
+    availability?: AvailabilityDay[] | null;
     upgrades?: Upgrade[] | null;
     itinerary?: ItineraryDay[];
     hotels?: Hotel[];
@@ -284,6 +294,7 @@ function AdminPlanForm() {
     recommendations?: string | null;
     cosmosAssistantNotes?: string | null;
     hasInternalOrConnectionFlight?: boolean;
+    internalFlightAfterDay?: number | null;
     requiresExtraDay?: boolean;
     hotelGalleryImageUrls?: string[] | null;
     adicionalesGalleryImageUrls?: string[] | null;
@@ -323,10 +334,19 @@ function AdminPlanForm() {
             : []
       );
       setPriceTiers((existing.priceTiers as PriceTier[]) ?? []);
+      setAvailabilityDays(
+        (existing.availability ?? []).map((day) => ({
+          date: day.date,
+          slots: day.slots,
+          price: day.price ?? null,
+        })),
+      );
       setUpgrades((existing.upgrades as Upgrade[]) ?? []);
       setPlanTaxes((existing.planTaxes as PlanTax[]) ?? []);
       setItinerary((existing.itinerary as ItineraryDay[]) ?? []);
+      setOpenItineraryIndex((existing.itinerary?.length ?? 0) > 0 ? 0 : null);
       setHotels((existing.hotels as Hotel[]) ?? []);
+      setOpenHotelIndex((existing.hotels?.length ?? 0) > 0 ? 0 : null);
       setInclusions((existing.inclusions as Inclusion[]) ?? []);
       setExclusions((existing.exclusions as Exclusion[]) ?? []);
       setImages((existing.images as ImageItem[]) ?? []);
@@ -341,6 +361,11 @@ function AdminPlanForm() {
       setRecommendations(existing.recommendations ?? "");
       setCosmosAssistantNotes(existing.cosmosAssistantNotes ?? "");
       setHasInternalOrConnectionFlight(existing.hasInternalOrConnectionFlight ?? false);
+      setInternalFlightAfterDay(
+        existing.internalFlightAfterDay != null && existing.internalFlightAfterDay > 0
+          ? existing.internalFlightAfterDay
+          : "",
+      );
       setRequiresExtraDay(existing.requiresExtraDay ?? false);
       const hg = existing.hotelGalleryImageUrls;
       setHotelGalleryImages(
@@ -403,6 +428,35 @@ function AdminPlanForm() {
         return;
       }
     }
+    const needsInternalAfterDay = planNeedsInternalFlightAfterDay({
+      hasInternalOrConnectionFlight: isBloqueo
+        ? internalFlights.some((f) => f.flightRole === "domestic" && f.imageUrl)
+        : hasInternalOrConnectionFlight,
+      isBloqueo,
+      internalFlights,
+    });
+    if (needsInternalAfterDay) {
+      if (!itinerary.length) {
+        toast({
+          title: "Itinerario requerido",
+          description: "Agrega los días del itinerario para indicar después de cuál va el vuelo interno en el PDF.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (
+        internalFlightAfterDay === "" ||
+        internalFlightAfterDay < 1 ||
+        internalFlightAfterDay > itinerary.length
+      ) {
+        toast({
+          title: "Día del vuelo interno",
+          description: `Indica después de qué día (1 a ${itinerary.length}) se muestra el vuelo interno en el PDF.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     const payload = {
       name,
       country,
@@ -422,6 +476,7 @@ function AdminPlanForm() {
       requiresExtraDay,
       allowedDays: allowedDays.length ? allowedDays : null,
       priceTiers: isBloqueo ? null : priceTiers.length ? normalizePriceTiers(priceTiers) : null,
+      availability: isBloqueo ? undefined : availabilityDays,
       upgrades: upgrades.length ? upgrades : null,
       itinerary: itinerary.map(itineraryDayToPayload),
       hotels,
@@ -429,9 +484,10 @@ function AdminPlanForm() {
       exclusions,
       images,
       hasInternalOrConnectionFlight: isBloqueo
-        ? internalFlights.length > 0
+        ? internalFlights.some((f) => f.flightRole === "domestic" && f.imageUrl)
         : hasInternalOrConnectionFlight,
-      internalFlights: internalFlights.length ? internalFlights : null,
+      internalFlightAfterDay: needsInternalAfterDay ? Number(internalFlightAfterDay) : null,
+      internalFlights: isBloqueo && internalFlights.length ? internalFlights : null,
       medicalAssistanceInfo: medicalAssistanceInfo || null,
       medicalAssistanceImageUrl: medicalAssistanceImageUrl || null,
       firstPageComments: firstPageComments || null,
@@ -454,6 +510,27 @@ function AdminPlanForm() {
     saveMutation.mutate(payload);
   };
 
+  const availabilitySaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleAvailabilityChange = (next: AvailabilityDay[]) => {
+    setAvailabilityDays(next);
+    if (!id || isBloqueo) return;
+    if (availabilitySaveTimer.current) clearTimeout(availabilitySaveTimer.current);
+    availabilitySaveTimer.current = setTimeout(() => {
+      apiRequest("PUT", `/api/admin/destinations/${id}/availability`, { days: next })
+        .then(() => {
+          invalidatePublicDestinationQueries(queryClient);
+          invalidateAdminDestinationQueries(queryClient, id);
+        })
+        .catch((error: Error) => {
+          toast({
+            title: "No se guardaron los cupos",
+            description: error.message,
+            variant: "destructive",
+          });
+        });
+    }, 400);
+  };
+
   const toggleAllowedDay = (day: string) => {
     setAllowedDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
@@ -461,18 +538,44 @@ function AdminPlanForm() {
   };
 
   const addItineraryDay = () => {
+    setOpenItineraryIndex(itinerary.length);
     setItinerary((prev) => [...prev, { dayNumber: prev.length + 1, title: "", description: "", activities: [], meals: [], accommodation: "" }]);
   };
   const updateItineraryDay = (i: number, f: Partial<ItineraryDay>) => {
     setItinerary((prev) => prev.map((d, j) => (j === i ? { ...d, ...f } : d)));
   };
   const removeItineraryDay = (i: number) => {
-    setItinerary((prev) => prev.filter((_, j) => j !== i).map((d, j) => ({ ...d, dayNumber: j + 1 })));
+    setOpenItineraryIndex((current) => {
+      if (current == null) return null;
+      if (current === i) return i > 0 ? i - 1 : 0;
+      if (current > i) return current - 1;
+      return current;
+    });
+    setItinerary((prev) => {
+      const next = prev.filter((_, j) => j !== i).map((d, j) => ({ ...d, dayNumber: j + 1 }));
+      setInternalFlightAfterDay((current) => {
+        if (current === "") return current;
+        if (next.length === 0) return "";
+        return current > next.length ? next.length : current;
+      });
+      return next;
+    });
   };
 
-  const addHotel = () => setHotels((prev) => [...prev, { name: "", category: "", location: "", nights: undefined }]);
+  const addHotel = () => {
+    setOpenHotelIndex(hotels.length);
+    setHotels((prev) => [...prev, { name: "", category: "", location: "", nights: undefined }]);
+  };
   const updateHotel = (i: number, f: Partial<Hotel>) => setHotels((prev) => prev.map((h, j) => (j === i ? { ...h, ...f } : h)));
-  const removeHotel = (i: number) => setHotels((prev) => prev.filter((_, j) => j !== i));
+  const removeHotel = (i: number) => {
+    setOpenHotelIndex((current) => {
+      if (current == null) return null;
+      if (current === i) return i > 0 ? i - 1 : 0;
+      if (current > i) return current - 1;
+      return current;
+    });
+    setHotels((prev) => prev.filter((_, j) => j !== i));
+  };
 
   const addInclusion = () => setInclusions((prev) => [...prev, { item: "" }]);
   const updateInclusion = (i: number, item: string) => setInclusions((prev) => prev.map((x, j) => (j === i ? { ...x, item } : x)));
@@ -550,9 +653,21 @@ function AdminPlanForm() {
     });
   };
 
-  const addUpgrade = () => setUpgrades((prev) => [...prev, { code: "", name: "", price: 0 }]);
+  const addUpgrade = () => {
+    setUpgrades((prev) => {
+      setOpenUpgradeIndex(prev.length);
+      return [...prev, { code: "", name: "", price: 0 }];
+    });
+  };
   const updateUpgrade = (i: number, f: Partial<Upgrade>) => setUpgrades((prev) => prev.map((u, j) => (j === i ? { ...u, ...f } : u)));
-  const removeUpgrade = (i: number) => setUpgrades((prev) => prev.filter((_, j) => j !== i));
+  const removeUpgrade = (i: number) => {
+    setUpgrades((prev) => prev.filter((_, j) => j !== i));
+    setOpenUpgradeIndex((current) => {
+      if (current === null) return null;
+      if (current === i) return null;
+      return current > i ? current - 1 : current;
+    });
+  };
 
   const addPlanTax = () => setPlanTaxes((prev) => [...prev, createEmptyPlanTax()]);
   const updatePlanTax = (i: number, f: Partial<PlanTax>) =>
@@ -692,8 +807,12 @@ function AdminPlanForm() {
     if (plan.basePrice) setBasePrice(String(plan.basePrice));
     if (Array.isArray(plan.itinerary) && plan.itinerary.length) {
       setItinerary((plan.itinerary as ItineraryDay[]).map((d, i) => ({ ...d, dayNumber: d.dayNumber ?? i + 1 })));
+      setOpenItineraryIndex(0);
     }
-    if (Array.isArray(plan.hotels) && plan.hotels.length) setHotels(plan.hotels as Hotel[]);
+    if (Array.isArray(plan.hotels) && plan.hotels.length) {
+      setHotels(plan.hotels as Hotel[]);
+      setOpenHotelIndex(0);
+    }
     if (Array.isArray(plan.inclusions) && plan.inclusions.length) setInclusions(plan.inclusions as Inclusion[]);
     if (Array.isArray(plan.exclusions) && plan.exclusions.length) setExclusions(plan.exclusions as Exclusion[]);
     if (Array.isArray(plan.priceTiers) && plan.priceTiers.length) setPriceTiers(plan.priceTiers as PriceTier[]);
@@ -1050,6 +1169,41 @@ function AdminPlanForm() {
     [adicionalesGalleryImages, reorderAdicionalesGalleryMutation]
   );
 
+  const goToSection = useCallback((id: string) => {
+    setActiveTab(id);
+    requestAnimationFrame(() => {
+      document.querySelector("[data-plan-editor-top]")?.scrollIntoView({ block: "start" });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isBloqueo && (activeTab === "precios" || activeTab === "cupos")) {
+      setActiveTab("basico");
+    }
+  }, [isBloqueo, activeTab]);
+
+  const visibleSections = PLAN_EDITOR_SECTIONS.filter(
+    (section) => !isBloqueo || (section.id !== "precios" && section.id !== "cupos"),
+  );
+  const publishGaps = [
+    !name.trim() ? "el nombre" : null,
+    !country.trim() ? "el país" : null,
+    !String(basePrice).trim() ? "el precio" : null,
+    !imageUrl ? "la portada" : null,
+    itinerary.length === 0 ? "días de itinerario" : null,
+  ].filter((item): item is string => Boolean(item));
+  const readySectionIds = new Set<string>(
+    [
+      name.trim() && country.trim() && String(basePrice).trim() ? "basico" : null,
+      itinerary.length > 0 ? "itinerario" : null,
+      hotels.some((hotel) => hotel.name.trim()) ? "hoteles" : null,
+      inclusions.some((item) => item.item.trim()) || exclusions.some((item) => item.item.trim()) ? "incl-excl" : null,
+      priceTiers.length > 0 ? "precios" : null,
+      availabilityDays.length > 0 ? "cupos" : null,
+      images.length > 0 || Boolean(imageUrl) ? "imagenes" : null,
+    ].filter((id): id is string => Boolean(id)),
+  );
+
   if (isEditing && isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -1070,18 +1224,45 @@ function AdminPlanForm() {
         progress={cosmoProgress}
         stageLabel={cosmoStageLabel}
       />
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => setLocation("/admin/plans")}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver
-        </Button>
-        <Button onClick={handleSave} disabled={saveMutation.isPending}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mt-0.5 shrink-0"
+            onClick={() => setLocation("/admin/plans")}
+            aria-label="Volver al listado"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {isEditing ? "Editar plan" : "Nuevo plan"}
+            </p>
+            <h1 className="truncate text-2xl font-semibold tracking-tight">
+              {name.trim() || "Sin nombre todavía"}
+            </h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {country.trim() ? (
+                <span className="text-sm text-muted-foreground">{country.trim()}</span>
+              ) : null}
+              <Badge variant={isActive ? "default" : "secondary"}>
+                {isActive ? "Visible en el catálogo" : "Oculto"}
+              </Badge>
+              {isBloqueo ? <Badge variant="outline">Bloqueo</Badge> : null}
+              <span className={cn("text-xs", publishGaps.length ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400")}>
+                {publishGaps.length ? `Falta ${publishGaps.join(", ")}` : "Listo para publicar"}
+              </span>
+            </div>
+          </div>
+        </div>
+        <Button onClick={handleSave} disabled={saveMutation.isPending} className="shrink-0 sm:self-center">
           {saveMutation.isPending ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Save className="mr-2 h-4 w-4" />
           )}
-          {saveMutation.isPending ? "Guardando..." : "Guardar"}
+          {saveMutation.isPending ? "Guardando..." : "Guardar plan"}
         </Button>
       </div>
 
@@ -1145,29 +1326,24 @@ function AdminPlanForm() {
         </Card>
       )}
 
-      {/* Tabs al estilo categoría: inactivos=solo título, activo=color+relleno dentro del contenedor */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0 tabs-plan-form">
-        <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 rounded-lg">
-          <TabsTrigger value="basico">Básico</TabsTrigger>
-          <TabsTrigger value="itinerario">Itinerario</TabsTrigger>
-          <TabsTrigger value="hoteles">Hoteles</TabsTrigger>
-          <TabsTrigger value="incl-excl">Incl./Excl.</TabsTrigger>
-          <TabsTrigger value="precios">Precios</TabsTrigger>
-          <TabsTrigger value="imagenes">Imágenes</TabsTrigger>
-        </TabsList>
-
-      <div className="space-y-4 mt-4">
+      <Tabs value={activeTab} onValueChange={goToSection} className="w-full min-w-0">
+      <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
+        <div className="min-h-full">
+          <PlanSectionNav activeId={activeTab} onChange={goToSection} sections={visibleSections} readyIds={readySectionIds} />
+        </div>
+        <div data-plan-editor-top className="plan-editor min-w-0 space-y-5 scroll-mt-24">
         <TabsContent value="basico" className="mt-0">
           <>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">1</span>
-                Información básica
+                Datos del plan
               </CardTitle>
-              <CardDescription>Nombre, país, duración, descripción y configuración del plan.</CardDescription>
+              <CardDescription>Lo necesario para publicar: nombre, país, duración, precio y categoría.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              <div className="plan-group space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Nombre del plan</Label>
@@ -1188,7 +1364,7 @@ function AdminPlanForm() {
                   <Input type="number" min={0} value={nights} onChange={(e) => setNights(Number(e.target.value) || 0)} />
                 </div>
                 <div>
-                  <Label>Precio base (USD)</Label>
+                  <Label>Precio del plan (USD)</Label>
                   <Input value={basePrice} onChange={(e) => setBasePrice(e.target.value)} placeholder="1599" />
                 </div>
               </div>
@@ -1202,98 +1378,7 @@ function AdminPlanForm() {
                   className={BASIC_TAB_TEXTAREA_CLASS}
                 />
               </div>
-              <div>
-                <Label className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  Tooltip de la tarjeta
-                </Label>
-                <Textarea
-                  value={cardTooltip}
-                  onChange={(e) => setCardTooltip(e.target.value)}
-                  rows={3}
-                  placeholder="Texto que aparece al pasar el cursor sobre la tarjeta del plan en la página principal. Ej: Salidas diarias desde 2 pax. Impuestos no incluidos..."
-                  className={BASIC_TAB_TEXTAREA_CLASS}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Si no se completa, se usará un texto por defecto según el plan.
-                </p>
               </div>
-
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" aria-hidden />
-                  <div className="space-y-1 min-w-0">
-                    <Label className="text-base">Contexto para Cosmos (notas internas)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Bloc de notas con texto enriquecido. Aquí puedes dejar ideas, aclaraciones o contexto exclusivo para el asistente Cosmos sobre este plan.
-                      <strong className="font-medium text-foreground"> No se publica</strong> en el catálogo, la ficha del plan ni el PDF de cotización.
-                    </p>
-                  </div>
-                </div>
-                <RichTextEditor
-                  value={cosmosAssistantNotes}
-                  onChange={setCosmosAssistantNotes}
-                  placeholder="Ej: Si preguntan por visa, aclarar que aplica eVisa para colombianos. No combinar con bloqueos de diciembre. Precio terrestre no incluye tasas aeroportuarias en Estambul..."
-                  minHeight={240}
-                />
-              </div>
-
-              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <Headphones className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
-                  <div className="space-y-1 min-w-0">
-                    <Label className="text-base">Audio descriptivo del programa (MP3)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Opcional. Se muestra en la ficha del plan con reproductor y descarga. Máx. 40 MB. Se guarda en el bucket del plan como{" "}
-                      <code className="text-[11px] bg-muted px-1 rounded">audio/programa-descriptivo.mp3</code>.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-                  <div className="flex-1 min-w-0">
-                    <Label className="text-xs text-muted-foreground">URL pública del MP3</Label>
-                    <Input
-                      value={descriptiveAudioUrl}
-                      onChange={(e) => setDescriptiveAudioUrl(e.target.value)}
-                      placeholder="https://…/programa-descriptivo.mp3"
-                      className="mt-1 font-mono text-xs"
-                    />
-                  </div>
-                  <input
-                    ref={descriptiveAudioFileInputRef}
-                    type="file"
-                    accept=".mp3,audio/mpeg,audio/mp3"
-                    className="hidden"
-                    onChange={handleDescriptiveAudioUpload}
-                    disabled={uploadingDescriptiveAudio}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={uploadingDescriptiveAudio || !name.trim()}
-                    onClick={() => descriptiveAudioFileInputRef.current?.click()}
-                    className="shrink-0"
-                  >
-                    {uploadingDescriptiveAudio ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Subiendo…
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Subir MP3
-                      </>
-                    )}
-                  </Button>
-                  {descriptiveAudioUrl ? (
-                    <Button type="button" variant="ghost" size="sm" className="shrink-0 text-destructive" onClick={() => setDescriptiveAudioUrl("")}>
-                      Quitar
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-
               {/* Fila: Bloque Imagen principal (50%) + Bloque Categoría (50%, más centrado) */}
               <div className="flex flex-col sm:flex-row gap-4 sm:items-stretch">
                 {/* Bloque Imagen principal - ocupa la mitad del layout */}
@@ -1319,15 +1404,14 @@ function AdminPlanForm() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex flex-col gap-2">
+                      {images.length > 0 ? (
                       <Dialog open={galleryDialogOpen} onOpenChange={setGalleryDialogOpen}>
                         <DialogTrigger asChild>
                           <Button
                             variant="outline"
                             size="default"
                             className="h-10 px-4"
-                            disabled={images.length === 0}
-                            title={images.length === 0 ? "Sube imágenes en la pestaña Imágenes primero" : undefined}
                           >
                             <ImageIcon className="h-4 w-4 mr-2" />
                             Elegir de galería
@@ -1372,6 +1456,7 @@ function AdminPlanForm() {
                           </div>
                         </DialogContent>
                       </Dialog>
+                      ) : null}
                       <input
                         ref={mainImageFileInputRef}
                         type="file"
@@ -1413,7 +1498,7 @@ function AdminPlanForm() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Haz clic en el recuadro para seleccionar un archivo
+                    Sube la portada aquí. Si ya hay fotos en la galería, también puedes elegir una.
                   </p>
                 </div>
 
@@ -1470,8 +1555,7 @@ function AdminPlanForm() {
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
                   <p className="text-sm font-medium text-foreground">Configuración del bloqueo</p>
                   <p className="text-xs text-muted-foreground">
-                    El precio visible es <strong>basePrice</strong> (porción terrestre). Los vuelos se cargan con «Gestionar vuelos del bloqueo» (ida, regreso y/o
-                    conexión interna).
+                    El precio del plan es la porción terrestre. Los vuelos se cargan con «Gestionar vuelos del bloqueo» (ida, regreso o conexión).
                     La fecha de salida no se puede cambiar después de guardarla. Puedes ajustar los cupos cuando vendas; en 0 el plan aparece como agotado.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1587,6 +1671,108 @@ function AdminPlanForm() {
                 </div>
               </div>
 
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="group flex w-full items-center justify-between rounded-xl border bg-muted/30 px-4 py-3 text-left hover:bg-muted/50">
+                    <span>
+                      <span className="block text-sm font-semibold">Detalles</span>
+                      <span className="block text-xs text-muted-foreground">Tooltip, notas de Cosmos, audio, términos, recomendaciones y asistencia médica. Opcional para publicar.</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-6 pt-4">
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  Tooltip de la tarjeta
+                </Label>
+                <Textarea
+                  value={cardTooltip}
+                  onChange={(e) => setCardTooltip(e.target.value)}
+                  rows={3}
+                  placeholder="Texto que aparece al pasar el cursor sobre la tarjeta del plan en la página principal. Ej: Salidas diarias desde 2 pax. Impuestos no incluidos..."
+                  className={BASIC_TAB_TEXTAREA_CLASS}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Si no se completa, se usará un texto por defecto según el plan.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" aria-hidden />
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-base">Contexto para Cosmos (notas internas)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Bloc de notas con texto enriquecido. Aquí puedes dejar ideas, aclaraciones o contexto exclusivo para el asistente Cosmos sobre este plan.
+                      <strong className="font-medium text-foreground"> No se publica</strong> en el catálogo, la ficha del plan ni el PDF de cotización.
+                    </p>
+                  </div>
+                </div>
+                <RichTextEditor
+                  value={cosmosAssistantNotes}
+                  onChange={setCosmosAssistantNotes}
+                  placeholder="Ej: Si preguntan por visa, aclarar que aplica eVisa para colombianos. No combinar con bloqueos de diciembre. Precio terrestre no incluye tasas aeroportuarias en Estambul..."
+                  minHeight={240}
+                />
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Headphones className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-base">Audio descriptivo del programa (MP3)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Opcional. Se escucha en la ficha del plan. Máximo 40 MB.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground">URL pública del MP3</Label>
+                    <Input
+                      value={descriptiveAudioUrl}
+                      onChange={(e) => setDescriptiveAudioUrl(e.target.value)}
+                      placeholder="https://…/programa-descriptivo.mp3"
+                      className="mt-1 font-mono text-xs"
+                    />
+                  </div>
+                  <input
+                    ref={descriptiveAudioFileInputRef}
+                    type="file"
+                    accept=".mp3,audio/mpeg,audio/mp3"
+                    className="hidden"
+                    onChange={handleDescriptiveAudioUpload}
+                    disabled={uploadingDescriptiveAudio}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={uploadingDescriptiveAudio || !name.trim()}
+                    onClick={() => descriptiveAudioFileInputRef.current?.click()}
+                    className="shrink-0"
+                  >
+                    {uploadingDescriptiveAudio ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Subiendo…
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Subir MP3
+                      </>
+                    )}
+                  </Button>
+                  {descriptiveAudioUrl ? (
+                    <Button type="button" variant="ghost" size="sm" className="shrink-0 text-destructive" onClick={() => setDescriptiveAudioUrl("")}>
+                      Quitar
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
               {/* Comentarios primera hoja del PDF */}
               <div className="border-t border-border pt-4 mt-4">
                 <Label className="text-sm font-medium">Comentarios del PDF (después de Excluido)</Label>
@@ -1678,15 +1864,10 @@ function AdminPlanForm() {
                   </div>
                 </div>
               </div>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
           </Card>
-          <div className="flex justify-between pt-2">
-            <div />
-            <Button type="button" variant="outline" onClick={() => setActiveTab("itinerario")}>
-              Siguiente: Itinerario
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
           </>
         </TabsContent>
 
@@ -1711,7 +1892,7 @@ function AdminPlanForm() {
                 {itinerary.map((day, i) => {
                   const rowBg = i % 2 === 0 ? ROW_COLOR_A : ROW_COLOR_B;
                   return (
-                    <Collapsible key={i} defaultOpen={i === 0}>
+                    <Collapsible key={i} open={openItineraryIndex === i} onOpenChange={(open) => setOpenItineraryIndex(open ? i : null)}>
                       <div
                         className={cn(
                           "rounded-lg border border-border overflow-hidden",
@@ -1729,11 +1910,8 @@ function AdminPlanForm() {
                                 Día {day.dayNumber}
                               </span>
                               <span className="truncate text-sm font-medium">
-                                {day.title || "Sin título"}
+                                {day.location || day.title || "Sin título"}
                               </span>
-                              {day.location && (
-                                <span className="text-muted-foreground text-xs shrink-0">— {day.location}</span>
-                              )}
                             </button>
                           </CollapsibleTrigger>
                           <Button
@@ -1844,76 +2022,49 @@ Puedes usar **texto** para resaltar.`}
 
               {/* Vuelo interno/conexión y mapa del itinerario */}
               <div className="border-t border-border pt-4 mt-4 space-y-4">
+                {!isBloqueo && (
                 <div className="rounded-xl border-2 border-primary/30 bg-primary/5 dark:bg-primary/10 px-4 py-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <Switch
                       checked={hasInternalOrConnectionFlight}
                       onCheckedChange={setHasInternalOrConnectionFlight}
                     />
-                    <span className="text-sm font-medium">Este plan tiene vuelo interno o de conexión</span>
+                    <span className="text-sm font-medium">Este plan tiene vuelo interno</span>
                   </label>
                   <p className="text-xs text-muted-foreground mt-1 ml-6">
-                    Cuando se active, en la cotización aparecerá la opción para subir imágenes del vuelo (interno dentro del país o de conexión entre destinos).
+                    Actívalo si hay un vuelo dentro del programa (p. ej. Estambul→Capadocia). Aquí solo eliges el día. Las fotos se suben al cotizar ese plan; el PDF las inserta después del día indicado.
                   </p>
                 </div>
+                )}
 
-                {hasInternalOrConnectionFlight && !isBloqueo && (
-                  <div>
-                    <Label className="text-sm font-medium">Imágenes del vuelo interno/conexión</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Imágenes por defecto del plan. En la cotización el usuario puede subir las suyas.
+                {(hasInternalOrConnectionFlight ||
+                  internalFlights.some((f) => f.flightRole === "domestic" && f.imageUrl)) && (
+                  <div className="rounded-xl border border-border bg-background/60 px-4 py-3 space-y-2">
+                    <Label className="text-sm font-medium">Mostrar el vuelo interno en el PDF después del día</Label>
+                    {itinerary.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Primero agrega los días del itinerario para elegir el punto de inserción.
+                      </p>
+                    ) : (
+                      <select
+                        className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={internalFlightAfterDay === "" ? "" : String(internalFlightAfterDay)}
+                        onChange={(e) =>
+                          setInternalFlightAfterDay(e.target.value ? Number(e.target.value) : "")
+                        }
+                      >
+                        <option value="">Selecciona un día</option>
+                        {itinerary.map((day) => (
+                          <option key={day.dayNumber} value={day.dayNumber}>
+                            Día {day.dayNumber}
+                            {day.title?.trim() ? ` — ${day.title.trim()}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      En cotización aparecerá el paso «Vuelo interno de este plan». El PDF lo coloca justo después de este día.
                     </p>
-                    <FlightImageGallery
-                      images={internalFlights.map((f) => f.imageUrl)}
-                      setImages={(urlsOrFn) => {
-                        const prevUrls = internalFlights.map((f) => f.imageUrl);
-                        const nextUrls = typeof urlsOrFn === "function" ? urlsOrFn(prevUrls) : urlsOrFn;
-                        setInternalFlights((prev) =>
-                          nextUrls.map((url) => {
-                            const existing = prev.find((f) => f.imageUrl === url);
-                            return existing ?? { imageUrl: url, cabinBaggage: false, holdBaggage: false, flightRole: "outbound" as const };
-                          })
-                        );
-                      }}
-                      onRemoveImage={async (url) => {
-                        try {
-                          await apiRequest("DELETE", `/api/admin/plan-image?url=${encodeURIComponent(url)}`);
-                        } catch {
-                          toast({ title: "Error", description: "No se pudo eliminar la imagen del almacenamiento.", variant: "destructive" });
-                        }
-                      }}
-                      onFilesUpload={async (files) => {
-                        if (!name.trim()) {
-                          toast({ title: "Nombre requerido", description: "Ingresa el nombre del plan primero.", variant: "destructive" });
-                          return;
-                        }
-                        setUploadingInternalFlight(true);
-                        try {
-                          for (let i = 0; i < files.length; i++) {
-                            const formData = new FormData();
-                            formData.append("file", files[i]);
-                            formData.append("planName", name.trim());
-                            formData.append("galleryIndex", `internal-${internalFlights.length + i + 1}`);
-                            const res = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" });
-                            if (!res.ok) throw new Error("Upload failed");
-                            const { url } = await res.json();
-                            setInternalFlights((prev) => [
-                              ...prev,
-                              { imageUrl: url, cabinBaggage: false, holdBaggage: false, flightRole: "outbound" },
-                            ]);
-                          }
-                          toast({ title: "Imágenes subidas", description: `${files.length} imagen(es) agregada(s).` });
-                        } catch {
-                          toast({ title: "Error", description: "No se pudieron subir las imágenes.", variant: "destructive" });
-                        } finally {
-                          setUploadingInternalFlight(false);
-                        }
-                      }}
-                      isUploading={uploadingInternalFlight}
-                      label="vuelo interno/conexión"
-                      description="Arrastra aquí o haz clic para seleccionar. El orden se usará en el PDF."
-                      inputId="internal-flight-images"
-                    />
                   </div>
                 )}
 
@@ -1928,16 +2079,6 @@ Puedes usar **texto** para resaltar.`}
               </div>
             </CardContent>
           </Card>
-          <div className="flex justify-between pt-2">
-            <Button type="button" variant="ghost" onClick={() => setActiveTab("basico")}>
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setActiveTab("hoteles")}>
-              Siguiente: Hoteles
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
           </>
         </TabsContent>
 
@@ -1963,7 +2104,7 @@ Puedes usar **texto** para resaltar.`}
                 {hotels.map((h, i) => {
                   const rowBg = i % 2 === 0 ? ROW_COLOR_A : ROW_COLOR_B;
                   return (
-                    <Collapsible key={i} defaultOpen={i === 0 || hotels.length <= 3}>
+                    <Collapsible key={i} open={openHotelIndex === i} onOpenChange={(open) => setOpenHotelIndex(open ? i : null)}>
                       <div
                         className={cn(
                           "rounded-lg border border-border overflow-hidden",
@@ -2157,16 +2298,6 @@ Puedes usar **texto** para resaltar.`}
             </CardContent>
           </Card>
 
-          <div className="flex justify-between pt-2">
-            <Button type="button" variant="ghost" onClick={() => setActiveTab("itinerario")}>
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setActiveTab("incl-excl")}>
-              Siguiente: Incl./Excl.
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
           </>
         </TabsContent>
 
@@ -2185,7 +2316,7 @@ Puedes usar **texto** para resaltar.`}
             </CardHeader>
             <CardContent>
               {inclusions.map((x, i) => (
-                <div key={i} className="flex gap-2 mb-2">
+                <div key={i} className="plan-list-row">
                   <Input value={x.item} onChange={(e) => updateInclusion(i, e.target.value)} placeholder="Inclusión" />
                   <Button variant="ghost" size="icon" onClick={() => removeInclusion(i)}>
                     <Trash2 className="h-4 w-4" />
@@ -2204,7 +2335,7 @@ Puedes usar **texto** para resaltar.`}
             </CardHeader>
             <CardContent>
               {exclusions.map((x, i) => (
-                <div key={i} className="flex gap-2 mb-2">
+                <div key={i} className="plan-list-row">
                   <Input value={x.item} onChange={(e) => updateExclusion(i, e.target.value)} placeholder="Exclusión" />
                   <Button variant="ghost" size="icon" onClick={() => removeExclusion(i)}>
                     <Trash2 className="h-4 w-4" />
@@ -2213,240 +2344,354 @@ Puedes usar **texto** para resaltar.`}
               ))}
             </CardContent>
           </Card>
-          <div className="flex justify-between pt-2">
-            <Button type="button" variant="ghost" onClick={() => setActiveTab("hoteles")}>
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setActiveTab("precios")}>
-              Siguiente: Precios
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
           </>
         </TabsContent>
 
-        <TabsContent value="precios" className="mt-0">
-          <>
+        <TabsContent value="precios" className="mt-0 space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">5</span>
-                Precios por fechas (Price Tiers)
-              </CardTitle>
-              <CardDescription>Rangos de fechas con precios específicos. Usado para planes como Turquía o Gran Tour.</CardDescription>
-              <Button variant="outline" size="sm" onClick={addPriceTier}>
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar rango
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <DollarSign className="h-4 w-4 text-primary" />
-                  Precio global
+            <CardHeader className="gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Precios por fechas</CardTitle>
+                  <CardDescription>
+                    {priceTiers.length === 0
+                      ? "Agrega una salida con su precio."
+                      : `${priceTiers.length} salida${priceTiers.length === 1 ? "" : "s"}`}
+                  </CardDescription>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Aplica el mismo precio a todas las filas de la lista (incluidos días de vuelo). Después puedes ajustar fechas individuales.
-                </p>
-                <div className="flex flex-wrap items-end gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="bulk-price">Precio USD</Label>
-                    <Input
-                      id="bulk-price"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={bulkPriceInput}
-                      onChange={(e) => setBulkPriceInput(e.target.value)}
-                      placeholder="Ej: 540"
-                      className="w-36"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          applyBulkPriceToAllTiers();
-                        }
-                      }}
-                    />
-                  </div>
-                  <Button type="button" variant="secondary" onClick={applyBulkPriceToAllTiers} disabled={!priceTiers.length}>
-                    Aplicar a todas las fechas
-                  </Button>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-                  <Checkbox
-                    checked={bulkExcludeFlightDays}
-                    onCheckedChange={(c) => setBulkExcludeFlightDays(!!c)}
-                  />
-                  Excluir días de vuelo (solo actualizar fechas de salida con precio)
-                </label>
+                <Button type="button" size="sm" onClick={addPriceTier}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar salida
+                </Button>
               </div>
-
-              {priceTiers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay fechas configuradas. Usa «Agregar rango» para crear la primera.</p>
-              ) : null}
-
-              {priceTiers.map((t, i) => (
-                <div key={i} className="flex gap-2 items-center flex-wrap">
-                  <Input
-                    type="date"
-                    value={t.startDate ?? ""}
-                    onChange={(e) => updatePriceTier(i, { startDate: e.target.value || undefined })}
-                    placeholder="Inicio"
-                    className="w-36"
-                  />
-                  <Input
-                    type="date"
-                    value={t.endDate}
-                    onChange={(e) => updatePriceTier(i, { endDate: e.target.value })}
-                    placeholder="Fin"
-                    className="w-36"
-                  />
-                  <Input
-                    value={t.price}
-                    onChange={(e) => updatePriceTier(i, { price: e.target.value })}
-                    onBlur={() => commitPriceTierPrice(i)}
-                    placeholder="Precio USD"
-                    className="w-24"
-                  />
-                  <label className="flex items-center gap-1 text-sm">
-                    <Checkbox
-                      checked={t.isFlightDay ?? false}
-                      onCheckedChange={(c) => updatePriceTier(i, { isFlightDay: !!c })}
-                    />
-                    Día vuelo
-                  </label>
-                  <Input
-                    value={t.flightLabel ?? ""}
-                    onChange={(e) => updatePriceTier(i, { flightLabel: e.target.value || undefined })}
-                    placeholder="Etiqueta"
-                    className="w-28"
-                  />
-                  <Button variant="ghost" size="icon" onClick={() => removePriceTier(i)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Upgrades</CardTitle>
-              <CardDescription>Opciones de mejora (ej: Turquía option1, option2).</CardDescription>
-              <Button variant="outline" size="sm" onClick={addUpgrade}>
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar upgrade
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {upgrades.map((u, i) => (
-                <div key={i} className="flex gap-2 items-center flex-wrap">
-                  <Input
-                    value={u.code}
-                    onChange={(e) => updateUpgrade(i, { code: e.target.value })}
-                    placeholder="Código (option1)"
-                    className="w-24"
-                  />
-                  <Input
-                    value={u.name}
-                    onChange={(e) => updateUpgrade(i, { name: e.target.value })}
-                    placeholder="Nombre"
-                    className="flex-1"
-                  />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  value={priceQuery}
+                  onChange={(e) => setPriceQuery(e.target.value)}
+                  placeholder="Buscar por fecha o precio"
+                  className="sm:max-w-xs"
+                />
+                <div className="flex flex-1 flex-wrap items-center gap-2">
                   <Input
                     type="number"
-                    value={u.price}
-                    onChange={(e) => updateUpgrade(i, { price: Number(e.target.value) || 0 })}
-                    placeholder="Precio +"
-                    className="w-24"
+                    min={0}
+                    step="0.01"
+                    value={bulkPriceInput}
+                    onChange={(e) => setBulkPriceInput(e.target.value)}
+                    placeholder="Precio USD para todas"
+                    className="w-40"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        applyBulkPriceToAllTiers();
+                      }
+                    }}
                   />
-                  <Input
-                    value={u.description ?? ""}
-                    onChange={(e) => updateUpgrade(i, { description: e.target.value || undefined })}
-                    placeholder="Descripción"
-                    className="w-48"
-                  />
-                  <Button variant="ghost" size="icon" onClick={() => removeUpgrade(i)}>
-                    <Trash2 className="h-4 w-4" />
+                  <Button type="button" variant="secondary" size="sm" onClick={applyBulkPriceToAllTiers} disabled={!priceTiers.length}>
+                    Aplicar
                   </Button>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={bulkExcludeFlightDays}
+                      onCheckedChange={(c) => setBulkExcludeFlightDays(!!c)}
+                    />
+                    Sin días de vuelo
+                  </label>
                 </div>
-              ))}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {priceTiers.length === 0 ? (
+                <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                  Todavía no hay salidas. Agrega la primera con su fecha y precio.
+                </p>
+              ) : (
+                <div className="max-h-[min(28rem,58vh)] overflow-auto rounded-xl border">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                      <tr className="border-b text-left text-xs text-muted-foreground">
+                        <th className="px-3 py-2 font-medium">Desde</th>
+                        <th className="px-3 py-2 font-medium">Hasta</th>
+                        <th className="px-3 py-2 font-medium">Precio USD</th>
+                        <th className="px-3 py-2 font-medium">Día de vuelo</th>
+                        <th className="w-10 px-2 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {priceTiers.map((tier, index) => {
+                        const query = priceQuery.trim().toLowerCase();
+                        const haystack = `${tier.startDate ?? ""} ${tier.endDate} ${tier.price} ${tier.flightLabel ?? ""}`.toLowerCase();
+                        if (query && !haystack.includes(query)) return null;
+                        return (
+                          <tr key={index} className="border-b last:border-0 align-middle">
+                            <td className="px-2 py-1.5">
+                              <Input
+                                type="date"
+                                value={tier.startDate ?? ""}
+                                onChange={(e) => updatePriceTier(index, { startDate: e.target.value || undefined })}
+                                aria-label="Fecha desde"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <Input
+                                type="date"
+                                value={tier.endDate}
+                                onChange={(e) => updatePriceTier(index, { endDate: e.target.value })}
+                                aria-label="Fecha hasta"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <Input
+                                value={tier.price}
+                                onChange={(e) => updatePriceTier(index, { price: e.target.value })}
+                                onBlur={() => commitPriceTierPrice(index)}
+                                placeholder="0"
+                                aria-label="Precio en dólares"
+                                className="w-28"
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={tier.isFlightDay ?? false}
+                                  onCheckedChange={(checked) => updatePriceTier(index, { isFlightDay: !!checked })}
+                                  aria-label="Marcar como día de vuelo"
+                                />
+                                {tier.isFlightDay ? (
+                                  <Input
+                                    value={tier.flightLabel ?? ""}
+                                    onChange={(e) => updatePriceTier(index, { flightLabel: e.target.value || undefined })}
+                                    placeholder="Etiqueta"
+                                    className="h-8 w-28"
+                                  />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Salida</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-1 py-1.5">
+                              <Button variant="ghost" size="icon" onClick={() => removePriceTier(index)} aria-label="Quitar salida">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
+
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5" />
-                Impuestos del plan
-              </CardTitle>
-              <CardDescription>
-                Montos fijos que se suman al PVP al cotizar este plan. Si el plan no lleva impuestos, déjalo vacío.
-              </CardDescription>
-              <Button variant="outline" size="sm" onClick={addPlanTax}>
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar impuesto
+            <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Mejoras
+                </CardTitle>
+                <CardDescription>
+                  Extras opcionales que el asesor elige al cotizar. El cliente ve el nombre, qué incluye y el precio adicional en dólares.
+                </CardDescription>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addUpgrade} className="shrink-0">
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar mejora
               </Button>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {planTaxes.length === 0 && (
-                <p className="text-sm text-muted-foreground">Sin impuestos configurados para este plan.</p>
+            <CardContent>
+              {upgrades.length === 0 ? (
+                <div className="rounded-xl border border-dashed px-4 py-10 text-center">
+                  <Sparkles className="mx-auto mb-3 h-8 w-8 text-muted-foreground/60" />
+                  <p className="text-sm font-medium">Este plan todavía no tiene mejoras</p>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                    Úsalas para hoteles superiores, tours extra o comidas. Si no aplica, puedes dejar esta sección vacía.
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={addUpgrade} className="mt-4">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar la primera mejora
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {upgrades.map((upgrade, index) => {
+                    const title = upgrade.name.trim() || "Mejora sin nombre";
+                    const priceLabel = `+ US$ ${Number(upgrade.price || 0).toLocaleString("en-US")}`;
+                    return (
+                      <Collapsible
+                        key={index}
+                        open={openUpgradeIndex === index}
+                        onOpenChange={(open) => setOpenUpgradeIndex(open ? index : null)}
+                      >
+                        <div className="overflow-hidden rounded-xl border bg-card">
+                          <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
+                            <CollapsibleTrigger asChild>
+                              <button type="button" className="group flex min-w-0 flex-1 items-center gap-3 text-left">
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+                                  {index + 1}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-semibold">{title}</span>
+                                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                    {upgrade.description?.trim() || "Sin detalle de lo que incluye"}
+                                    {upgrade.code.trim() ? ` · código ${upgrade.code.trim()}` : ""}
+                                  </span>
+                                </span>
+                              </button>
+                            </CollapsibleTrigger>
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                              {priceLabel}
+                            </span>
+                            <Button variant="ghost" size="icon" onClick={() => removeUpgrade(index)} aria-label={`Quitar ${title}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <CollapsibleContent>
+                            <div className="grid gap-4 border-t bg-muted/20 p-4 sm:grid-cols-2">
+                              <div className="sm:col-span-2">
+                                <Label htmlFor={`upgrade-name-${index}`}>Nombre</Label>
+                                <p className="mb-1.5 text-xs text-muted-foreground">Lo que lee el asesor al elegir la mejora.</p>
+                                <Input
+                                  id={`upgrade-name-${index}`}
+                                  value={upgrade.name}
+                                  onChange={(e) => updateUpgrade(index, { name: e.target.value })}
+                                  placeholder="Hotel céntrico + tour por el Bósforo"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`upgrade-price-${index}`}>Precio adicional (USD)</Label>
+                                <p className="mb-1.5 text-xs text-muted-foreground">Se suma al plan por persona.</p>
+                                <div className="relative">
+                                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">US$</span>
+                                  <Input
+                                    id={`upgrade-price-${index}`}
+                                    type="number"
+                                    min={0}
+                                    value={upgrade.price}
+                                    onChange={(e) => updateUpgrade(index, { price: Number(e.target.value) || 0 })}
+                                    className="pl-12"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label htmlFor={`upgrade-code-${index}`}>Código interno</Label>
+                                <p className="mb-1.5 text-xs text-muted-foreground">Identificador corto. No se muestra al cliente.</p>
+                                <Input
+                                  id={`upgrade-code-${index}`}
+                                  value={upgrade.code}
+                                  onChange={(e) => updateUpgrade(index, { code: e.target.value })}
+                                  placeholder="opcion-1"
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <Label htmlFor={`upgrade-description-${index}`}>Qué incluye</Label>
+                                <p className="mb-1.5 text-xs text-muted-foreground">Detalle visible junto al nombre en la cotización.</p>
+                                <Textarea
+                                  id={`upgrade-description-${index}`}
+                                  value={upgrade.description ?? ""}
+                                  onChange={(e) => updateUpgrade(index, { description: e.target.value || undefined })}
+                                  placeholder="8 almuerzos, hotel céntrico en Estambul y tour clásico"
+                                  rows={3}
+                                  className="resize-y"
+                                />
+                              </div>
+                            </div>
+                          </CollapsibleContent>
+                        </div>
+                      </Collapsible>
+                    );
+                  })}
+                </div>
               )}
-              {planTaxes.map((tax, i) => (
-                <div key={tax.id} className="flex gap-2 items-start flex-wrap border rounded-lg p-3">
+            </CardContent>
+          </Card>
+
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <button type="button" className="group flex w-full items-center justify-between rounded-xl border bg-card px-4 py-3 text-left">
+                <span>
+                  <span className="block text-sm font-semibold">Impuestos</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {planTaxes.length === 0 ? "Opcional. Se suman al cotizar." : `${planTaxes.length} impuesto${planTaxes.length === 1 ? "" : "s"}`}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-2">
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={addPlanTax}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar impuesto
+                </Button>
+              </div>
+              {planTaxes.map((tax, index) => (
+                <div key={tax.id} className="flex flex-wrap items-center gap-2 rounded-xl border p-3">
                   <Input
                     value={tax.label}
-                    onChange={(e) => updatePlanTax(i, { label: e.target.value })}
-                    placeholder="Nombre (ej. Tasa aeroportuaria)"
-                    className="flex-1 min-w-[180px]"
+                    onChange={(e) => updatePlanTax(index, { label: e.target.value })}
+                    placeholder="Nombre, por ejemplo tasa aeroportuaria"
+                    className="min-w-[180px] flex-1"
                   />
-                  <div className="flex rounded-md border border-input p-0.5 bg-background shrink-0">
-                    {(["USD", "COP"] as const).map((cur) => (
+                  <div className="flex rounded-md border border-input bg-background p-0.5">
+                    {(["USD", "COP"] as const).map((currency) => (
                       <button
-                        key={cur}
+                        key={currency}
                         type="button"
-                        onClick={() => updatePlanTax(i, { currency: cur })}
+                        onClick={() => updatePlanTax(index, { currency })}
                         className={cn(
-                          "px-2 py-1 text-xs font-medium rounded-md transition-colors",
-                          tax.currency === cur
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground",
+                          "rounded-md px-2 py-1 text-xs font-medium",
+                          tax.currency === currency ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                         )}
                       >
-                        {cur === "USD" ? "US$" : "COP$"}
+                        {currency === "USD" ? "US$" : "COP$"}
                       </button>
                     ))}
                   </div>
                   <Input
                     value={tax.amount}
-                    onChange={(e) => updatePlanTax(i, { amount: e.target.value.replace(/,/g, "") })}
+                    onChange={(e) => updatePlanTax(index, { amount: e.target.value.replace(/,/g, "") })}
                     placeholder="Monto"
                     className="w-28"
                   />
-                  <label className="flex items-center gap-1.5 text-sm shrink-0 pt-2">
+                  <label className="flex items-center gap-1.5 text-sm">
                     <Checkbox
                       checked={tax.perPassenger !== false}
-                      onCheckedChange={(c) => updatePlanTax(i, { perPassenger: !!c })}
+                      onCheckedChange={(checked) => updatePlanTax(index, { perPassenger: !!checked })}
                     />
                     Por pasajero
                   </label>
-                  <Button variant="ghost" size="icon" onClick={() => removePlanTax(i)} className="shrink-0">
+                  <Button variant="ghost" size="icon" onClick={() => removePlanTax(index)} aria-label="Quitar impuesto">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
+            </CollapsibleContent>
+          </Collapsible>
+        </TabsContent>
+        <TabsContent value="cupos" className="mt-0">
+          <Card>
+            <CardHeader>
+              <CardTitle>Disponibilidad por fecha</CardTitle>
+              <CardDescription>
+                Cupos de cada salida. El color del calendario sigue la cantidad: verde, amarillo, naranja, rojo y gris si ya no hay cupos.
+                {isEditing
+                  ? " Al actualizar, las fechas se publican en la ficha y en el cotizador."
+                  : " En un plan nuevo, pulsa Guardar para publicarlas."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isBloqueo ? (
+                <p className="text-sm text-muted-foreground">
+                  Este plan es un bloqueo. La salida y los cupos se cargan en la pestaña Básico.
+                </p>
+              ) : (
+                <AvailabilityEditor days={availabilityDays} onChange={handleAvailabilityChange} />
+              )}
             </CardContent>
           </Card>
-          <div className="flex justify-between pt-2">
-            <Button type="button" variant="ghost" onClick={() => setActiveTab("incl-excl")}>
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setActiveTab("imagenes")}>
-              Siguiente: Imágenes
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-          </>
         </TabsContent>
 
         <TabsContent value="imagenes" className="mt-0">
@@ -2454,7 +2699,7 @@ Puedes usar **texto** para resaltar.`}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">6</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">7</span>
                 Galería de imágenes
               </CardTitle>
               <CardDescription>Imágenes del destino para el catálogo y PDF. La primera puede usarse como imagen principal.</CardDescription>
@@ -2627,15 +2872,39 @@ Puedes usar **texto** para resaltar.`}
             </div>
           </div>
 
-          <div className="flex justify-between pt-2">
-            <Button type="button" variant="ghost" onClick={() => setActiveTab("precios")}>
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
-            <div />
-          </div>
           </>
         </TabsContent>
+
+        {(() => {
+          const { prev, next, index } = planSectionNeighbors(activeTab, visibleSections);
+          return (
+            <div className="sticky bottom-3 z-20 flex items-center justify-between gap-2 rounded-2xl border bg-background/95 px-2 py-2 shadow-lg backdrop-blur">
+              {prev ? (
+                <Button type="button" variant="ghost" onClick={() => goToSection(prev.id)}>
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  {prev.label}
+                </Button>
+              ) : (
+                <span />
+              )}
+              <p className="hidden text-xs tabular-nums text-muted-foreground sm:block">
+                {index + 1} / {visibleSections.length}
+              </p>
+              {next ? (
+                <Button type="button" variant="outline" onClick={() => goToSection(next.id)}>
+                  {next.label}
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              ) : (
+                <Button type="button" onClick={handleSave} disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Guardar plan
+                </Button>
+              )}
+            </div>
+          );
+        })()}
+      </div>
       </div>
       </Tabs>
     </div>

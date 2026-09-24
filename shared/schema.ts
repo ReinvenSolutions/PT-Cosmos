@@ -35,6 +35,8 @@ export const destinations = pgTable(
     /** Impuestos fijos del plan (se suman al PVP en cotización). */
     planTaxes: json("plan_taxes").$type<PlanTax[] | null>(),
     hasInternalOrConnectionFlight: boolean("has_internal_or_connection_flight").default(false),
+    /** Día del itinerario tras el cual el PDF inserta el vuelo interno de este plan. */
+    internalFlightAfterDay: integer("internal_flight_after_day"),
     internalFlights: json("internal_flights").$type<
       Array<{
         imageUrl: string;
@@ -92,6 +94,29 @@ export const insertDestinationImageSchema = createInsertSchema(destinationImages
 });
 export type InsertDestinationImage = z.infer<typeof insertDestinationImageSchema>;
 export type DestinationImage = typeof destinationImages.$inferSelect;
+
+/** Cupos (y precio opcional) por fecha de salida de un plan. */
+export const destinationAvailability = pgTable(
+  "destination_availability",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    destinationId: varchar("destination_id")
+      .notNull()
+      .references(() => destinations.id, { onDelete: "cascade" }),
+    date: text("date").notNull(),
+    slots: integer("slots").notNull(),
+    price: decimal("price", { precision: 10, scale: 2 }),
+  },
+  (table) => [
+    uniqueIndex("destination_availability_dest_date_unique").on(table.destinationId, table.date),
+  ],
+);
+
+export const insertDestinationAvailabilitySchema = createInsertSchema(destinationAvailability).omit({
+  id: true,
+});
+export type InsertDestinationAvailability = z.infer<typeof insertDestinationAvailabilitySchema>;
+export type DestinationAvailability = typeof destinationAvailability.$inferSelect;
 
 export const itineraryDays = pgTable("itinerary_days", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -234,6 +259,8 @@ export const quotes = pgTable("quotes", {
   outboundFlightImages: text("outbound_flight_images").array(),
   returnFlightImages: text("return_flight_images").array(),
   domesticFlightImages: text("domestic_flight_images").array(),
+  /** Imágenes de vuelo interno por destinationId (combinados). */
+  domesticFlightImagesByDestination: json("domestic_flight_images_by_destination").$type<Record<string, string[]>>(),
   includeFlights: boolean("include_flights").default(false),
   outboundCabinBaggage: boolean("outbound_cabin_baggage").default(false),
   outboundHoldBaggage: boolean("outbound_hold_baggage").default(false),
@@ -443,6 +470,26 @@ export const cosmosSessionMessages = pgTable(
 );
 
 export type CosmosSessionMessage = typeof cosmosSessionMessages.$inferSelect;
+
+export const cosmosStrategicContexts = pgTable(
+  "cosmos_strategic_contexts",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    name: text("name").notNull(),
+    kind: text("kind").notNull(),
+    content: text("content").notNull().default(""),
+    destinationId: varchar("destination_id").references(() => destinations.id, { onDelete: "set null" }),
+    pinned: boolean("pinned").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("cosmos_strategic_contexts_updated_idx").on(t.updatedAt),
+    index("cosmos_strategic_contexts_destination_idx").on(t.destinationId),
+  ],
+);
+
+export type CosmosStrategicContextRow = typeof cosmosStrategicContexts.$inferSelect;
 
 export function formatUSD(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;

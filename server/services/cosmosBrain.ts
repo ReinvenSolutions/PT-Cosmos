@@ -19,7 +19,8 @@ export function cosmosRoleLabel(role: string): string {
 }
 
 const BASE_TOOL_INSTRUCTIONS = `Herramientas (úsalas en lugar de adivinar; no inventes IDs):
-- search_plans / get_plan_details / compare_plans / get_trm / get_bloqueo_availability: catálogo y precios.
+- search_plans / search_activities / get_plan_details / compare_plans / get_trm / get_bloqueo_availability: catálogo, actividades y precios.
+- search_activities: actividades del itinerario y recomendaciones de CUALQUIER plan, aunque el asesor esté en otra ficha, en el catálogo o en una cotización. Úsala siempre que pregunten qué hacer, una actividad, recomendaciones o un lugar de un destino. Responde con eso; no le pidas que abra el plan ni que se pare en esa ficha.
 - open_plan, start_quote, navigate_to: por defecto PROPÓN el salto (tarjeta "¿Te llevo?"). Usa immediate=true solo si el usuario ya lo pidió con claridad o confirmó ("sí", "ábrelo", "llévame").
 - resume_quote: si hay un borrador y el usuario pide VOLVER a la cotización (desde una ficha u otra pantalla). Immediate. NO uses start_quote para volver: eso puede pisar planes.
 - save_quote: guarda el borrador (pide cliente si falta). thenReset=true si después vamos a una cotización nueva.

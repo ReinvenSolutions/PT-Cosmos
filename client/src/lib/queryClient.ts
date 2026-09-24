@@ -2,7 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 /**
  * Invalida la caché de la vista pública de Tutoriales (Academia) tras guardar cursos o lecciones en admin.
- * el QueryClient global usa `staleTime: Infinity`, así que sin esto el listado no se actualiza hasta F5.
+ * El QueryClient usa staleTime de 60s: sin invalidar, un guardado puede tardar hasta un minuto en verse.
  */
 export function invalidatePublicTutorialQueries(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ["/api/tutorials/courses"] });
@@ -25,7 +25,7 @@ export function invalidatePublicDestinationQueries(qc: QueryClient) {
 /**
  * Invalida listado y detalle admin de destinos tras crear/editar un plan.
  * La query de detalle usa clave `["/api/admin/destinations/:id"]` (un solo segmento);
- * invalidar solo `["/api/admin/destinations"]` no la cubre con staleTime: Infinity.
+ * invalidar solo `["/api/admin/destinations"]` no cubre la clave de detalle.
  */
 export function invalidateAdminDestinationQueries(qc: QueryClient, destinationId?: string) {
   qc.invalidateQueries({ queryKey: ["/api/admin/destinations"] });
@@ -101,7 +101,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 60_000,
       retry: false,
     },
     mutations: {

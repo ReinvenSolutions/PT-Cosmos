@@ -69,7 +69,6 @@ function prefetchAfterAuth(queryClient: ReturnType<typeof useQueryClient>, user:
   void queryClient.prefetchQuery({ queryKey: ["/api/settings/global-trm"] });
   if (user.role === "agency" || user.role === "super_admin") {
     void queryClient.prefetchQuery({ queryKey: ["/api/destinations-previews?isActive=true"] });
-    void queryClient.prefetchQuery({ queryKey: ["/api/destinations?isActive=true"] });
   }
   const path = getPostLoginPath(user.role);
   if (path === "/") void import("@/pages/home");

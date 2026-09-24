@@ -14,6 +14,7 @@ import { GroupDiscountBanner } from "@/components/group-discount-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/optimized-image";
 import { clearHomeBuilderSelection } from "@/lib/home-selection-storage";
+import { prefetchPlan } from "@/lib/route-prefetch";
 import { COSMOS_QUOTE_RESET_EVENT } from "@/lib/cosmos-actions";
 import { cn } from "@/lib/utils";
 import { getPlanCardTooltip } from "@shared/planCardTooltip";
@@ -319,7 +320,10 @@ export default function Home() {
                     <Card
                       variant="glass"
                       className={`transition-all hover:shadow-glow overflow-hidden ${isSelected ? "bg-accent/40 shadow-glow" : ""}`}
-                      onMouseEnter={() => setExpandedCard(dest.id)}
+                      onMouseEnter={() => {
+                        setExpandedCard(dest.id);
+                        prefetchPlan(dest.id);
+                      }}
                       onMouseLeave={() => setExpandedCard(null)}
                       data-testid={`destination-card-${dest.id}`}
                     >
@@ -328,6 +332,7 @@ export default function Home() {
                           <OptimizedImage
                             src={imageUrl}
                             alt={dest.name}
+                            preset="card"
                             priority={idx < 3}
                             containerClassName="aspect-video w-full"
                             imageClassName="object-cover"

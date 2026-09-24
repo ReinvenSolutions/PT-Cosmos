@@ -55,6 +55,7 @@ export class QuoteService {
       outboundFlightImages: data.outboundFlightImages || null,
       returnFlightImages: data.returnFlightImages || null,
       domesticFlightImages: data.domesticFlightImages || null,
+      domesticFlightImagesByDestination: data.domesticFlightImagesByDestination || null,
       includeFlights: data.includeFlights ?? false,
       outboundCabinBaggage: data.outboundCabinBaggage ?? false,
       outboundHoldBaggage: data.outboundHoldBaggage ?? false,
@@ -169,6 +170,9 @@ export class QuoteService {
     }
     if (data.domesticFlightImages !== undefined) {
       quoteData.domesticFlightImages = data.domesticFlightImages || null;
+    }
+    if (data.domesticFlightImagesByDestination !== undefined) {
+      quoteData.domesticFlightImagesByDestination = data.domesticFlightImagesByDestination || null;
     }
     if (data.includeFlights !== undefined) {
       quoteData.includeFlights = data.includeFlights;

@@ -5,6 +5,8 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar, type PriceTier } from "@/components/ui/calendar";
+import type { AvailabilityDay } from "@shared/availability";
+import { AvailabilityLegend } from "@/components/availability-calendar";
 import {
   Popover,
   PopoverContent,
@@ -18,6 +20,8 @@ interface DatePickerProps {
   disabled?: (date: Date) => boolean;
   className?: string;
   priceTiers?: PriceTier[];
+  availability?: AvailabilityDay[];
+  presentation?: "popover" | "inline";
 }
 
 export function DatePicker({
@@ -27,9 +31,41 @@ export function DatePicker({
   disabled,
   className,
   priceTiers,
+  availability,
+  presentation = "popover",
 }: DatePickerProps) {
   const today = new Date();
-  
+
+  const calendar = (
+    <>
+      {(availability?.length ?? 0) > 0 ? (
+        <div className={cn("border-b px-3 py-2", presentation === "inline" && "px-0")}>
+          <AvailabilityLegend />
+        </div>
+      ) : null}
+      <Calendar
+        mode="single"
+        selected={date}
+        onSelect={onDateChange}
+        disabled={disabled}
+        initialFocus={presentation === "popover"}
+        locale={es}
+        numberOfMonths={2}
+        defaultMonth={date || today}
+        priceTiers={priceTiers}
+        availability={availability}
+      />
+    </>
+  );
+
+  if (presentation === "inline") {
+    return (
+      <div className={cn("rounded-xl border border-border bg-card p-2", className)}>
+        {calendar}
+      </div>
+    );
+  }
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -46,18 +82,8 @@ export function DatePicker({
           {date ? format(date, "PPP", { locale: es }) : placeholder}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={onDateChange}
-          disabled={disabled}
-          initialFocus
-          locale={es}
-          numberOfMonths={2}
-          defaultMonth={date || today}
-          priceTiers={priceTiers}
-        />
+      <PopoverContent className="w-auto max-w-[95vw] p-0" align="start">
+        {calendar}
       </PopoverContent>
     </Popover>
   );

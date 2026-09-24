@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CosmosFooter } from "@/components/cosmos-footer";
@@ -85,6 +85,11 @@ function HeaderTrmBadge() {
 /** Solo se usa dentro de ProtectedRoute, que ya verificó auth. */
 export function DashboardLayout({ children }: DashboardLayoutProps) {
     const [location] = useLocation();
+    const mainRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        mainRef.current?.scrollTo({ top: 0 });
+    }, [location]);
 
     const isHome = location === "/";
     const isQuoteExpress = location === "/cotizacion-express";
@@ -100,7 +105,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <SidebarProvider>
             <div className="flex min-h-screen w-full">
                 <AppSidebar />
-                <main className="flex flex-1 flex-col min-h-0 overflow-auto">
+                <main ref={mainRef} className="flex flex-1 flex-col min-h-0 overflow-auto">
                     <header className="header-glass header-warm sticky top-0 z-10 hidden md:block overflow-hidden">
                         <div className="container mx-auto px-6 py-4 relative">
                             <div className="flex items-center justify-between gap-4">
@@ -153,7 +158,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         )}
                     </div>
 
-                    <div className={`flex-1 min-h-0 ${isFullWidthPage ? "p-0" : "p-4 md:p-8"}`}>
+                    <div key={location} className={`page-enter flex-1 min-h-0 ${isFullWidthPage ? "p-0" : "p-4 md:p-8"}`}>
                         {children}
                     </div>
                     <CosmosFooter />
