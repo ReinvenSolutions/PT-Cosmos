@@ -112,14 +112,14 @@ export function PDFLoadingModal({ isOpen, isComplete = false }: PDFLoadingModalP
           </div>
 
           {/* Title */}
-          <h3 className="text-xl font-bold text-gray-800 mb-2 text-center">
+          <h3 className="text-xl font-bold text-foreground mb-2 text-center">
             {isCompleteState ? "¡Cotización Lista!" : "Generando tu Cotización"}
           </h3>
 
           {/* Progress bar */}
           <div className="w-full mb-6">
             <Progress value={progress} className="h-2 mb-2" />
-            <p className="text-sm text-gray-600 text-center">
+            <p className="text-sm text-muted-foreground text-center">
               {Math.round(progress)}% completado
             </p>
           </div>
