@@ -18,17 +18,17 @@ function slotSwatchClass(slots: number): string {
 
 export function AvailabilityLegend() {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+    <ul className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-foreground">
       <li className="flex items-center gap-1.5">
         <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
         16 o más cupos
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+        <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
         8–15 cupos
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+        <span className="h-2.5 w-2.5 rounded-full bg-orange-600" />
         4–7 cupos
       </li>
       <li className="flex items-center gap-1.5">
@@ -36,7 +36,7 @@ export function AvailabilityLegend() {
         1–3 cupos
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-gray-400" />
+        <span className="h-2.5 w-2.5 rounded-full bg-zinc-500" />
         Sin cupos
       </li>
     </ul>

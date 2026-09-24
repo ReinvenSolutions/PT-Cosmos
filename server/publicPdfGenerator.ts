@@ -14,6 +14,7 @@ import {
   clampInternalFlightAfterDay,
   flattenDomesticImagesByDestination,
   internalFlightPdfHeading,
+  planHasInternalFlightSlot,
   resolveDomesticImagesForDestination,
   shouldInsertInternalFlightAfterDay,
 } from "@shared/internalFlightPlacement";
@@ -335,34 +336,31 @@ function renderMixedBoldParagraphs(
   for (let paraIndex = 0; paraIndex < paragraphs.length; paraIndex++) {
     const para = paragraphs[paraIndex];
     if (paraIndex > 0) {
-      doc.moveDown(0.5);
-      currentY = doc.y;
+      const paragraphGap = fontSize * 0.8;
+      currentY += paragraphGap;
     }
 
-    const parts = para.split(/(\*\*[^*]+\*\*)/g);
-    let isFirst = true;
-    for (const part of parts) {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        doc.font("Helvetica-Bold");
-        const partText = part.slice(2, -2);
-        if (isFirst) {
-          doc.text(partText, x, currentY, { width, align, lineGap, continued: true });
-          isFirst = false;
-        } else {
-          doc.text(partText, { width, align, lineGap, continued: true });
-        }
-      } else if (part) {
-        doc.font("Helvetica");
-        if (isFirst) {
-          doc.text(part, x, currentY, { width, align, lineGap, continued: true });
-          isFirst = false;
-        } else {
-          doc.text(part, { width, align, lineGap, continued: true });
-        }
+    const plainPara = para.replace(/\*\*/g, "");
+    doc.font("Helvetica").fontSize(fontSize);
+    const paraHeight = doc.heightOfString(plainPara, { width, align, lineGap });
+
+    const parts = para.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+    parts.forEach((part, partIndex) => {
+      const isBold = part.startsWith("**") && part.endsWith("**");
+      const partText = isBold ? part.slice(2, -2) : part;
+      const isLast = partIndex === parts.length - 1;
+      doc.font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize).fillColor(textColor);
+      const options = { width, align, lineGap, continued: !isLast };
+      if (partIndex === 0) {
+        doc.text(partText, x, currentY, options);
+      } else {
+        doc.text(partText, options);
       }
-    }
-    doc.text("", { continued: false });
-    currentY = doc.y;
+    });
+
+    currentY = Math.max(doc.y, currentY + paraHeight);
+    doc.y = currentY;
+    doc.x = x;
   }
 
   return currentY;
@@ -453,6 +451,29 @@ function formatDateWithMonthName(date: Date): string {
   const month = months[date.getMonth()];
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
+}
+
+function internalImagesForPdfDestination(
+  dest: PublicQuoteData["destinations"][number],
+  destIds: string[],
+  data: PublicQuoteData,
+): string[] {
+  const plan = dest.destination;
+  if (
+    !planHasInternalFlightSlot({
+      hasInternalOrConnectionFlight: plan?.hasInternalOrConnectionFlight,
+      isBloqueo: plan?.isBloqueo,
+      internalFlights: plan?.internalFlights,
+    })
+  ) {
+    return [];
+  }
+  return resolveDomesticImagesForDestination(
+    dest.id,
+    destIds,
+    data.domesticFlightImagesByDestination,
+    data.domesticFlightImages,
+  );
 }
 
 export async function generatePublicQuotePDF(
@@ -1690,11 +1711,10 @@ export async function generatePublicQuotePDF(
     }
 
     const destIdsForInternal = data.destinations.map((d) => d.id);
-    const internalImages = resolveDomesticImagesForDestination(
-      dest.id,
+    const internalImages = internalImagesForPdfDestination(
+      dest,
       destIdsForInternal,
-      data.domesticFlightImagesByDestination,
-      data.domesticFlightImages,
+      data,
     );
     const afterDay = clampInternalFlightAfterDay(
       (dest.destination as { internalFlightAfterDay?: number | null } | undefined)?.internalFlightAfterDay,
@@ -1929,11 +1949,10 @@ export async function generatePublicQuotePDF(
     doc.moveDown(0.5);
     } else {
       const destIdsForInternal = data.destinations.map((d) => d.id);
-      const internalImages = resolveDomesticImagesForDestination(
-        dest.id,
+      const internalImages = internalImagesForPdfDestination(
+        dest,
         destIdsForInternal,
-        data.domesticFlightImagesByDestination,
-        data.domesticFlightImages,
+        data,
       );
       if (internalImages.length > 0) {
         const heading = internalFlightPdfHeading(
@@ -3151,56 +3170,50 @@ export async function generatePublicQuotePDF(
 
       const paragraphs = section.text.split(/\n+/).map((p) => p.trim()).filter(Boolean);
       for (const para of paragraphs) {
-        doc.font("Helvetica").fontSize(8).fillColor(textColor);
-        const plainPara = para.replace(/\*\*/g, "");
+        const isBullet = /^[-•]\s*/.test(para);
+        const body = isBullet ? para.replace(/^[-•]\s*/, "") : para;
+        const bulletGap = 12;
+        const textX = leftMargin + (isBullet ? bulletGap : 0);
+        const textWidth = contentWidth - (isBullet ? bulletGap : 0);
+
+        doc.font("Helvetica").fontSize(9).fillColor(textColor);
+        const plainPara = body.replace(/\*\*/g, "");
         const paraHeight = doc.heightOfString(plainPara, {
-          width: contentWidth,
+          width: textWidth,
           lineGap: 2,
         });
-        ensureRecommendationsSpace(paraHeight + 10);
+        ensureRecommendationsSpace(paraHeight + 8);
 
-        const parts = para.split(/(\*\*[^*]+\*\*)/g);
-        let isFirst = true;
-        let startY = doc.y;
-
-        for (const part of parts) {
-          if (!part) continue;
-          if (doc.y > bottomSafe - 16) {
-            startRecommendationsPage(false);
-            startY = doc.y;
-            isFirst = true;
-          }
-          if (part.startsWith("**") && part.endsWith("**")) {
-            doc.font("Helvetica-Bold").fontSize(8);
-            const text = part.slice(2, -2);
-            if (isFirst) {
-              doc.text(text, leftMargin, startY, {
-                width: contentWidth,
-                align: "justify",
-                lineGap: 2,
-                continued: true,
-              });
-              isFirst = false;
-            } else {
-              doc.text(text, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-            }
-          } else {
-            doc.font("Helvetica").fontSize(8);
-            if (isFirst) {
-              doc.text(part, leftMargin, startY, {
-                width: contentWidth,
-                align: "justify",
-                lineGap: 2,
-                continued: true,
-              });
-              isFirst = false;
-            } else {
-              doc.text(part, { width: contentWidth, align: "justify", lineGap: 2, continued: true });
-            }
-          }
+        const startY = doc.y;
+        if (isBullet) {
+          doc.font("Helvetica").fontSize(9).fillColor(textColor);
+          doc.text("•", leftMargin, startY, { lineBreak: false });
         }
-        doc.text("", { continued: false });
-        doc.moveDown(0.55);
+
+        const parts = body.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+        parts.forEach((part, partIndex) => {
+          const isBold = part.startsWith("**") && part.endsWith("**");
+          const text = isBold ? part.slice(2, -2) : part;
+          const isLast = partIndex === parts.length - 1;
+          doc.font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(textColor);
+          const options = {
+            width: textWidth,
+            align: "left" as const,
+            lineGap: 2,
+            continued: !isLast,
+          };
+          if (partIndex === 0) {
+            doc.text(text, textX, startY, options);
+          } else {
+            doc.text(text, options);
+          }
+        });
+
+        if (doc.y < startY + paraHeight - 1) {
+          doc.y = startY + paraHeight;
+        }
+        doc.x = leftMargin;
+        doc.moveDown(0.4);
       }
     }
 

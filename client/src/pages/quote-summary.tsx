@@ -2076,15 +2076,15 @@ export default function QuoteSummary() {
                 {!bloqueoPdfOnly &&
                   selectedDestinations.length > 0 &&
                   selectedDests.some((d) => (d.priceTiers && d.priceTiers.length > 0) || (d.availability?.length ?? 0) > 0) && (
-                  <div className="mt-2 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
+                  <div className="mt-2 rounded-lg border border-emerald-800/20 bg-emerald-50 p-3 dark:border-emerald-400/30 dark:bg-emerald-950/60">
                     <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-chart-3 mt-0.5 flex-shrink-0" />
-                      <div className="text-xs text-chart-3 space-y-1 opacity-95">
+                      <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-800 dark:text-emerald-200" />
+                      <div className="space-y-1 text-xs text-emerald-950 dark:text-emerald-50">
                         <p className="font-semibold">Salidas, cupos y precios:</p>
                         <ul className="list-disc list-inside space-y-0.5 ml-1">
                           <li>Cada salida muestra el precio en dorado y los cupos en el recuadro de color</li>
                           {selectedDestinations.length > 1 && (
-                            <li>En un combinado, cada punto de color es un plan: ves su precio y sus cupos en la misma fecha</li>
+                            <li>En un combinado, cada punto de color es un plan. Pasa el cursor sobre el día para ver el nombre, el precio y los cupos</li>
                           )}
                           {hasTurkeyEsencial && (
                             <li>La etiqueta de vuelo marca la salida desde Colombia</li>

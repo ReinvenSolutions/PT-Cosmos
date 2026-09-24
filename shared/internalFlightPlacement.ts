@@ -74,6 +74,10 @@ export function resolveDomesticImagesForDestination(
 ): string[] {
   const fromMap = byDestination?.[destId];
   if (fromMap && fromMap.length > 0) return fromMap;
+  const mapHasAny =
+    byDestination != null &&
+    Object.values(byDestination).some((urls) => (urls?.length ?? 0) > 0);
+  if (mapHasAny) return [];
   const firstId = destIds[0];
   if (destId === firstId && legacyDomestic && legacyDomestic.length > 0) {
     return legacyDomestic;

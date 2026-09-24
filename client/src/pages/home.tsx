@@ -152,7 +152,7 @@ export default function Home() {
       <GroupDiscountBanner />
 
       <main className="flex-1 overflow-y-auto bg-gradient-to-b from-accent/50 to-background">
-        <div className="container mx-auto px-4 py-4 md:py-6">
+        <div className={cn("container mx-auto px-4 py-4 md:py-6", selectedDestinations.length > 0 && "pb-28")}>
           <section
             className="mb-4 md:mb-6 rounded-2xl border-2 border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card/90 to-background shadow-md ring-1 ring-primary/10 p-4 sm:p-5"
             aria-label="Enlaces a servicios externos"
@@ -469,10 +469,10 @@ export default function Home() {
           </Tabs>
 
           {selectedDestinations.length > 0 && (
-            <div className="fixed bottom-6 right-6 z-50">
+            <div className="fixed bottom-6 right-24 z-40 max-w-[calc(100vw-8.5rem)]">
               <Button
                 size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl sm:w-auto"
                 onClick={() => {
                   const selectedData = {
                     destinations: selectedDestinations,

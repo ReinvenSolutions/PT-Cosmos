@@ -103,6 +103,9 @@ describe("internalFlightPlacement", () => {
     ).toEqual(["x.jpg"]);
     expect(resolveDomesticImagesForDestination("a", ids, {}, ["legacy.jpg"])).toEqual(["legacy.jpg"]);
     expect(resolveDomesticImagesForDestination("b", ids, {}, ["legacy.jpg"])).toEqual([]);
+    expect(
+      resolveDomesticImagesForDestination("a", ids, { b: ["peru.jpg"] }, ["peru.jpg"]),
+    ).toEqual([]);
   });
 
   it("al quitar un destino no arrastra sus fotos internas", () => {
