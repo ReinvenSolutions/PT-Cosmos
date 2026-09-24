@@ -15,6 +15,8 @@ describe("buildCosmosSystemPrompt idioma", () => {
     expect(prompt).toMatch(/IDIOMA OBLIGATORIO: español latino de Colombia/);
     expect(prompt).toMatch(/Prohibido el inglés/);
     expect(prompt).toMatch(/mejoras\/upgrades/);
+    expect(prompt).toMatch(/search_activities/);
+    expect(prompt).toMatch(/no le pidas que abra el plan/i);
     expect(prompt).toMatch(/resume_quote/);
     expect(prompt).toMatch(/save_quote/);
     expect(prompt).toMatch(/reset_quote/);

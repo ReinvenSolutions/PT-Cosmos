@@ -15,6 +15,7 @@ import {
   getPlanDetailText,
   getTrmSummary,
   resolveCatalogPlanId,
+  searchActivitiesAndRecommendations,
   searchCatalogPlans,
 } from "./cosmosKnowledge";
 import {
@@ -87,8 +88,24 @@ export const OPENAI_COSMOS_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "search_activities",
+      description:
+        "Busca actividades del itinerario y recomendaciones de cualquier plan, aunque el asesor no esté en esa ficha. Úsala si preguntan qué hacer, actividades, recomendaciones o un lugar de un destino o de otro plan.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Lugar, actividad o destino. Ej. Capadocia, globo, recomendaciones de Egipto" },
+          plan: { type: "string", description: "Opcional: UUID o nombre si ya se sabe el plan" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "get_plan_details",
-      description: "Itinerario, inclusiones, hoteles y precios de un plan (id o nombre).",
+      description: "Itinerario, inclusiones, hoteles, recomendaciones y precios de un plan (id o nombre), esté o no abierto en pantalla.",
       parameters: {
         type: "object",
         properties: { plan: { type: "string", description: "UUID o nombre del plan" } },
@@ -943,6 +960,19 @@ export async function executeCosmosTool(
           `- ${p.name} (${p.country}) [id=${p.id}] — ${p.duration}d/${p.nights}n — USD ${p.basePrice ?? "?"}${p.isBloqueo ? " [bloqueo]" : ""}${p.isPromotion ? " [promo]" : ""}`
       );
       return { result: `Planes encontrados:\n${lines.join("\n")}` };
+    }
+    case "search_activities": {
+      const query = asString(args.query);
+      if (!query) return { result: "Indica el lugar, la actividad o el plan." };
+      const planQuery = asString(args.plan);
+      let planId: string | undefined;
+      if (planQuery) {
+        const resolved = await resolveCatalogPlanId(planQuery);
+        if (!resolved) return { result: `No encontré el plan "${planQuery}".` };
+        planId = resolved.id;
+      }
+      const found = await searchActivitiesAndRecommendations(query, planId);
+      return { result: found.text };
     }
     case "get_plan_details": {
       const planQuery = asString(args.plan) || asString(args.planId);

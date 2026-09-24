@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import type { Destination, ItineraryDay, Hotel, Inclusion, Exclusion, DestinationImage } from "@shared/schema";
+import type { AvailabilityDay } from "@shared/availability";
+import { AvailabilityMonthView } from "@/components/availability-calendar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +53,7 @@ type PlanDetailPayload = Destination & {
   inclusions: Inclusion[];
   exclusions: Exclusion[];
   images: DestinationImage[];
+  availability?: AvailabilityDay[];
 };
 
 function formatUsd(value: string | null | undefined): string {
@@ -93,6 +96,7 @@ function GalleryThumb({
       <OptimizedImage
         src={src}
         alt={alt}
+        preset="card"
         containerClassName="absolute inset-0 size-full"
         imageClassName="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
       />
@@ -146,6 +150,7 @@ function PlanHeroGalleryCarousel({
         <OptimizedImage
           src={fallbackCoverUrl}
           alt={planName}
+          preset="hero"
           priority
           containerClassName="aspect-[21/9] min-h-[200px] w-full"
           imageClassName="object-cover"
@@ -177,6 +182,7 @@ function PlanHeroGalleryCarousel({
               <OptimizedImage
                 src={slide.url}
                 alt={slide.alt}
+                preset="hero"
                 priority={i === 0}
                 containerClassName="absolute inset-0 size-full min-h-[200px]"
                 imageClassName="object-cover"
@@ -483,6 +489,19 @@ export default function PlanDetail() {
                 {plan.description}
               </p>
             )}
+
+            {((plan.availability?.length ?? 0) > 0 || (plan.priceTiers?.length ?? 0) > 0) && (
+              <div className="space-y-3 border-t border-border pt-4">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  Salidas y disponibilidad
+                </h2>
+                <AvailabilityMonthView
+                  days={(plan.availability ?? []).map((day) => ({ ...day, destinationName: plan.name }))}
+                  priceTiers={(plan.priceTiers ?? []).map((tier) => ({ ...tier, destinationName: plan.name }))}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -573,6 +592,7 @@ export default function PlanDetail() {
                     <OptimizedImage
                       src={mapUrl}
                       alt={`Mapa · ${plan.name}`}
+                      preset="full"
                       containerClassName="w-full aspect-video"
                       imageClassName="object-contain bg-muted"
                     />
@@ -761,6 +781,23 @@ export default function PlanDetail() {
               </CardContent>
             </Card>
 
+            {((plan.availability?.length ?? 0) > 0 || (plan.priceTiers?.length ?? 0) > 0) && (
+              <Card variant="glass">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    Salidas y disponibilidad
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AvailabilityMonthView
+                    days={(plan.availability ?? []).map((day) => ({ ...day, destinationName: plan.name }))}
+                    priceTiers={(plan.priceTiers ?? []).map((tier) => ({ ...tier, destinationName: plan.name }))}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             {tierRows.length > 0 && (
               <Card variant="glass">
                 <CardHeader>
@@ -814,6 +851,11 @@ export default function PlanDetail() {
                     <Plane className="h-4 w-4" />
                     Vuelos internos / conexiones (referencia)
                   </CardTitle>
+                  {plan.internalFlightAfterDay ? (
+                    <p className="text-sm text-muted-foreground">
+                      En el PDF del interno, estas fotos se muestran después del día {plan.internalFlightAfterDay}.
+                    </p>
+                  ) : null}
                 </CardHeader>
                 <CardContent className="grid sm:grid-cols-2 gap-4">
                   {plan.internalFlights.map((f, i) => (

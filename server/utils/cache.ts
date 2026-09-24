@@ -60,4 +60,8 @@ export function clearDestinationCache(destinationId: string) {
   cache.del(CacheKeys.destinationsPreviews(false));
   cache.del(CacheKeys.destinationsPreviews());
   cache.del("cosmos:catalog");
+  cache.del("cosmos:activity-index");
+  for (const key of cache.keys()) {
+    if (key.startsWith("cosmos:plan-detail:")) cache.del(key);
+  }
 }

@@ -28,6 +28,11 @@ import { getOrSetCache } from "../utils/cache";
 import { htmlToPlainText } from "../utils/sanitize";
 import { COSMOS_APP_GUIDE } from "./cosmosAppGuide";
 import { getCosmosAssistantConfig } from "./cosmosAssistantConfigService";
+import { listCosmosStrategicContexts } from "./cosmosStrategicContextService";
+import {
+  COSMOS_CONTEXT_KIND_LABELS,
+  pickRelevantStrategicContexts,
+} from "@shared/cosmosStrategicContexts";
 
 export type CosmosChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -39,9 +44,59 @@ type FullPlan = Destination & {
 };
 
 const COSMOS_CATALOG_CACHE = "cosmos:catalog";
+const COSMOS_ACTIVITY_INDEX_CACHE = "cosmos:activity-index";
 const COSMOS_CATALOG_TTL = 600;
 const COSMOS_PLAN_DETAIL_TTL = 180;
-const MAX_DETAIL_PLANS = 4;
+const MAX_DETAIL_PLANS = 5;
+
+const ACTIVITY_STOPWORDS = new Set([
+  "que",
+  "cual",
+  "cuales",
+  "hay",
+  "en",
+  "el",
+  "la",
+  "los",
+  "las",
+  "un",
+  "una",
+  "de",
+  "del",
+  "al",
+  "para",
+  "por",
+  "con",
+  "y",
+  "o",
+  "me",
+  "te",
+  "se",
+  "lo",
+  "le",
+  "actividad",
+  "actividades",
+  "recomendacion",
+  "recomendaciones",
+  "recomienda",
+  "recomiendas",
+  "hacer",
+  "puedo",
+  "podemos",
+  "plan",
+  "planes",
+  "destino",
+  "lugar",
+  "sobre",
+  "dime",
+  "cuenta",
+  "incluye",
+  "incluida",
+  "tour",
+  "tours",
+  "otro",
+  "otra",
+]);
 
 function normalize(s: string): string {
   return s
@@ -148,6 +203,7 @@ Escalas de precio:
 ${formatPriceTiers(plan)}
 ${formatUpgrades(plan)}
 ${plan.requiresTuesday ? "Requiere salida en martes. " : ""}${plan.requiresExtraDay ? "Requiere día extra. " : ""}${plan.allowedDays?.length ? `Días permitidos: ${plan.allowedDays.join(", ")}.` : ""}
+${plan.hasInternalOrConnectionFlight ? `Vuelo interno: sí. En cotización aparece el paso «Vuelo interno del plan ${plan.name}». En el PDF se imprime después del día ${plan.internalFlightAfterDay ?? "(último día del itinerario si no está definido)"}.` : "Vuelo interno: no."}
 ${plan.flightTerms ? `Términos vuelo: ${plan.flightTerms}` : ""}
 ${plan.termsConditions ? `Términos: ${plan.termsConditions}` : ""}
 ${plan.recommendations ? `Recomendaciones (texto del PDF):\n${plan.recommendations}` : "Recomendaciones: (sin texto registrado)"}
@@ -166,6 +222,179 @@ ${exc}
 Itinerario:
 ${days || "  (sin itinerario)"}
 `.trim();
+}
+
+export type CatalogActivityDay = {
+  destinationId: string;
+  dayNumber: number;
+  title: string;
+  location: string | null;
+  activities: string[];
+  description: string;
+};
+
+export type ActivityCatalogPlan = {
+  id: string;
+  name: string;
+  country: string;
+  recommendations: string | null;
+};
+
+export function activitySearchTokens(text: string): string[] {
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+  for (const word of normalize(text).split(/[^a-z0-9]+/)) {
+    if (word.length < 3 || ACTIVITY_STOPWORDS.has(word) || seen.has(word)) continue;
+    seen.add(word);
+    tokens.push(word);
+  }
+  return tokens;
+}
+
+function excerptAround(text: string, tokens: string[], max = 500): string {
+  const plain = text.replace(/\s+/g, " ").trim();
+  if (plain.length <= max) return plain;
+  const hay = normalize(plain);
+  let at = -1;
+  for (const token of tokens) {
+    const idx = hay.indexOf(token);
+    if (idx >= 0 && (at < 0 || idx < at)) at = idx;
+  }
+  if (at < 0) return `${plain.slice(0, max)}…`;
+  const start = Math.max(0, at - 80);
+  const slice = plain.slice(start, start + max);
+  return `${start > 0 ? "…" : ""}${slice}${start + max < plain.length ? "…" : ""}`;
+}
+
+export function matchCatalogActivities(opts: {
+  query: string;
+  catalog: ActivityCatalogPlan[];
+  days: CatalogActivityDay[];
+  onlyPlanId?: string;
+  limitPlans?: number;
+}): { planIds: string[]; text: string } {
+  const tokens = activitySearchTokens(opts.query);
+  const limit = opts.limitPlans ?? 4;
+  const plans = opts.catalog.filter((plan) => !opts.onlyPlanId || plan.id === opts.onlyPlanId);
+  if (!plans.length) return { planIds: [], text: "" };
+
+  const daysByPlan = new Map<string, CatalogActivityDay[]>();
+  for (const day of opts.days) {
+    if (opts.onlyPlanId && day.destinationId !== opts.onlyPlanId) continue;
+    const list = daysByPlan.get(day.destinationId) ?? [];
+    list.push(day);
+    daysByPlan.set(day.destinationId, list);
+  }
+
+  if (!tokens.length) {
+    if (!opts.onlyPlanId) return { planIds: [], text: "" };
+    const plan = plans[0];
+    return {
+      planIds: [plan.id],
+      text: formatActivityPlanBlock(plan, daysByPlan.get(plan.id) ?? [], tokens, true),
+    };
+  }
+
+  const ranked = plans
+    .map((plan) => {
+      const days = daysByPlan.get(plan.id) ?? [];
+      let score = 0;
+      const name = normalize(`${plan.name} ${plan.country}`);
+      const recs = normalize(htmlToPlainText(plan.recommendations ?? ""));
+      for (const token of tokens) {
+        if (name.includes(token)) score += 6;
+        if (recs.includes(token)) score += 8;
+      }
+      const dayHits = days.filter((day) => {
+        const blob = normalize(
+          `${day.title} ${day.location ?? ""} ${day.activities.join(" ")} ${day.description}`
+        );
+        const hits = tokens.filter((token) => blob.includes(token)).length;
+        if (hits) score += hits * 5;
+        return hits > 0;
+      });
+      return { plan, days: dayHits.length ? dayHits : days, score, focused: dayHits.length > 0 };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  if (!ranked.length) return { planIds: [], text: "" };
+
+  return {
+    planIds: ranked.map((row) => row.plan.id),
+    text: ranked
+      .map((row) => formatActivityPlanBlock(row.plan, row.focused ? row.days : row.days.slice(0, 8), tokens, !row.focused))
+      .join("\n\n"),
+  };
+}
+
+function formatActivityPlanBlock(
+  plan: ActivityCatalogPlan,
+  days: CatalogActivityDay[],
+  tokens: string[],
+  listAllActivities: boolean
+): string {
+  const recPlain = htmlToPlainText(plan.recommendations ?? "").trim();
+  const recLine = recPlain
+    ? `Recomendaciones del plan:\n${excerptAround(recPlain, tokens, 900)}`
+    : "Recomendaciones del plan: (sin texto registrado)";
+  const shown = (listAllActivities ? days.slice(0, 8) : days.slice(0, 6))
+    .sort((a, b) => a.dayNumber - b.dayNumber)
+    .map((day) => {
+      const acts = day.activities.length ? day.activities.join("; ") : "(sin actividades listadas)";
+      const where = day.location ? ` (${day.location})` : "";
+      const desc = day.description.replace(/\s+/g, " ").trim().slice(0, 280);
+      return `- Día ${day.dayNumber} — ${day.title}${where}: ${acts}${desc ? `\n  ${desc}` : ""}`;
+    });
+  return `### ${plan.name} (${plan.country}) [id=${plan.id}]
+${recLine}
+
+Actividades del itinerario:
+${shown.join("\n") || "- (sin itinerario)"}`;
+}
+
+async function getCatalogActivityDays(catalog: Destination[]): Promise<CatalogActivityDay[]> {
+  return getOrSetCache(
+    COSMOS_ACTIVITY_INDEX_CACHE,
+    async () => {
+      const rows = await storage.listItineraryDaysForDestinations(catalog.map((plan) => plan.id));
+      return rows.map((day) => ({
+        destinationId: day.destinationId,
+        dayNumber: day.dayNumber,
+        title: day.title,
+        location: day.location,
+        activities: day.activities ?? [],
+        description: day.description ?? "",
+      }));
+    },
+    COSMOS_CATALOG_TTL
+  );
+}
+
+export async function searchActivitiesAndRecommendations(
+  query: string,
+  planId?: string
+): Promise<{ planIds: string[]; text: string }> {
+  const trimmed = query.trim();
+  if (!trimmed && !planId) {
+    return { planIds: [], text: "Indica el lugar, la actividad o el plan." };
+  }
+  const catalog = await getActiveCatalog();
+  const days = await getCatalogActivityDays(catalog);
+  const match = matchCatalogActivities({
+    query: trimmed,
+    catalog,
+    days,
+    onlyPlanId: planId,
+  });
+  if (!match.text) {
+    return {
+      planIds: [],
+      text: `No encontré actividades ni recomendaciones para "${trimmed}" en los planes activos.`,
+    };
+  }
+  return match;
 }
 
 export async function getActiveCatalog(): Promise<Destination[]> {
@@ -204,16 +433,26 @@ function scorePlanMatch(text: string, plan: Destination): number {
   return score;
 }
 
+function uniqueLimited(ids: string[], limit: number): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of ids) {
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 function pickRelevantPlanIds(
   userMessage: string,
   history: CosmosChatMessage[],
   catalog: Destination[],
   currentPlanId?: string,
-  extraIds: string[] = []
+  extraIds: string[] = [],
+  activityPlanIds: string[] = []
 ): string[] {
-  const ids = new Set<string>(extraIds.filter(Boolean));
-  if (currentPlanId) ids.add(currentPlanId);
-
   const recentUserText = [
     userMessage,
     ...history
@@ -225,31 +464,23 @@ function pickRelevantPlanIds(
   const hay = normalize(recentUserText);
   const asksTurkey =
     hay.includes("turquia") || hay.includes("capadocia") || hay.includes("estambul");
-  const asksTaxes = hay.includes("impuesto") || hay.includes("tax");
   const asksCombination = hay.includes("combin") || hay.includes("mezcl");
-
-  if (asksTurkey || (asksCombination && hay.includes("turquia"))) {
-    for (const plan of catalog.filter(isTurkeyPlan)) {
-      ids.add(plan.id);
-    }
-  }
-
-  if (asksTaxes && asksTurkey) {
-    for (const plan of catalog.filter(isTurkeyPlan)) {
-      ids.add(plan.id);
-    }
-  }
+  const turkeyIds =
+    asksTurkey || (asksCombination && hay.includes("turquia"))
+      ? catalog.filter(isTurkeyPlan).map((plan) => plan.id)
+      : [];
 
   const scored = catalog
     .map((p) => ({ id: p.id, score: scorePlanMatch(recentUserText, p) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  for (const { id } of scored.slice(0, MAX_DETAIL_PLANS)) {
-    ids.add(id);
-  }
-
-  return Array.from(ids).slice(0, MAX_DETAIL_PLANS);
+  const asked = scored.slice(0, MAX_DETAIL_PLANS).map((x) => x.id);
+  // Lo que preguntó (otro destino, un lugar, una actividad) va antes que la ficha abierta.
+  return uniqueLimited(
+    [...activityPlanIds, ...turkeyIds, ...asked, ...(currentPlanId ? [currentPlanId] : []), ...extraIds],
+    MAX_DETAIL_PLANS
+  );
 }
 
 function formatAgencyContext(): string {
@@ -323,6 +554,11 @@ export async function buildCosmosSystemContext(opts: {
   brief?: Record<string, unknown> | null;
 }): Promise<string> {
   const catalog = await getActiveCatalog();
+  const activityMatch = matchCatalogActivities({
+    query: opts.userMessage,
+    catalog,
+    days: await getCatalogActivityDays(catalog),
+  });
   const extraIds = [
     ...(opts.screen?.planId ? [opts.screen.planId] : []),
     ...(opts.screen?.quoteDraft?.planIds ?? []),
@@ -332,7 +568,8 @@ export async function buildCosmosSystemContext(opts: {
     opts.history,
     catalog,
     opts.currentPlanId,
-    extraIds
+    extraIds,
+    activityMatch.planIds
   );
 
   const catalogLines = catalog.map(formatCatalogLine);
@@ -356,9 +593,50 @@ export async function buildCosmosSystemContext(opts: {
         : "El usuario es agencia de viajes (cotizaciones, mis clientes y academia; solo ve sus propias cotizaciones y clientes).";
 
   const cosmosConfig = await getCosmosAssistantConfig();
-  const strategicContextPlain = htmlToPlainText(cosmosConfig.strategicContext);
-  const strategicBlock = strategicContextPlain
-    ? `## Contexto estratégico de Cosmos Mayorista (información prioritaria del equipo)\n${strategicContextPlain}`
+  const strategicContexts = await listCosmosStrategicContexts();
+  const recentUserText = [
+    opts.userMessage,
+    ...opts.history.filter((m) => m.role === "user").slice(-4).map((m) => m.content),
+  ].join(" ");
+  const planNameById = new Map(catalog.map((plan) => [plan.id, plan.name]));
+  const planHints = catalog.map((plan) => ({
+    id: plan.id,
+    name: plan.name,
+    country: plan.country,
+  }));
+  const missingIds = strategicContexts
+    .map((ctx) => ctx.destinationId)
+    .filter((id): id is string => Boolean(id) && !planNameById.has(id));
+  if (missingIds.length) {
+    const extraPlans = await Promise.all(missingIds.map((id) => storage.getDestination(id)));
+    for (const plan of extraPlans) {
+      if (!plan) continue;
+      planNameById.set(plan.id, plan.name);
+      planHints.push({ id: plan.id, name: plan.name, country: plan.country });
+    }
+  }
+  const matchedContexts = pickRelevantStrategicContexts(
+    strategicContexts,
+    recentUserText,
+    relevantIds,
+    planHints
+  );
+  const strategicFromModules = matchedContexts
+    .map((ctx) => {
+      const plain = htmlToPlainText(ctx.content).slice(0, 8000);
+      if (!plain) return "";
+      const planLabel = ctx.destinationId
+        ? planNameById.get(ctx.destinationId) ?? "plan vinculado"
+        : "sin plan vinculado";
+      return `### ${ctx.name} (${COSMOS_CONTEXT_KIND_LABELS[ctx.kind]}) · ${planLabel}\n${plain}`;
+    })
+    .filter(Boolean)
+    .join("\n\n");
+  const legacyPlain =
+    strategicContexts.length > 0 ? "" : htmlToPlainText(cosmosConfig.strategicContext);
+  const strategicBody = strategicFromModules || legacyPlain;
+  const strategicBlock = strategicBody
+    ? `## Contexto estratégico de Cosmos Mayorista (información prioritaria del equipo)\nEsta información es obligatoria: úsala para responder sobre ese destino, actividad o plan. Si contradice una suposición, sigue este contexto. No digas que existe un módulo de contextos ni copies el texto de forma literal; intégralo con naturalidad.\n\n${strategicBody}`
     : "";
 
   const screenBlock = formatScreenContext(opts.screen);
@@ -381,7 +659,7 @@ ${catalogLines.join("\n") || "(ningún plan activo)"}
 ---
 ${formatCombinationRules(catalog)}
 
-${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo. Si necesitas itinerario, inclusiones o precios de un plan concreto, usa get_plan_details."}
+${activityMatch.text ? `## Actividades y recomendaciones (cualquier plan, no solo el de pantalla)\nResponde con estos datos aunque el asesor esté en otra ficha o en el catálogo. No le pidas que abra el plan para contarle las actividades.\n\n${activityMatch.text}\n\n---\n` : ""}${detailBlocks.length ? `## Detalle de planes relevantes para esta consulta\n\n${detailBlocks.join("\n\n---\n\n")}` : "## Detalle ampliado\nUsa el catálogo. Si necesitas itinerario, inclusiones, actividades o recomendaciones de un plan concreto —esté o no en pantalla— usa search_activities o get_plan_details."}
 `.trim();
 }
 

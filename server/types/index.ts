@@ -18,6 +18,7 @@ export interface CreateQuoteInput {
   outboundFlightImages?: string[] | null;
   returnFlightImages?: string[] | null;
   domesticFlightImages?: string[] | null;
+  domesticFlightImagesByDestination?: Record<string, string[]> | null;
   includeFlights?: boolean;
   outboundCabinBaggage?: boolean;
   outboundHoldBaggage?: boolean;
@@ -59,6 +60,7 @@ export interface PublicQuotePdfInput {
   returnCabinBaggage?: boolean;
   returnHoldBaggage?: boolean;
   domesticFlightImages?: string[];
+  domesticFlightImagesByDestination?: Record<string, string[]>;
   domesticCabinBaggage?: boolean;
   domesticHoldBaggage?: boolean;
   connectionFlightImages?: string[];

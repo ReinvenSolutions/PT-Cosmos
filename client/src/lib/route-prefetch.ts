@@ -2,6 +2,7 @@
  * Prefetch de chunks de rutas al hacer hover en enlaces.
  * Reduce la demora al cambiar de sección (de segundos a casi instantáneo).
  */
+import { queryClient } from "@/lib/queryClient";
 
 const routeToImport: Record<string, () => Promise<unknown>> = {
   "/": () => import("@/pages/home"),
@@ -20,6 +21,7 @@ const routeToImport: Record<string, () => Promise<unknown>> = {
   "quote-detail": () => import("@/pages/quote-detail"),
   "quote-edit": () => import("@/pages/quote-edit"),
   "admin-plan-form": () => import("@/pages/admin-plan-form"),
+  "plan-detail": () => import("@/pages/plan-detail"),
 };
 
 const prefetched = new Set<string>();
@@ -45,4 +47,14 @@ export function prefetchRoute(path: string): void {
   if (/^\/advisor\/quotes\/[^/]+\/edit$/.test(normalized)) prefetchKey("quote-edit");
   else if (/^\/advisor\/quotes\/[^/]+$/.test(normalized)) prefetchKey("quote-detail");
   if (/^\/admin\/plans\/[^/]+\/edit$/.test(normalized)) prefetchKey("admin-plan-form");
+  if (/^\/plan\/[^/]+$/.test(normalized)) prefetchKey("plan-detail");
+  if (normalized === "/cotizacion" || normalized === "/cotizacion-express") {
+    void queryClient.prefetchQuery({ queryKey: ["/api/destinations?isActive=true"] });
+  }
+}
+
+/** Anticipa el chunk y el JSON de la ficha al pasar el mouse por un plan. */
+export function prefetchPlan(id: string): void {
+  prefetchKey("plan-detail");
+  void queryClient.prefetchQuery({ queryKey: [`/api/destinations/${id}`] });
 }

@@ -2,6 +2,9 @@ import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Destination, formatUSD, formatDate } from "@shared/schema";
+import type { AvailabilityDay } from "@shared/availability";
+
+type QuoteDestination = Destination & { availability?: AvailabilityDay[] };
 import { applyLandPortionDiscount, normalizeDiscountPercentage } from "@shared/discount";
 import {
   EMPTY_QUOTE_FEES_CONFIG,
@@ -60,10 +63,16 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import {
-  connectionSegmentCardTitle,
   remapConnectionSegmentsByEdgeOrder,
   type ConnectionSegmentImages,
 } from "@shared/quoteCombination";
+import {
+  buildQuoteFlightUploadSteps,
+  defaultInternalImagesForPlan,
+  flattenDomesticImagesByDestination,
+  planHasInternalFlightSlot,
+  type QuoteFlightUploadStep,
+} from "@shared/internalFlightPlacement";
 import {
   formatCosmosQuoteMoney,
   type CosmosMoneyCurrency,
@@ -153,6 +162,62 @@ function LandPortionPriceDisplay({
   );
 }
 
+const FLIGHT_STEP_CARD_CLASS: Record<QuoteFlightUploadStep["kind"], string> = {
+  outbound:
+    "bg-gradient-to-r from-sky-50 to-blue-50 border-blue-200 dark:from-sky-950/40 dark:to-blue-950/40 dark:border-blue-700/60",
+  internal:
+    "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 dark:from-purple-950/50 dark:to-indigo-950/50 dark:border-purple-700/60",
+  connection:
+    "bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200 dark:from-orange-950/50 dark:to-amber-950/50 dark:border-orange-700/60",
+  return:
+    "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 dark:from-emerald-950/40 dark:to-teal-950/40 dark:border-emerald-700/60",
+};
+
+function FlightBaggageFields({
+  idPrefix,
+  cabin,
+  hold,
+  onCabin,
+  onHold,
+}: {
+  idPrefix: string;
+  cabin: boolean;
+  hold: boolean;
+  onCabin: (checked: boolean) => void;
+  onHold: (checked: boolean) => void;
+}) {
+  return (
+    <div className="mt-4 pt-4 border-t">
+      <p className="text-sm font-semibold text-foreground mb-3">Equipajes incluidos:</p>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`${idPrefix}-cabin`}
+            checked={cabin}
+            onCheckedChange={(checked) => onCabin(checked as boolean)}
+            data-testid={`checkbox-${idPrefix}-cabin`}
+          />
+          <Label htmlFor={`${idPrefix}-cabin`} className="cursor-pointer">
+            Equipaje de cabina 10kg
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`${idPrefix}-hold`}
+            checked={hold}
+            onCheckedChange={(checked) => onHold(checked as boolean)}
+            data-testid={`checkbox-${idPrefix}-hold`}
+          />
+          <Label htmlFor={`${idPrefix}-hold`} className="cursor-pointer">
+            Equipaje de bodega 23kg
+          </Label>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
+      </div>
+    </div>
+  );
+}
+
 function SortableQuoteDestinationRow({
   dest,
   effectiveTrm,
@@ -203,6 +268,7 @@ function SortableQuoteDestinationRow({
           <OptimizedImage
             src={imageUrl}
             alt={dest.name}
+            preset="thumb"
             containerClassName="w-full h-full"
             imageClassName="object-cover"
           />
@@ -241,7 +307,7 @@ export default function QuoteSummary() {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [outboundImages, setOutboundImages] = useState<string[]>([]);
   const [returnImages, setReturnImages] = useState<string[]>([]);
-  const [domesticFlightImages, setDomesticFlightImages] = useState<string[]>([]);
+  const [domesticImagesByDest, setDomesticImagesByDest] = useState<Record<string, string[]>>({});
   const [connectionSegments, setConnectionSegments] = useState<ConnectionSegmentImages[]>([]);
   const [uploadingOutbound, setUploadingOutbound] = useState(false);
   const [uploadingReturn, setUploadingReturn] = useState(false);
@@ -308,7 +374,7 @@ export default function QuoteSummary() {
     finalPrice,
   };
 
-  const { data: destinations = [], isLoading: destinationsLoading } = useQuery<Destination[]>({
+  const { data: destinations = [], isLoading: destinationsLoading } = useQuery<QuoteDestination[]>({
     queryKey: ["/api/destinations?isActive=true"],
   });
   destinationsRef.current = destinations;
@@ -426,6 +492,8 @@ export default function QuoteSummary() {
       passengers?: number;
       originCity?: string;
       connectionFlightSegments?: Array<{ images?: string[] }>;
+      domesticFlightImagesByDestination?: Record<string, string[]>;
+      domesticFlightImages?: string[];
       flightsCost?: string;
       flightsCurrency?: string;
       assistanceCost?: string;
@@ -449,6 +517,18 @@ export default function QuoteSummary() {
         setConnectionSegments(
           savedSegs.map((s) => ({ images: [...(s.images ?? [])] })),
         );
+      }
+      if (parsed.domesticFlightImagesByDestination && typeof parsed.domesticFlightImagesByDestination === "object") {
+        setDomesticImagesByDest(
+          Object.fromEntries(
+            Object.entries(parsed.domesticFlightImagesByDestination).map(([id, urls]) => [
+              id,
+              Array.isArray(urls) ? [...urls] : [],
+            ]),
+          ),
+        );
+      } else if (Array.isArray(parsed.domesticFlightImages) && parsed.domesticFlightImages.length && destIds[0]) {
+        setDomesticImagesByDest({ [destIds[0]]: [...parsed.domesticFlightImages] });
       }
 
       if (start) {
@@ -670,6 +750,7 @@ export default function QuoteSummary() {
           destinations: selectedDestinations,
           startDate: startDate ? formatLocalDate(startDate) : base.startDate ?? "",
           connectionFlightSegments: connectionSegments,
+          domesticFlightImagesByDestination: domesticImagesByDest,
           passengers,
           originCity,
           flightsCost,
@@ -699,7 +780,7 @@ export default function QuoteSummary() {
     } catch {
       /* ignore */
     }
-  }, [selectedDestinations, startDate, connectionSegments, passengers, originCity, flightsCost, inputCurrencyFlights, assistanceCost, inputCurrencyAssistance, finalPrice, inputCurrencyFinal, minPayment, customFilename, turkeyUpgrade, italiaUpgrade, granTourUpgrade, otherDestUpgrades, destinations]);
+  }, [selectedDestinations, startDate, connectionSegments, domesticImagesByDest, passengers, originCity, flightsCost, inputCurrencyFlights, assistanceCost, inputCurrencyAssistance, finalPrice, inputCurrencyFinal, minPayment, customFilename, turkeyUpgrade, italiaUpgrade, granTourUpgrade, otherDestUpgrades, destinations]);
 
   useEffect(() => {
     if (!quoteSessionHydratedRef.current) return;
@@ -719,7 +800,7 @@ export default function QuoteSummary() {
     () =>
       selectedDestinations
         .map((id) => destinations.find((d) => d.id === id))
-        .filter((d): d is Destination => !!d),
+        .filter((d): d is QuoteDestination => !!d),
     [selectedDestinations, destinations],
   );
 
@@ -771,7 +852,9 @@ export default function QuoteSummary() {
     }
     if (outbound.length) setOutboundImages(outbound);
     if (returnI.length) setReturnImages(returnI);
-    if (domestic.length) setDomesticFlightImages(domestic);
+    if (domestic.length && bloqueoPlan.id) {
+      setDomesticImagesByDest((prev) => ({ ...prev, [bloqueoPlan.id]: domestic }));
+    }
     setOutboundCabinBaggage(obC);
     setOutboundHoldBaggage(obH);
     setReturnCabinBaggage(rC);
@@ -812,12 +895,42 @@ export default function QuoteSummary() {
   );
   const hasTurkeyEsencial = selectedDests.some((d) => d.name === "Turquía Esencial");
   const hasGranTourEuropa = selectedDests.some((d) => d.name === "Gran Tour de Europa");
-  const showConnectionFlight = selectedDestinations.length >= 2;
+
+  const flightUploadSteps = useMemo(
+    () => buildQuoteFlightUploadSteps(selectedDests),
+    [selectedDests],
+  );
+  const firstInternalStep = flightUploadSteps.find((step) => step.kind === "internal")?.step;
+  const firstConnectionStep = flightUploadSteps.find((step) => step.kind === "connection")?.step;
 
   const flatConnectionFlightImages = useMemo(
     () => connectionSegments.flatMap((s) => s.images),
     [connectionSegments],
   );
+
+  const domesticFlightImages = useMemo(
+    () => flattenDomesticImagesByDestination(domesticImagesByDest),
+    [domesticImagesByDest],
+  );
+
+  useEffect(() => {
+    setDomesticImagesByDest((prev) => {
+      const next: Record<string, string[]> = {};
+      let changed = false;
+      for (const dest of selectedDests) {
+        if (!planHasInternalFlightSlot(dest)) continue;
+        if (dest.id in prev) {
+          next[dest.id] = prev[dest.id];
+        } else {
+          next[dest.id] = defaultInternalImagesForPlan(dest);
+          changed = true;
+        }
+      }
+      if (Object.keys(prev).some((id) => !(id in next))) changed = true;
+      if (!changed && Object.keys(prev).length === Object.keys(next).length) return prev;
+      return changed ? next : prev;
+    });
+  }, [selectedDestinations, selectedDests]);
 
   const turkeyDestination = selectedDests.find((d) => d.name === "Turquía Esencial");
   const turkeyUpgrades = turkeyDestination?.upgrades || [];
@@ -861,6 +974,15 @@ export default function QuoteSummary() {
 
     if (bloqueoPlan?.bloqueoSalidaFecha) {
       return formatLocalYmd(date) !== bloqueoPlan.bloqueoSalidaFecha;
+    }
+
+    const plansWithAvailability = selectedDests.filter((dest) => (dest.availability?.length ?? 0) > 0);
+    if (plansWithAvailability.length > 0) {
+      const dateStr = formatLocalYmd(date);
+      const hasOpenSlots = plansWithAvailability.every((dest) =>
+        dest.availability?.some((day) => day.date === dateStr && day.slots > 0),
+      );
+      if (!hasOpenSlots) return true;
     }
 
     if (hasAllowedDaysRestriction && allowedDaysDestination?.allowedDays) {
@@ -941,9 +1063,13 @@ export default function QuoteSummary() {
 
   const displayDuration = calculateDisplayDuration();
 
-  const getPriceForDate = (dest: Destination, date: Date | undefined): number => {
+  const getPriceForDate = (dest: QuoteDestination, date: Date | undefined): number => {
     if (dest.isBloqueo) {
       return dest.basePrice ? parseFloat(dest.basePrice) : 0;
+    }
+    if (date) {
+      const day = dest.availability?.find((item) => item.date === formatLocalYmd(date) && item.price);
+      if (day?.price) return parseFloat(day.price);
     }
     if (!date || !dest.priceTiers || dest.priceTiers.length === 0) {
       return dest.basePrice ? parseFloat(dest.basePrice) : 0;
@@ -1205,14 +1331,27 @@ export default function QuoteSummary() {
     }
   };
 
-  const processDomesticFlightFiles = async (files: File[]) => {
+  const processDomesticFlightFilesForDest = (destinationId: string) => async (files: File[]) => {
+    if (files.length === 0) return;
     setUploadingDomesticFlight(true);
     try {
-      await uploadFlightImages(
-        files,
-        setDomesticFlightImages,
-        `${files.length} imagen(es) del vuelo interno guardadas`
-      );
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!response.ok) throw new Error("Upload failed");
+        const { url } = await response.json();
+        uploadedUrls.push(url);
+      }
+      setDomesticImagesByDest((prev) => ({
+        ...prev,
+        [destinationId]: [...(prev[destinationId] ?? []), ...uploadedUrls],
+      }));
+      toast({
+        title: "Imágenes subidas",
+        description: `${uploadedUrls.length} imagen(es) del vuelo interno guardadas`,
+      });
     } catch {
       toast({ title: "Error", description: "No se pudieron subir algunas imágenes.", variant: "destructive" });
     } finally {
@@ -1407,6 +1546,7 @@ export default function QuoteSummary() {
       outboundFlightImages: outboundImages,
       returnFlightImages: returnImages,
       domesticFlightImages: domesticFlightImages,
+      domesticFlightImagesByDestination: domesticImagesByDest,
       connectionFlightImages: flatConnectionFlightImages,
       connectionFlightSegments: connectionSegments,
       includeFlights: hasFlightData,
@@ -1580,6 +1720,7 @@ export default function QuoteSummary() {
           outboundFlightImages: outboundImages,
           returnFlightImages: returnImages,
           domesticFlightImages: domesticFlightImages,
+          domesticFlightImagesByDestination: domesticImagesByDest,
           connectionFlightImages: flatConnectionFlightImages,
           connectionFlightSegments: connectionSegments,
           includeFlights: hasFlightData,
@@ -1753,6 +1894,7 @@ export default function QuoteSummary() {
                           <OptimizedImage
                             src={imageUrl}
                             alt={dest.name}
+                            preset="thumb"
                             containerClassName="w-full h-full"
                             imageClassName="object-cover"
                           />
@@ -1833,7 +1975,7 @@ export default function QuoteSummary() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                   Fecha de Inicio
@@ -1855,6 +1997,11 @@ export default function QuoteSummary() {
                 <DatePicker
                   date={startDate}
                   onDateChange={setStartDate}
+                  presentation={
+                    selectedDests.some((dest) => (dest.availability?.length ?? 0) > 0 || (dest.priceTiers?.length ?? 0) > 0)
+                      ? "inline"
+                      : "popover"
+                  }
                   placeholder={
                     bloqueoPlan
                       ? bloqueoPlan.bloqueoSalidaFecha ?? "Fecha del bloqueo"
@@ -1869,6 +2016,12 @@ export default function QuoteSummary() {
                               : "Selecciona una fecha"
                   }
                   disabled={bloqueoPlan ? () => true : disableDates}
+                  availability={selectedDests.flatMap((dest) =>
+                    (dest.availability ?? []).map((day) => ({
+                      ...day,
+                      destinationName: dest.name,
+                    })),
+                  )}
                   priceTiers={
                     selectedDestinations.length > 0
                       ? selectedDests.flatMap(dest =>
@@ -1922,28 +2075,20 @@ export default function QuoteSummary() {
 
                 {!bloqueoPdfOnly &&
                   selectedDestinations.length > 0 &&
-                  selectedDests.some((d) => d.priceTiers && d.priceTiers.length > 0) && (
+                  selectedDests.some((d) => (d.priceTiers && d.priceTiers.length > 0) || (d.availability?.length ?? 0) > 0) && (
                   <div className="mt-2 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
                     <div className="flex items-start gap-2">
                       <Info className="w-4 h-4 text-chart-3 mt-0.5 flex-shrink-0" />
                       <div className="text-xs text-chart-3 space-y-1 opacity-95">
-                        <p className="font-semibold">Información del Calendario:</p>
+                        <p className="font-semibold">Salidas, cupos y precios:</p>
                         <ul className="list-disc list-inside space-y-0.5 ml-1">
-                          <li>Las fechas con <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[0.65rem] font-medium">precio</span> están disponibles</li>
-                          {hasTurkeyEsencial && (
-                            <li>
-                              <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[0.6rem] font-medium">🛫 COL</span> = Vuelo desde Colombia (lunes, 11 días total)
-                            </li>
-                          )}
-                          {hasTurkeyEsencial && (
-                            <li>
-                              Martes = Llegada directa desde otro país (10 días)
-                            </li>
-                          )}
+                          <li>Cada salida muestra el precio en dorado y los cupos en el recuadro de color</li>
                           {selectedDestinations.length > 1 && (
-                            <li>El número <span className="bg-blue-600 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[0.5rem] font-bold">2+</span> indica múltiples destinos en esa fecha</li>
+                            <li>En un combinado, cada punto de color es un plan: ves su precio y sus cupos en la misma fecha</li>
                           )}
-                          <li>Pasa el mouse sobre una fecha para ver detalles de precio por destino</li>
+                          {hasTurkeyEsencial && (
+                            <li>La etiqueta de vuelo marca la salida desde Colombia</li>
+                          )}
                         </ul>
                       </div>
                     </div>
@@ -2229,128 +2374,114 @@ export default function QuoteSummary() {
         )}
 
         {!bloqueoPdfOnly && (
-        <Card className="mb-6" data-cosmos-target="quote.flights">
-          <CardHeader>
-            <CardTitle>Vuelos de Ida</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FlightImageGallery
-              images={outboundImages}
-              setImages={setOutboundImages}
-              onFilesUpload={processOutboundFiles}
-              isUploading={uploadingOutbound}
-              label="vuelo de ida"
-              description="Sube capturas de los detalles del vuelo de ida. Puedes arrastrar imágenes aquí o hacer clic para seleccionar. El orden definido se usará en el PDF."
-              inputId="outbound-flight-images"
-            />
-
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="outbound-cabin"
-                    checked={outboundCabinBaggage}
-                    onCheckedChange={(checked) => setOutboundCabinBaggage(checked as boolean)}
-                    data-testid="checkbox-outbound-cabin"
-                  />
-                  <Label htmlFor="outbound-cabin" className="cursor-pointer">
-                    Equipaje de cabina 10kg
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="outbound-hold"
-                    checked={outboundHoldBaggage}
-                    onCheckedChange={(checked) => setOutboundHoldBaggage(checked as boolean)}
-                    data-testid="checkbox-outbound-hold"
-                  />
-                    <Label htmlFor="outbound-hold" className="cursor-pointer">
-                      Equipaje de bodega 23kg
-                    </Label>
-                  </div>
-                <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        )}
-
-        {/* Domestic Flight Card - For single plan with internal/connection flight flag */}
-        {!bloqueoPdfOnly &&
-          selectedDestinations.length === 1 &&
-          (selectedDests[0]?.hasInternalOrConnectionFlight || selectedDests[0]?.isBloqueo) && (
-          <Card className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 dark:from-purple-950/50 dark:to-indigo-950/50 dark:border-purple-700/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-foreground">
-                <Plane className="w-5 h-5" />
-                Vuelo Interno
+        <div className="space-y-6 mb-8" data-cosmos-target="quote.flights">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Ruta de vuelos</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Carga las capturas en el orden del viaje. Si reordenas o quitas un plan más arriba, esta ruta se actualiza sola. El PDF coloca cada tramo en su sitio: interno después del día configurado, conexión entre planes.
+            </p>
+          </div>
+          {flightUploadSteps.map((step) => {
+            const cardClass = FLIGHT_STEP_CARD_CLASS[step.kind];
+            const title = (
+              <CardTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground text-background text-sm font-bold">
+                  {step.step}
+                </span>
+                <Plane className="w-5 h-5 shrink-0" />
+                <span className="leading-snug">{step.title}</span>
               </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FlightImageGallery
-                images={domesticFlightImages}
-                setImages={setDomesticFlightImages}
-                onFilesUpload={processDomesticFlightFiles}
-                isUploading={uploadingDomesticFlight}
-                label="vuelo interno"
-                description="Sube las imágenes del vuelo interno (máximo 10). Arrastra aquí o haz clic para seleccionar. El orden definido se usará en el PDF."
-                inputId="domestic-flight-images"
-              />
+            );
 
-              <div className="mt-4 pt-4 border-t border-purple-200/60 dark:border-purple-700/40">
-                <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="domestic-cabin"
-                      checked={domesticCabinBaggage}
-                      onCheckedChange={(checked) => setDomesticCabinBaggage(checked as boolean)}
-                      data-testid="checkbox-domestic-cabin"
-                    />
-                    <Label htmlFor="domestic-cabin" className="cursor-pointer">
-                      Equipaje de cabina 10kg
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="domestic-hold"
-                      checked={domesticHoldBaggage}
-                      onCheckedChange={(checked) => setDomesticHoldBaggage(checked as boolean)}
-                      data-testid="checkbox-domestic-hold"
-                    />
-                    <Label htmlFor="domestic-hold" className="cursor-pointer">
-                      Equipaje de bodega 23kg
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!bloqueoPdfOnly && showConnectionFlight && (
-          <div className="space-y-6 mb-6">
-            {connectionSegments.map((segment, segmentIndex) => {
-              const title = connectionSegmentCardTitle(
-                selectedDests.map((d) => d.name),
-                segmentIndex,
-              );
+            if (step.kind === "outbound") {
               return (
-                <Card
-                  key={`conn-${segmentIndex}-${selectedDests[segmentIndex]?.id ?? segmentIndex}`}
-                  className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200 dark:from-orange-950/50 dark:to-amber-950/50 dark:border-orange-700/60"
-                >
+                <Card key="outbound" className={cardClass} data-testid={`quote-flight-step-${step.step}`}>
+                  <CardHeader>{title}</CardHeader>
+                  <CardContent>
+                    <FlightImageGallery
+                      images={outboundImages}
+                      setImages={setOutboundImages}
+                      onFilesUpload={processOutboundFiles}
+                      isUploading={uploadingOutbound}
+                      label="vuelo de ida"
+                      description="Sube capturas del vuelo de ida. El orden se respeta en el PDF."
+                      inputId="outbound-flight-images"
+                    />
+                    <FlightBaggageFields
+                      idPrefix="outbound"
+                      cabin={outboundCabinBaggage}
+                      hold={outboundHoldBaggage}
+                      onCabin={setOutboundCabinBaggage}
+                      onHold={setOutboundHoldBaggage}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            if (step.kind === "internal") {
+              const destId = step.destId;
+              return (
+                <Card key={`internal-${destId}`} className={cardClass} data-testid={`quote-flight-step-${step.step}`}>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
-                      <Plane className="w-5 h-5 shrink-0" />
-                      <span className="leading-snug">{title}</span>
-                    </CardTitle>
+                    {title}
+                    <p className="text-sm text-muted-foreground pt-1">
+                      {step.afterDay
+                        ? `En el PDF aparece después del día ${step.afterDay} de este plan.`
+                        : "En el PDF aparece al final del itinerario de este plan si no hay día configurado."}
+                    </p>
                   </CardHeader>
                   <CardContent>
                     <FlightImageGallery
-                      images={segment.images}
+                      images={domesticImagesByDest[destId] ?? []}
+                      setImages={(updater) => {
+                        setDomesticImagesByDest((prev) => {
+                          const prevImgs = prev[destId] ?? [];
+                          const newImgs =
+                            typeof updater === "function"
+                              ? (updater as (p: string[]) => string[])(prevImgs)
+                              : updater;
+                          return { ...prev, [destId]: newImgs };
+                        });
+                      }}
+                      onFilesUpload={processDomesticFlightFilesForDest(destId)}
+                      isUploading={uploadingDomesticFlight}
+                      label={`vuelo interno (${step.destName})`}
+                      description="Sube las capturas de este tramo interno. El PDF las inserta en el itinerario de este plan."
+                      inputId={`domestic-flight-images-${destId}`}
+                    />
+                    {step.step === firstInternalStep && (
+                      <FlightBaggageFields
+                        idPrefix="domestic"
+                        cabin={domesticCabinBaggage}
+                        hold={domesticHoldBaggage}
+                        onCabin={setDomesticCabinBaggage}
+                        onHold={setDomesticHoldBaggage}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            if (step.kind === "connection") {
+              const segmentIndex = step.segmentIndex;
+              const segmentImages = connectionSegments[segmentIndex]?.images ?? [];
+              return (
+                <Card
+                  key={`conn-${segmentIndex}`}
+                  className={cardClass}
+                  data-testid={`quote-flight-step-${step.step}`}
+                >
+                  <CardHeader>
+                    {title}
+                    <p className="text-sm text-muted-foreground pt-1">
+                      En el PDF aparece entre estos dos planes, en la conexión del combinado.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <FlightImageGallery
+                      images={segmentImages}
                       setImages={(updater) => {
                         setConnectionSegments((prev) => {
                           const next = [...prev];
@@ -2365,94 +2496,49 @@ export default function QuoteSummary() {
                       }}
                       onFilesUpload={processConnectionFlightFilesForSegment(segmentIndex)}
                       isUploading={uploadingConnectionFlight}
-                      label={`vuelo de conexión (${title})`}
-                      description="Sube las imágenes de este tramo (máximo 10). El orden se respeta en el PDF, en páginas insertadas entre los planes indicados."
+                      label={`vuelo de conexión (paso ${step.step})`}
+                      description="Estas fotos se insertan en el PDF entre los itinerarios de los planes indicados."
                       inputId={`connection-flight-segment-${segmentIndex}`}
                     />
+                    {step.step === firstConnectionStep && (
+                      <FlightBaggageFields
+                        idPrefix="connection"
+                        cabin={connectionCabinBaggage}
+                        hold={connectionHoldBaggage}
+                        onCabin={setConnectionCabinBaggage}
+                        onHold={setConnectionHoldBaggage}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               );
-            })}
+            }
 
-            <Card className="border-orange-200/80 dark:border-orange-700/50 bg-orange-50/40 dark:bg-orange-950/20">
-              <CardContent className="pt-6">
-                <p className="text-sm font-semibold text-foreground mb-3">Equipajes incluidos (todos los tramos de conexión)</p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="connection-cabin"
-                      checked={connectionCabinBaggage}
-                      onCheckedChange={(checked) => setConnectionCabinBaggage(checked as boolean)}
-                      data-testid="checkbox-connection-cabin"
-                    />
-                    <Label htmlFor="connection-cabin" className="cursor-pointer">
-                      Equipaje de cabina 10kg
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="connection-hold"
-                      checked={connectionHoldBaggage}
-                      onCheckedChange={(checked) => setConnectionHoldBaggage(checked as boolean)}
-                      data-testid="checkbox-connection-hold"
-                    />
-                    <Label htmlFor="connection-hold" className="cursor-pointer">
-                      Equipaje de bodega 23kg
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {!bloqueoPdfOnly && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Vuelos de Regreso</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FlightImageGallery
-              images={returnImages}
-              setImages={setReturnImages}
-              onFilesUpload={processReturnFiles}
-              isUploading={uploadingReturn}
-              label="vuelo de regreso"
-              description="Sube capturas de los detalles del vuelo de regreso. Puedes arrastrar imágenes aquí o hacer clic para seleccionar. El orden definido se usará en el PDF."
-              inputId="return-flight-images"
-            />
-
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-sm font-semibold text-foreground mb-3">Equipajes Incluidos:</p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="return-cabin"
-                    checked={returnCabinBaggage}
-                    onCheckedChange={(checked) => setReturnCabinBaggage(checked as boolean)}
-                    data-testid="checkbox-return-cabin"
+            return (
+              <Card key="return" className={cardClass} data-testid={`quote-flight-step-${step.step}`}>
+                <CardHeader>{title}</CardHeader>
+                <CardContent>
+                  <FlightImageGallery
+                    images={returnImages}
+                    setImages={setReturnImages}
+                    onFilesUpload={processReturnFiles}
+                    isUploading={uploadingReturn}
+                    label="vuelo de regreso"
+                    description="Sube capturas del vuelo de regreso. El orden se respeta en el PDF."
+                    inputId="return-flight-images"
                   />
-                  <Label htmlFor="return-cabin" className="cursor-pointer">
-                    Equipaje de cabina 10kg
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="return-hold"
-                    checked={returnHoldBaggage}
-                    onCheckedChange={(checked) => setReturnHoldBaggage(checked as boolean)}
-                    data-testid="checkbox-return-hold"
+                  <FlightBaggageFields
+                    idPrefix="return"
+                    cabin={returnCabinBaggage}
+                    hold={returnHoldBaggage}
+                    onCabin={setReturnCabinBaggage}
+                    onHold={setReturnHoldBaggage}
                   />
-                    <Label htmlFor="return-hold" className="cursor-pointer">
-                      Equipaje de bodega 23kg
-                    </Label>
-                  </div>
-                <p className="text-xs text-muted-foreground mt-2">* Personal 8kg siempre está incluido</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
         )}
 
         {!bloqueoPdfOnly && (

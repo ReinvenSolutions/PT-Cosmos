@@ -46,6 +46,9 @@ const MIGRATIONS = [
   "0032_per_program_miles_markup.sql",
   "0033_user_enabled_modules.sql",
   "0034_cosmos_sessions.sql",
+  "0035_destination_availability.sql",
+  "0036_cosmos_strategic_contexts.sql",
+  "0037_internal_flight_after_day.sql",
 ];
 
 const SKIPPABLE_ERROR_CODES = new Set(["42701", "42P07", "42710", "42P16"]);

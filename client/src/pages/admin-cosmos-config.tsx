@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RichTextEditor } from "@/components/rich-text-editor";
 import {
   Loader2,
   Bot,
@@ -21,8 +20,10 @@ import {
   ScrollText,
   Volume2,
   MessageSquare,
+  Library,
 } from "lucide-react";
 import { CosmosSessionsPanel } from "@/components/cosmos-sessions-panel";
+import { CosmosStrategicContextsPanel } from "@/components/cosmos-strategic-contexts";
 import {
   COSMOS_TTS_VOICE_OPTIONS,
   DEFAULT_COSMOS_ASSISTANT_CONFIG,
@@ -35,7 +36,6 @@ const FIELD_LIMITS = {
   personality: 4000,
   userGreetingHint: 2000,
   rules: 12000,
-  strategicContext: 50000,
 } as const;
 
 function FieldCounter({ value, max }: { value: string; max: number }) {
@@ -203,7 +203,7 @@ export default function AdminCosmosConfig() {
             {actionButtons}
           </div>
 
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg p-1 sm:grid-cols-4">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg p-1 sm:grid-cols-5">
             <TabsTrigger value="personality" className="gap-1.5 text-xs sm:text-sm">
               <Sparkles className="hidden h-3.5 w-3.5 sm:block" />
               Personalidad
@@ -211,6 +211,10 @@ export default function AdminCosmosConfig() {
             <TabsTrigger value="instructions" className="gap-1.5 text-xs sm:text-sm">
               <ScrollText className="hidden h-3.5 w-3.5 sm:block" />
               Instrucciones
+            </TabsTrigger>
+            <TabsTrigger value="contexts" className="gap-1.5 text-xs sm:text-sm">
+              <Library className="hidden h-3.5 w-3.5 sm:block" />
+              Contextos
             </TabsTrigger>
             <TabsTrigger value="voice" className="gap-1.5 text-xs sm:text-sm">
               <Volume2 className="hidden h-3.5 w-3.5 sm:block" />
@@ -295,25 +299,16 @@ export default function AdminCosmosConfig() {
                 <FieldCounter value={form.rules} max={FIELD_LIMITS.rules} />
               </CardContent>
             </Card>
+          </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Contexto estratégico</CardTitle>
-                <CardDescription>
-                  Información adicional para alimentar a Cosmos: políticas comerciales, prioridades de venta,
-                  campañas, lineamientos del equipo u otros datos que no están en los planes.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <RichTextEditor
-                  value={form.strategicContext}
-                  onChange={(value) => updateField("strategicContext", value)}
-                  placeholder="Escribe aquí el contexto estratégico para el asistente…"
-                  minHeight={280}
-                />
-                <FieldCounter value={form.strategicContext} max={FIELD_LIMITS.strategicContext} />
-              </CardContent>
-            </Card>
+          <TabsContent value="contexts" className="mt-0 space-y-3">
+            <div>
+              <h2 className="text-base font-semibold">Contextos estratégicos</h2>
+              <p className="text-sm text-muted-foreground">
+                Cada contexto es un destino o una actividad. Cosmos usa el que coincide con la pregunta o con el plan vinculado.
+              </p>
+            </div>
+            <CosmosStrategicContextsPanel />
           </TabsContent>
 
           <TabsContent value="voice" className="mt-0 space-y-6">

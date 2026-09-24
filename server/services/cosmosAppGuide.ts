@@ -30,7 +30,7 @@ Herramienta interna para agencias, proveedores y administradores de Cosmos Mayor
 - **TRM global** (menú admin): tasa base en COP/USD; el cotizador usa TRM efectiva = base + 30 COP.
 
 ### Planes de viaje (destinos)
-Cada plan incluye: nombre, país, duración, descripción, precio base USD, escalas de precio por fechas (priceTiers), itinerario día a día, hoteles, inclusiones, exclusiones, upgrades opcionales, términos, asistencia médica, bloqueos (fechas fijas y cupos), audio descriptivo.
+Cada plan incluye: nombre, país, duración, descripción, precio base USD, escalas de precio por fechas (priceTiers), itinerario día a día, hoteles, inclusiones, exclusiones, upgrades opcionales, términos, asistencia médica, bloqueos (fechas fijas y cupos), audio descriptivo. Si el plan tiene vuelo interno, en admin solo se marca el flag y el día del itinerario; las fotos se suben al cotizar.
 
 ### Cotización
 1. Elegir plan(es) y fechas de salida según reglas del plan (días permitidos, martes, etc.).
@@ -40,6 +40,7 @@ Cada plan incluye: nombre, país, duración, descripción, precio base USD, esca
 5. TRM para precio en COP.
 6. Guardar cotización (asociada a un cliente) y generar **PDF** para el cliente. Cosmos puede guardar el borrador si el asesor lo pide; si pide una cotización nueva, debe preguntar si guarda la actual.
 7. Si sales a la ficha de un plan (/plan/:id) el borrador se conserva: al volver a /cotizacion reaparecen fecha, pax, vuelos, PVP, etc.
+8. **Vuelos en cotización y PDF**: en /cotizacion la carga va en ruta numerada según el orden de planes (ida → interno del plan X si aplica → conexión entre planes → interno del siguiente → … → regreso). Esa ruta cambia si se reordenan o quitan destinos. El PDF pone el interno después del día configurado en Admin Planes y la conexión entre un itinerario y el siguiente.
 
 ### Detalle de plan (/plan/:id)
 Itinerario completo, hoteles, qué incluye/no incluye, mapa, galerías, audio descriptivo descargable.

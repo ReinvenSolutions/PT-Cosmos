@@ -10,6 +10,13 @@ import {
   formatDate,
 } from "@shared/schema";
 import { connectionSegmentPdfHeading, displayPlanNamesForCombo } from "@shared/quoteCombination";
+import {
+  clampInternalFlightAfterDay,
+  flattenDomesticImagesByDestination,
+  internalFlightPdfHeading,
+  resolveDomesticImagesForDestination,
+  shouldInsertInternalFlightAfterDay,
+} from "@shared/internalFlightPlacement";
 import { DAVIVIENDA_CARD_COMMISSION_PERCENT } from "@shared/externalServices";
 import {
   getDestinationImages,
@@ -223,6 +230,7 @@ interface PublicQuoteData {
   outboundFlightImages?: string[];
   returnFlightImages?: string[];
   domesticFlightImages?: string[];
+  domesticFlightImagesByDestination?: Record<string, string[]>;
   connectionFlightImages?: string[];
   connectionFlightSegments?: Array<{ images: string[] }>;
   includeFlights?: boolean;
@@ -495,6 +503,7 @@ export async function generatePublicQuotePDF(
       ...(data.outboundFlightImages || []),
       ...(data.returnFlightImages || []),
       ...(data.domesticFlightImages || []),
+      ...flattenDomesticImagesByDestination(data.domesticFlightImagesByDestination),
       ...(data.connectionFlightSegments?.length
         ? data.connectionFlightSegments.flatMap((s) => s.images || [])
         : data.connectionFlightImages || []),
@@ -1263,12 +1272,16 @@ export async function generatePublicQuotePDF(
     return Math.ceil(totalHeight) + 20;
   };
 
-  const renderConnectionFlightBlock = (sectionTitle: string, flightImages: string[]) => {
+  const renderItineraryFlightSection = (
+    sectionTitle: string,
+    flightImages: string[],
+    baggage: { cabin?: boolean; hold?: boolean },
+  ) => {
     if (!flightImages.length) return;
 
     const baggageItemsConn = ["PERSONAL 8KG"];
-    if (data.connectionCabinBaggage) baggageItemsConn.push("CABINA 10KG");
-    if (data.connectionHoldBaggage) baggageItemsConn.push("BODEGA 23KG");
+    if (baggage.cabin) baggageItemsConn.push("CABINA 10KG");
+    if (baggage.hold) baggageItemsConn.push("BODEGA 23KG");
     const baggageTextConn = baggageItemsConn.join(" + ");
     const termsHeightConn = calculateFlightTermsHeight();
 
@@ -1377,6 +1390,13 @@ export async function generatePublicQuotePDF(
     doc.addPage();
     addPageBackground();
     addPlaneLogoBottom();
+  };
+
+  const renderConnectionFlightBlock = (sectionTitle: string, flightImages: string[]) => {
+    renderItineraryFlightSection(sectionTitle, flightImages, {
+      cabin: data.connectionCabinBaggage,
+      hold: data.connectionHoldBaggage,
+    });
   };
 
   // VUELOS DE IDA - Hoja 3 (después del itinerario resumido, antes del itinerario detallado)
@@ -1581,169 +1601,6 @@ export async function generatePublicQuotePDF(
     }
   }
 
-  // VUELO INTERNO - Nueva sección (solo si hay imágenes)
-  if (
-    data.includeFlights &&
-    data.domesticFlightImages &&
-    data.domesticFlightImages.length > 0
-  ) {
-    console.log(
-      "[PDF Generator] Domestic flight images:",
-      data.domesticFlightImages,
-    );
-    doc.addPage();
-    addPageBackground();
-    addPlaneLogoBottom();
-
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(18)
-      .fillColor(textColor)
-      .text("VUELO INTERNO", leftMargin, 80, {
-        align: "center",
-        width: contentWidth,
-      });
-
-    // Generar texto de equipajes dinámicamente
-    const baggageItems = ["PERSONAL 8KG"];
-    if (data.domesticCabinBaggage) {
-      baggageItems.push("CABINA 10KG");
-    }
-    if (data.domesticHoldBaggage) {
-      baggageItems.push("BODEGA 23KG");
-    }
-    const baggageText = baggageItems.join(" + ");
-
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(12)
-      .fillColor(textColor)
-      .text(baggageText, leftMargin, 110, {
-        align: "center",
-        width: contentWidth,
-      });
-
-    const termsHeight = calculateFlightTermsHeight();
-    let flightImageY = 140; // Start closer to baggage text
-
-    for (let index = 0; index < data.domesticFlightImages.length; index++) {
-      const imageUrl = data.domesticFlightImages[index];
-      console.log(
-        `[PDF Generator] Processing domestic image ${index}:`,
-        imageUrl,
-      );
-      // Extract filename from URL (format: /api/images/filename.ext)
-      const filename = imageUrl.split("/").pop();
-      if (filename) {
-        // Use cached image data for faster processing
-        const cachedImage = imageCache.get(filename);
-        
-        if (cachedImage) {
-          try {
-            const imageWidth = contentWidth;
-
-            // Calculate natural height based on aspect ratio from cached dimensions
-            let naturalHeight =
-              cachedImage.height && cachedImage.width
-                ? (cachedImage.height / cachedImage.width) * imageWidth
-                : contentWidth * 0.6; // Fallback estimate
-
-              // For the last image, maximize to fit available space with terms
-              const isLastImage =
-                index === data.domesticFlightImages.length - 1;
-              let imageHeight = naturalHeight;
-
-              if (isLastImage) {
-                // Recalculate available space based on CURRENT position (after previous images)
-                let maxAvailableHeight = Math.max(
-                  0,
-                  pageHeight - 50 - flightImageY - termsHeight - 40,
-                );
-
-                // If available space is too small (less than 200px), move to new page WITH section header
-                // Skip for first image (index === 0) to avoid empty page - we're already on a fresh page
-                const minimumImageHeight = 200;
-                if (index > 0 && maxAvailableHeight < minimumImageHeight) {
-                  console.log(
-                    `[PDF Generator] Insufficient space for domestic image ${index} (${Math.round(maxAvailableHeight)}px < ${minimumImageHeight}px), moving to new page with header`,
-                  );
-                  doc.addPage();
-                  addPageBackground();
-                  addPlaneLogoBottom();
-
-                  // Re-render section title and baggage text on new page
-                  doc
-                    .font("Helvetica-Bold")
-                    .fontSize(18)
-                    .fillColor(textColor)
-                    .text("VUELO INTERNO", leftMargin, 80, {
-                      align: "center",
-                      width: contentWidth,
-                    });
-                  doc
-                    .font("Helvetica-Bold")
-                    .fontSize(12)
-                    .fillColor(textColor)
-                    .text(baggageText, leftMargin, 110, {
-                      align: "center",
-                      width: contentWidth,
-                    });
-
-                  flightImageY = 140; // Start after header
-                  maxAvailableHeight = Math.max(
-                    0,
-                    pageHeight - 50 - flightImageY - termsHeight - 40,
-                  );
-                }
-
-                // Maximize to fit available space, but respect natural height if smaller
-                imageHeight = Math.min(naturalHeight, maxAvailableHeight);
-              }
-
-            doc.image(cachedImage.buffer, leftMargin, flightImageY, {
-              width: imageWidth,
-              height: imageHeight,
-              align: "center",
-            });
-
-            flightImageY += imageHeight + 10; // Add spacing between images
-          } catch (error) {
-            console.error(
-              `[PDF Generator] Error rendering domestic image ${index}:`,
-              error,
-            );
-          }
-        } else {
-          console.error(
-            `[PDF Generator] Image not found in cache: ${filename}`,
-          );
-        }
-      }
-    }
-
-    // Add flight terms and conditions after images
-    if (flightImageY > 80) {
-      flightImageY += 20; // Add some spacing
-
-      doc.font("Helvetica-Bold").fontSize(11).fillColor(textColor);
-      doc.text("Términos y condiciones", leftMargin, flightImageY, {
-        width: contentWidth,
-      });
-      doc.moveDown(0.5);
-
-      doc.font("Helvetica").fontSize(9).fillColor(textColor);
-
-      flightTermsLines.forEach((line) => {
-        if (line === "") {
-          doc.moveDown(0.3);
-        } else {
-          doc.text(line, { width: contentWidth, align: "left" });
-          doc.moveDown(0.3);
-        }
-      });
-    }
-  }
-
   doc.addPage();
   addPageBackground();
   addPlaneLogoBottom();
@@ -1832,7 +1689,24 @@ export async function generatePublicQuotePDF(
       doc.y = currentY + imageHeight + 15;
     }
 
-    dest.itinerary.forEach((day) => {
+    const destIdsForInternal = data.destinations.map((d) => d.id);
+    const internalImages = resolveDomesticImagesForDestination(
+      dest.id,
+      destIdsForInternal,
+      data.domesticFlightImagesByDestination,
+      data.domesticFlightImages,
+    );
+    const afterDay = clampInternalFlightAfterDay(
+      (dest.destination as { internalFlightAfterDay?: number | null } | undefined)?.internalFlightAfterDay,
+      dest.itinerary.length,
+    );
+    const itineraryDayNumbers = dest.itinerary.map((d) => d.dayNumber);
+    const internalHeading = internalFlightPdfHeading(
+      itineraryHeading,
+      data.destinations.length >= 2,
+    );
+
+    dest.itinerary.forEach((day, dayIndex) => {
       if (doc.y > 720) {
         doc.addPage();
         addPageBackground();
@@ -2034,9 +1908,43 @@ export async function generatePublicQuotePDF(
       });
       
       doc.moveDown(0.8);
+
+      if (
+        shouldInsertInternalFlightAfterDay({
+          dayNumber: day.dayNumber,
+          dayIndex,
+          itineraryLength: dest.itinerary!.length,
+          afterDay,
+          hasImages: internalImages.length > 0,
+          itineraryDayNumbers,
+        })
+      ) {
+        renderItineraryFlightSection(internalHeading, internalImages, {
+          cabin: data.domesticCabinBaggage,
+          hold: data.domesticHoldBaggage,
+        });
+      }
     });
 
     doc.moveDown(0.5);
+    } else {
+      const destIdsForInternal = data.destinations.map((d) => d.id);
+      const internalImages = resolveDomesticImagesForDestination(
+        dest.id,
+        destIdsForInternal,
+        data.domesticFlightImagesByDestination,
+        data.domesticFlightImages,
+      );
+      if (internalImages.length > 0) {
+        const heading = internalFlightPdfHeading(
+          dest.name || "",
+          data.destinations.length >= 2,
+        );
+        renderItineraryFlightSection(heading, internalImages, {
+          cabin: data.domesticCabinBaggage,
+          hold: data.domesticHoldBaggage,
+        });
+      }
     }
     const segConn = segmentAfterPlan[destIndex];
     if (segConn?.images?.length) {

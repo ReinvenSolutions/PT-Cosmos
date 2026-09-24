@@ -137,7 +137,7 @@ export function extractPlanHeuristic(rawText: string): ExtractedPlan {
   const beforeIncl = text.split(/(?:INCLUYE|incluye|incluido)/i)[0];
   const para = beforeIncl.split(/\n\n+/).find((p) => p.length > 40 && !/^\s*(día|day)\s*\d/i.test(p));
   if (para) {
-    result.description = para.trim().slice(0, 1000);
+    result.description = para.trim();
   }
 
   // Inclusiones
@@ -146,7 +146,7 @@ export function extractPlanHeuristic(rawText: string): ExtractedPlan {
     const items = inclSection[1]
       .split(/[\n•\-\*]/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 2 && s.length < 300);
+      .filter((s) => s.length > 2);
     result.inclusions = items.map((item) => ({ item }));
   }
 
@@ -156,7 +156,7 @@ export function extractPlanHeuristic(rawText: string): ExtractedPlan {
     const items = exclSection[1]
       .split(/[\n•\-\*]/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 2 && s.length < 300);
+      .filter((s) => s.length > 2);
     result.exclusions = items.map((item) => ({ item }));
   }
 
@@ -171,7 +171,7 @@ export function extractPlanHeuristic(rawText: string): ExtractedPlan {
     const locMatch = block.match(/(?:ubicación|ubicacion|location|lugar)[\s:]+([^\n]+)/i);
     const location = locMatch ? locMatch[1].trim() : undefined;
     const descMatch = block.match(/(?:descripción|descripcion|contenido)[\s:]*\n?([\s\S]*?)(?=\n\s*(?:comidas|alojamiento|ubicación)|$)/i);
-    let description = descMatch ? descMatch[1].trim() : block.slice(0, 800).trim();
+    let description = descMatch ? descMatch[1].trim() : block.trim();
     const mealsMatch = block.match(/(?:comidas|almuerzo|desayuno|cena)[\s:]*([^\n]+)/i);
     const meals = mealsMatch
       ? mealsMatch[1].split(/[,;]/).map((m) => m.trim()).filter(Boolean)
@@ -254,27 +254,25 @@ NOMBRE DEL PLAN vs DESTINO/PAÍS (MUY IMPORTANTE):
 - Si el documento tiene un título como "Tour El Cairo Maravilloso" y también dice "Destino: Egipto", entonces name = "Tour El Cairo Maravilloso" y country = "Egipto".
 - NUNCA pongas solo el país en name (ej. "Egipto" como name es INCORRECTO). El name debe ser el título del plan/tour.
 
+FIDELIDAD AL DOCUMENTO (OBLIGATORIO):
+- Transcribe el texto original. No resumas, no parafrasees, no acortes, no omitas ni reescribas.
+- Conserva actividades, horarios, comidas, hoteles, inclusiones, exclusiones, precios y notas tal como aparecen.
+- Si un párrafo es largo, cópialo completo. Nunca lo reduzcas a un eslogan ni a "lo más destacado".
+
 DESCRIPCIÓN DEL PLAN (campo "description"):
-- NO copies la descripción del documento. COSMO la GENERA.
-- Escribe una descripción vendedora de MÁXIMO 3 líneas (~120-180 caracteres).
-- Debe invitar a viajar: destaca lo mejor, sensaciones, experiencias únicas del plan.
-- Objetivo: que quien la lea piense "¡quiero vivir eso!". Ejemplo: "Descubre Capadocia desde el cielo en globo y recorre las ruinas de Éfeso. Noches en hoteles 5* con cenas incluidas. Una aventura que recordarás para siempre."
+- Copia la descripción original del documento, completa.
+- No inventes un texto comercial ni la limites a unas pocas líneas.
 
-ITINERARIO - Resumen vs Detalle (el PDF exporta dos vistas):
-- **title** = RESUMEN: breve, centrado en ubicación. Formato "Ciudad" o "Ciudad A - Ciudad B". Usado en la hoja 2 del PDF (timeline de ciudades). Ej: "Estambul", "Capadocia - Pamukkale", "Llegada a Lima".
-- **description** = DETALLE: contenido completo para la hoja "Itinerario Detallado". Actividades con horarios, una por línea.
-- Si el documento tiene itinerario resumido Y detallado, usa el resumido para title y el detallado para description.
-
-ITINERARIO - Actividades con horarios:
-- Si el documento tiene actividades con horarios (ej: 08:50, 9:30 AM, 14:00 hrs), extrae CADA actividad con su hora en "activities" como: "HH:MM - Descripción" (ej: "08:50 - Recojo en hotel").
-- En description: une las activities con \\n para que cada actividad quede en una línea (description = activities.join("\\n")).
-- Si no hay horarios, description puede ser párrafo normal y activities vacío o con ítems sin hora.
+ITINERARIO:
+- **title** = el encabezado del día tal como está en el documento. Si hay un título breve de ciudades (ej. "Estambul", "Capadocia - Pamukkale"), úsalo solo como title.
+- **description** = el texto detallado de ese día, palabra por palabra. Si el documento trae versión resumida y detallada, la detallada va íntegra en description. Si solo hay un texto, cópialo completo; no lo acortes.
+- Si hay actividades con horarios (08:50, 9:30 AM, 14:00 hrs), lístalas también en "activities" como "HH:MM - Descripción", sin quitar detalle del texto original en description.
 
 HOTELES - Categoría:
 - category debe ser solo el número con asterisco: "3*", "4*", "5*".
 - Si el doc dice "three stars", "3 stars", "tres estrellas", "3 estrellas" → usa "3*".
 - Si dice "four stars", "4 stars", "cuatro estrellas" → "4*". Igual para 5.`;
-    const userPrompt = `Extrae la información del siguiente documento de plan de viaje y devuelve el JSON:\n\n${rawText.slice(0, 28000)}`;
+    const userPrompt = `Extrae la información del siguiente documento de plan de viaje y devuelve el JSON. Copia el texto; no lo resumas:\n\n${rawText.slice(0, 100000)}`;
 
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -283,7 +281,8 @@ HOTELES - Categoría:
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.2,
+      temperature: 0,
+      max_tokens: 16384,
     });
     const content = response.choices[0]?.message?.content;
     if (!content) return null;
@@ -318,13 +317,13 @@ function normalizeHotelCategory(raw: string | undefined): string | undefined {
   return numMatch ? `${numMatch[1]}*` : raw.slice(0, 20);
 }
 
-function normalizeExtractedPlan(p: Partial<ExtractedPlan>): ExtractedPlan {
+export function normalizeExtractedPlan(p: Partial<ExtractedPlan>): ExtractedPlan {
   return {
     name: String(p?.name ?? "").slice(0, 120),
     country: String(p?.country ?? "").slice(0, 80),
     duration: Math.max(1, Math.min(99, Number(p?.duration) || 1)),
     nights: Math.max(0, Math.min(99, Number(p?.nights) ?? 0)),
-    description: String(p?.description ?? "").slice(0, 300).trim(),
+    description: String(p?.description ?? "").trim(),
     basePrice: String(p?.basePrice ?? "").replace(/\D/g, "").slice(0, 10) || "",
     itinerary: Array.isArray(p?.itinerary)
       ? p.itinerary.map((d, i) => {
@@ -332,15 +331,13 @@ function normalizeExtractedPlan(p: Partial<ExtractedPlan>): ExtractedPlan {
             ? d.activities.map((a) => String(a ?? "").trim()).filter(Boolean)
             : undefined;
           const desc = String(d?.description ?? "").trim();
-          const finalDesc =
-            activities?.length && activities.some((a) => /\d{1,2}[:\h]\d{2}/.test(a))
-              ? activities.join("\n")
-              : desc || (activities?.join("\n") ?? "");
+          const fromActivities = activities?.join("\n") ?? "";
+          const finalDesc = desc.length >= fromActivities.length ? desc : fromActivities;
           return {
             dayNumber: d.dayNumber ?? i + 1,
-            title: String(d.title ?? "").slice(0, 200),
-            location: d.location ? String(d.location).slice(0, 100) : undefined,
-            description: finalDesc.slice(0, 3000),
+            title: String(d.title ?? ""),
+            location: d.location ? String(d.location) : undefined,
+            description: finalDesc,
             activities,
             meals: normalizeMealsField(d.meals),
             accommodation: d.accommodation ? String(d.accommodation).slice(0, 200) : undefined,
@@ -356,10 +353,10 @@ function normalizeExtractedPlan(p: Partial<ExtractedPlan>): ExtractedPlan {
         }))
       : [],
     inclusions: Array.isArray(p?.inclusions)
-      ? p.inclusions.map((x) => ({ item: String(x?.item ?? "").slice(0, 300) })).filter((x) => x.item)
+      ? p.inclusions.map((x) => ({ item: String(x?.item ?? "") })).filter((x) => x.item)
       : [],
     exclusions: Array.isArray(p?.exclusions)
-      ? p.exclusions.map((x) => ({ item: String(x?.item ?? "").slice(0, 300) })).filter((x) => x.item)
+      ? p.exclusions.map((x) => ({ item: String(x?.item ?? "") })).filter((x) => x.item)
       : [],
     priceTiers: Array.isArray(p?.priceTiers)
       ? p.priceTiers.map((t) => ({
@@ -374,7 +371,7 @@ function normalizeExtractedPlan(p: Partial<ExtractedPlan>): ExtractedPlan {
       ? p.upgrades.map((u) => ({
           code: String(u.code ?? "").slice(0, 30),
           name: String(u.name ?? "").slice(0, 100),
-          description: u.description ? String(u.description).slice(0, 200) : undefined,
+          description: u.description ? String(u.description) : undefined,
           price: Number(u.price) || 0,
         }))
       : [],

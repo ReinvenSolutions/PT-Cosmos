@@ -1,27 +1,20 @@
 /**
- * OptimizedImage: Carga rápida sin sacrificar calidad
- *
- * - loading="lazy": Carga la imagen completa en alta definición cuando entra al viewport.
- *   NO reduce calidad, solo difiere el momento de carga.
- * - decoding="async": Decodificación no bloqueante para mejor rendimiento.
- * - fetchpriority (HTML): prioridad de red en navegadores compatibles (React 18: minúsculas, no fetchPriority).
- * - Skeleton mientras carga: Feedback visual inmediato.
- *
- * La imagen siempre se carga en resolución completa; no hay compresión ni reducción de calidad.
+ * Imagen con tamaño de visualización (thumb / card / hero) y fallback al original
+ * si Supabase no puede transformar el archivo.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { displayImageUrl, type ImagePreset } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 
 interface OptimizedImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "loading"> {
-  /** URL de la imagen (siempre se carga en alta definición) */
   src: string;
   alt: string;
   /** Si true, el navegador prioriza esta imagen (above-the-fold) */
   priority?: boolean;
-  /** Clase para el contenedor (ej: aspect-video, w-32 h-24) */
+  /** thumb ~160px, card ~800px, hero ~1600px, full = archivo original */
+  preset?: ImagePreset;
   containerClassName?: string;
-  /** Clase para la imagen */
   imageClassName?: string;
 }
 
@@ -29,12 +22,20 @@ export function OptimizedImage({
   src,
   alt,
   priority = false,
+  preset = "card",
   containerClassName,
   imageClassName,
   className,
   ...imgProps
 }: OptimizedImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [useOriginal, setUseOriginal] = useState(false);
+  const displaySrc = useOriginal ? src : displayImageUrl(src, preset);
+
+  useEffect(() => {
+    setIsLoaded(false);
+    setUseOriginal(false);
+  }, [src, preset]);
 
   return (
     <div className={cn("relative overflow-hidden bg-muted", containerClassName)}>
@@ -42,11 +43,15 @@ export function OptimizedImage({
         <Skeleton className="absolute inset-0 rounded-none" />
       )}
       <img
-        src={src}
+        src={displaySrc}
         alt={alt}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         onLoad={() => setIsLoaded(true)}
+        onError={() => {
+          if (!useOriginal && displaySrc !== src) setUseOriginal(true);
+          else setIsLoaded(true);
+        }}
         className={cn(
           "w-full h-full object-cover transition-opacity duration-200",
           !isLoaded && "opacity-0",
@@ -54,7 +59,6 @@ export function OptimizedImage({
           className
         )}
         {...imgProps}
-        // Atributo HTML (minúsculas). `fetchPriority` en camelCase provoca warning en React 18.
         {...({ fetchpriority: priority ? "high" : "auto" } as Record<string, string>)}
       />
     </div>
