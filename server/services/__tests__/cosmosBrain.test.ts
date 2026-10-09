@@ -18,6 +18,8 @@ describe("buildCosmosSystemPrompt idioma", () => {
     expect(prompt).toMatch(/search_activities/);
     expect(prompt).toMatch(/no le pidas que abra el plan/i);
     expect(prompt).toMatch(/resume_quote/);
+    expect(prompt).toMatch(/ficha técnica/);
+    expect(prompt).toMatch(/fichas anteriores/);
     expect(prompt).toMatch(/save_quote/);
     expect(prompt).toMatch(/reset_quote/);
     expect(prompt).toMatch(/cotización NUEVA/);

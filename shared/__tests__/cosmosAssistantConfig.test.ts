@@ -6,6 +6,8 @@ import {
   mergeCosmosAssistantConfig,
   COSMOS_STT_LANGUAGE,
   COSMOS_TTS_MODEL,
+  COSMOS_TTS_SPEED,
+  COSMOS_VOICE_INTERRUPTION_MIN_MS,
 } from "../cosmosAssistantConfig";
 
 describe("mergeCosmosAssistantConfig", () => {
@@ -46,5 +48,9 @@ describe("idioma de Cosmos", () => {
   it("usa transcripción en español y TTS con instrucciones de acento", () => {
     expect(COSMOS_STT_LANGUAGE).toBe("es");
     expect(COSMOS_TTS_MODEL).toBe("gpt-4o-mini-tts");
+    expect(COSMOS_TTS_SPEED).toBeGreaterThan(1);
+    expect(COSMOS_TTS_SPEED).toBeLessThanOrEqual(1.5);
+    expect(COSMOS_VOICE_INTERRUPTION_MIN_MS).toBeGreaterThan(0);
+    expect(COSMOS_VOICE_INTERRUPTION_MIN_MS).toBeLessThan(500);
   });
 });

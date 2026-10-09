@@ -126,7 +126,7 @@ export const OPENAI_COSMOS_TOOLS = [
     function: {
       name: "open_plan",
       description:
-        "Propone o abre la ficha del plan en pantalla. Por defecto propone; immediate=true si el usuario ya lo pidió o confirmó.",
+        "Abre la ficha técnica del programa (/plan/:id). Plan, programa, ficha técnica e itinerario significan esta misma pantalla. immediate=true si ya pidió que lo lleves o que se lo muestres.",
       parameters: {
         type: "object",
         properties: {

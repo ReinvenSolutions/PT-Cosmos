@@ -10,6 +10,7 @@ import { buildCosmosSystemContext, type CosmosChatMessage } from "../services/co
 import { getCosmosAssistantConfig } from "../services/cosmosAssistantConfigService";
 import { buildCosmosSystemPrompt } from "../services/cosmosBrain";
 import { executeCosmosTool, openaiCosmosToolsForRole, type CosmosToolContext } from "../services/cosmosTools";
+import { resolvePlanSheetTurn } from "../services/cosmosPlanSheet";
 import {
   appendCosmosSessionMessage,
   ensureCosmosSession,
@@ -163,6 +164,25 @@ export async function handleCosmosChat(req: Request, res: Response): Promise<voi
     currentPlanId: currentPlanId ?? screen?.planId ?? null,
   });
   const brief = parseCosmosCaseBrief((session.metadata as Record<string, unknown> | null)?.brief);
+  const sheetTurn = await resolvePlanSheetTurn(lastUser.content, screen);
+  if (sheetTurn) {
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+    writeSse(res, { sessionId });
+    if (sheetTurn.action && parseCosmosClientAction(sheetTurn.action)) {
+      writeSse(res, { action: sheetTurn.action });
+    }
+    writeSse(res, { content: sheetTurn.reply });
+    await Promise.all([
+      appendCosmosSessionMessage({ sessionId, role: "user", content: lastUser.content }),
+      appendCosmosSessionMessage({ sessionId, role: "assistant", content: sheetTurn.reply }),
+    ]);
+    writeSse(res, { done: true, sessionId });
+    res.end();
+    return;
+  }
   const toolCtx: CosmosToolContext = {
     userId: user.id,
     userRole: user.role,

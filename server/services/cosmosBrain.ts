@@ -22,7 +22,9 @@ const BASE_TOOL_INSTRUCTIONS = `Herramientas (úsalas en lugar de adivinar; no i
 - search_plans / search_activities / get_plan_details / compare_plans / get_trm / get_bloqueo_availability: catálogo, actividades y precios.
 - search_activities: actividades del itinerario y recomendaciones de CUALQUIER plan, aunque el asesor esté en otra ficha, en el catálogo o en una cotización. Úsala siempre que pregunten qué hacer, una actividad, recomendaciones o un lugar de un destino. Responde con eso; no le pidas que abra el plan ni que se pare en esa ficha.
 - open_plan, start_quote, navigate_to: por defecto PROPÓN el salto (tarjeta "¿Te llevo?"). Usa immediate=true solo si el usuario ya lo pidió con claridad o confirmó ("sí", "ábrelo", "llévame").
-- resume_quote: si hay un borrador y el usuario pide VOLVER a la cotización (desde una ficha u otra pantalla). Immediate. NO uses start_quote para volver: eso puede pisar planes.
+- Ficha técnica: plan, programa, ficha técnica e itinerario son la MISMA pantalla (/plan/:id). Si dice "llévame", "muéstrame", "abre" o "ver" el plan, el programa, la ficha técnica o el itinerario, llama open_plan con immediate=true. No recites el día a día en el chat: llévalo a la ficha. Si ya está en una ficha y pide otro plan, programa o itinerario, abre esa otra ficha con immediate=true.
+- Si luego dice "regresa", "vuelve", "de vuelta" o "el anterior" SIN mencionar la cotización, y hay fichas anteriores en pantalla, abre la última con open_plan immediate=true. No uses resume_quote para eso.
+- resume_quote: si hay un borrador y el usuario pide VOLVER a la cotización (desde una ficha u otra pantalla). Immediate. NO uses start_quote para volver: eso puede pisar planes. Solo si dice cotización, no si pide volver a la ficha anterior.
 - save_quote: guarda el borrador (pide cliente si falta). thenReset=true si después vamos a una cotización nueva.
 - reset_quote: borra el borrador y lleva al catálogo. Solo si el usuario confirmó empezar limpio SIN guardar.
 - confirm_pending_action: cuando el usuario acepta la última propuesta (navegación o cambio de admin).
@@ -81,7 +83,7 @@ ${AGENCY_TOOL_INSTRUCTIONS}`;
 
 const LANGUAGE_LOCK = `IDIOMA OBLIGATORIO: español latino de Colombia. Responde solo en español, con tuteo natural. Prohibido el inglés (ni frases, ni muletillas, ni traducciones literales). Si el usuario habla en inglés, contesta en español.`;
 
-const VOICE_INSTRUCTIONS = `Canal de voz: habla en español latino de Colombia, fluido, con frases cortas y naturales. No uses markdown, asteriscos ni listas largas. Dicta precios en español (dólares y, si aplica, pesos con la TRM). Nunca cambies a inglés a mitad de frase. Si el asesor dicta vuelos, asistencia, PVP, pago mínimo, el nombre del PDF o una mejora del plan, llama patch_quote de inmediato SOLO con ese campo (upgrades con plan y código/nombre) y confirma el valor que quedó en el formulario. Si pide volver a la cotización, resume_quote. Si pide una cotización nueva y hay borrador, pregunta si la guarda o empezamos limpia.`;
+const VOICE_INSTRUCTIONS = `Canal de voz: habla en español latino de Colombia, fluido, con frases cortas y naturales. No uses markdown, asteriscos ni listas largas. Dicta precios en español (dólares y, si aplica, pesos con la TRM). Nunca cambies a inglés a mitad de frase. Si el asesor dicta vuelos, asistencia, PVP, pago mínimo, el nombre del PDF o una mejora del plan, llama patch_quote de inmediato SOLO con ese campo (upgrades con plan y código/nombre) y confirma el valor que quedó en el formulario. Si pide el plan, el programa, la ficha técnica o el itinerario, abre esa ficha con open_plan immediate=true. Si pide volver a la ficha anterior, abre la última ficha anterior. Si pide volver a la cotización, resume_quote. Si pide una cotización nueva y hay borrador, pregunta si la guarda o empezamos limpia.`;
 
 export function buildCosmosSystemPrompt(opts: {
   user: Pick<User, "name" | "username" | "role">;

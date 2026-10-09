@@ -44,6 +44,15 @@ export const COSMOS_STT_LANGUAGE = "es";
 /** Modelo TTS con instrucciones de acento (tts-1 no las respeta). */
 export const COSMOS_TTS_MODEL = "gpt-4o-mini-tts";
 
+/**
+ * Ritmo de la voz. 1 es el de OpenAI; 1.2 suena un poco más ágil sin perder naturalidad.
+ * Rango admitido por la API: 0.25–4.
+ */
+export const COSMOS_TTS_SPEED = 1.2;
+
+/** Milisegundos de voz del usuario para cortar a Cosmos mientras habla. */
+export const COSMOS_VOICE_INTERRUPTION_MIN_MS = 300;
+
 /** Instrucciones de síntesis: el modelo TTS las sigue mejor en inglés. */
 export const COSMOS_TTS_INSTRUCTIONS =
   "Speak exclusively in fluent Latin American Spanish, Colombian accent, using natural conversational tú. Warm, clear, professional. Never switch to English, even for a single phrase. Pronounce Spanish with Spanish phonetics (not English). Read numbers, prices, dates and currencies in Spanish (dólares, pesos). Keep destination names in their Spanish form when that is how Colombians say them (Turquía, Dubái, Egipto).";
