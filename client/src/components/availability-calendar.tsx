@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { dateToYmd, eachDateYmd, type AvailabilityDay } from "@shared/availability";
+import {
+  dateToYmd,
+  eachDateYmd,
+  eachWeekdayYmd,
+  WEEKDAY_OPTIONS,
+  type AvailabilityDay,
+  type Weekday,
+} from "@shared/availability";
 
 function slotSwatchClass(slots: number): string {
   if (slots <= 0) return "bg-gray-400";
@@ -56,6 +63,16 @@ function parsePrice(raw: string): string | null | undefined {
   return amount.toFixed(2);
 }
 
+type PickMode = "single" | "range" | "weekdays";
+
+function formatWeekdayList(selected: readonly Weekday[]): string {
+  const labels = WEEKDAY_OPTIONS
+    .filter((option) => selected.includes(option.value))
+    .map((option) => option.label.toLowerCase());
+  if (labels.length <= 1) return labels[0] ?? "";
+  return `${labels.slice(0, -1).join(", ")} y ${labels[labels.length - 1]}`;
+}
+
 export function AvailabilityEditor({
   days,
   onChange,
@@ -63,19 +80,27 @@ export function AvailabilityEditor({
   days: AvailabilityDay[];
   onChange: (days: AvailabilityDay[]) => void;
 }) {
-  const [pickMode, setPickMode] = useState<"single" | "range">("single");
+  const [pickMode, setPickMode] = useState<PickMode>("single");
   const [singleDate, setSingleDate] = useState<Date | undefined>();
   const [range, setRange] = useState<DateRange | undefined>();
+  const [weekdays, setWeekdays] = useState<Weekday[]>([]);
   const [slots, setSlots] = useState("16");
   const [price, setPrice] = useState("");
   const [error, setError] = useState("");
+
+  const rangeBounds = (value: DateRange | undefined): { from: string; to: string } | null => {
+    if (!value?.from) return null;
+    return { from: dateToYmd(value.from), to: dateToYmd(value.to ?? value.from) };
+  };
 
   const selectedDates = (): string[] => {
     if (pickMode === "single") {
       return singleDate ? [dateToYmd(singleDate)] : [];
     }
-    if (!range?.from) return [];
-    return eachDateYmd(dateToYmd(range.from), dateToYmd(range.to ?? range.from));
+    const bounds = rangeBounds(range);
+    if (!bounds) return [];
+    if (pickMode === "range") return eachDateYmd(bounds.from, bounds.to);
+    return eachWeekdayYmd(bounds.from, bounds.to, weekdays);
   };
 
   const fillFromDates = (dates: string[]) => {
@@ -91,14 +116,40 @@ export function AvailabilityEditor({
     setPrice(first.price ?? "");
   };
 
+  const toggleWeekday = (day: Weekday) => {
+    const next = weekdays.includes(day)
+      ? weekdays.filter((item) => item !== day)
+      : [...weekdays, day];
+    setWeekdays(next);
+    setError("");
+    const bounds = rangeBounds(range);
+    if (!bounds) return;
+    fillFromDates(eachWeekdayYmd(bounds.from, bounds.to, next));
+  };
+
+  const weekdayPreview = (): string => {
+    if (!range?.from) return "";
+    if (weekdays.length === 0) return "Marca al menos un día.";
+    const names = formatWeekdayList(weekdays);
+    const count = selectedDates().length;
+    if (count === 0) return `En ese rango no hay ${names}.`;
+    return `${count} fecha${count === 1 ? "" : "s"}: ${names}.`;
+  };
+
   const apply = () => {
     const dates = selectedDates();
     if (dates.length === 0) {
-      setError(
-        pickMode === "single"
-          ? "Selecciona una fecha en el calendario."
-          : "Selecciona un día o un rango en el calendario.",
-      );
+      if (pickMode === "single") {
+        setError("Selecciona una fecha en el calendario.");
+      } else if (pickMode === "range") {
+        setError("Selecciona un día o un rango en el calendario.");
+      } else if (!range?.from) {
+        setError("Selecciona el primer y el último día del rango.");
+      } else if (weekdays.length === 0) {
+        setError("Elige al menos un día de la semana.");
+      } else {
+        setError("En ese rango no hay fechas de los días elegidos.");
+      }
       return;
     }
     const slotNum = parseSlots(slots);
@@ -159,12 +210,48 @@ export function AvailabilityEditor({
         >
           Rango de fechas
         </Button>
+        <Button
+          type="button"
+          variant={pickMode === "weekdays" ? "default" : "outline"}
+          onClick={() => {
+            setPickMode("weekdays");
+            setSingleDate(undefined);
+            setError("");
+          }}
+        >
+          Días de la semana
+        </Button>
       </div>
       <p className="text-sm text-muted-foreground">
         {pickMode === "single"
           ? "Elige un día. Si ya tiene cupos, puedes cambiar la cantidad y actualizar."
-          : "Elige el primer y el último día. Actualizar aplica los mismos cupos a todo el rango, incluso si esas fechas ya existían."}
+          : pickMode === "range"
+            ? "Elige el primer y el último día. Actualizar aplica los mismos cupos a todo el rango, incluso si esas fechas ya existían."
+            : "Elige el primer y el último día, y marca los días que quieras. Actualizar aplica los mismos cupos solo a esos días dentro del rango, incluso si esas fechas ya existían."}
       </p>
+      {pickMode === "weekdays" ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Días</p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Días de la semana">
+            {WEEKDAY_OPTIONS.map((option) => {
+              const active = weekdays.includes(option.value);
+              return (
+                <Button
+                  key={option.value}
+                  type="button"
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  aria-pressed={active}
+                  onClick={() => toggleWeekday(option.value)}
+                >
+                  {option.label}
+                </Button>
+              );
+            })}
+          </div>
+          {range?.from ? <p className="text-sm text-muted-foreground">{weekdayPreview()}</p> : null}
+        </div>
+      ) : null}
       {pickMode === "single" ? (
         <Calendar
           mode="single"
@@ -185,9 +272,34 @@ export function AvailabilityEditor({
           selected={range}
           onSelect={(next) => {
             setRange(next);
-            if (!next?.from) return;
-            fillFromDates(eachDateYmd(dateToYmd(next.from), dateToYmd(next.to ?? next.from)));
+            const bounds = rangeBounds(next);
+            if (!bounds) return;
+            fillFromDates(
+              pickMode === "weekdays"
+                ? eachWeekdayYmd(bounds.from, bounds.to, weekdays)
+                : eachDateYmd(bounds.from, bounds.to),
+            );
           }}
+          modifiers={
+            pickMode === "weekdays"
+              ? {
+                  weekdayHit: (date: Date) => {
+                    const bounds = rangeBounds(range);
+                    if (!bounds || weekdays.length === 0) return false;
+                    const ymd = dateToYmd(date);
+                    const start = bounds.from <= bounds.to ? bounds.from : bounds.to;
+                    const end = bounds.from <= bounds.to ? bounds.to : bounds.from;
+                    if (ymd < start || ymd > end) return false;
+                    return weekdays.includes(date.getDay() as Weekday);
+                  },
+                }
+              : undefined
+          }
+          modifiersClassNames={
+            pickMode === "weekdays"
+              ? { weekdayHit: "ring-2 ring-inset ring-primary" }
+              : undefined
+          }
           availability={days}
         />
       )}

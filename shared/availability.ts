@@ -61,3 +61,28 @@ export function eachDateYmd(from: string, to: string): string[] {
   }
   return dates;
 }
+
+/** 0 = domingo … 6 = sábado, igual que Date.getDay(). */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export const WEEKDAY_OPTIONS: { value: Weekday; label: string }[] = [
+  { value: 1, label: "Lunes" },
+  { value: 2, label: "Martes" },
+  { value: 3, label: "Miércoles" },
+  { value: 4, label: "Jueves" },
+  { value: 5, label: "Viernes" },
+  { value: 6, label: "Sábado" },
+  { value: 0, label: "Domingo" },
+];
+
+export function ymdWeekday(ymd: string): Weekday {
+  const [year, month, day] = ymd.split("-").map(Number);
+  return new Date(year, month - 1, day).getDay() as Weekday;
+}
+
+/** Fechas del rango que caen en los días de la semana indicados. */
+export function eachWeekdayYmd(from: string, to: string, weekdays: readonly Weekday[]): string[] {
+  if (weekdays.length === 0) return [];
+  const allowed = new Set(weekdays);
+  return eachDateYmd(from, to).filter((date) => allowed.has(ymdWeekday(date)));
+}
