@@ -532,12 +532,18 @@ function formatScreenContext(screen?: CosmosScreenContext): string {
   const resumeHint = hasDraft
     ? screen.path.startsWith("/cotizacion")
       ? "Hay una cotización en curso en pantalla. Si pide una NUEVA, pregunta si guardar o empezar limpia."
-      : "Hay una cotización en curso (los datos están en el borrador). Si pide volver a ella, usa resume_quote. Si pide una NUEVA, pregunta si guardar o empezar limpia."
+      : "Hay una cotización en curso (los datos están en el borrador). Si pide volver a la cotización, usa resume_quote. Si pide una NUEVA, pregunta si guardar o empezar limpia."
     : "No hay borrador de cotización.";
+  const sheetHistory = screen.planSheetHistory ?? [];
+  const sheetHint = sheetHistory.length
+    ? `Fichas anteriores (la última es la ficha técnica a la que hay que volver con open_plan immediate=true si dice regresa, vuelve, de vuelta o el anterior, y NO menciona la cotización): ${sheetHistory.join(" → ")}`
+    : "No hay una ficha técnica anterior en esta visita.";
   return `## Pantalla actual
 Ruta: ${screen.path}${screen.planId ? ` · planId=${screen.planId}` : ""}${screen.quoteId ? ` · quoteId=${screen.quoteId}` : ""}${screen.courseId ? ` · courseId=${screen.courseId}` : ""}
 ${draftLine}
-${resumeHint}`;
+${resumeHint}
+${sheetHint}
+Plan, programa, ficha técnica e itinerario significan abrir /plan/:id, no recitar el día a día.`;
 }
 
 function formatBriefContext(brief?: Record<string, unknown> | null): string {

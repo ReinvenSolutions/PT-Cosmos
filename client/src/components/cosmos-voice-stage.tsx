@@ -38,8 +38,11 @@ function headerStatus(state: CosmosVoiceState): string {
 }
 
 function statusCopy(state: CosmosVoiceState, micEnabled: boolean): { title: string; hint: string } {
-  if (!micEnabled && (state === "listening" || state === "thinking")) {
-    return { title: "Micrófono silenciado", hint: "Actívalo para seguir hablando" };
+  if (!micEnabled && (state === "listening" || state === "thinking" || state === "speaking")) {
+    return {
+      title: "Micrófono silenciado",
+      hint: state === "speaking" ? "Actívalo para interrumpir" : "Actívalo para seguir hablando",
+    };
   }
   switch (state) {
     case "connecting":

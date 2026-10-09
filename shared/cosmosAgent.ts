@@ -125,6 +125,8 @@ export const cosmosScreenContextSchema = z.object({
   quoteId: z.string().uuid().optional(),
   courseId: z.string().uuid().optional(),
   lessonId: z.string().uuid().optional(),
+  /** Fichas visitadas antes de la actual. La última es a la que hay que volver. */
+  planSheetHistory: z.array(z.string().uuid()).max(8).optional(),
   quoteDraft: z
     .object({
       planIds: z.array(z.string().uuid()).max(6).optional(),

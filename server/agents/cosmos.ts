@@ -19,11 +19,14 @@ import {
   parseCosmosVoiceJobMetadata,
   type CosmosClientAction,
 } from "@shared/cosmosAgent";
+import { rememberOpenedPlan } from "@shared/cosmosPlanSheet";
 import { ChatMessage } from "@livekit/agents";
 import {
   COSMOS_STT_LANGUAGE,
   COSMOS_TTS_INSTRUCTIONS,
   COSMOS_TTS_MODEL,
+  COSMOS_TTS_SPEED,
+  COSMOS_VOICE_INTERRUPTION_MIN_MS,
 } from "@shared/cosmosAssistantConfig";
 import { getCosmosAssistantConfig } from "../services/cosmosAssistantConfigService";
 import { buildCosmosSystemPrompt } from "../services/cosmosBrain";
@@ -35,6 +38,7 @@ import {
   updateCosmosSessionMetadata,
 } from "../services/cosmosSessionService";
 import { executeCosmosTool, type CosmosToolContext } from "../services/cosmosTools";
+import { resolvePlanSheetTurn } from "../services/cosmosPlanSheet";
 import { storage } from "../storage";
 import { logger } from "../logger";
 
@@ -61,12 +65,77 @@ async function performClientAction(
   });
 }
 
+function rememberOpenedPlanOnScreen(ctx: CosmosToolContext, planId: string) {
+  if (!ctx.screen) ctx.screen = { path: `/plan/${planId}` };
+  const history = rememberOpenedPlan(ctx.screen.planSheetHistory ?? [], ctx.screen.planId, planId);
+  ctx.screen.planId = planId;
+  ctx.screen.path = `/plan/${planId}`;
+  ctx.screen.planSheetHistory = history.length ? history : undefined;
+}
+
+function rememberPlanFromAction(ctx: CosmosToolContext, action: CosmosClientAction) {
+  if (action.type === "propose_action") return;
+  const planId =
+    action.type === "open_plan"
+      ? action.planId
+      : action.type === "navigate"
+        ? action.path.match(/^\/plan\/([0-9a-f-]{36})/i)?.[1]
+        : undefined;
+  if (planId) rememberOpenedPlanOnScreen(ctx, planId);
+}
+
+function applyPlanSheetPatch(
+  ctx: CosmosToolContext,
+  patch: { planId: string; path: string; planSheetHistory: string[] }
+) {
+  if (!ctx.screen) ctx.screen = { path: patch.path };
+  ctx.screen.path = patch.path;
+  ctx.screen.planId = patch.planId;
+  ctx.screen.planSheetHistory = patch.planSheetHistory.length ? patch.planSheetHistory : undefined;
+}
+
+class CosmosVoiceAgent extends voice.Agent {
+  private readonly job: JobContext;
+  private readonly cosmosCtx: CosmosToolContext;
+  private readonly userIdentity: string;
+
+  constructor(
+    instructions: string,
+    tools: ReturnType<typeof createTools>,
+    job: JobContext,
+    cosmosCtx: CosmosToolContext,
+    userIdentity: string
+  ) {
+    super({ instructions, tools });
+    this.job = job;
+    this.cosmosCtx = cosmosCtx;
+    this.userIdentity = userIdentity;
+  }
+
+  override async onUserTurnCompleted(_chatCtx: llm.ChatContext, newMessage: ChatMessage): Promise<void> {
+    const text = newMessage.textContent?.trim() ?? "";
+    if (!text) return;
+    try {
+      const turn = await resolvePlanSheetTurn(text, this.cosmosCtx.screen);
+      if (!turn) return;
+      if (turn.action) await performClientAction(this.job, this.userIdentity, turn.action);
+      if (turn.screenPatch) applyPlanSheetPatch(this.cosmosCtx, turn.screenPatch);
+      this.session.say(turn.reply);
+      throw new voice.StopResponse();
+    } catch (err) {
+      if (err instanceof voice.StopResponse) throw err;
+      logger.warn("No pude abrir la ficha técnica por voz", { err });
+    }
+  }
+}
+
 function createTools(job: JobContext, toolCtx: CosmosToolContext, userIdentity: string) {
   const run = async (name: string, args: Record<string, unknown> = {}) => {
     const { result, action } = await executeCosmosTool(name, args, toolCtx);
     if (action) {
       try {
         await performClientAction(job, userIdentity, action);
+        rememberPlanFromAction(toolCtx, action);
       } catch (err) {
         logger.warn("RPC cosmos_action falló", { err, name });
         return `${result} (no pude aplicar el cambio en pantalla)`;
@@ -110,7 +179,8 @@ function createTools(job: JobContext, toolCtx: CosmosToolContext, userIdentity: 
     }),
     llm.tool({
       name: "open_plan",
-      description: "Propone o abre la ficha del plan.",
+      description:
+        "Abre la ficha técnica. Plan, programa, ficha técnica e itinerario son esa pantalla. immediate=true si pidió que lo lleves o se lo muestres.",
       parameters: z.object({ plan: z.string(), immediate: z.boolean().optional() }),
       execute: async (args) => run("open_plan", args),
     }),
@@ -454,8 +524,23 @@ export default defineAgent({
           model: COSMOS_TTS_MODEL,
           voice: cosmosConfig.voice,
           instructions: COSMOS_TTS_INSTRUCTIONS,
+          speed: COSMOS_TTS_SPEED,
         }),
         vad: ctx.proc.userData.vad as InstanceType<typeof silero.VAD>,
+        // El valor por defecto (3 s) tapa el saludo entero. 1 s basta para que el
+        // cancelador de eco arranque y después ya se puede interrumpir.
+        aecWarmupDuration: 1000,
+        // En producción la detección adaptativa está apagada y, con el valor por
+        // defecto, Cosmos solo pausa y retoma la frase. Con VAD corta de verdad.
+        turnHandling: {
+          interruption: {
+            enabled: true,
+            mode: "vad",
+            minDuration: COSMOS_VOICE_INTERRUPTION_MIN_MS,
+            minWords: 0,
+            resumeFalseInterruption: false,
+          },
+        },
       });
 
       session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (event) => {
@@ -481,10 +566,13 @@ export default defineAgent({
       });
 
       const voiceHistory: { role: "user" | "assistant"; content: string }[] = [];
-      const agent = voice.Agent.create({
+      const agent = new CosmosVoiceAgent(
         instructions,
-        tools: createTools(ctx, toolCtx, metadata.userIdentity),
-      });
+        createTools(ctx, toolCtx, metadata.userIdentity),
+        ctx,
+        toolCtx,
+        metadata.userIdentity
+      );
 
       session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (event) => {
         if (!event.isFinal) return;
@@ -494,9 +582,9 @@ export default defineAgent({
           const knowledge = await buildCosmosSystemContext({
             userMessage: text,
             history: voiceHistory,
-            currentPlanId: metadata.currentPlanId ?? metadata.screen?.planId,
+            currentPlanId: toolCtx.screen?.planId ?? metadata.currentPlanId,
             userRole: metadata.userRole,
-            screen: metadata.screen,
+            screen: toolCtx.screen ?? metadata.screen,
             brief: sessionBrief,
           });
           voiceHistory.push({ role: "user", content: text });
