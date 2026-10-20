@@ -781,23 +781,6 @@ export default function PlanDetail() {
               </CardContent>
             </Card>
 
-            {((plan.availability?.length ?? 0) > 0 || (plan.priceTiers?.length ?? 0) > 0) && (
-              <Card variant="glass">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    Salidas y disponibilidad
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AvailabilityMonthView
-                    days={(plan.availability ?? []).map((day) => ({ ...day, destinationName: plan.name }))}
-                    priceTiers={(plan.priceTiers ?? []).map((tier) => ({ ...tier, destinationName: plan.name }))}
-                  />
-                </CardContent>
-              </Card>
-            )}
-
             {tierRows.length > 0 && (
               <Card variant="glass">
                 <CardHeader>
